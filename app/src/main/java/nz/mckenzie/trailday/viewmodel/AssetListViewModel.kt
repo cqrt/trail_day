@@ -11,11 +11,13 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.data.AssetRepository
+import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.asset.AssetKind
@@ -26,7 +28,12 @@ import nz.mckenzie.trailday.domain.asset.AssetKindFilter
  */
 class AssetListViewModel(
     private val assetRepository: AssetRepository,
-    private val context: Context
+    private val context: Context,
+    /**
+     * Where the one-time tidy is remembered. Built from the context by default so a test that has no
+     * opinion about it - or no need of one - does not have to hand one over.
+     */
+    private val settings: SettingsRepository = SettingsRepository(context)
 ) : ViewModel() {
 
     val assets: StateFlow<List<AssetEntity>> = assetRepository.observeActiveAssets()
@@ -67,6 +74,26 @@ class AssetListViewModel(
 
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy
+
+    /**
+     * The one-time tidy: the places an earlier build copied out of DOC leave the walker's list.
+     *
+     * **Here, on the list they are leaving**, rather than at startup somewhere out of sight: the number
+     * gone is said on the very screen the walker would have looked for them on. It runs once and then
+     * writes that down, whether or not there was anything to drop, so an install does not count DOC's
+     * rows on every visit.
+     *
+     * Below the message it writes to, deliberately: a coroutine launched before that property is built
+     * would be writing to a null.
+     */
+    init {
+        viewModelScope.launch {
+            if (settings.docPlacesDropped.first()) return@launch
+            val dropped = runCatching { assetRepository.dropPlacesFromDoc() }.getOrDefault(0)
+            settings.setDocPlacesDropped(true)
+            if (dropped > 0) _message.value = docPlacesMovedMessage(dropped)
+        }
+    }
 
     fun clearMessage() {
         _message.value = null
@@ -150,4 +177,18 @@ class AssetListViewModel(
             }
         }
     }
+}
+/**
+ * What the walker is told when places that came from DOC leave their list.
+ *
+ * The number is the point of the sentence: a list that quietly gets shorter is a list somebody stops
+ * trusting. What follows says where they went and why they can be had again - DOC's material is the
+ * map's own layer now, drawn under the walker's work, and it is a download away rather than lost.
+ */
+internal fun docPlacesMovedMessage(count: Int): String {
+    val what = if (count == 1) "1 place" else "$count places"
+    val verb = if (count == 1) "is" else "are"
+    return "$what that came from DOC $verb no longer in your list. DOC's own tracks, huts, campsites " +
+        "and bike locations are drawn on the map as its own layer, and can be fetched again whenever " +
+        "you like."
 }

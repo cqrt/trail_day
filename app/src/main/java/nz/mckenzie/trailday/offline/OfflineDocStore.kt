@@ -45,8 +45,8 @@ class OfflineDocStore(
         dao.deleteAll()
     }
 
-    /** A live count, for the offline screen to say what is stored. */
-    fun observeCount(): Flow<Int> = dao.observeCount()
+    /** A live count, for the offline screen to say what is stored, and for the map to redraw on. */
+    override fun observeCount(): Flow<Int> = dao.observeCount()
 
     /**
      * The ground the held material covers, for the offline screen's map, or null when there is nothing

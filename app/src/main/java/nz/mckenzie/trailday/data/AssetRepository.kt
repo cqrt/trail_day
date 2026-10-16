@@ -151,6 +151,26 @@ class AssetRepository(
     suspend fun existingSourceRefs(): Set<String> = assetDao.sourceRefs().toSet()
 
     /**
+     * How many places the walker keeps came from DOC rather than from them.
+     *
+     * DOC's material is the map's own reference layer now - drawn under the work, browsed in its own
+     * screen - rather than something kept as a place of the walker's. An earlier build did keep copies,
+     * and these are those copies: counted, said out loud, and dropped, because a place that cannot be
+     * changed or deleted by the walker has no business being in the walker's list. See
+     * [dropPlacesFromDoc].
+     */
+    suspend fun placesFromDoc(): Int = assetDao.countFromDoc()
+
+    /**
+     * Drops every place that came from DOC, returning how many went.
+     *
+     * Safe to lose: the reference layer fetches DOC's material again for the cost of a download, and it
+     * is DOC's own line rather than a copy of it. What is *not* dropped is anything the walker made -
+     * a place they drew or brought in from a file has no reference and is not this method's business.
+     */
+    suspend fun dropPlacesFromDoc(): Int = assetDao.deleteFromDoc()
+
+    /**
      * Inserts an asset that has already been built, with its geometry, in one transaction.
      *
      * Here for the desk's new track, which arrives as a row [nz.mckenzie.trailday.ui.AssetEdits] has

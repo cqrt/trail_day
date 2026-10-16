@@ -43,6 +43,21 @@ abstract class AssetDao {
     @Query("SELECT sourceRef FROM assets WHERE sourceRef IS NOT NULL")
     abstract suspend fun sourceRefs(): List<String>
 
+    /**
+     * How many places in the walker's own list came from one of DOC's services.
+     *
+     * **Matched on the shape of the reference rather than on one form of it**: an install that imported
+     * a DOC track before the sources were namespaced wrote `doc:35239046`, and one that imported it
+     * since wrote `doc-tracks:35239046`. Both are DOC's, and both are what the one-time tidy takes out.
+     * Nothing else ever writes a reference, so nothing else is caught by this.
+     */
+    @Query("SELECT COUNT(*) FROM assets WHERE sourceRef LIKE 'doc-%' OR sourceRef LIKE 'doc:%'")
+    abstract suspend fun countFromDoc(): Int
+
+    /** Takes them out, returning how many went. Their points go with them, by the foreign key. */
+    @Query("DELETE FROM assets WHERE sourceRef LIKE 'doc-%' OR sourceRef LIKE 'doc:%'")
+    abstract suspend fun deleteFromDoc(): Int
+
     @Insert
     abstract suspend fun insert(asset: AssetEntity): Long
 

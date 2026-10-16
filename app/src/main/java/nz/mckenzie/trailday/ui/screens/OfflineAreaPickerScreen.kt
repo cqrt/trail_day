@@ -198,9 +198,9 @@ fun OfflineAreaPickerScreen(
                         }
                     } else {
                         Text(
-                            text = "Every DOC track inside the box is downloaded, so the DOC tracks " +
-                                "browser can import them with no reception. Nothing else is fetched, " +
-                                "and no LINZ key is needed.",
+                            text = "Every DOC track inside the box is downloaded and drawn on the map " +
+                                "as DOC's own layer. Nothing else is fetched, and no LINZ key is " +
+                                "needed.",
                             style = MaterialTheme.typography.bodySmall
                         )
                         docMessage?.let {

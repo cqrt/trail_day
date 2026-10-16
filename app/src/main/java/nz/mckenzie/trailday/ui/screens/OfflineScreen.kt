@@ -257,7 +257,7 @@ private fun ImageryTab(
     }
 }
 
-/** DOC's tracks, for the DOC tracks browser to import with no reception. */
+/** DOC's tracks: drawn on the map as its own layer, and kept here for the hills. */
 @Composable
 private fun DocTracksTab(
     apiKey: String,
@@ -267,9 +267,10 @@ private fun DocTracksTab(
     onClear: () -> Unit
 ) {
     Text(
-        text = "The Department of Conservation's tracks, for the DOC tracks browser to import " +
-            "with no reception. It is separate from the imagery: no LINZ key is needed, and " +
-            "nothing here appears on the map by itself.",
+        text = "The Department of Conservation's tracks, drawn on the map as DOC's own layer. " +
+            "Downloading an area keeps every track inside it on the phone, so the layer draws and the " +
+            "DOC tracks browser works with no reception; none of it is yours to change, and none of it " +
+            "needs a LINZ key.",
         style = MaterialTheme.typography.bodySmall
     )
 
@@ -281,8 +282,8 @@ private fun DocTracksTab(
         EmptyState(
             glyph = IconGlyph.MAP,
             title = "No DOC tracks downloaded",
-            body = "Choose an area and every DOC track inside it is downloaded, so the DOC tracks " +
-                "browser can import them with no reception.",
+            body = "Choose an area and every DOC track inside it is downloaded, drawn on the map, and " +
+                "available to the DOC tracks browser with no reception.",
             actionLabel = "Choose an area",
             onAction = onChooseArea
         )

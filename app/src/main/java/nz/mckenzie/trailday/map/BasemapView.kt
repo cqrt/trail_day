@@ -53,6 +53,12 @@ const val DEFAULT_CAMERA_ZOOM = 6.0
 
 internal const val ASSETS_SOURCE = "trailday-assets"
 
+/**
+ * Where DOC's material is drawn from: its own source, so it can be styled, ordered and tapped
+ * separately from the walker's own work - which is the whole difference between the two.
+ */
+internal const val DOC_SOURCE = "trailday-doc"
+
 // The layers of the work are named in [AssetLayerIds], which is also where the map's own switches
 // find them: the layer that is created and the layer a switch hides are the same name by
 // construction, rather than two strings that have to be kept in step.
@@ -111,6 +117,14 @@ fun BasemapView(
      */
     apiKey: String,
     assetGeoJson: String,
+    /**
+     * DOC's material, drawn **under** the work.
+     *
+     * Empty by default, and that is what every map shows until something of DOC's has been kept for
+     * offline use: the reference layer is what is on the phone, not what could be fetched, so it works
+     * exactly where reception does not. See [DocGeoJson].
+     */
+    docGeoJson: String = AssetGeoJson.build(emptyList()),
     modifier: Modifier = Modifier,
     /**
      * Whether the camera should keep the phone in the middle of the screen.
@@ -296,6 +310,7 @@ fun BasemapView(
                         apiKey = apiKey,
                         tileUrlTemplate = tileUrlTemplate,
                         assetGeoJson = assetGeoJson,
+                        docGeoJson = docGeoJson,
                         positionGeoJson = positionGeoJson,
                         density = density,
                         hiddenLayers = hiddenLayers,
@@ -326,6 +341,7 @@ fun BasemapView(
                 apiKey = apiKey,
                 tileUrlTemplate = tileUrlTemplate,
                 assetGeoJson = assetGeoJson,
+                docGeoJson = docGeoJson,
                 positionGeoJson = positionGeoJson,
                 density = density,
                 hiddenLayers = hiddenLayers,
@@ -338,6 +354,10 @@ fun BasemapView(
 
     LaunchedEffect(assetGeoJson, styleState.value) {
         styleState.value?.getSourceAs<GeoJsonSource>(ASSETS_SOURCE)?.setGeoJson(assetGeoJson)
+    }
+
+    LaunchedEffect(docGeoJson, styleState.value) {
+        styleState.value?.getSourceAs<GeoJsonSource>(DOC_SOURCE)?.setGeoJson(docGeoJson)
     }
 
     // A layer the walker has switched off, applied to the style that is already loaded. This is a
@@ -428,6 +448,14 @@ internal fun MapLibreMap.loadTrailDayStyle(
     apiKey: String,
     tileUrlTemplate: String?,
     assetGeoJson: String,
+    /**
+     * DOC's material, drawn **under** the work.
+     *
+     * Empty by default, and that is what every map shows until something of DOC's has been kept for
+     * offline use: the reference layer is what is on the phone, not what could be fetched, so it works
+     * exactly where reception does not. See [DocGeoJson].
+     */
+    docGeoJson: String = AssetGeoJson.build(emptyList()),
     positionGeoJson: String,
     density: Float,
     hiddenLayers: Set<AssetLayer>,
@@ -459,6 +487,16 @@ internal fun MapLibreMap.loadTrailDayStyle(
     }
 
     setStyle(Style.Builder().fromJson(json)) { style ->
+        // DOC's material first, so it lies **under** the walker's own work: what you made is what you
+        // are reading, and the reference is the ground it sits on.
+        if (style.getSource(DOC_SOURCE) == null) {
+            style.addSource(GeoJsonSource(DOC_SOURCE, docGeoJson))
+        }
+        // The pictures both sets of marker layers draw, handed over once for both: DOC's places wear the
+        // same glyphs the walker's do, because a hut is a hut wherever it was published.
+        addPlaceMarkerImages(style, density)
+        addDocLayers(style)
+
         if (style.getSource(ASSETS_SOURCE) == null) {
             style.addSource(GeoJsonSource(ASSETS_SOURCE, assetGeoJson))
         }
@@ -472,8 +510,8 @@ internal fun MapLibreMap.loadTrailDayStyle(
         addTrackNameLayer(style)
         // A place is a marker, not a short line: drawing a waypoint as a line would claim a shape the
         // record does not have, and a marker says what the thing is rather than only where it is - the
-        // same glyph the place's own row carries.
-        addPlaceMarkerImages(style, density)
+        // same glyph the place's own row carries. The pictures themselves were handed over with DOC's
+        // material, before either set of marker layers: both draw the same glyphs.
         PlaceIcons.KINDS.forEach { kind -> addPlaceLayer(style, kind) }
 
         // Where the phone is. Added after the assets so it draws over them: the work is what
@@ -551,7 +589,6 @@ private fun applyLayerVisibility(style: Style, hidden: Set<AssetLayer>) {
 private fun addPlaceMarkerImages(style: Style, density: Float) {
     val sizePx = (PlaceIcons.MARKER_DP * density).roundToInt()
     if (sizePx <= 0) return
-
     val outlinePx = PlaceIcons.MARKER_OUTLINE_DP * density
     val missing = HashMap<String, Bitmap>(PlaceIcons.IMAGE_NAMES.size)
     PlaceIcons.KINDS.forEach { kind ->
@@ -579,12 +616,16 @@ private fun addPlaceMarkerImages(style: Style, density: Float) {
  * the feature's own business - see [AssetGeoJson.ICON_PROPERTY] - and that picture is the kind's own
  * glyph in the kind's own colour.
  */
-private fun addPlaceLayer(style: Style, kind: AssetKind) {
-    val id = AssetLayerIds.pointOf(kind)
+private fun addPlaceLayer(
+    style: Style,
+    kind: AssetKind,
+    id: String = AssetLayerIds.pointOf(kind),
+    source: String = ASSETS_SOURCE
+) {
     if (style.getLayer(id) != null) return
 
     style.addLayer(
-        SymbolLayer(id, ASSETS_SOURCE)
+        SymbolLayer(id, source)
             .withProperties(
                 // The feature names the marker it wants, so which colour a place is drawn in is
                 // decided in Kotlin, where it is tested - and the fallback means a place can never
@@ -623,7 +664,8 @@ private fun addPlaceLayer(style: Style, kind: AssetKind) {
 private fun addLineLayer(
     style: Style,
     id: String,
-    kind: AssetKind
+    kind: AssetKind,
+    source: String = ASSETS_SOURCE
 ) {
     if (style.getLayer(id) != null) return
 
@@ -637,7 +679,7 @@ private fun addLineLayer(
     AssetLineStyles.forKind(kind)?.let { dash -> properties += PropertyFactory.lineDasharray(dash) }
 
     style.addLayer(
-        LineLayer(id, ASSETS_SOURCE)
+        LineLayer(id, source)
             .withProperties(*properties.toTypedArray())
             .withFilter(
                 Expression.all(
@@ -699,6 +741,51 @@ private fun addTrackNameLayer(style: Style) {
     // names crowd the screen and read as a muddle.
     names.minZoom = TrackNames.MIN_ZOOM
     style.addLayer(names)
+}
+
+/**
+ * Adds DOC's material: the cased tracks, and a marker layer for every kind DOC publishes a place as.
+ *
+ * **No switches are wired to these.** What DOC publishes is the ground the day's work sits on rather
+ * than another layer of it, and the layer switches are the walker's answer about their *own* things -
+ * see the plan for where the reference layer gets its own control, if it ever does.
+ */
+private fun addDocLayers(style: Style) {
+    addDocCasing(style)
+    addLineLayer(style, DocLayerIds.TRACKS, AssetKind.TRACK, source = DOC_SOURCE)
+    DocLayerIds.REACHABLE_MARKER_KINDS.forEach { kind ->
+        addPlaceLayer(style, kind, id = DocLayerIds.pointOf(kind), source = DOC_SOURCE)
+    }
+}
+
+/**
+ * The white line under DOC's tracks.
+ *
+ * The same geometry as the line over it, drawn wider and first: a route has to read against dark bush
+ * and pale scree alike, and the walker's own lines have no casing - so the casing is also what says, at
+ * a glance, which lines are DOC's. The mock screens draw their track exactly this way.
+ */
+private fun addDocCasing(style: Style) {
+    if (style.getLayer(DocLayerIds.CASING) != null) return
+
+    style.addLayer(
+        LineLayer(DocLayerIds.CASING, DOC_SOURCE)
+            .withProperties(
+                PropertyFactory.lineColor(Expression.literal(DocLayerIds.CASING_COLOUR)),
+                PropertyFactory.lineWidth(
+                    Expression.literal(ASSET_LINE_WIDTH + DocLayerIds.CASING_WIDTH_PX)
+                ),
+                PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                PropertyFactory.lineOpacity(Expression.literal(0.75f))
+            )
+            .withFilter(
+                Expression.all(
+                    Expression.eq(Expression.get("kind"), Expression.literal(AssetKind.TRACK.name)),
+                    shapeIs(AssetShape.LINE)
+                )
+            )
+    )
 }
 
 private fun shapeIs(shape: AssetShape): Expression =

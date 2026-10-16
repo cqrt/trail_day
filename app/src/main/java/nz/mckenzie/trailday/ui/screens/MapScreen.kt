@@ -62,6 +62,7 @@ fun MapScreen(
     val apiKey by viewModel.linzApiKey.collectAsStateWithLifecycle()
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
     val geoJson by viewModel.assetGeoJson.collectAsStateWithLifecycle()
+    val docGeoJson by viewModel.docGeoJson.collectAsStateWithLifecycle()
     val initialFrame by viewModel.initialFrame.collectAsStateWithLifecycle()
     val recentre by viewModel.recentre.collectAsStateWithLifecycle()
     val locationNotice by viewModel.locationNotice.collectAsStateWithLifecycle()
@@ -120,6 +121,10 @@ fun MapScreen(
                 basemap = basemap,
                 apiKey = apiKey,
                 assetGeoJson = geoJson,
+                // DOC's material, under the walker's own work: the tracks, huts, campsites and bike
+                // locations kept on the phone for offline use. It is not the walker's to change, and
+                // nothing on this screen can open one - see DocGeoJson.
+                docGeoJson = docGeoJson,
                 // What the walker has switched off. The home map is the one these apply to: a
                 // screen that is about one place, or about the spot being drawn, draws it
                 // whatever is hidden here.

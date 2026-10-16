@@ -58,6 +58,7 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     private val webEditorEnabledPref = booleanPreferencesKey("web_editor_enabled")
     private val webEditorKeepAwakePref = booleanPreferencesKey("web_editor_keep_awake")
     private val updateChecksPref = booleanPreferencesKey("update_checks_enabled")
+    private val docPlacesDroppedPref = booleanPreferencesKey("doc_places_dropped")
     private val lastNotifiedUpdatePref = stringPreferencesKey("last_notified_update")
     private val backupDestinationPref = stringPreferencesKey("backup_destination")
     private val backupRepoPref = stringPreferencesKey("backup_repo")
@@ -245,6 +246,25 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
 
     suspend fun setWebEditorKeepAwake(keepAwake: Boolean) {
         context.settingsDataStore.edit { prefs -> prefs[webEditorKeepAwakePref] = keepAwake }
+    }
+
+    /**
+     * Whether the places an earlier build imported from DOC have been dropped from the walker's list.
+     *
+     * A one-time tidy, and this is what makes it once: it is written down as soon as it has run, whether
+     * or not there was anything to drop, so an install does not count DOC's rows again on every visit to
+     * the list. **Off when unset**, which is every install that has not had it yet - and the tidy itself
+     * is the thing that says how many went, in numbers, before they go.
+     *
+     * It is not carried in a backup: a restored phone's places have no DOC copies in them, and a flag
+     * saying they had been dropped would be a fact about a list that no longer exists.
+     */
+    val docPlacesDropped: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[docPlacesDroppedPref] ?: false
+    }
+
+    suspend fun setDocPlacesDropped(dropped: Boolean) {
+        context.settingsDataStore.edit { prefs -> prefs[docPlacesDroppedPref] = dropped }
     }
 
     /**

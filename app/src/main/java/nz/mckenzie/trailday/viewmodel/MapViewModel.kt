@@ -27,7 +27,15 @@ import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.map.AssetColors
+import nz.mckenzie.trailday.doc.ArcGisDoc
+import nz.mckenzie.trailday.doc.DocDownloader
+import nz.mckenzie.trailday.domain.doc.DocCache
+import nz.mckenzie.trailday.domain.doc.DocItem
+import nz.mckenzie.trailday.domain.doc.DocSource
+import nz.mckenzie.trailday.domain.doc.EmptyDocCache
 import nz.mckenzie.trailday.map.AssetGeoJson
+import nz.mckenzie.trailday.map.DocGeoJson
+import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.map.AssetHitTest
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.tracking.FusedLocationSource
@@ -51,6 +59,13 @@ class MapViewModel(
     private val assetRepository: AssetRepository,
     private val settingsRepository: SettingsRepository,
     private val locationSource: LocationSource,
+    /**
+     * DOC's material kept on the phone: the map's reference layer.
+     *
+     * Read here rather than fetched, because the layer is what has been kept for offline use - which is
+     * why it draws in the hills with no reception at all. See [DocGeoJson].
+     */
+    private val docStore: DocCache = EmptyDocCache,
     /** Injected so a test can count how often a line is re-read from the database. */
     private val loadGeometry: suspend (Long) -> AssetGeometry = assetRepository::getAssetGeometry
 ) : ViewModel() {
@@ -72,6 +87,32 @@ class MapViewModel(
      */
     val hiddenLayers: StateFlow<Set<AssetLayer>> = settingsRepository.hiddenMapLayers
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    /**
+     * DOC's material, as the map's own document.
+     *
+     * Re-read whenever the cache changes, so an area downloaded while the app is open appears on the map
+     * without a restart - and read from the cache rather than from DOC, because the reference layer is
+     * what is on the phone: that is what makes it draw where reception does not.
+     */
+    val docGeoJson: StateFlow<String> = docStore.observeCount()
+        .map { cached() }
+        .map { items -> DocGeoJson.build(items) }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+            AssetGeoJson.build(emptyList())
+        )
+
+    /**
+     * Everything DOC's cache holds, of every source, or nothing when it cannot be read.
+     *
+     * A cache that will not read is an empty reference layer rather than a map that will not open: the
+     * walker's own work is what this screen is for, and the layer under it is the ground.
+     */
+    private suspend fun cached(): List<DocItem> =
+        runCatching { DocSource.entries.flatMap { source -> docStore.cached(source) } }
+            .getOrDefault(emptyList())
 
     val assets: StateFlow<List<AssetEntity>> = assetRepository.observeActiveAssets()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
@@ -251,7 +292,11 @@ class MapViewModel(
                     MapViewModel(
                         assetRepository = AssetRepository(TrailDayDatabase.get(appContext)),
                         settingsRepository = SettingsRepository(appContext),
-                        locationSource = FusedLocationSource(appContext)
+                        locationSource = FusedLocationSource(appContext),
+                        docStore = OfflineDocStore(
+                            dao = TrailDayDatabase.get(appContext).offlineDocItemDao(),
+                            downloader = DocDownloader(ArcGisDoc())
+                        )
                     )
                 }
             }

@@ -1,5 +1,8 @@
 package nz.mckenzie.trailday.domain.doc
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
+
 /**
  * DOC's material kept on the phone, so a walk in the hills needs nothing from DOC.
  *
@@ -19,6 +22,15 @@ interface DocCache {
     /** How many things are held, all sources together: the number the Offline screen shows. */
     suspend fun count(): Int
 
+    /**
+     * The same number, as it changes.
+     *
+     * For the offline screen's count and for a map that has to draw material downloaded while it is
+     * open - an area kept for the walk ahead is expected on the map before the walk starts, not after
+     * the app is opened again.
+     */
+    fun observeCount(): Flow<Int>
+
     /** Keeps [items], replacing what was held of the same sources and the same numbers. */
     suspend fun store(items: List<DocItem>)
 
@@ -30,6 +42,7 @@ interface DocCache {
 object EmptyDocCache : DocCache {
     override suspend fun cached(source: DocSource): List<DocItem> = emptyList()
     override suspend fun count(): Int = 0
+    override fun observeCount(): Flow<Int> = flowOf(0)
     override suspend fun store(items: List<DocItem>) = Unit
     override suspend fun clear() = Unit
 }
