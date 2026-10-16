@@ -326,12 +326,12 @@ Done:
   no migrations, because nothing has ever shipped under this app id.
 - **The laptop page** reduced to the map, the places, drawing a line, importing and the DOC browser.
 - **The README** rewritten around what the app now is.
+- **The first release** - the signing secrets copied onto the new repositories, and `v0.1.0` tagged,
+  built and published with one signed APK per architecture and the bundle.
 
 Still to do, exactly as the plan has it:
 
 - **Huts, campsites and bike tracks read from DOC** the way its tracks are. Until then they are kinds
   you keep yourself: drawn on the map or brought in from a file.
-- **The trip** — the recorder and the recordings screen reframed as a walk or a ride.
+- **The trip** - the recorder and the recordings screen reframed as a walk or a ride.
 - **Waypoints** saved from the map, and **"download along this track"**.
-- **The release** — a first tagged version, once the signing secrets are copied onto the new
-  repositories.
