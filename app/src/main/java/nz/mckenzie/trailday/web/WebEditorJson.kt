@@ -11,7 +11,8 @@ import nz.mckenzie.trailday.domain.asset.AssetRemovalRules
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.backup.AssetRecord
 import nz.mckenzie.trailday.domain.doc.DocPlaces
-import nz.mckenzie.trailday.domain.doc.DocTrack
+import nz.mckenzie.trailday.domain.doc.DocItem
+import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.distanceM
 import nz.mckenzie.trailday.domain.geo.ElevationProfile
 import nz.mckenzie.trailday.domain.geo.GeoPoint
@@ -152,7 +153,7 @@ object WebEditorJson {
      * between the search and the import cannot put a different line on the map.
      */
     fun docSearch(
-        tracks: List<DocTrack>,
+        tracks: List<DocItem>,
         importedRefs: Set<String>,
         from: GeoPoint?,
         message: String?,
@@ -162,7 +163,7 @@ object WebEditorJson {
             WebEditorDocSearch.serializer(),
             WebEditorDocSearch(
                 tracks = tracks.map { track ->
-                    WebEditorDocTrack(
+                    WebEditorDocItem(
                         id = track.objectId,
                         name = track.name,
                         // The name the import will give it - place first - so the desk shows what the
@@ -173,7 +174,7 @@ object WebEditorJson {
                         flocId = track.flocId,
                         points = track.pointCount,
                         lengthM = track.lengthM,
-                        paths = track.reading.paths.map { path ->
+                        paths = track.paths.map { path ->
                             path.map { WebEditorPoint(lat = it.lat, lng = it.lng, altitudeM = it.altitudeM) }
                         },
                         imported = track.sourceRef in importedRefs,
@@ -422,7 +423,7 @@ data class WebEditorGpxRules(
  * be able to make it without a second trip to DOC.
  */
 @Serializable
-data class WebEditorDocTrack(
+data class WebEditorDocItem(
     val id: Long = 0,
     val name: String = "",
     /**
@@ -456,14 +457,14 @@ data class WebEditorDocTrack(
  */
 @Serializable
 data class WebEditorDocSearch(
-    val tracks: List<WebEditorDocTrack> = emptyList(),
+    val tracks: List<WebEditorDocItem> = emptyList(),
     val message: String? = null,
     val capped: Boolean = false
 )
 
 /** One track the desk ticked, on its way back to be made into an asset. */
 @Serializable
-data class WebEditorDocTrackBody(
+data class WebEditorDocItemBody(
     /** The service's own key, kept so the asset records where it came from. */
     val id: Long = 0,
     val name: String = "",
@@ -475,7 +476,7 @@ data class WebEditorDocTrackBody(
 /** The body `POST /api/doc/import` carries: the ticked tracks, with the geometry they were shown. */
 @Serializable
 data class WebEditorDocImportBody(
-    val tracks: List<WebEditorDocTrackBody> = emptyList()
+    val tracks: List<WebEditorDocItemBody> = emptyList()
 )
 
 /** The answer to an import: how many assets were made, and the phone's own sentence about it. */

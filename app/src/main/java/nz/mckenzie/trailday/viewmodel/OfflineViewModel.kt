@@ -15,12 +15,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.doc.ArcGisDocTracks
-import nz.mckenzie.trailday.doc.DocTrackDownloader
+import nz.mckenzie.trailday.doc.ArcGisDoc
+import nz.mckenzie.trailday.doc.DocDownloader
+import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.offline.OfflineArea
 import nz.mckenzie.trailday.offline.OfflineAreaManager
-import nz.mckenzie.trailday.offline.OfflineDocTrackStore
+import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.offline.TileServerHolder
 import nz.mckenzie.trailday.offline.TileStoreSummary
 
@@ -35,7 +36,7 @@ import nz.mckenzie.trailday.offline.TileStoreSummary
 class OfflineViewModel(
     private val manager: OfflineAreaManager,
     private val settings: SettingsRepository,
-    private val docStore: OfflineDocTrackStore
+    private val docStore: OfflineDocStore
 ) : ViewModel() {
 
     val apiKey: StateFlow<String> = settings.linzApiKey
@@ -88,7 +89,7 @@ class OfflineViewModel(
                 _docBounds.value = if (count == 0) {
                     null
                 } else {
-                    runCatching { docStore.bounds() }.getOrNull()
+                    runCatching { docStore.bounds(DocSource.TRACKS) }.getOrNull()
                 }
             }
         }
@@ -168,9 +169,9 @@ class OfflineViewModel(
                         settings = SettingsRepository(appContext),
                         // DOC's tracks, downloaded by the picker into the same cache the browsers
                         // fall back to when the service cannot be reached.
-                        docStore = OfflineDocTrackStore(
-                            dao = database.offlineDocTrackDao(),
-                            downloader = DocTrackDownloader(ArcGisDocTracks())
+                        docStore = OfflineDocStore(
+                            dao = database.offlineDocItemDao(),
+                            downloader = DocDownloader(ArcGisDoc())
                         )
                     )
                 }

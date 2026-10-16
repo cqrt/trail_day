@@ -18,9 +18,10 @@ import kotlinx.coroutines.withTimeoutOrNull
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.doc.ArcGisDocTracks
+import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDownloadResult
-import nz.mckenzie.trailday.doc.DocTrackDownloader
+import nz.mckenzie.trailday.doc.DocDownloader
+import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.DocBounds
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
@@ -30,7 +31,7 @@ import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.offline.OfflineArea
 import nz.mckenzie.trailday.offline.OfflineAreaDraft
 import nz.mckenzie.trailday.offline.OfflineAreaManager
-import nz.mckenzie.trailday.offline.OfflineDocTrackStore
+import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.offline.OfflinePickerMode
 import nz.mckenzie.trailday.offline.TileServerHolder
 import nz.mckenzie.trailday.offline.docDownloadedMessage
@@ -52,7 +53,7 @@ class OfflineAreaPickerViewModel(
     private val locationSource: LocationSource,
     private val settings: SettingsRepository,
     /** The DOC tracks kept for offline use, downloaded for the box drawn here. */
-    private val docStore: OfflineDocTrackStore,
+    private val docStore: OfflineDocStore,
     /** Which pack this run is choosing an area for. */
     val mode: OfflinePickerMode
 ) : ViewModel() {
@@ -244,15 +245,15 @@ class OfflineAreaPickerViewModel(
             _docWorking.value = true
             _docMessage.value = null
             try {
-                when (val result = docStore.download(plan.bounds.toDocBounds())) {
+                when (val result = docStore.download(plan.bounds.toDocBounds(), DocSource.TRACKS)) {
                     is DocDownloadResult.Done -> {
-                        _docMessage.value = docDownloadedMessage(result.tracks.size)
+                        _docMessage.value = docDownloadedMessage(result.items.size, DocSource.TRACKS)
                         _saved.value = true
                     }
                     // A download that stopped short still kept what arrived, so say both and stay,
                     // so the walker can see it rather than being sent back with half an answer.
                     is DocDownloadResult.Failed ->
-                        _docMessage.value = "${result.message} ${docDownloadedMessage(result.tracks.size)}"
+                        _docMessage.value = "${result.message} ${docDownloadedMessage(result.items.size, DocSource.TRACKS)}"
                 }
             } catch (cancelled: CancellationException) {
                 // Leaving the screen is not a failure; what already arrived is kept.
@@ -308,9 +309,9 @@ class OfflineAreaPickerViewModel(
                         locationSource = FusedLocationSource(appContext),
                         settings = SettingsRepository(appContext),
                         // The tracks the DOC browser falls back to when the service cannot be reached.
-                        docStore = OfflineDocTrackStore(
-                            dao = database.offlineDocTrackDao(),
-                            downloader = DocTrackDownloader(ArcGisDocTracks())
+                        docStore = OfflineDocStore(
+                            dao = database.offlineDocItemDao(),
+                            downloader = DocDownloader(ArcGisDoc())
                         ),
                         mode = mode
                     )

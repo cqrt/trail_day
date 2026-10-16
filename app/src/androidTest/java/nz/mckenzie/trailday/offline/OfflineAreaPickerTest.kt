@@ -12,8 +12,8 @@ import kotlinx.coroutines.withTimeout
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.doc.ArcGisDocTracks
-import nz.mckenzie.trailday.doc.DocTrackDownloader
+import nz.mckenzie.trailday.doc.ArcGisDoc
+import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.tracking.LocationSource
 import nz.mckenzie.trailday.viewmodel.OfflineAreaPickerViewModel
@@ -80,9 +80,9 @@ class OfflineAreaPickerTest {
         locationSource = FakeLocationSource(fix),
         settings = SettingsRepository(context),
         // The DOC cache is not what this test is about; it is wired so the view model can be built.
-        docStore = OfflineDocTrackStore(
-            dao = db.offlineDocTrackDao(),
-            downloader = DocTrackDownloader(ArcGisDocTracks())
+        docStore = OfflineDocStore(
+            dao = db.offlineDocItemDao(),
+            downloader = DocDownloader(ArcGisDoc())
         ),
         // This test is about the imagery area the picker stores.
         mode = OfflinePickerMode.IMAGERY

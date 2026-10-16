@@ -1,7 +1,6 @@
 package nz.mckenzie.trailday.domain.doc
 
 import nz.mckenzie.trailday.domain.geo.GeoPoint
-import nz.mckenzie.trailday.domain.track.TrackInterchange
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,21 +12,25 @@ import org.junit.Test
  * beside the phone is near the phone, where its middle would not be - and that a nearest sort with
  * nothing to be near to is no order at all, so it falls back to by name rather than inventing one.
  */
-class DocTrackListTest {
+class DocListTest {
 
-    private fun track(id: Long, name: String, kind: String?, at: GeoPoint, type: String? = null) = DocTrack(
+    private fun track(id: Long, name: String, kind: String?, at: GeoPoint, type: String? = null) = DocItem(
+        source = DocSource.TRACKS,
         objectId = id,
         name = name,
-        kind = kind,
-        trackType = type,
-        reading = TrackInterchange.Reading(
-            paths = listOf(
-                listOf(at, GeoPoint(at.lat + 0.01, at.lng + 0.01)),
-                listOf(at, GeoPoint(at.lat - 0.01, at.lng))
-            ),
-            sideTracks = 1,
-            segmentsDidNotMeet = false
-        )
+        paths = listOf(
+            listOf(at, GeoPoint(at.lat + 0.01, at.lng + 0.01)),
+            listOf(at, GeoPoint(at.lat - 0.01, at.lng))
+        ),
+        facts = buildMap {
+            kind?.let { put("SubObjectType", it) }
+            // The type is one of the tracks service's pivoted characteristics, so it is written the way
+            // the wire writes it: inside a name-and-value slot rather than as a field of its own.
+            if (type != null) {
+                put("CharName1", DocSource.TRACK_TYPE_CHARACTERISTIC)
+                put("CharValue1", type)
+            }
+        }
     )
 
     private val invercargill = GeoPoint(-46.4132, 168.3538)
@@ -71,7 +74,7 @@ class DocTrackListTest {
             tracks.showing(
                 kinds = emptySet(),
                 types = setOf("Loop"),
-                sort = DocTrackSort.NAME,
+                sort = DocSort.NAME,
                 from = invercargill
             )
         )
@@ -81,7 +84,7 @@ class DocTrackListTest {
             tracks.showing(
                 kinds = setOf("Tramping Track"),
                 types = setOf("Loop"),
-                sort = DocTrackSort.NAME,
+                sort = DocSort.NAME,
                 from = invercargill
             )
         )
@@ -104,7 +107,7 @@ class DocTrackListTest {
         val shown = listOf(far, near).showing(
             kinds = emptySet(),
             types = emptySet(),
-            sort = DocTrackSort.NEAREST,
+            sort = DocSort.NEAREST,
             from = invercargill
         )
 
@@ -119,7 +122,7 @@ class DocTrackListTest {
         val shown = listOf(b, a).showing(
             kinds = emptySet(),
             types = emptySet(),
-            sort = DocTrackSort.NEAREST,
+            sort = DocSort.NEAREST,
             from = null
         )
 
@@ -131,7 +134,7 @@ class DocTrackListTest {
         val walk = track(1, "Walk", "Walking Track", invercargill)
         val tramp = track(2, "Tramp", "Tramping Track", invercargill)
 
-        val shown = listOf(walk, tramp).showing(setOf("Tramping Track"), emptySet(), DocTrackSort.NAME, invercargill)
+        val shown = listOf(walk, tramp).showing(setOf("Tramping Track"), emptySet(), DocSort.NAME, invercargill)
 
         assertEquals(listOf(tramp), shown)
     }
@@ -141,7 +144,7 @@ class DocTrackListTest {
         val walk = track(1, "Walk", "Walking Track", invercargill)
         val tramp = track(2, "Tramp", "Tramping Track", invercargill)
 
-        val shown = listOf(walk, tramp).showing(emptySet(), emptySet(), DocTrackSort.NAME, invercargill)
+        val shown = listOf(walk, tramp).showing(emptySet(), emptySet(), DocSort.NAME, invercargill)
 
         assertTrue(shown.containsAll(listOf(walk, tramp)))
     }
@@ -176,6 +179,6 @@ class DocTrackListTest {
         assertEquals(-46.39, bounds.maxLat, 1e-9)
         assertEquals(168.21, bounds.maxLng, 1e-9)
 
-        assertEquals(null, emptyList<DocTrack>().bounds())
+        assertEquals(null, emptyList<DocItem>().bounds())
     }
 }

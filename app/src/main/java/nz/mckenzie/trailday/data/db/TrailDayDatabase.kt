@@ -13,9 +13,9 @@ import androidx.room.RoomDatabase
         RecordedPointEntity::class,
         RecordedBreakEntity::class,
         OfflineAreaEntity::class,
-        OfflineDocTrackEntity::class
+        OfflineDocItemEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class TrailDayDatabase : RoomDatabase() {
@@ -24,8 +24,8 @@ abstract class TrailDayDatabase : RoomDatabase() {
     abstract fun recordingDao(): RecordingDao
     abstract fun offlineAreaDao(): OfflineAreaDao
 
-    /** The DOC tracks kept for offline use. */
-    abstract fun offlineDocTrackDao(): OfflineDocTrackDao
+    /** DOC's material kept for offline use. */
+    abstract fun offlineDocItemDao(): OfflineDocItemDao
 
     /** Reads and writes everything, for backup and restore. */
     abstract fun backupDao(): BackupDao
@@ -36,7 +36,13 @@ abstract class TrailDayDatabase : RoomDatabase() {
         @Volatile
         private var instance: TrailDayDatabase? = null
 
-        /** One database for the whole app; tests build their own in memory instead. */
+        /**
+         * One database for the whole app; tests build their own in memory instead.
+         *
+         * The migration is named here rather than left to be discovered: an install from before the DOC
+         * cache was keyed by source has data in the old shape, and Room refuses to open a database it has
+         * no path to - which would be the app failing to start rather than a cache being rebuilt.
+         */
         fun get(context: Context): TrailDayDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -44,6 +50,7 @@ abstract class TrailDayDatabase : RoomDatabase() {
                     TrailDayDatabase::class.java,
                     NAME
                 )
+                    .addMigrations(MIGRATION_1_2)
                     .build().also { instance = it }
             }
     }

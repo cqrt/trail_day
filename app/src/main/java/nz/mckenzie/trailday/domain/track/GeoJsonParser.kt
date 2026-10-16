@@ -15,8 +15,9 @@ import nz.mckenzie.trailday.domain.geo.GeoPoint
  * GeoJSON is the one interchange format that says what its own coordinates are: RFC 7946 fixes them
  * to WGS84 and to **longitude first** (`[lon, lat, (alt)]`), the same order KML uses - so there is no
  * CRS to honour and no flip to get wrong. A `LineString` is one path, a `MultiLineString` and a
- * `Polygon`'s rings are several, and a `GeometryCollection` is whatever it nests. `Point` and
- * `MultiPoint` are deliberately not read: a place is not a line.
+ * `Polygon`'s rings are several, and a `GeometryCollection` is whatever it nests. `Point` is read as
+ * **one coordinate** rather than as a line of one vertex: DOC publishes its huts, campsites and bike
+ * locations that way, and a line of one vertex is not what any of them is. `MultiPoint` is not read.
  *
  * A feature's name is taken from its own properties where it has one - see [NAME_KEYS] - so a file of
  * named tracks can be imported as one asset each rather than all under the file's own name. What the
@@ -35,7 +36,9 @@ object GeoJsonParser {
     data class Feature(
         val name: String?,
         val paths: List<List<GeoPoint>>,
-        val properties: Map<String, String> = emptyMap()
+        val properties: Map<String, String> = emptyMap(),
+        /** The coordinate, for a feature that is a place rather than a line. */
+        val point: GeoPoint? = null
     )
 
     /**
@@ -76,8 +79,17 @@ object GeoJsonParser {
             feature
         }
         val properties = feature["properties"] as? JsonObject
-        return Feature(nameOf(properties), pathsOf(geometry), scalarsOf(properties))
+        return Feature(
+            name = nameOf(properties),
+            paths = pathsOf(geometry),
+            properties = scalarsOf(properties),
+            point = pointOf(geometry)
+        )
     }
+
+    /** One `[lon, lat]` coordinate, for a geometry that is a place rather than a line. */
+    private fun pointOf(geometry: JsonObject): GeoPoint? =
+        if (typeOf(geometry) == "Point") position(geometry["coordinates"]) else null
 
     /** A feature's properties as plain text, keeping only the values that are a single scalar. */
     private fun scalarsOf(properties: JsonObject?): Map<String, String> {
@@ -100,7 +112,8 @@ object GeoJsonParser {
         "GeometryCollection" -> (geometry["geometries"] as? JsonArray).orEmpty().flatMap { child ->
             (child as? JsonObject)?.let { pathsOf(it) }.orEmpty()
         }
-        // Point and MultiPoint: a place, which this import does not make a line of.
+        // MultiPoint is not read, and a bare Point reaches the caller as a coordinate rather than as a
+        // path: a place is not a line.
         else -> emptyList()
     }
 
@@ -111,7 +124,7 @@ object GeoJsonParser {
             ?.takeIf { it.isNotEmpty() }
 
     /** One `[lon, lat, (alt)]` position. Longitude is first, as GeoJSON requires. */
-    private fun position(element: JsonElement): GeoPoint? {
+    private fun position(element: JsonElement?): GeoPoint? {
         val array = element as? JsonArray ?: return null
         val lon = number(array.getOrNull(0)) ?: return null
         val lat = number(array.getOrNull(1)) ?: return null

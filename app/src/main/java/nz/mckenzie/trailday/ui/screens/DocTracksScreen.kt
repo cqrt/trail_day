@@ -41,8 +41,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.doc.DocPlaces
-import nz.mckenzie.trailday.domain.doc.DocTrack
-import nz.mckenzie.trailday.domain.doc.DocTrackSort
+import nz.mckenzie.trailday.domain.doc.DocItem
+import nz.mckenzie.trailday.domain.doc.DocSort
 import nz.mckenzie.trailday.domain.doc.distanceM
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.viewmodel.DocTracksViewModel
@@ -208,7 +208,7 @@ fun DocTracksScreen(
                 else -> LazyColumn(modifier = Modifier.weight(1f)) {
                     itemsIndexed(visible, key = { _, track -> track.objectId }) { index, track ->
                         if (index > 0) HorizontalDivider()
-                        DocTrackRow(
+                        DocItemRow(
                             track = track,
                             checked = track.objectId in selected,
                             imported = track.sourceRef in imported,
@@ -276,22 +276,22 @@ private fun FilterMenu(
 
 /** The **Sort** control: the order the list is in, and the one it can be in. */
 @Composable
-private fun SortMenu(sort: DocTrackSort, onSort: (DocTrackSort) -> Unit) {
+private fun SortMenu(sort: DocSort, onSort: (DocSort) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val label = when (sort) {
-        DocTrackSort.NEAREST -> "Sort: Nearest"
-        DocTrackSort.NAME -> "Sort: Name"
+        DocSort.NEAREST -> "Sort: Nearest"
+        DocSort.NAME -> "Sort: Name"
     }
 
     Box {
         OutlinedButton(onClick = { open = true }) { Text(label) }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            MenuChoice("Nearest to phone", sort == DocTrackSort.NEAREST) {
-                onSort(DocTrackSort.NEAREST)
+            MenuChoice("Nearest to phone", sort == DocSort.NEAREST) {
+                onSort(DocSort.NEAREST)
                 open = false
             }
-            MenuChoice("Name", sort == DocTrackSort.NAME) {
-                onSort(DocTrackSort.NAME)
+            MenuChoice("Name", sort == DocSort.NAME) {
+                onSort(DocSort.NAME)
                 open = false
             }
         }
@@ -328,8 +328,8 @@ private fun MenuChoice(label: String, chosen: Boolean, onChoose: () -> Unit) {
 }
 
 @Composable
-private fun DocTrackRow(
-    track: DocTrack,
+private fun DocItemRow(
+    track: DocItem,
     checked: Boolean,
     imported: Boolean,
     distanceM: Double?,

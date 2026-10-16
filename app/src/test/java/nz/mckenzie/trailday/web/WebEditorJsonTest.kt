@@ -4,7 +4,8 @@ import kotlinx.serialization.json.Json
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetPhrase
-import nz.mckenzie.trailday.domain.doc.DocTrack
+import nz.mckenzie.trailday.domain.doc.DocItem
+import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.track.TrackInterchange
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
@@ -372,20 +373,20 @@ class WebEditorJsonTest {
     fun `a DOC search carries each track with its geometry, kind and the phone's own figures`() {
         val text = WebEditorJson.docSearch(
             tracks = listOf(
-                DocTrack(
+                DocItem(
+                    source = DocSource.TRACKS,
                     objectId = 42,
                     name = "Glory Tk",
-                    kind = "Walking Track",
-                    trackType = "One way",
-                    flocId = "BLUFFHIL-TK02",
-                    reading = TrackInterchange.Reading(
-                        paths = listOf(listOf(GeoPoint(-46.6, 168.3), GeoPoint(-46.61, 168.31))),
-                        sideTracks = 0,
-                        segmentsDidNotMeet = false
+                    paths = listOf(listOf(GeoPoint(-46.6, 168.3), GeoPoint(-46.61, 168.31))),
+                    facts = mapOf(
+                        "SubObjectType" to "Walking Track",
+                        "CharName7" to DocSource.TRACK_TYPE_CHARACTERISTIC,
+                        "CharValue7" to "One way",
+                        "FlocID" to "BLUFFHIL-TK02"
                     )
                 )
             ),
-            importedRefs = setOf("doc:99"),
+            importedRefs = setOf("doc-tracks:99"),
             from = GeoPoint(-46.62, 168.32),
             message = null,
             capped = false
@@ -416,15 +417,12 @@ class WebEditorJsonTest {
 
     @Test
     fun `with no fix the distance is left out, and the desk falls back to by name`() {
-        val track = DocTrack(
+        val track = DocItem(
+            source = DocSource.TRACKS,
             objectId = 42,
             name = "Glory Tk",
-            kind = "Walking Track",
-            reading = TrackInterchange.Reading(
-                paths = listOf(listOf(GeoPoint(-46.6, 168.3), GeoPoint(-46.61, 168.31))),
-                sideTracks = 0,
-                segmentsDidNotMeet = false
-            )
+            paths = listOf(listOf(GeoPoint(-46.6, 168.3), GeoPoint(-46.61, 168.31))),
+            facts = mapOf("SubObjectType" to "Walking Track")
         )
 
         val text = WebEditorJson.docSearch(
@@ -441,15 +439,12 @@ class WebEditorJsonTest {
 
     @Test
     fun `a DOC track the phone already has is marked imported, so the desk will not import it twice`() {
-        val track = DocTrack(
+        val track = DocItem(
+            source = DocSource.TRACKS,
             objectId = 42,
             name = "Glory Tk",
-            kind = "Walking Track",
-            reading = TrackInterchange.Reading(
-                paths = listOf(listOf(GeoPoint(-46.6, 168.3), GeoPoint(-46.61, 168.31))),
-                sideTracks = 0,
-                segmentsDidNotMeet = false
-            )
+            paths = listOf(listOf(GeoPoint(-46.6, 168.3), GeoPoint(-46.61, 168.31))),
+            facts = mapOf("SubObjectType" to "Walking Track")
         )
 
         val text = WebEditorJson.docSearch(

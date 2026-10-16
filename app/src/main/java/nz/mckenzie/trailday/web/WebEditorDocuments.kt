@@ -3,17 +3,18 @@ package nz.mckenzie.trailday.web
 import kotlinx.coroutines.flow.first
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.AssetEntity
-import nz.mckenzie.trailday.doc.ArcGisDocTracks
-import nz.mckenzie.trailday.doc.DocTracksResult
-import nz.mckenzie.trailday.doc.DocTracksSource
+import nz.mckenzie.trailday.doc.ArcGisDoc
+import nz.mckenzie.trailday.doc.DocReadResult
+import nz.mckenzie.trailday.doc.DocReader
+import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetRemovalRules
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.doc.DocBounds
 import nz.mckenzie.trailday.domain.doc.DocPlaces
-import nz.mckenzie.trailday.domain.doc.DocTrackCache
-import nz.mckenzie.trailday.domain.doc.DocTrackQuery
-import nz.mckenzie.trailday.domain.doc.EmptyDocTrackCache
+import nz.mckenzie.trailday.domain.doc.DocCache
+import nz.mckenzie.trailday.domain.doc.DocQuery
+import nz.mckenzie.trailday.domain.doc.EmptyDocCache
 import nz.mckenzie.trailday.domain.doc.docSourceRef
 import nz.mckenzie.trailday.domain.doc.matching
 import nz.mckenzie.trailday.domain.doc.within
@@ -68,12 +69,12 @@ class WebEditorDocuments(
      * Where DOC's tracks are searched from. The live service by default; a test hands in its own, so
      * the desk's search can be proved without a network.
      */
-    private val docTracks: DocTracksSource = ArcGisDocTracks(),
+    private val docTracks: DocReader = ArcGisDoc(),
     /**
      * The DOC tracks downloaded for offline use, searched when the service cannot be reached - the
      * desk can import a downloaded track as readily as the phone can.
      */
-    private val docCache: DocTrackCache = EmptyDocTrackCache,
+    private val docCache: DocCache = EmptyDocCache,
     private val now: () -> Long = System::currentTimeMillis
 ) : WebEditorData {
 
@@ -284,9 +285,12 @@ class WebEditorDocuments(
             )
         }
 
-        val limit = DocTrackQuery.DEFAULT_LIMIT
+        val limit = DocQuery.DEFAULT_LIMIT
         val radius = radiusKm ?: DEFAULT_DOC_RADIUS_KM
-        val query = DocTrackQuery(
+        val query = DocQuery(
+            // Which of DOC's services this browser asks. Four are published and four are read; this
+            // screen is the tracks one until the browser itself is generalised.
+            source = DocSource.TRACKS,
             nameContains = name.trim(),
             near = point,
             radiusKm = radius,
@@ -301,22 +305,22 @@ class WebEditorDocuments(
         // the search was "near", because a map view's own box is the answer.
         val radiusM = radius * 1000.0
         return when (val result = docTracks.search(query)) {
-            is DocTracksResult.Found -> {
+            is DocReadResult.Found -> {
                 // Read once, so every row can be told whether the phone already has it.
                 val imported = assets.existingSourceRefs()
-                val tracks = if (point != null) result.tracks.within(radiusM, point) else result.tracks
+                val tracks = if (point != null) result.items.within(radiusM, point) else result.items
                 WebEditorJson.docSearch(
                     tracks = tracks,
                     importedRefs = imported,
                     from = from,
                     message = if (tracks.isEmpty()) "No DOC tracks matched." else null,
-                    capped = result.tracks.size >= limit
+                    capped = result.items.size >= limit
                 )
             }
-            is DocTracksResult.Failed -> {
+            is DocReadResult.Failed -> {
                 // No service: fall back to the tracks downloaded for offline use, so the desk can
                 // still import one. Filtered by name; the download is the place filter.
-                val cached = docCache.cached().matching(name)
+                val cached = docCache.cached(DocSource.TRACKS).matching(name)
                     .let { if (point != null) it.within(radiusM, point) else it }
                 WebEditorJson.docSearch(
                     tracks = cached,
@@ -361,7 +365,7 @@ class WebEditorDocuments(
         for (track in tracks) {
             val paths = track.paths.map { path -> path.map { GeoPoint(lat = it.lat, lng = it.lng) } }
             if (paths.isEmpty()) continue
-            val sourceRef = if (track.id != 0L) docSourceRef(track.id) else null
+            val sourceRef = if (track.id != 0L) docSourceRef(DocSource.TRACKS, track.id) else null
             if (sourceRef != null && sourceRef in already) continue
             val name = DocPlaces.assetName(track.name.trim().ifBlank { "DOC track" }, track.flocId)
             runCatching {

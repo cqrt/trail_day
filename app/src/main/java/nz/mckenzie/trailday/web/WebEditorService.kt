@@ -32,11 +32,11 @@ import nz.mckenzie.trailday.R
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.doc.ArcGisDocTracks
-import nz.mckenzie.trailday.doc.DocTrackDownloader
+import nz.mckenzie.trailday.doc.ArcGisDoc
+import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.offline.LocalTileServer
-import nz.mckenzie.trailday.offline.OfflineDocTrackStore
+import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.offline.TileServerHolder
 import nz.mckenzie.trailday.tracking.DevicePosition
 
@@ -188,9 +188,9 @@ class WebEditorService : Service() {
             readPageFile = ::readPageFile,
             // The tracks downloaded for offline use, so the desk's browser falls back to them when
             // DOC cannot be reached - the same cache the offline screen fills.
-            docCache = OfflineDocTrackStore(
-                dao = database.offlineDocTrackDao(),
-                downloader = DocTrackDownloader(ArcGisDocTracks())
+            docCache = OfflineDocStore(
+                dao = database.offlineDocItemDao(),
+                downloader = DocDownloader(ArcGisDoc())
             )
         )
 

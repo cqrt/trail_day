@@ -1,7 +1,6 @@
 package nz.mckenzie.trailday.domain.doc
 
 import nz.mckenzie.trailday.domain.geo.GeoPoint
-import nz.mckenzie.trailday.domain.track.TrackInterchange
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -12,17 +11,13 @@ import org.junit.Test
  * No place filter is applied here: a cache only holds the areas the walker downloaded, so the
  * download *is* the place filter - which is what lets an offline search be a name and nothing more.
  */
-class DocTrackCacheTest {
+class DocCacheTest {
 
-    private fun track(id: Long, name: String) = DocTrack(
+    private fun track(id: Long, name: String) = DocItem(
+        source = DocSource.TRACKS,
         objectId = id,
         name = name,
-        kind = null,
-        reading = TrackInterchange.Reading(
-            paths = listOf(listOf(GeoPoint(-46.6, 168.3), GeoPoint(-46.61, 168.31))),
-            sideTracks = 0,
-            segmentsDidNotMeet = false
-        )
+        paths = listOf(listOf(GeoPoint(-46.6, 168.3), GeoPoint(-46.61, 168.31)))
     )
 
     @Test

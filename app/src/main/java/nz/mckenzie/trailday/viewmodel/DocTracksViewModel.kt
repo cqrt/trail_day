@@ -15,14 +15,15 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.doc.ArcGisDocTracks
-import nz.mckenzie.trailday.doc.DocTrackDownloader
-import nz.mckenzie.trailday.doc.DocTracksResult
-import nz.mckenzie.trailday.doc.DocTracksSource
-import nz.mckenzie.trailday.domain.doc.DocTrack
-import nz.mckenzie.trailday.domain.doc.DocTrackCache
-import nz.mckenzie.trailday.domain.doc.DocTrackQuery
-import nz.mckenzie.trailday.domain.doc.DocTrackSort
+import nz.mckenzie.trailday.doc.ArcGisDoc
+import nz.mckenzie.trailday.doc.DocDownloader
+import nz.mckenzie.trailday.doc.DocReadResult
+import nz.mckenzie.trailday.doc.DocReader
+import nz.mckenzie.trailday.domain.doc.DocItem
+import nz.mckenzie.trailday.domain.doc.DocSource
+import nz.mckenzie.trailday.domain.doc.DocCache
+import nz.mckenzie.trailday.domain.doc.DocQuery
+import nz.mckenzie.trailday.domain.doc.DocSort
 import nz.mckenzie.trailday.domain.doc.DocPlaces
 import nz.mckenzie.trailday.domain.doc.kindsPresent
 import nz.mckenzie.trailday.domain.doc.matching
@@ -31,7 +32,7 @@ import nz.mckenzie.trailday.domain.doc.typesPresent
 import nz.mckenzie.trailday.domain.doc.within
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
-import nz.mckenzie.trailday.offline.OfflineDocTrackStore
+import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.tracking.DevicePosition
 
 /**
@@ -44,9 +45,9 @@ import nz.mckenzie.trailday.tracking.DevicePosition
  */
 class DocTracksViewModel(
     private val assets: AssetRepository,
-    private val source: DocTracksSource,
+    private val source: DocReader,
     /** The tracks downloaded for offline use, searched when DOC cannot be reached. */
-    private val cache: DocTrackCache
+    private val cache: DocCache
 ) : ViewModel() {
 
     private val _name = MutableStateFlow("")
@@ -61,8 +62,8 @@ class DocTracksViewModel(
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
 
-    private val _results = MutableStateFlow<List<DocTrack>>(emptyList())
-    val results: StateFlow<List<DocTrack>> = _results
+    private val _results = MutableStateFlow<List<DocItem>>(emptyList())
+    val results: StateFlow<List<DocItem>> = _results
 
     private val _selected = MutableStateFlow<Set<Long>>(emptySet())
     val selected: StateFlow<Set<Long>> = _selected
@@ -98,8 +99,8 @@ class DocTracksViewModel(
     private val _types = MutableStateFlow<Set<String>>(emptySet())
     val types: StateFlow<Set<String>> = _types
 
-    private val _sort = MutableStateFlow(DocTrackSort.NEAREST)
-    val sort: StateFlow<DocTrackSort> = _sort
+    private val _sort = MutableStateFlow(DocSort.NEAREST)
+    val sort: StateFlow<DocSort> = _sort
 
     /** The kinds a filter should offer, from what the search actually returned. */
     val kindChoices: StateFlow<List<String>> = _results
@@ -117,7 +118,7 @@ class DocTracksViewModel(
      * Derived rather than stored, because the fix moves: standing still and turning "Nearest" on
      * re-orders the page without asking DOC again.
      */
-    val visible: StateFlow<List<DocTrack>> =
+    val visible: StateFlow<List<DocItem>> =
         combine(_results, _kinds, _types, _sort, fix) { results, kinds, types, sort, position ->
             results.showing(kinds, types, sort, position)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
@@ -158,12 +159,12 @@ class DocTracksViewModel(
         _types.value = emptySet()
     }
 
-    fun setSort(sort: DocTrackSort) {
+    fun setSort(sort: DocSort) {
         _sort.value = sort
     }
 
     /** Tick or untick a track, unless it is one already on the phone - that one is not tickable. */
-    fun toggle(track: DocTrack) {
+    fun toggle(track: DocItem) {
         if (track.sourceRef in _imported.value) return
         _selected.value = if (track.objectId in _selected.value) {
             _selected.value - track.objectId
@@ -192,11 +193,11 @@ class DocTracksViewModel(
         viewModelScope.launch {
             _busy.value = true
             _message.value = null
-            when (val result = source.search(DocTrackQuery(nameContains = name, near = position, radiusKm = radius))) {
-                is DocTracksResult.Found -> {
+            when (val result = source.search(DocQuery(source = DocSource.TRACKS, nameContains = name, near = position, radiusKm = radius))) {
+                is DocReadResult.Found -> {
                     // The service filters by a box, whose corners reach about 1.4x the radius and which
                     // any long track clipping it passes through; keep only what is truly within it.
-                    _results.value = result.tracks.within(radius * 1000.0, position)
+                    _results.value = result.items.within(radius * 1000.0, position)
                     _selected.value = emptySet()
                     // A new set of results, so a filter from the last search is not carried onto it.
                     _kinds.value = emptySet()
@@ -205,19 +206,19 @@ class DocTracksViewModel(
                     // Read once per search, so every row can say whether it is already on the phone.
                     _imported.value = assets.existingSourceRefs()
                     _message.value = when {
-                        result.tracks.isEmpty() -> null
+                        result.items.isEmpty() -> null
                         // The service hands back a page, not the whole answer; say so rather than
                         // letting a capped search look like a complete one.
-                        result.tracks.size >= DocTrackQuery.DEFAULT_LIMIT ->
-                            "Showing the first ${result.tracks.size} matches. Narrow the search to see the rest."
+                        result.items.size >= DocQuery.DEFAULT_LIMIT ->
+                            "Showing the first ${result.items.size} matches. Narrow the search to see the rest."
                         else -> null
                     }
                 }
-                is DocTracksResult.Failed -> {
+                is DocReadResult.Failed -> {
                     // No service: fall back to what was downloaded for offline use, so a track can
                     // still be imported with no reception. Filtered by name; the download is the
                     // place filter, because the cache only holds the areas asked for.
-                    val cached = cache.cached().matching(name).within(radius * 1000.0, position)
+                    val cached = cache.cached(DocSource.TRACKS).matching(name).within(radius * 1000.0, position)
                     _results.value = cached
                     _selected.value = emptySet()
                     _kinds.value = emptySet()
@@ -252,7 +253,7 @@ class DocTracksViewModel(
                         // The place the FlocID names, then the track's own name, so the list reads by
                         // where the work is.
                         name = DocPlaces.assetName(track.name, track.flocId),
-                        geometry = AssetGeometry(track.reading.paths),
+                        geometry = AssetGeometry(track.paths),
                         sourceRef = track.sourceRef
                     )
                 }.isSuccess
@@ -283,11 +284,11 @@ class DocTracksViewModel(
                     val database = TrailDayDatabase.get(appContext)
                     DocTracksViewModel(
                         assets = AssetRepository(database),
-                        source = ArcGisDocTracks(),
+                        source = ArcGisDoc(),
                         // The same cache the offline screen downloads into.
-                        cache = OfflineDocTrackStore(
-                            dao = database.offlineDocTrackDao(),
-                            downloader = DocTrackDownloader(ArcGisDocTracks())
+                        cache = OfflineDocStore(
+                            dao = database.offlineDocItemDao(),
+                            downloader = DocDownloader(ArcGisDoc())
                         )
                     )
                 }

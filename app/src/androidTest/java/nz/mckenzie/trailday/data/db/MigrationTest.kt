@@ -1,0 +1,107 @@
+package nz.mckenzie.trailday.data.db
+
+import androidx.room.testing.MigrationTestHelper
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import nz.mckenzie.trailday.domain.doc.DocFactsJson
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+
+/**
+ * The one database change this app has ever made, on a database that already had something in it.
+ *
+ * The DOC cache gained the source it came from, and **what a walker had already downloaded is carried
+ * across rather than dropped**: every row of the old table was a track, so each is copied as one and the
+ * fields the old table held as columns are written into the facts column the new model reads. A cache is
+ * cheap to refill and the walker is not always somewhere they can refill it, so the version changing is
+ * not a reason for their downloaded area to vanish.
+ *
+ * Room's own harness is what makes this a real check rather than a description: it builds a version 1
+ * database from the exported schema, runs the migration, and then validates the result against the
+ * version 2 schema the build produces.
+ */
+@RunWith(AndroidJUnit4::class)
+class MigrationTest {
+
+    @get:Rule
+    val helper = MigrationTestHelper(
+        InstrumentationRegistry.getInstrumentation(),
+        TrailDayDatabase::class.java
+    )
+
+    @Test
+    fun theDocCacheGainsItsSourceAndKeepsWhatWasDownloaded() {
+        helper.createDatabase(TEST_DATABASE, 1).apply {
+            execSQL(
+                """
+                INSERT INTO offline_doc_tracks
+                    (objectId, name, kind, trackType, flocId, lengthM, pathsJson, downloadedAtEpochMs)
+                VALUES
+                    (35239046, 'Glory Tk', 'Walking Track', 'One way', 'BLUFFHIL-TK02', 1234.5,
+                     '[[-46.6,168.3],[-46.61,168.31]]', 1790000000000)
+                """.trimIndent()
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(TEST_DATABASE, 2, true, MIGRATION_1_2)
+
+        migrated.query(
+            "SELECT source, objectId, name, lengthM, pathsJson, factsJson FROM offline_doc_items"
+        ).use { rows ->
+            assertTrue("the downloaded track is still there", rows.moveToFirst())
+            assertEquals("and it came from the tracks service", "tracks", rows.getString(0))
+            assertEquals(35239046L, rows.getLong(1))
+            assertEquals("Glory Tk", rows.getString(2))
+            assertEquals(1234.5, rows.getDouble(3), 1e-9)
+            assertEquals("[[-46.6,168.3],[-46.61,168.31]]", rows.getString(4))
+
+            // The three columns the old table had are facts now, under the names DOC uses for them - so
+            // the reader finds them exactly as it finds them on the wire.
+            val facts = DocFactsJson.read(rows.getString(5))
+            assertEquals("Walking Track", facts["SubObjectType"])
+            assertEquals("One way", facts["WEB_TRACK_TYPE"])
+            assertEquals("BLUFFHIL-TK02", facts["FlocID"])
+
+            assertEquals("and nothing was invented", 1, rows.count)
+        }
+    }
+
+    @Test
+    fun aHutAndATrackMayShareDOCsNumberOnceTheKeyIsThePair() {
+        // The reason for the change: DOC numbers its features per service, so the number alone is not an
+        // identity. Two rows with the same number and different sources coexist; before this they could
+        // not, and one would have overwritten the other without saying so.
+        helper.createDatabase(TEST_DATABASE_SHARED, 1).close()
+        val migrated = helper.runMigrationsAndValidate(TEST_DATABASE_SHARED, 2, true, MIGRATION_1_2)
+
+        migrated.execSQL(
+            """
+            INSERT INTO offline_doc_items
+                (source, objectId, name, lengthM, pathsJson, factsJson, downloadedAtEpochMs)
+            VALUES
+                ('tracks', 123, 'A track', 0.0, '[[-46.6,168.3]]', '{}', 1),
+                ('huts', 123, 'A hut', 0.0, '[[-46.6,168.3]]', '{}', 2)
+            """.trimIndent()
+        )
+
+        migrated.query("SELECT COUNT(*) FROM offline_doc_items").use { rows ->
+            rows.moveToFirst()
+            assertEquals("both are kept", 2, rows.getInt(0))
+        }
+    }
+
+    private companion object {
+        /** Names of this test's own: the real database is never opened by a test. */
+        const val TEST_DATABASE = "migration-test.db"
+
+        /**
+         * A second one, because the harness migrates the file it is given and two tests sharing a name
+         * would be two tests fighting over one database rather than two cases of one change.
+         */
+        const val TEST_DATABASE_SHARED = "migration-test-shared.db"
+    }
+}

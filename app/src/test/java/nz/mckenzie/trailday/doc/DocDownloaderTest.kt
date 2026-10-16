@@ -1,10 +1,10 @@
 package nz.mckenzie.trailday.doc
 
 import nz.mckenzie.trailday.domain.doc.DocBounds
-import nz.mckenzie.trailday.domain.doc.DocTrack
-import nz.mckenzie.trailday.domain.doc.DocTrackQuery
+import nz.mckenzie.trailday.domain.doc.DocItem
+import nz.mckenzie.trailday.domain.doc.DocSource
+import nz.mckenzie.trailday.domain.doc.DocQuery
 import nz.mckenzie.trailday.domain.geo.GeoPoint
-import nz.mckenzie.trailday.domain.track.TrackInterchange
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -17,31 +17,28 @@ import org.junit.Test
  * worth-holding rules are that it keeps asking until a page comes back short, and that a failure
  * half way through keeps the pages that did arrive rather than throwing them away.
  */
-class DocTrackDownloaderTest {
+class DocDownloaderTest {
 
-    private fun track(id: Long): DocTrack = DocTrack(
+    private fun track(id: Long): DocItem = DocItem(
+        source = DocSource.TRACKS,
         objectId = id,
         name = "Track $id",
-        kind = "Walking Track",
-        reading = TrackInterchange.Reading(
-            paths = listOf(listOf(GeoPoint(-46.6, 168.3), GeoPoint(-46.61, 168.31))),
-            sideTracks = 0,
-            segmentsDidNotMeet = false
-        )
+        paths = listOf(listOf(GeoPoint(-46.6, 168.3), GeoPoint(-46.61, 168.31))),
+        facts = mapOf("SubObjectType" to "Walking Track")
     )
 
     private val box = DocBounds(minLat = -46.7, minLng = 168.1, maxLat = -46.5, maxLng = 168.6)
 
     /** A source that hands back prepared pages, recording the offset each was asked at. */
-    private class PagingSource(private val pages: List<List<DocTrack>>) : DocTracksSource {
+    private class PagingSource(private val pages: List<List<DocItem>>) : DocReader {
         val offsets = mutableListOf<Int>()
         private var call = 0
 
-        override suspend fun search(query: DocTrackQuery): DocTracksResult {
+        override suspend fun search(query: DocQuery): DocReadResult {
             offsets += query.offset
             val page = pages.getOrElse(call) { emptyList() }
             call++
-            return DocTracksResult.Found(page)
+            return DocReadResult.Found(page)
         }
     }
 
@@ -49,14 +46,14 @@ class DocTrackDownloaderTest {
     fun `a full page is followed by the next, until a short one ends it`() {
         val source = PagingSource(
             listOf(
-                List(DocTrackDownloader.PAGE) { track(it.toLong()) },
+                List(DocDownloader.PAGE) { track(it.toLong()) },
                 listOf(track(9999))
             )
         )
 
-        val result = runBlocking { DocTrackDownloader(source).download(box) }
+        val result = runBlocking { DocDownloader(source).download(box, DocSource.TRACKS) }
 
-        assertEquals(DocTrackDownloader.PAGE + 1, (result as DocDownloadResult.Done).tracks.size)
+        assertEquals(DocDownloader.PAGE + 1, (result as DocDownloadResult.Done).items.size)
         assertEquals("the second page was asked for where the first ended", listOf(0, 2000), source.offsets)
     }
 
@@ -64,29 +61,29 @@ class DocTrackDownloaderTest {
     fun `one short page is the whole download`() {
         val source = PagingSource(listOf(listOf(track(1), track(2))))
 
-        val done = runBlocking { DocTrackDownloader(source).download(box) } as DocDownloadResult.Done
+        val done = runBlocking { DocDownloader(source).download(box, DocSource.TRACKS) } as DocDownloadResult.Done
 
-        assertEquals(2, done.tracks.size)
+        assertEquals(2, done.items.size)
         assertEquals(listOf(0), source.offsets)
     }
 
     @Test
     fun `a failure half way keeps the pages that arrived`() {
-        val source = object : DocTracksSource {
+        val source = object : DocReader {
             private var call = 0
-            override suspend fun search(query: DocTrackQuery): DocTracksResult {
+            override suspend fun search(query: DocQuery): DocReadResult {
                 call++
                 return if (call == 1) {
-                    DocTracksResult.Found(List(DocTrackDownloader.PAGE) { track(it.toLong()) })
+                    DocReadResult.Found(List(DocDownloader.PAGE) { track(it.toLong()) })
                 } else {
-                    DocTracksResult.Failed("Unable to resolve host")
+                    DocReadResult.Failed("Unable to resolve host")
                 }
             }
         }
 
-        val failed = runBlocking { DocTrackDownloader(source).download(box) } as DocDownloadResult.Failed
+        val failed = runBlocking { DocDownloader(source).download(box, DocSource.TRACKS) } as DocDownloadResult.Failed
 
-        assertEquals("the first page is kept", DocTrackDownloader.PAGE, failed.tracks.size)
+        assertEquals("the first page is kept", DocDownloader.PAGE, failed.items.size)
         assertTrue("and the reason is the service's", failed.message.contains("Unable to resolve host"))
     }
 }
