@@ -246,3 +246,23 @@ Two things came out of it that this plan did not foresee:
   ignored, because ignoring it would leave the page believing it had moved a track it had not.
 
 Steps 2 to 11 are as written above.
+
+**Step 2 is done.** DOC's four services are read - tracks, huts, campsites and bike locations - and
+what DOC says about each is kept: a hut's bookable flag, its facilities line and its place, a campsite's
+sites, a bike location's difficulty and its time. The cache is keyed by the source as well as by DOC's
+number, which is the one schema change this app has ever made; the migration carries a walker's
+downloaded area across rather than dropping it.
+
+Four things came out of asking DOC rather than assuming them, and they shape the screens to come:
+
+- **A hut has no bunk count.** What it has is a facilities line, and that line is very often empty.
+- **`hasAlerts` is not a yes-or-no.** Every row of every service carries the same sentence telling the
+  walker to check DOC's own page, so nothing may read it as "no alerts" - which is what the mock
+  screens' "none reported" would have done.
+- **The bike layer is points**, as the plan expected: where riding is permitted, with a difficulty and
+  a time. The app calls it "Bike locations".
+- **DOC's text arrives with HTML in it**, truncated mid-tag, so it is stripped before anyone reads it.
+
+**The screens still show tracks, and the download still covers tracks.** The browser over four sources
+is step 4 and the area's DOC data in one act is step 5; this step was the reading, and the reading is
+what everything after it stands on.
