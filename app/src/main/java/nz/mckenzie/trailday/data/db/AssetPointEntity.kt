@@ -10,7 +10,7 @@ import androidx.room.PrimaryKey
  *
  * Stored as rows rather than an encoded blob so geometry can be re-filtered or
  * simplified later without a data migration. An asset that is a place rather than a
- * path has exactly one of these; a line has as many as the operator drew.
+ * path has exactly one of these; a line has as many as the walker drew.
  *
  * **A row knows which path it belongs to.** [pathIndex] 0 is the line itself and 1 and up are the
  * side tracks hanging off it, in the order they were drawn; [sequence] counts within one path. That

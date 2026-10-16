@@ -152,7 +152,7 @@ class BasemapStylesTest {
      * The phone's own style document, against the rules MapLibre judges an expression by.
      *
      * The other half of the test the desk's style has, and the one that matters most here: this
-     * document is the app's map, and a style the renderer refuses is a blank rectangle where the farm
+     * document is the app's map, and a style the renderer refuses is a blank rectangle where the map
      * should be - on the phone, with no console open to say why. v0.6.97 shipped a filter shaped
      * `["literal", "city", "town"]`, which a `literal` may not be, and this is what catches that.
      */

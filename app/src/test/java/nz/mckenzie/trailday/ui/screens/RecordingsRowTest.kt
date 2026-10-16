@@ -8,10 +8,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * What a recording's row says about it.
+ * What a trip's row says about it.
  *
- * A recording is the evidence behind a spray, so the row has to be honest about two things
- * in particular: a session that is still running, and a session whose asset has since been
+ * A trip is the record of a walk or a ride, so the row has to be honest about two things
+ * in particular: a session that is still running, and a trip whose place has since been
  * deleted. Saying nothing in either case makes the list read as a set of finished jobs,
  * which is exactly what it is not.
  */
@@ -54,17 +54,17 @@ class RecordingsRowTest {
     }
 
     @Test
-    fun `a recording whose asset has gone says so, rather than saying nothing`() {
+    fun `a trip whose place has gone says so, rather than saying nothing`() {
         assertEquals(
-            "Its asset has since been deleted",
+            "Its place has since been deleted",
             recordingAsset(row(assetId = 7L, assetName = null))
         )
     }
 
     @Test
-    fun `a recording made without an asset does not claim its asset was deleted`() {
+    fun `a trip made without a place does not claim its place was deleted`() {
         assertEquals(
-            "Not linked to an asset",
+            "Not linked to a place",
             recordingAsset(row(assetId = null, assetName = null))
         )
     }

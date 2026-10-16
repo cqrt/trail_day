@@ -43,9 +43,9 @@ fun polylineLengthMeters(points: List<GeoPoint>): Double {
  * Shortest distance in metres from [point] to the segment [start]-[end].
  *
  * Uses a local equirectangular projection, which is accurate to well under a
- * metre over the distances involved in a sprayed track (tens to hundreds of
+ * metre over the distances involved in a recorded track (tens to hundreds of
  * metres). This is the primitive used to work out how much of a planned track
- * a recorded spray actually covered.
+ * a trip actually covered.
  */
 fun distanceToSegmentMeters(point: GeoPoint, start: GeoPoint, end: GeoPoint): Double {
     val midLatRad = Math.toRadians((start.lat + end.lat) / 2.0)

@@ -5,21 +5,21 @@ package nz.mckenzie.trailday.domain.tiles
  *
  * **The problem this answers.** The aerial imagery is a photograph: it says what the ground looks
  * like and nothing about what any of it is called. The drawn map has names, but it is a different
- * basemap - an operator reading the photograph to decide where to spray cannot see that the paddock
+ * basemap - a walker reading the photograph to decide where they are cannot see that the paddock
  * they are looking at is beside Waipukurau.
  *
  * **Where the names come from.** LINZ publishes the same data the imagery comes from as **vector
  * tiles**, and one layer of them is a point per named place with the name in [NAME_PROPERTY]. It is
  * the same service, the same key and the same licence as the imagery, so nothing new is being trusted
  * - see https://basemaps.linz.govt.nz. Only that one layer is drawn: the tile also carries contours,
- * buildings and streets, which the app either has a better answer for or does not want on a spray map.
+ * buildings and streets, which the app either has a better answer for or does not want on this map.
  *
  * **Both maps read this file.** The phone's own style and the desk's are built by different code for
  * good reasons, so the numbers a name is written with live here and both read them - the same reason
  * [nz.mckenzie.trailday.map.TrackNames] exists. A town written one size on the phone and another on
  * the desk is the drift this file is here to stop.
  *
- * **The tiles are small** - about fifteen kilobytes where the operator works, against tens of
+ * **The tiles are small** - about fifteen kilobytes where the walker works, against tens of
  * kilobytes per aerial tile - and they are kept in the same store, by the same server, as everything
  * else the map fetches. So names arrive for the ground that has been looked at, offline, exactly as
  * the imagery does over ground that has been looked at.
@@ -176,7 +176,7 @@ object PlaceLabels {
     /**
      * Towns and cities: the answer to "which town is this near", which is the whole question.
      *
-     * Drawn from a wide view, because that is the view a town answers - the operator zoomed out to
+     * Drawn from a wide view, because that is the view a town answers - the walker zoomed out to
      * get their bearings, and the name of the nearest town is what they are looking for.
      */
     val TOWNS = Band(
@@ -189,7 +189,7 @@ object PlaceLabels {
     )
 
     /**
-     * Lakes: the other thing an operator finds their bearings by.
+     * Lakes: the other thing a walker finds their bearings by.
      *
      * LINZ carries a lake as a **point** in this layer as well as a shape in `water_polygons`, and the
      * point is what a name wants: it sits where the lake is named, at the size the dam or the shoreline
@@ -206,7 +206,7 @@ object PlaceLabels {
     )
 
     /**
-     * Villages, localities and suburbs: the finer names, once the operator is close enough for them.
+     * Villages, localities and suburbs: the finer names, once the walker is close enough for them.
      *
      * Held back to a close view for the reason the app holds its own track names back: several of these
      * on one screen read as a muddle, and a locality answers a question - "where exactly is this" -
@@ -226,7 +226,7 @@ object PlaceLabels {
      *
      * Drawn from the same wide view the lakes are, and for the same reason: a bay or a sound is a big
      * thing that reads at the scale of a district, and one of the few names worth having when the
-     * operator is looking at a coastline rather than at ground.
+     * walker is looking at a coastline rather than at ground.
      */
     val BAYS = Band(
         id = "linz-place-bays",
@@ -246,7 +246,7 @@ object PlaceLabels {
      * property in that layer - which is `river` for everything that flows, burns and creeks included.
      *
      * **Held back to zoom 12**, and this is the densest band of the lot: a Fiordland tile at z11 has
-     * over a hundred named streams in it, and at z12 the operator is looking at a few square kilometres
+     * over a hundred named streams in it, and at z12 the walker is looking at a few square kilometres
      * of it. The map drops a name that will not fit without touching another, which is what keeps a
      * catchment from becoming a screen of text.
      */
@@ -263,12 +263,12 @@ object PlaceLabels {
     )
 
     /**
-     * Peaks: which hill that is, once the operator is looking at the hill.
+     * Peaks: which hill that is, once the walker is looking at the hill.
      *
      * Held back further than the rest, and further than a named summit might at first seem to deserve:
      * LINZ publishes peaks from low zooms, and a range has dozens of them, so a wide view with every
      * summit on it is a screen of names with the ground lost underneath. They are also the band no
-     * spray decision is made from - they are for reading the country rather than the paddock.
+     * decision is made from - they are for reading the country rather than the paddock.
      */
     val PEAKS = Band(
         id = "linz-place-peaks",
@@ -292,8 +292,8 @@ object PlaceLabels {
      * White letters with a dark outline, as the app writes its own names - see
      * [nz.mckenzie.trailday.map.TrackNames.COLOUR].
      *
-     * White because it is the one colour the traffic light never uses, so a place name never says
-     * anything about when work is due, and because over a photograph (green paddocks, grey roads,
+     * White because it is a colour no kind uses, so a place name never competes with the line under
+     * it, and because over a photograph (green paddocks, grey roads,
      * brown hills) white with a dark edge is what is readable.
      */
     const val COLOUR = "#FFFFFF"

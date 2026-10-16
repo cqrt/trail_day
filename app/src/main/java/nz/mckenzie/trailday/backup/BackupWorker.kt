@@ -19,7 +19,7 @@ import nz.mckenzie.trailday.data.db.TrailDayDatabase
  * deferrable work that should wait for a network, survive a reboot and not fight Doze.
  *
  * The failure path is the point of the worker existing at all. A backup that has been
- * failing silently for a season is worse than no backup, because the operator believes they
+ * failing silently for a season is worse than no backup, because the walker believes they
  * are covered - so a failure is retried, and then said out loud.
  */
 class BackupWorker(
@@ -58,14 +58,14 @@ class BackupWorker(
                 }
 
                 OffsiteResult.RefusedEmpty -> {
-                    // Refusing is right, and is what a fresh install does until the operator
+                    // Refusing is right, and is what a fresh install does until the walker
                     // restores. Worth saying only when a copy exists off-site: then it means
                     // this phone has lost what the copy still holds.
                     if (settings.lastOffsiteBackupAt.first() > 0L) {
                         tellTheOperator(
                             settings = settings,
                             title = "Nothing on this phone to back up",
-                            body = "This phone holds no assets or recordings, so the " +
+                            body = "This phone holds no places or trips, so the " +
                                 "copy in ${target.label} was left untouched. If that is not " +
                                 "what you expected, restore from it in Settings."
                         )
@@ -94,7 +94,7 @@ class BackupWorker(
      * Says it once, not every week.
      *
      * A backup failing for a month is worth four notifications at most, and this is the
-     * difference between an operator who fixes it and one who turns the app's notifications
+     * difference between a walker who fixes it and one who turns the app's notifications
      * off. The deadline is stored rather than counted, so it survives a restart.
      */
     private suspend fun tellTheOperator(settings: SettingsRepository, title: String, body: String) {

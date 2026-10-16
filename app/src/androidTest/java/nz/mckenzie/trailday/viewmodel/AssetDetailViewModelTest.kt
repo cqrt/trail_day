@@ -60,7 +60,7 @@ class AssetDetailViewModelTest {
 
     /**
      * The edit form, filled in the way the screen fills it, so these tests exercise the
-     * same path the operator does rather than a shortcut only the test knows.
+     * same path the walker does rather than a shortcut only the test knows.
      */
     private fun edit(
         asset: AssetEntity,

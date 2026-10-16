@@ -10,7 +10,7 @@ import org.junit.Test
  *
  * The cache row is the only place a path is not a points table, so what has to be held still is that
  * a track comes back exactly - every path, every vertex, in order - and that a broken row is nothing
- * rather than a crash in front of an operator with no reception.
+ * rather than a crash in front of a walker with no reception.
  */
 class DocPathsJsonTest {
 

@@ -37,16 +37,16 @@ object TrackNames {
      *
      * Read by both maps' name layers, and by the line layers to leave that stretch alone: a stretch
      * drawn twice - once as the track and once for the name - would paint over the colours of a track
-     * that is part sprayed.
+     * that is part walked.
      */
     const val CARRIES_NAME = "carriesName"
 
     /**
      * The zoom the map has to be at before a name is drawn at all.
      *
-     * The operator's own finding, after living with v0.6.57: on a wide view the names crowd together over
+     * The walker's own finding, after living with v0.6.57: on a wide view the names crowd together over
      * a work and read as a muddle, so a name now waits until the map is close in. The level shipped at
-     * seventeen in v0.6.58 and is sixteen from v0.6.59 - the operator's own adjustment after living with
+     * seventeen in v0.6.58 and is sixteen from v0.6.59 - the walker's own adjustment after living with
      * the floor. A level of the map's own zoom is the right kind of number rather than a distance on the
      * ground: how big the letters are against the ground under them is exactly what the zoom says, and
      * that is what decides whether a name can be read. Both maps hold their names back until this level -
@@ -80,8 +80,8 @@ object TrackNames {
     /**
      * White letters with a dark outline.
      *
-     * White is the one colour the traffic light never uses, so a name never says anything about when the
-     * work is due - the same argument the ground's own white rim is made of.
+     * White is a colour no kind uses, so a name never competes with the line it sits beside - the
+     * same argument the markers' own white edge is made of.
      */
     const val COLOUR = "#FFFFFF"
     const val HALO_COLOUR = "#000000"

@@ -10,7 +10,7 @@ import org.junit.Test
  *
  * What is pinned here is that the stretch is *near the middle of the track* and *gentle enough to write
  * across* - the two things the map needs before it will draw a name at all - because both of those are
- * decisions taken without a map in front of them, and a track is where the operator will notice if they
+ * decisions taken without a map in front of them, and a track is where the walker will notice if they
  * are wrong: a name at the far end of a paddock, or a name that is not there.
  */
 class TrackNamesTest {
@@ -99,7 +99,7 @@ class TrackNamesTest {
         // Both maps read these, so a change here changes both - which is the point of them being in one
         // place. Twelve pixels with a thin outline and a wide allowance for corners is what the first
         // look measured as readable; see `build/verify/names-look-first.txt`. The zoom floor is the
-        // operator's own finding after living with the first version: names crowded a wide view and read
+        // walker's own finding after living with the first version: names crowded a wide view and read
         // as a muddle, so a name now waits until the map is close in - and both maps wait for the same
         // level, which is why the number is here rather than in either map's own file.
         assertEquals(16f, TrackNames.MIN_ZOOM)

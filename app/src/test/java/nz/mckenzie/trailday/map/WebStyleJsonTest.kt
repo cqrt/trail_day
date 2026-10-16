@@ -314,7 +314,7 @@ class WebStyleJsonTest {
     @Test
     fun `a name waits for a close view, and the line it belongs to does not`() {
         // What the zoom floor is for: a name read on a wide view is a muddle, a track seen on a wide view
-        // is a track. A floor on the lines as well would hide the work itself from the operator until they
+        // is a track. A floor on the lines as well would hide the work itself from the walker until they
         // zoomed in, which is the opposite of what a map is for.
         listOf(AssetLayerIds.TRACKS, AssetLayerIds.BIKE_TRACKS).forEach { id ->
             assertNull("$id is drawn at every zoom", layer(id)["minzoom"])
@@ -415,11 +415,11 @@ class WebStyleJsonTest {
      * **This is the test v0.6.97 needed and did not have.** The builder wrote
      * `["literal", "city", "town"]`, and a `literal` takes one argument - the array - so MapLibre
      * refused the style outright: the desk drew a blank rectangle where the work should be, and said
-     * so in words the operator could do nothing with ("'literal' expression requires exactly one
+     * so in words the walker could do nothing with ("'literal' expression requires exactly one
      * argument, but found 3 instead"). Every test in this file passed, because they checked the
      * values inside the expressions and the values were right.
      *
-     * Both styles are checked, names on and names off: the expressions only appear when the operator
+     * Both styles are checked, names on and names off: the expressions only appear when the walker
      * has asked for them, which is exactly when they are not being looked at in a test run.
      */
     @Test

@@ -16,9 +16,9 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * Backup files at the edges: the file the operator picks, and the text in it.
+ * Backup files at the edges: the file the walker picks, and the text in it.
  *
- * The operator chooses the destination (a Downloads folder, a USB stick, an email
+ * The walker chooses the destination (a Downloads folder, a USB stick, an email
  * attachment) through the system file picker, so this deals in `Uri`s. Inspecting is
  * separate from restoring on purpose: the screen shows what a file holds, and what
  * the app holds, before anything is replaced.

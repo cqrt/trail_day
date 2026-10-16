@@ -77,8 +77,8 @@ class TileMathTest {
     }
 
     @Test
-    fun `default tile size estimate is sane for a spray block`() {
-        // ~20 x 20 km around a rural spray area.
+    fun `default tile size estimate is sane for a walking area`() {
+        // ~20 x 20 km around a rural area.
         val block = LatLngBounds(minLat = -41.4, minLng = 174.6, maxLat = -41.22, maxLng = 174.85)
         val bytes = TileMath.estimateBytes(block, 12, 16)
         val mb = bytes / 1_000_000.0

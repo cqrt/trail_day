@@ -124,7 +124,7 @@ class MarkerIconsTest {
 
     @Test
     fun everyMarkerWearsAThinWhiteEdge() {
-        // "Thin" is the operator's word for it and the number in the code is a width in
+        // "Thin" is the walker's word for it and the number in the code is a width in
         // density-independent pixels, so this draws the edge the map draws - at the marker's own size -
         // and counts what it costs. The edge has to be there, because a red marker with no white round
         // it was hard to read over winter imagery; and it has to be thin, because at two dp the markers

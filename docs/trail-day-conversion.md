@@ -314,4 +314,24 @@ Asked and answered before any of it was built, so the plan is a plan rather than
   invent rideable geometry DOC does not publish.
 - **DOC's datasets are being replaced.** Huts and tracks are both marked deprecated with replacements
   coming; the plan keeps every service URL in one place per source so that is a small change.
-- **Nothing here is built yet**, and the app still sprays. This is the plan to stop.
+## Where this got to
+
+Most of this plan is now built and shipped as its own commits, and the app no longer sprays at all.
+Done:
+
+- **The identity** — Trail Day, a new app id, a new icon, the repositories renamed.
+- **The spraying taken out, in steps** — the desk stops showing it first, then the blocks, then the
+  spray records and the products with the traffic light (they cannot come apart: the light reads the
+  sprays), and the kinds become the five a walker or rider wants. The database is at version 1 with
+  no migrations, because nothing has ever shipped under this app id.
+- **The laptop page** reduced to the map, the places, drawing a line, importing and the DOC browser.
+- **The README** rewritten around what the app now is.
+
+Still to do, exactly as the plan has it:
+
+- **Huts, campsites and bike tracks read from DOC** the way its tracks are. Until then they are kinds
+  you keep yourself: drawn on the map or brought in from a file.
+- **The trip** — the recorder and the recordings screen reframed as a walk or a ride.
+- **Waypoints** saved from the map, and **"download along this track"**.
+- **The release** — a first tagged version, once the signing secrets are copied onto the new
+  repositories.

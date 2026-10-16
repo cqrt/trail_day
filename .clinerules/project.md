@@ -1,8 +1,9 @@
 # Trail Day — project rules
 
-An Android app for planning spray tracks and keeping spray records: Kotlin + Jetpack Compose,
-Room, DataStore, WorkManager, MapLibre Android, kotlinx-serialization. Public repository
-`cqrt/trail_day`. The off-site backups live in the private `cqrt/trail-day-backups`.
+An Android app for walking and riding DOC tracks, keeping the places you find, and recording the
+walks and rides: Kotlin + Jetpack Compose, Room, DataStore, WorkManager, MapLibre Android,
+kotlinx-serialization. Public repository `cqrt/trail_day`. The off-site backups live in the private
+`cqrt/trail-day-backups`.
 
 Rules are split by what they govern: this file is the project itself, and
 `release-and-verification.md` is how a change gets out the door. Both are always active.
@@ -33,7 +34,7 @@ Rules are split by what they govern: this file is the project itself, and
 
 ## How to report back
 
-The operator reads the summary to decide what happens next, not to review the work. So:
+The person reading the summary is deciding what happens next, not reviewing the work. So:
 
 - **Say what is finished and what is next.** Nothing else, unless it was asked for.
 - **Answer the question that was asked.** "What is left?" gets the list of what is left — not a
@@ -51,9 +52,9 @@ The operator reads the summary to decide what happens next, not to review the wo
 - **The backup file has one writer.** `GitHubBackupTarget.save` PUTs the whole document under
   `trail-day-<model>.json`, so anything a second writer put in that file is destroyed by the next
   backup, silently.
-- **Deleting an asset cascades into its sprays** (`SprayEventEntity`, `onDelete = CASCADE`);
-  recordings survive (`RecordedSessionEntity.assetId` has no foreign key). Never make that easy by
-  accident.
+- **Deleting a place cascades into the points it is drawn from** (`AssetPointEntity`, `onDelete =
+  CASCADE`); recordings survive (`RecordedSessionEntity.assetId` has no foreign key). Never make that
+  easy by accident.
 - **The tile server is loopback-only by design** (`offline/LocalTileServer.kt`), and
   `TileServerHolder` is the only thing that starts it.
 - An empty database is never written over the off-site copy (`domain/backup/OffsiteBackupRules.kt`).

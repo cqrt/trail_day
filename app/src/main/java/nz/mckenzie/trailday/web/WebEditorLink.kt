@@ -8,9 +8,9 @@ import java.security.SecureRandom
  *
  * The editor is served by the phone, so the address is whatever address the phone holds *on the
  * Wi-Fi* - and a phone usually holds more than one. Mobile data is the case that matters: it is a
- * real address, it looks just as good to a naive picker, and no laptop on the farm's Wi-Fi can
+ * real address, it looks just as good to a naive picker, and no laptop on the same Wi-Fi can
  * reach it. Picking between them is the only interesting thing in this file, and it is kept away
- * from the socket on purpose: it is a decision about the operator's own network, so it is a pure
+ * from the socket on purpose: it is a decision about the walker's own network, so it is a pure
  * function of what the interfaces say, and a test can hold it.
  *
  * None of this needs a permission. `NetworkInterface` lists the device's own addresses, so the app
@@ -44,7 +44,7 @@ object WebEditorLink {
      *
      * Dropped: loopback, which is only the phone itself (and `LocalTileServer`'s own promise - the
      * editor is deliberately not that), and link-local, which needs a scope name the laptop does
-     * not have. Ordered: a private IPv4 address (a farm's Wi-Fi, a hotspot, most ethernets) over a
+     * not have. Ordered: a private IPv4 address (the home Wi-Fi, a hotspot, most ethernets) over a
      * public one, an address on a wireless interface over any other, and IPv4 before IPv6 because
      * a ULA is the least likely to be what the laptop can use and the least pleasant to type.
      */
@@ -56,7 +56,7 @@ object WebEditorLink {
     /**
      * The address to open on the computer - token and all, or bare when this run asks for none.
      *
-     * A null [token] is a run with no secret, which is a thing the operator can choose: see
+     * A null [token] is a run with no secret, which is a thing the walker can choose: see
      * [WebEditorServer]. What comes back then is the plain address, so the card shows a door that
      * anybody on the Wi-Fi can walk through as exactly that - and nothing is left on the end that
      * looks like a key and is not being checked.
@@ -105,7 +105,7 @@ object WebEditorLink {
         }
     }
 
-    /** The three RFC 1918 ranges: what a farm's router hands out, and what a hotspot hands out. */
+    /** The three RFC 1918 ranges: what a router hands out, and what a hotspot hands out. */
     private fun isPrivateV4(address: String): Boolean {
         val parts = address.split('.').mapNotNull { it.toIntOrNull() }
         if (parts.size != 4 || parts.any { it !in 0..255 }) return false

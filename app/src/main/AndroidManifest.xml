@@ -8,7 +8,7 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-    <!-- Serving the track editor over the farm's Wi-Fi, while its switch is on -->
+    <!-- Serving the track editor over the Wi-Fi, while its switch is on -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -21,7 +21,7 @@
 
     <!--
         Installing a downloaded update over this copy of the app. This only lets the
-        request be made: Android still asks the operator to confirm every time, and an APK
+        request be made: Android still asks the walker to confirm every time, and an APK
         signed with a different key is refused by the installer whatever this says.
     -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
@@ -63,7 +63,7 @@
         <!--
             The editor, served to a computer on the same Wi-Fi. Data-sync typed because what it
             does is serve data, and only ever started from the switch on the Settings screen - so
-            the phone is listening on the farm's network only while somebody has asked it to.
+            the phone is listening on the network only while somebody has asked it to.
         -->
         <service
             android:name=".web.WebEditorService"

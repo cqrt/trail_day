@@ -83,7 +83,7 @@ class AssetListViewModel(
      * Imports a GPX, KML, KMZ or GeoJSON file chosen through the system file picker.
      *
      * Failures are surfaced as messages rather than crashes: a malformed or
-     * empty track file is a normal thing for an operator to pick by mistake.
+     * empty track file is a normal thing for a walker to pick by mistake.
      */
     fun importTrackFile(uri: Uri) {
         viewModelScope.launch {

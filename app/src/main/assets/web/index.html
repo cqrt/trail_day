@@ -7,13 +7,13 @@
   <!--
     The page's own files are loaded by the script at the end of the body, not by tags written here,
     because every request the phone answers needs the token and the token is in the address the
-    operator opened. A browser asks for a stylesheet or a script with no query unless it is told
+    walker opened. A browser asks for a stylesheet or a script with no query unless it is told
     otherwise, and a request without the token is a 403 - which looks like a page of unstyled text
     with nothing on it, the exact failure the script exists to prevent.
 
     MapLibre GL JS is vendored rather than pulled from a CDN: the page is served by the phone over
-    the farm's own Wi-Fi, so it has to work with the internet down, and nothing from a third party
-    should be running inside a page that can see the operator's own database. The version is pinned
+    your own Wi-Fi, so it has to work with the internet down, and nothing from a third party
+    should be running inside a page that can see the walker's own database. The version is pinned
     in vendor/, with its licence beside it.
   -->
 </head>
@@ -30,7 +30,7 @@
     <aside id="side">
       <div id="side-actions">
         <!-- Off until the map has its style: a drawing needs somewhere to be drawn. -->
-        <button id="draw" type="button" disabled>Draw a new asset</button>
+        <button id="draw" type="button" disabled>Draw a new place</button>
         <!--
           A track that was drawn somewhere else: the file's own line is read by the phone and becomes
           the drawing, so a fence somebody walked with a handheld arrives ready to name and save
@@ -62,7 +62,7 @@
       <input id="search" type="search" placeholder="Find a place" autocomplete="off">
 
       <!--
-        The type, beside the words: which kind of asset is being looked for. Its options are the
+        The type, beside the words: which kind of place is being looked for. Its options are the
         phone's own, filled in once the phone has answered, so a kind the phone learns appears here
         already named. "Anything" is first, and is what a page opened and left alone shows.
       -->
@@ -73,7 +73,7 @@
     <div id="map"></div>
     <!--
       Said while a file is over the map rather than after it is dropped: a track file dropped anywhere
-      else in the browser is opened as a page, and an operator who does not know the map is the target
+      else in the browser is opened as a page, and a walker who does not know the map is the target
       would watch the work disappear. Shown by `app.js` only while something is being dragged.
     -->
     <p id="drop-hint" hidden>Drop the GPX, KML, KMZ or GeoJSON file to put its line on the map</p>
@@ -86,7 +86,7 @@
       its own screen has; the keys are the desk's own, because a keyboard is the desk's own furniture, and
       they are pairs rather than sentences so the box stays a corner rather than a bar.
 
-      *What it is* is the phone's own kind list, and it is asked while a new asset is being drawn because
+      *What it is* is the phone's own kind list, and it is asked while a new place is being drawn because
       the kind decides the shape: a carpark is drawn with its closing side and counted in ground, and a
       line is not. The phone's own screen asks the same question in the same place.
     -->
@@ -192,7 +192,7 @@
     <!--
       Deleting from the desk, with the phone's own sentence about what is on the track shown first: the
       count, and whether this is even something the desk may do. The button is off when the phone says
-      the delete belongs there, so the operator is told why before pressing anything rather than after.
+      the delete belongs there, so the walker is told why before pressing anything rather than after.
     -->
     <div id="card-remove-row">
       <p id="card-remove-words"></p>
@@ -203,9 +203,9 @@
   <!--
     The details form: a place's name, what it is, and its notes. What it is comes from the phone's own
     kind list, in the phone's own words, arrived in the state document, so the desk offers the words the
-    phone offers and cannot offer a choice the phone would refuse. Nothing about spray methods, intervals,
-    blocks or pass counts is asked for here: those are the phone's own fields, the desk neither shows nor
-    sends them, and a save from this form cannot wipe them.
+    phone offers and cannot offer a choice the phone would refuse. Nothing else the phone keeps is asked
+    for here: those are the phone's own fields, the desk neither shows nor sends them, and a save from
+    this form cannot wipe them.
   -->
   <section id="edit" hidden>
     <form id="edit-form">

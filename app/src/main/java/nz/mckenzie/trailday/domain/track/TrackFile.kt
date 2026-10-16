@@ -30,7 +30,7 @@ object TrackFile {
      */
     private const val MAX_KML_BYTES = 4 * 1024 * 1024
 
-    /** Said when a `.kmz` opens but holds no KML document, in the operator's own words. */
+    /** Said when a `.kmz` opens but holds no KML document, in the walker's own words. */
     const val NO_KML_IN_ARCHIVE = "That .kmz file holds no KML document to read."
 
     /** Said when a `.kmz` cannot be opened at all - not a ZIP, or a broken one. */
@@ -69,7 +69,7 @@ object TrackFile {
                 }
             } catch (broken: IOException) {
                 // Not a readable archive after all - a corrupted download, or a file named .kmz that
-                // is not one. The operator is told in words rather than shown a ZipException.
+                // is not one. The walker is told in words rather than shown a ZipException.
                 throw IllegalArgumentException(ARCHIVE_UNREADABLE)
             }
         }

@@ -9,7 +9,7 @@ import org.junit.Test
  *
  * A re-created Record screen sends one. Treating it as a fresh recording is what put
  * "0 m" and "1 point" under a coverage measured from every fix of the pass, so the
- * operator was shown two numbers about one run that disagreed - and the coverage was
+ * walker was shown two numbers about one run that disagreed - and the coverage was
  * the one telling the truth.
  */
 class TrackingServiceStartTest {

@@ -316,7 +316,7 @@ private fun DocTracksTab(
 /**
  * Where a cache is: the area drawn over the imagery, fitted so the whole box is in the frame.
  *
- * Aerial imagery whatever basemap the operator reads their own maps on, for the same reason the
+ * Aerial imagery whatever basemap the walker reads their own maps on, for the same reason the
  * picker uses it: this is a picture of what was downloaded, and imagery is the only basemap whose
  * licence allows downloading ahead of time.
  */

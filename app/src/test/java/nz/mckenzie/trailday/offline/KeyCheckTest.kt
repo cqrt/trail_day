@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * How LINZ's answers are read back to the operator, and how much of a key is safe to
+ * How LINZ's answers are read back to the walker, and how much of a key is safe to
  * show on screen.
  */
 class KeyCheckTest {
@@ -31,7 +31,7 @@ class KeyCheckTest {
     fun `being rate limited is reported as itself, not as a bad key`() {
         val check = KeyCheck.fromStatus(429) as KeyCheck.Failed
 
-        // 429 is about volume, so telling the operator their key expired would send them
+        // 429 is about volume, so telling the walker their key expired would send them
         // off to request a new one for nothing.
         assertTrue(check.message.contains("429"))
         assertTrue("should not blame the key: ${check.message}", !check.message.contains("expired"))

@@ -12,7 +12,7 @@ import org.junit.Test
  * The plan said the desk should archive instead of deleting (`active = false`); the app has no screen
  * that shows an archived asset and no way to bring one back, so that would be a quiet removal - see
  * [AssetRemovalRules]. The archive was dropped rather than waited for, so this is the whole of the rule:
- * nothing attached, delete it; anything attached, say how much and send the operator to the phone.
+ * nothing attached, delete it; anything attached, say how much and send the walker to the phone.
  */
 class AssetRemovalRulesTest {
 
@@ -32,7 +32,7 @@ class AssetRemovalRulesTest {
         val removal = AssetRemovalRules.of("Old track", recordings = 1)
 
         assertFalse(removal.allowed)
-        assertTrue("says what is on it: ${removal.sentence}", removal.sentence.contains("1 recording"))
+        assertTrue("says what is on it: ${removal.sentence}", removal.sentence.contains("1 trip"))
     }
 
     @Test
@@ -40,7 +40,7 @@ class AssetRemovalRulesTest {
         val removal = AssetRemovalRules.of("Old track", recordings = 3)
 
         assertFalse(removal.allowed)
-        assertTrue("says how many: ${removal.sentence}", removal.sentence.contains("3 recordings"))
+        assertTrue("says how many: ${removal.sentence}", removal.sentence.contains("3 trips"))
     }
 
     @Test

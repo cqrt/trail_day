@@ -35,7 +35,7 @@ function limitOf(maxBytes) {
 }
 
 /**
- * Why this file will not be sent, in words for the operator, or null when it will be.
+ * Why this file will not be sent, in words for the walker, or null when it will be.
  *
  * Judged on the file's **name** rather than on its type, because the type a browser reports for a
  * track file is whatever the computer that wrote it decided, and half the computers that write one
@@ -62,7 +62,7 @@ export function importProblem(file, maxBytes = TRACK_LIMIT) {
  * The phone's own importer does exactly this with the name its file picker hands it - the file's
  * name rather than whatever is written inside the file, because a file called after the paddock it
  * was drawn for is named for the job and not for whatever tool exported it. It is a starting point
- * in a form the operator can type over, so nothing here is a decision about what the track is
+ * in a form the walker can type over, so nothing here is a decision about what the track is
  * called.
  */
 export function trackName(file) {
@@ -116,7 +116,7 @@ export function importedNote(fileName, read) {
         ? `one line of ${points} points with 1 side track`
         : `one line of ${points} points with ${sideTracks} side tracks`;
 
-  // The desk draws one track; a file of several is not silently shrunk to its first, so the operator
+  // The desk draws one track; a file of several is not silently shrunk to its first, so the walker
   // is told the rest are there and where to get them.
   const rest = others === 0
     ? ''
@@ -126,7 +126,7 @@ export function importedNote(fileName, read) {
   return `${fileName}: ${said}. Give it a name, then save it to the phone.${rest}`;
 }
 
-/** A size in words an operator reads at a glance: megabytes once there is one to speak of, whole
+/** A size in words a walker reads at a glance: megabytes once there is one to speak of, whole
  * kilobytes below that, and never "0 KB". */
 function sizeWords(bytes) {
   if (bytes >= 1024 * 1024) {

@@ -3,7 +3,7 @@ package nz.mckenzie.trailday.domain.geo
 import kotlin.math.roundToInt
 
 /**
- * A line's height in the words the operator reads.
+ * A line's height in the words the walker reads.
  *
  * *"≈520–664 m, up 140 m"* - how low and how high it goes, then the way it mostly goes. The "≈" is
  * there because the height came off a device rather than a survey, so this is a shape to read and not

@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * The address is the state rather than a boolean beside it, and that is the point: there is no way
  * to be "on" with nothing listening, because "on" *is* having an address to show. The Settings card
  * reads this, so a switch that cannot find the address to serve on comes back off rather than
- * sitting there claiming to work - the failure the operator would otherwise discover on the laptop.
+ * sitting there claiming to work - the failure the walker would otherwise discover on the laptop.
  *
  * The two track-file facts are here for the one thing the page has to get right without being able to
  * check it: the name a dropped file travels under, and how large a file the phone will take. Both are

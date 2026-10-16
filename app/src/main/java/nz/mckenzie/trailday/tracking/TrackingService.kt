@@ -32,7 +32,7 @@ import nz.mckenzie.trailday.ui.formatDistance
 
 /**
  * Records a GPS track in the foreground so the screen can be off for the whole
- * spray run.
+ * trip.
  *
  * Every accepted fix is written to the database as it arrives, so a crash, a
  * process kill or a flat battery costs at most the last fix. Accepted fixes are
@@ -115,8 +115,8 @@ class TrackingService : Service() {
             scope.launch {
                 recordings.setStatus(sessionId, newStatus)
 
-                // A pause is a break in the pass, not a gap in the fixes: the operator said
-                // they had stopped, so the ground in between is not counted as sprayed - and a
+                // A pause is a break in the pass, not a gap in the fixes: the walker said
+                // they had stopped, so the ground in between is not counted as covered - and a
                 // dropped signal, which looks the same in the fixes, is. Written here, where
                 // the button is, because the fixes cannot tell the two apart afterwards. See
                 // RecordedBreakEntity.
@@ -187,7 +187,7 @@ class TrackingService : Service() {
      * the session's own fixes. Without this, collecting again on a session that is
      * already half recorded restarts the distance at zero while the fixes - and with
      * them the coverage, which is measured from the fixes - carry on, leaving an
-     * operator two numbers about one pass that disagree, and no way to tell which is
+     * walker two numbers about one pass that disagree, and no way to tell which is
      * the honest one. A session with nothing recorded yet is unaffected.
      */
     private suspend fun resumeFromWhatIsRecorded() {
@@ -282,7 +282,7 @@ class TrackingService : Service() {
  * Kept beside the service rather than inside it so the rule can be read and tested
  * without a running service: a re-created Record screen sends START again for the
  * session that is already recording, and that must not rewind a recording that is
- * going perfectly well - the operator would be told they had just started while the
+ * going perfectly well - the walker would be told they had just started while the
  * coverage beside it counted the whole pass.
  */
 internal fun stillRecording(

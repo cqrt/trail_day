@@ -60,7 +60,7 @@ class DrawAssetViewModelTest {
      * The live state of a drawing session, waited for the way the screen waits for it.
      *
      * The card's numbers are `WhileSubscribed` flows, so a test that reaches for `.value` without
-     * collecting gets the initial value and asserts about a number the operator never sees - the flows
+     * collecting gets the initial value and asserts about a number the walker never sees - the flows
      * only run while somebody is watching, which on the phone is the screen itself. Waiting for the
      * value is therefore both the honest reading and the race-free one.
      */
@@ -165,7 +165,7 @@ class DrawAssetViewModelTest {
         viewModel.save("Too short")
 
         assertNull("a line needs at least two points", viewModel.savedAssetId.value)
-        assertNotNull("the operator should be told why", viewModel.message.value)
+        assertNotNull("the walker should be told why", viewModel.message.value)
     }
 
     @Test
@@ -314,7 +314,7 @@ class DrawAssetViewModelTest {
         viewModel.addPoint(-41.5100, 173.9600)
         viewModel.addPoint(-41.5100, 173.9800)
 
-        // 550 m off the track with a fingertip's tolerance: this is the operator drawing, not pointing.
+        // 550 m off the track with a fingertip's tolerance: this is the walker drawing, not pointing.
         viewModel.addPoint(-41.5150, 173.9900, tapRadiusM = 40.0)
 
         assertEquals("the line grew", 3, viewModel.paths.value[0].size)
@@ -323,11 +323,11 @@ class DrawAssetViewModelTest {
     }
 
     /**
-     * The taps that the operator makes to carry a line on, made at the spacing a person taps them.
+     * The taps that the walker makes to carry a line on, made at the spacing a person taps them.
      *
      * Every one of these is a little past the end of the line, and nearer to it than a fingertip: from
      * v0.6.34 to v0.6.40 that was read as a tap **on** the line, so the point went inside it - where
-     * nothing moves - and what the operator saw was a count going up and a line standing still. The
+     * nothing moves - and what the walker saw was a count going up and a line standing still. The
      * points counted, and the line did not.
      */
     @Test
@@ -402,7 +402,7 @@ class DrawAssetViewModelTest {
         assertTrue("started again, to undo it this time", drawingBecome(viewModel, true))
         viewModel.undo()
         assertEquals("undo takes the side track with the junction tap", 1, viewModel.paths.value.size)
-        assertTrue("and hands the operator back to the line", pointsBecome(viewModel, 2))
+        assertTrue("and hands the walker back to the line", pointsBecome(viewModel, 2))
         assertTrue(drawingBecome(viewModel, false))
     }
 
@@ -502,7 +502,7 @@ class DrawAssetViewModelTest {
      * A track at the equator: 111 m east, in three vertices.
      *
      * Nowhere near the phone these tests stand in for, because that is the case this exists for: the
-     * operator is changing a track they drew weeks ago, from somewhere else entirely.
+     * walker is changing a track they drew weeks ago, from somewhere else entirely.
      */
     private suspend fun aDrawnTrack(repository: AssetRepository): Long {
         val junction = GeoPoint(0.0, 0.0005)

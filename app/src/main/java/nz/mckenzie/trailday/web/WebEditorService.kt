@@ -44,18 +44,18 @@ import nz.mckenzie.trailday.tracking.DevicePosition
  * The editor, served while the switch on the Settings screen is on.
  *
  * A foreground service for the same reason the recorder is one: the phone must keep serving while
- * the screen is off and the operator is reading the page on the laptop, and Android stops anything
+ * the screen is off and the walker is reading the page on the laptop, and Android stops anything
  * that is not foreground. The type is `dataSync` rather than `location`, because what it does is
  * serve data - it *reads* the phone's last fix for the desk's locate button, which is not the same
- * as tracking the operator around a paddock.
+ * as tracking the walker around a paddock.
  *
  * Everything it needs it takes from where the app already keeps it: the database through
- * `TrailDayDatabase`, the basemap from the settings the operator chose, the tiles from
+ * `TrailDayDatabase`, the basemap from the settings the walker chose, the tiles from
  * [TileServerHolder] - so the tiles a laptop draws are the tiles already downloaded for the
  * tractor - and the fix from [DevicePosition]. The token is made here, once per run, and lives only
  * here and in the running server: turning the switch off ends it, as it should for something that
  * is opened by its own address. A run may also be served with **no** token, which is a choice the
- * operator makes on the Settings card and which is read here, at the start of a run - so a run that
+ * walker makes on the Settings card and which is read here, at the start of a run - so a run that
  * is already going is built again when that choice changes, rather than left claiming an answer it
  * was not built with.
  */
@@ -77,7 +77,7 @@ class WebEditorService : Service() {
      * [server] is still null.
      *
      * It exists because "be serving" has to be a thing an app can ask for twice and get one run out
-     * of: the Settings switch is a tap an operator can land twice, and the app asks for the run
+     * of: the Settings switch is a tap a walker can land twice, and the app asks for the run
      * itself on the way to the map, which a rotation repeats. Without it the second ask tears the
      * first run down a moment after it was built and hands out a new token, breaking a page that was
      * already open. Only ever touched on the main thread, where every command below is handled.
@@ -107,8 +107,8 @@ class WebEditorService : Service() {
             ACTION_REFRESH -> if (server != null) start() else stopSelf()
             ACTION_STOP -> stopSelf()
         }
-        // Not sticky: a service that resurrected itself would put the phone back on the farm's
-        // network with nobody having asked - and with a token the operator no longer has.
+        // Not sticky: a service that resurrected itself would put the phone back on the
+        // network with nobody having asked - and with a token the walker no longer has.
         return START_NOT_STICKY
     }
 
@@ -124,7 +124,7 @@ class WebEditorService : Service() {
      *
      * The card's address is not taken away here because a replacement run sets a new one a moment
      * later, in the same trip through the main thread - so the switch cannot blink off and on while
-     * the operator watches it. [onDestroy] is where the address goes, because that is the one case
+     * the walker watches it. [onDestroy] is where the address goes, because that is the one case
      * where nothing is being served.
      */
     private fun stopRun() {
@@ -156,10 +156,10 @@ class WebEditorService : Service() {
 
         // The address the laptop will reach, which is one specific address on the Wi-Fi rather than
         // every interface the phone has: binding to all of them would put the editor on mobile data
-        // as well, and the plan's promise is a door on the farm's network.
+        // as well, and the plan's promise is a door on the network.
         val address = WebEditorLink.gather().firstOrNull()?.address
         if (address == null) {
-            // Plain English rather than a stack trace: the operator has just thrown a switch and
+            // Plain English rather than a stack trace: the walker has just thrown a switch and
             // nothing happened, so the log says the one thing that explains it.
             Log.w(TAG, "No address on the Wi-Fi, so the editor cannot be served")
             stopSelf()
@@ -169,7 +169,7 @@ class WebEditorService : Service() {
         val database = TrailDayDatabase.get(this)
         val settings = SettingsRepository(this)
 
-        // A run either has a token or asks for none, and which one it is is the operator's choice
+        // A run either has a token or asks for none, and which one it is is the walker's choice
         // made on the Settings card: null here is that second answer, not a missing value.
         val token = if (settings.webEditorTokenRequired.first()) WebEditorLink.newToken() else null
 
@@ -182,7 +182,7 @@ class WebEditorService : Service() {
             token = token,
             basemap = { settings.basemap.first() },
             position = { position.value },
-            // The map's own switch, read when the desk asks for its style: an operator who turns the
+            // The map's own switch, read when the desk asks for its style: a walker who turns the
             // names on and reloads the page gets them, without the run being rebuilt.
             placeNames = { settings.placeNames.first() },
             readPageFile = ::readPageFile,
@@ -199,7 +199,7 @@ class WebEditorService : Service() {
             // makes the address on the card work whichever way the laptop reaches it, and what lets
             // `adb forward` reach it for the checks in the plan. The tile server's loopback promise
             // is a different server and is untouched; what guards this one is the token, and the
-            // address the operator is given is still the Wi-Fi one, because that is the one a
+            // address the walker is given is still the Wi-Fi one, because that is the one a
             // laptop on the same network can use.
             host = WebEditorServer.ANY_ADDRESS,
             token = token,
@@ -284,7 +284,7 @@ class WebEditorService : Service() {
     }
 
     /**
-     * The notification carries the address rather than a way to stop: the operator is at a computer
+     * The notification carries the address rather than a way to stop: the walker is at a computer
      * and the switch is on the phone in their pocket. It is the shade where the address is found
      * when the laptop is not the one they read the card on.
      */

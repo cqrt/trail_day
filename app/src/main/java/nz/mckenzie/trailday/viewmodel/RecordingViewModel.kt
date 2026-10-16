@@ -68,7 +68,7 @@ class RecordingViewModel(
     val apiKey: StateFlow<String> = settingsRepository.linzApiKey
         .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
-    /** Which map to draw the pass on: the operator's choice in Settings. */
+    /** Which map to draw the pass on: the walker's choice in Settings. */
     val basemap: StateFlow<Basemap> = settingsRepository.basemap
         .stateIn(viewModelScope, SharingStarted.Eagerly, Basemap.DEFAULT)
 
@@ -101,14 +101,14 @@ class RecordingViewModel(
      * The pass that has just been saved.
      *
      * Held here so the screen a moment after the save still shows what was recorded,
-     * and given up the moment the operator says they are done with it: choosing another
+     * and given up the moment the walker says they are done with it: choosing another
      * place, starting another recording, or leaving the recorder - see [onScreenLeft].
      */
     private val _finished = MutableStateFlow<FinishedPass?>(null)
     val finished: StateFlow<FinishedPass?> = _finished
 
     /**
-     * Whether the operator wants the map to keep the phone in the middle of the screen.
+     * Whether the walker wants the map to keep the phone in the middle of the screen.
      *
      * Their wish, not the map's behaviour: [followPhone] is what the map is told.
      */
@@ -117,9 +117,9 @@ class RecordingViewModel(
 
     /**
      * What the map is told: follow the phone while a pass is being driven, and only while the
-     * operator has not taken the map for themselves by dragging it.
+     * walker has not taken the map for themselves by dragging it.
      *
-     * Not while the recording is paused - that is the operator stopped, with both hands free
+     * Not while the recording is paused - that is the walker stopped, with both hands free
      * and the map theirs to read - and not after it is finished, so the pass they have just
      * finished stays where it ended rather than sliding around under them.
      */
@@ -200,7 +200,7 @@ class RecordingViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /**
-     * The breaks in the recording that is happening now: the stretches the operator paused for.
+     * The breaks in the recording that is happening now: the stretches the walker paused for.
      *
      * Followed exactly as the fixes are, so the line drawn is the pass as it actually was.
      */
@@ -214,7 +214,7 @@ class RecordingViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /**
-     * What the map draws: the recorded line, broken where the operator paused.
+     * What the map draws: the recorded line, broken where the walker paused.
      *
      * With nothing live, the pass that has just been saved stays where it was rather than the
      * map going blank the moment Save is pressed.
@@ -235,10 +235,10 @@ class RecordingViewModel(
             )
 
     /**
-     * The recorded line as the map draws it, in pieces where the operator paused.
+     * The recorded line as the map draws it, in pieces where the walker paused.
      *
      * The gaps where the fixes only went missing are drawn through: the recording is the
-     * evidence, and what the operator stopped for is part of it.
+     * evidence, and what the walker stopped for is part of it.
      */
     private fun recordingGeoJson(points: List<GeoPoint>, breaks: List<RecordingBreak>): String {
         if (points.isEmpty()) return AssetGeoJson.build(emptyList())
@@ -269,7 +269,7 @@ class RecordingViewModel(
     val pendingTrackName: StateFlow<String?> = _pendingTrackName
 
     init {
-        // A new pass is a map that should be moving with the operator: following comes back on
+        // A new pass is a map that should be moving with the walker: following comes back on
         // by itself whenever a session begins, so driving a line one-handed never starts with
         // the map parked somewhere else. Only a drag, or the control, takes it off again.
         viewModelScope.launch {
@@ -284,7 +284,7 @@ class RecordingViewModel(
             // Its fixes are still in the database, so how far it has got is too.
             val progress = runCatching { recordings.recordingProgress(unfinished.id) }
                 .getOrDefault(RecordingProgress.EMPTY)
-            // Those two reads suspend, so the operator may have begun a pass - or finished one
+            // Those two reads suspend, so the walker may have begun a pass - or finished one
             // and begun another - while they were in flight. Reattach only if nothing is being
             // mirrored yet.
             if (TrackingState.current.sessionId != null) return@launch
@@ -326,7 +326,7 @@ class RecordingViewModel(
         _selectedAssetId.value = assetId
         // Choosing a place is the start of a new job, so the pass that was on the screen gives
         // way to the one being set up. Cancelling the choice - assetId null - is not: that is
-        // the operator backing out of the picker, with the finished pass still the last thing
+        // the walker backing out of the picker, with the finished pass still the last thing
         // they did.
         if (assetId != null) _finished.value = null
         viewModelScope.launch {
@@ -361,7 +361,7 @@ class RecordingViewModel(
     fun pause() = sessionIdOrNull()?.let { TrackingService.pause(context) }
 
     /**
-     * Carrying on is a pass being driven again, so following comes back on: the operator
+     * Carrying on is a pass being driven again, so following comes back on: the walker
      * stopped for a reason that has now passed, and the map is theirs to look at until then.
      */
     fun resume() {
@@ -369,13 +369,13 @@ class RecordingViewModel(
         sessionIdOrNull()?.let { TrackingService.resume(context) }
     }
 
-    /** The follow control: the operator saying yes, or no, to the map moving with them. */
+    /** The follow control: the walker saying yes, or no, to the map moving with them. */
     fun setFollowing(value: Boolean) {
         _following.value = value
     }
 
     /**
-     * The operator dragged the map while it was following them.
+     * The walker dragged the map while it was following them.
      *
      * Following gives way rather than fighting the drag at the next fix. It stays off until
      * they ask for it again, which the screen's control does - and the same control is what
@@ -386,7 +386,7 @@ class RecordingViewModel(
     }
 
     /**
-     * The operator has left the recorder: another tab, back to the map, or the app put down.
+     * The walker has left the recorder: another tab, back to the map, or the app put down.
      *
      * A saved pass belongs to the visit, not to the screen for good. Left behind, a card that is
      * waiting to start the next job still carries the last job's distance, its points and the
@@ -475,8 +475,8 @@ class RecordingViewModel(
 
             recordings.finishRecording(sessionId, distanceM = distanceM)
 
-            // Name the recording after the work it is: a new line takes the name the
-            // operator typed, and a recording made for an existing place takes that
+            // Name the trip after the work it is: a new line takes the name the
+            // walker typed, and a trip made for an existing place takes that
             // place's name and the date. Neither asks a question - a dialog on the
             // common path is friction for an answer the app already has.
             val sessionName = when {
@@ -495,9 +495,9 @@ class RecordingViewModel(
             var message = "Saved $points ${if (points == 1) "point" else "points"}"
             message += when {
                 newTrackName == null -> ""
-                assetId != null -> " as \"$newTrackName\", which is on the Assets page now"
+                assetId != null -> " as \"$newTrackName\", which is on the Places page now"
                 trackError != null -> " - the track could not be saved: $trackError"
-                else -> " - too few points for a track, so it is in Recordings only"
+                else -> " - too few points for a track, so it is in Trips only"
             }
 
             _message.value = message
@@ -513,7 +513,7 @@ class RecordingViewModel(
 
     private fun sessionIdOrNull(): Long? = TrackingState.current.sessionId
 
-    private fun defaultName(): String = "Recording"
+    private fun defaultName(): String = "Trip"
 
     /** Suggests a track name: "Track 14 Sep" beats an empty box to type into. */
     private fun defaultTrackName(): String = "Track " + formatShortDate(System.currentTimeMillis())

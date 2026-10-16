@@ -320,7 +320,7 @@ class WebEditorSaveTest {
      *
      * This is the write v0.6.27 had to refuse outright, and the two writes together are the whole
      * contract: the paths travel back with the line as the page's own record holds them, and the phone
-     * writes what it is given - the side track untouched, the line as the operator tidied it, and the
+     * writes what it is given - the side track untouched, the line as the walker tidied it, and the
      * length worked out from both.
      */
     @Test
@@ -455,7 +455,7 @@ class WebEditorSaveTest {
 
         val refusal = refused(documents.remove(id, version), WebEditorRefusal.IN_USE)
 
-        assertTrue("names the recording: ${refusal.message}", refusal.message.contains("1 recording"))
+        assertTrue("names the trip: ${refusal.message}", refusal.message.contains("1 trip"))
         assertEquals(
             "and the recording still points at the track it was made against",
             id,

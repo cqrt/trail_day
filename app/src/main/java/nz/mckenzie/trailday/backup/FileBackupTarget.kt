@@ -10,7 +10,7 @@ import nz.mckenzie.trailday.domain.backup.BackupTarget
 import nz.mckenzie.trailday.domain.backup.StoredBackup
 
 /**
- * Keeps the backup in the file the operator chose, through the system file picker.
+ * Keeps the backup in the file the walker chose, through the system file picker.
  *
  * This is the destination that can be anywhere - a Downloads folder, a USB stick, a
  * synced folder, an email attachment - because the app never learns what is behind the
@@ -34,7 +34,7 @@ class FileBackupTarget(
     /**
      * The one file, or nothing.
      *
-     * Nothing is not a failure: the operator may have chosen the destination before ever
+     * Nothing is not a failure: the walker may have chosen the destination before ever
      * having written it, and a screen that reports an error for that would be wrong.
      */
     override suspend fun list(): List<StoredBackup> = listOfNotNull(current())

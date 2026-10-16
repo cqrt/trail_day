@@ -10,7 +10,7 @@ import nz.mckenzie.trailday.domain.update.ReleaseCatalog
  * What one update check found, in words worth putting on the settings screen.
  *
  * [notified] is false when there was something to say and nothing was said - because the
- * operator has already been told about this version, or because notifications are turned
+ * walker has already been told about this version, or because notifications are turned
  * off for the app. Those are different sentences on the screen, so the reason is in
  * [message] rather than inferred.
  */
@@ -24,8 +24,8 @@ data class UpdateOutcome(
  * One pass of "is there a newer version, and should I say so?".
  *
  * Shared by the background worker and the settings screen's Check now button, so the
- * button reports exactly what the background job would have done - the arrangement the due
- * reminders already use, and the reason there is one of these rather than two.
+ * button reports exactly what the background job would have done - the arrangement the
+ * reminder notifications use, and the reason there is one of these rather than two.
  *
  * Nothing is remembered about a version that was not actually announced: turning
  * notifications on later should not find that the news was already spent, which is the
@@ -35,7 +35,7 @@ class UpdateCheck(
     private val current: AppVersion?,
     private val supportedAbis: List<String>,
     private val feed: ReleaseFeed,
-    /** The version the operator has already been told about, if any. */
+    /** The version the walker has already been told about, if any. */
     private val lastNotified: suspend () -> String,
     private val rememberNotified: suspend (String) -> Unit,
     /** Posts the notification and says whether it actually appeared. */
@@ -84,7 +84,7 @@ class UpdateCheck(
                         UpdateOutcome(null, false, "You are on the newest version ($version).")
 
                     // Asked for from the settings screen, where the answer is already on
-                    // the screen: posting a notification about the very thing the operator
+                    // the screen: posting a notification about the very thing the walker
                     // is looking at is noise, and saying nothing was announced because
                     // notifications are off would be a lie.
                     !announce ->

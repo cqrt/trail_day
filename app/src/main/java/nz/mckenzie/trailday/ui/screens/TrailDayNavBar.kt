@@ -9,18 +9,18 @@ import androidx.compose.runtime.Composable
 /**
  * The five places the work starts from.
  *
- * The map, the assets being sprayed, recording a line, the recordings that prove it, and
- * the imagery kept for the places with no reception. Everything else - a drawn line, one
- * asset, a spray, an area being chosen - is opened from one of these and is not a tab.
+ * The map, the places, recording a line, the trips that prove it, and the imagery kept for
+ * the places with no reception. Everything else - a drawn line, one place, a spot, an area
+ * being chosen - is opened from one of these and is not a tab.
  *
  * The names match MainActivity's destinations, which is how a tap down here becomes a
  * screen change up there without either file learning the other's vocabulary.
  */
 enum class Tab(val label: String, val glyph: IconGlyph) {
     MAP("Map", IconGlyph.MAP),
-    ASSETS("Assets", IconGlyph.ASSETS),
+    ASSETS("Places", IconGlyph.ASSETS),
     RECORD("Record", IconGlyph.RECORD),
-    RECORDINGS("Recordings", IconGlyph.RECORDINGS),
+    RECORDINGS("Trips", IconGlyph.RECORDINGS),
     OFFLINE("Offline", IconGlyph.OFFLINE)
 }
 

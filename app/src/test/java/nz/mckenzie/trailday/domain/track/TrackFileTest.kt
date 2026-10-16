@@ -54,7 +54,7 @@ class TrackFileTest {
     }
 
     @Test
-    fun `an archive holding no kml is refused in the operator's own words`() {
+    fun `an archive holding no kml is refused in the walker's own words`() {
         val outcome = TrackInterchange.readBytes(zip("readme.txt" to "not a track"))
 
         assertEquals(

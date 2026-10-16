@@ -55,8 +55,8 @@ internal data class ErrorBody(val message: String = "")
  * to be somewhere else, on a service that is not going to be unplugged, and to keep its
  * history: every backup is a commit, so yesterday's copy is still fetchable even though the
  * app only ever writes one file per device. A private repository is the point - see
- * [RepoCheck.isPrivate], which the screen reports on, because farm records in a public
- * repository are farm records in public.
+ * [RepoCheck.isPrivate], which the screen reports on, because your records in a public
+ * repository are your records in public.
  *
  * Why this API and not a Git client: it is a handful of calls, it needs no working copy, and
  * the token can be scoped to this one repository's contents. The file goes up as base64 in a
@@ -108,7 +108,7 @@ class GitHubBackupTarget(
             throw BackupTargetException(
                 "This backup is ${bytes.size / 1_000_000} MB, and GitHub will not take more " +
                     "than ${MAX_TEXT_BYTES / 1_000_000} MB in one write. Back up to a file as " +
-                    "well, and keep the long recordings there."
+                    "well, and keep the long trips there."
             )
         }
 
@@ -175,7 +175,7 @@ class GitHubBackupTarget(
         val connection = (URL(baseUrl + path).openConnection() as HttpURLConnection).apply {
             requestMethod = method
             connectTimeout = CONNECT_TIMEOUT_MS
-            // Uploading a season over a farm connection is allowed to be slow; the point of
+            // Uploading a season over a slow connection is allowed to be slow; the point of
             // a read timeout here is to notice a dead connection, not to hurry a big file.
             readTimeout = READ_TIMEOUT_MS
             setRequestProperty("Authorization", "Bearer $token")

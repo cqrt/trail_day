@@ -11,7 +11,7 @@ import java.time.ZoneId
  * The off-site backup's decisions, which are the ones that have to be right.
  *
  * The first test here is the reason the feature has a rule at all. A phone that has been
- * wiped holds nothing, and a backup that ran before the operator restored would write that
+ * wiped holds nothing, and a backup that ran before the walker restored would write that
  * nothing over the last copy of a season - the one mistake in this feature that cannot be
  * undone, because the thing that would undo it is the thing that was overwritten.
  */
@@ -100,7 +100,7 @@ class OffsiteBackupRulesTest {
     fun `the comparison names both sides with numbers`() {
         val line = OffsiteBackupRules.comparison(summary(assets = 4, recordings = 9), summary(assets = 1))
 
-        assertTrue(line, line.contains("4 assets, 9 recordings"))
-        assertTrue(line, line.contains("This phone: 1 asset,"))
+        assertTrue(line, line.contains("4 places, 9 trips"))
+        assertTrue(line, line.contains("This phone: 1 place,"))
     }
 }

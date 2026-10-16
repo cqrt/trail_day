@@ -44,7 +44,7 @@ class RecordingDataTest {
 
     @Test
     fun recordingStartsInTheRecordingState() = runBlocking {
-        val sessionId = recordings.startRecording(name = "Spray run", assetId = assetId, startedAtEpochMs = 500L)
+        val sessionId = recordings.startRecording(name = "Walk", assetId = assetId, startedAtEpochMs = 500L)
 
         val session = recordings.getSession(sessionId)!!
         assertEquals(RecordingStatus.RECORDING.name, session.status)
@@ -55,7 +55,7 @@ class RecordingDataTest {
 
     @Test
     fun appendedFixesAreSequencedFromZero() = runBlocking {
-        val sessionId = recordings.startRecording(name = "Spray run")
+        val sessionId = recordings.startRecording(name = "Walk")
 
         fixes.forEach { recordings.appendPoint(sessionId, it) }
 
@@ -103,7 +103,7 @@ class RecordingDataTest {
 
     @Test
     fun finishingASessionStoresDistancePointCountAndEndTime() = runBlocking {
-        val sessionId = recordings.startRecording(name = "Spray run")
+        val sessionId = recordings.startRecording(name = "Walk")
         fixes.forEach { recordings.appendPoint(sessionId, it) }
 
         recordings.finishRecording(
@@ -122,7 +122,7 @@ class RecordingDataTest {
 
     @Test
     fun pausingKeepsTheSessionOpen() = runBlocking {
-        val sessionId = recordings.startRecording(name = "Spray run")
+        val sessionId = recordings.startRecording(name = "Walk")
 
         recordings.setStatus(sessionId, RecordingStatus.PAUSED)
 
@@ -133,7 +133,7 @@ class RecordingDataTest {
 
     @Test
     fun pointsStreamReflectsStoredFixes() = runBlocking {
-        val sessionId = recordings.startRecording(name = "Spray run")
+        val sessionId = recordings.startRecording(name = "Walk")
         fixes.forEach { recordings.appendPoint(sessionId, it) }
 
         val emitted = recordings.observePoints(sessionId).first()
@@ -144,7 +144,7 @@ class RecordingDataTest {
 
     @Test
     fun deletingASessionCascadesItsPoints() = runBlocking {
-        val sessionId = recordings.startRecording(name = "Spray run")
+        val sessionId = recordings.startRecording(name = "Walk")
         fixes.forEach { recordings.appendPoint(sessionId, it) }
 
         recordings.deleteRecording(sessionId)

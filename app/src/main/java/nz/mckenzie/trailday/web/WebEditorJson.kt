@@ -35,7 +35,7 @@ import nz.mckenzie.trailday.domain.tiles.LatLngBounds
  * or what colour its kind is. A record here carries `points` empty, and its `lengthM` still says how
  * long it is.
  *
- * Nothing about a spray method, an interval or a pass count travels here: those fields are gone
+ * Nothing about the fields the app no longer has travels here: they are gone
  * from the app.
  */
 object WebEditorJson {
@@ -55,7 +55,7 @@ object WebEditorJson {
      * The mapping is written out here rather than reached for in the backup, where the same
      * mapping is private, and it is pinned field by field by this file's test: a column added to
      * the asset table and forgotten here would be a column the desk never sees, which is a quiet
-     * way to lose something the operator typed on the phone.
+     * way to lose something the walker typed on the phone.
      *
      * [paths] is the asset's whole geometry - the line, and the side tracks hanging off it - and it is
      * here for the version rather than for the document: the geometry itself travels once, in the
@@ -111,7 +111,7 @@ object WebEditorJson {
      * What a refusal answers with.
      *
      * [reason] is for the page's own code to act on - it decides whether the card is stale and has
-     * to be reloaded - and [message] is for the operator, in the words the phone itself would use.
+     * to be reloaded - and [message] is for the walker, in the words the phone itself would use.
      */
     fun refused(refusal: WebEditorRefusal, message: String): String =
         json.encodeToString(WebEditorRefused.serializer(), WebEditorRefused(refusal.reason, message))
@@ -120,7 +120,7 @@ object WebEditorJson {
      * What a delete answers with.
      *
      * One sentence and nothing else, because there is no record left to send: the page's next move is
-     * to read the work again, which is how it learns what is on the farm now.
+     * to read the work again, which is how it learns what is on the map now.
      */
     fun removed(message: String): String =
         json.encodeToString(WebEditorRemoved.serializer(), WebEditorRemoved(message))
@@ -149,7 +149,7 @@ object WebEditorJson {
      *
      * The geometry travels here rather than being asked for again at import, because a track ticked on
      * the desk is imported from the very vertices the desk was shown - so a service that changed
-     * between the search and the import cannot put a different line on the farm.
+     * between the search and the import cannot put a different line on the map.
      */
     fun docSearch(
         tracks: List<DocTrack>,
@@ -195,9 +195,9 @@ object WebEditorJson {
 /** Everything `GET /api/state` answers with. */
 @Serializable
 data class WebEditorDocument(
-    /** The active assets. An archived one is not on the map the operator works from. */
+    /** The active assets. An archived one is not on the map the walker works from. */
     val assets: List<WebEditorAssetRecord> = emptyList(),
-    /** The box the work is in, so the page can open on the farm rather than on the ocean. */
+    /** The box the work is in, so the page can open on the map rather than on the ocean. */
     val bounds: WebEditorBounds? = null,
     /** The phone's last fix, if it has one. Better than the browser's own: see the plan. */
     val position: WebEditorPosition? = null,
@@ -344,7 +344,7 @@ data class WebEditorGpx(
      *
      * Here rather than left to the page to work out from a count of paths: the difference between a
      * file with one segment and a file whose segments could not be joined is a difference the page
-     * cannot see, and it is the one an operator wants told about.
+     * cannot see, and it is the one a walker wants told about.
      */
     val segmentsDidNotMeet: Boolean = false,
     /**
@@ -352,7 +352,7 @@ data class WebEditorGpx(
      *
      * The desk holds a single drawing, so a file of named tracks - a GeoJSON FeatureCollection - is
      * drawn one track at a time; this is what lets the page say the rest are there rather than
-     * leaving the operator to think the whole file was four times smaller than it was.
+     * leaving the walker to think the whole file was four times smaller than it was.
      */
     val otherTracks: Int = 0
 )
@@ -380,7 +380,7 @@ data class WebEditorBounds(
 data class WebEditorPosition(val lat: Double, val lng: Double)
 
 /**
- * The body `POST /api/gpx` carries: the file the operator dropped, base64-encoded.
+ * The body `POST /api/gpx` carries: the file the walker dropped, base64-encoded.
  *
  * Base64 rather than the file's own characters, because a KMZ is a zip and not text - a GPX, KML or
  * GeoJSON file would survive as text, but a zipped one would not, and one wire for every file is
@@ -485,7 +485,7 @@ data class WebEditorDocImported(
     val message: String = ""
 )
 
-/** One thing an operator can pick, as the phone stores it and as the phone says it. */
+/** One thing a walker can pick, as the phone stores it and as the phone says it. */
 @Serializable
 data class WebEditorChoice(
     val value: String,
@@ -532,7 +532,7 @@ data class WebEditorSaved(val asset: WebEditorAssetRecord)
  * What a write answers a refusal with.
  *
  * [reason] is the machine's half - [WebEditorRefusal.reason], so a page can tell a stale card from
- * a field it got wrong - and [message] is the operator's half, already worded by the phone.
+ * a field it got wrong - and [message] is the walker's half, already worded by the phone.
  */
 @Serializable
 data class WebEditorRefused(val reason: String, val message: String)

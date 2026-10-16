@@ -10,7 +10,7 @@ package nz.mckenzie.trailday.domain.doc
  * the app's own.
  *
  * **This map is the thing to edit.** A prefix with no entry simply gives no place and the asset keeps
- * the name DOC gave it. The seed is the sites seen in the data so far, to be corrected by the operator
+ * the name DOC gave it. The seed is the sites seen in the data so far, to be corrected by the walker
  * who knows them.
  */
 object DocPlaces {

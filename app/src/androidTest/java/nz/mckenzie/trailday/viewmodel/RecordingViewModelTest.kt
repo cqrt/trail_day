@@ -36,7 +36,7 @@ import org.junit.runner.RunWith
  * The record screen's finish flow.
  *
  * A regression lives here: recording a line used to save only a GPS session, so the
- * line never appeared on the Assets page. On this screen "record" means "make a track",
+ * line never appeared on the Places page. On this screen "record" means "make a track",
  * so finishing a new line asks for a name and creates one - while finishing a recording
  * made for an existing place just links it, since that place already has a name.
  */
@@ -156,7 +156,7 @@ class RecordingViewModelTest {
         }
         assertFalse(
             "no new track should have been created: $message",
-            message!!.contains("on the Assets page")
+            message!!.contains("on the Places page")
         )
         val session = recordings.getSession(sessionId)!!
         assertEquals(RecordingStatus.FINISHED.name, session.status)
@@ -201,9 +201,9 @@ class RecordingViewModelTest {
         viewModel.confirmFinish("One point")
 
         val message = withTimeout(5_000) {
-            viewModel.message.first { it?.contains("Recordings only") == true }
+            viewModel.message.first { it?.contains("Trips only") == true }
         }
-        assertTrue("the message should be honest about the shortfall: $message", message!!.contains("Recordings only"))
+        assertTrue("the message should be honest about the shortfall: $message", message!!.contains("Trips only"))
         assertEquals(RecordingStatus.FINISHED.name, recordings.getSession(sessionId)!!.status)
         assertTrue(
             "no track should have been created",
@@ -258,7 +258,7 @@ class RecordingViewModelTest {
         val leftOver = recordings.startRecording(name = "Left over")
         line.forEach { recordings.appendPoint(leftOver, it) }
 
-        // The pass in the operator's hand, begun - and so already mirrored - before the screen
+        // The pass in the walker's hand, begun - and so already mirrored - before the screen
         // arrives. Finished in the database so the reattach cannot find it, only the leftover.
         val ownPass = recordings.startRecording(name = "Recording")
         recordings.finishRecording(ownPass, distanceM = 0.0)
@@ -308,7 +308,7 @@ class RecordingViewModelTest {
         awaitFollow("a session beginning", expected = true, viewModel = viewModel)
 
         TrackingState.setStatus(RecordingStatus.PAUSED)
-        awaitFollow("paused, with both hands free and the map the operator's to read",
+        awaitFollow("paused, with both hands free and the map the walker's to read",
             expected = false, viewModel = viewModel)
 
         TrackingState.setStatus(RecordingStatus.RECORDING)
@@ -316,7 +316,7 @@ class RecordingViewModelTest {
             expected = true, viewModel = viewModel)
 
         viewModel.onMapPanned()
-        awaitFollow("a drag is the operator taking the map back", expected = false, viewModel = viewModel)
+        awaitFollow("a drag is the walker taking the map back", expected = false, viewModel = viewModel)
         assertFalse(viewModel.following.value)
 
         viewModel.setFollowing(true)
@@ -337,14 +337,14 @@ class RecordingViewModelTest {
         }
         assertTrue(
             "$stage: the map should ${if (expected) "follow" else "not follow"} the phone, " +
-                "but the operator asked for ${viewModel.following.value} and the map was last " +
+                "but the walker asked for ${viewModel.following.value} and the map was last " +
                 "told ${viewModel.followPhone.value}",
             reached.isSuccess
         )
     }
 
     /**
-     * The map and the numbers a moment after Save: the operator should be looking at the pass
+     * The map and the numbers a moment after Save: the walker should be looking at the pass
      * they just finished rather than at a blank screen.
      */
     @Test
@@ -403,7 +403,7 @@ class RecordingViewModelTest {
 
     /**
      * Leaving the recorder is what finishes with a saved pass: it is on the screen while the
-     * operator is there to see it, and the next visit opens ready to record.
+     * walker is there to see it, and the next visit opens ready to record.
      */
     @Test
     fun leavingTheRecorderPutsTheSavedPassAway() = runBlocking {

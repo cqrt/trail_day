@@ -10,7 +10,7 @@ import java.util.Locale
  * The decisions an off-site backup makes, in one place and without a network.
  *
  * The first of them is the one that matters. A phone that has been wiped, or a fresh
- * install, holds nothing - and a backup that runs before the operator has restored would
+ * install, holds nothing - and a backup that runs before the walker has restored would
  * replace the only copy of a season with an empty file. Nothing here is allowed to do that.
  */
 object OffsiteBackupRules {
@@ -35,8 +35,8 @@ object OffsiteBackupRules {
     /**
      * How old a copy is, in the terms a person uses about backups: days, then months.
      *
-     * The time of day is deliberately not included: what the operator is deciding is
-     * whether a fortnight's spraying is missing from it, not what hour it was written.
+     * The time of day is deliberately not included: what the walker is deciding is
+     * whether a fortnight's walking is missing from it, not what hour it was written.
      */
     fun ageOf(
         savedAtEpochMs: Long,
@@ -60,7 +60,7 @@ object OffsiteBackupRules {
      * The name this device's copy is written under.
      *
      * One file per device, so two phones backing up to the same place cannot overwrite each
-     * other's copy - which also means the operator can see which phone a copy came from.
+     * other's copy - which also means the walker can see which phone a copy came from.
      */
     fun fileNameFor(deviceName: String): String = FILE_PREFIX + safe(deviceName) + FILE_SUFFIX
 

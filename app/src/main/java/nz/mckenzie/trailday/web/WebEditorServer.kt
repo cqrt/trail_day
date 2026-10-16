@@ -20,9 +20,9 @@ import java.security.MessageDigest
  *
  * **The token is a setting rather than a law.** It is what stops the other devices on the Wi-Fi -
  * a visitor's phone, a tablet in the ute, a printer - and, more to the point, any web page open on
- * the operator's own computer from reaching this door; a router keeps the internet out and does
+ * the walker's own computer from reaching this door; a router keeps the internet out and does
  * nothing at all about either of those. That is what lets the switch be thrown on a network nobody
- * vouches for. On a network the operator owns, where every device on it is theirs, the secret buys
+ * vouches for. On a network the walker owns, where every device on it is theirs, the secret buys
  * them little and costs them a paste, so a run may be served with no token at all: [token] is then
  * null, the gate below claims nothing, and the address on the Settings card is the bare one that
  * says so. What is *not* offered is an empty token, or a default that turns this off - an install
@@ -78,7 +78,7 @@ class WebEditorServer(
      * Binds the first port that is free and returns it.
      *
      * A bookmarkable port is worth asking for and not worth insisting on: 8799 is the one the
-     * operator's bookmark points at, so it is tried first, the two after it are tried next, and if
+     * walker's bookmark points at, so it is tried first, the two after it are tried next, and if
      * something else on the phone holds all three the OS is asked for any free port at all. The
      * address on the Settings card is read off the socket either way, so a fallback is a surprise
      * for nobody.
@@ -136,7 +136,7 @@ class WebEditorServer(
         ),
         HttpRoute(
             claims = { it.method == POST && it.path == GPX_PATH },
-            // A file the operator dropped on the desk's map, read as a line and its side tracks. The
+            // A file the walker dropped on the desk's map, read as a line and its side tracks. The
             // route is here rather than the page because what a track file *is* is the phone's own rule
             // - the same reading the phone's list screen imports a file with - and a second copy of it
             // in JavaScript is the one that would drift. Nothing is written: the paths go back to the
@@ -145,7 +145,7 @@ class WebEditorServer(
         ),
         HttpRoute(
             claims = { it.method == GET && it.path == DOC_PATH },
-            // DOC's track network searched by the phone on the operator's behalf. A GET because it
+            // DOC's track network searched by the phone on the walker's behalf. A GET because it
             // changes nothing, and read like the other documents: a name and a place go out, a page of
             // tracks comes back. The phone asks DOC, not the laptop - the service is the phone's
             // business, and so is what a track is.
@@ -275,7 +275,7 @@ class WebEditorServer(
     /**
      * The address the page was asked on, so the documents it is handed point back at the same one.
      *
-     * A phone usually holds more than one address on the Wi-Fi and the operator may open any of
+     * A phone usually holds more than one address on the Wi-Fi and the walker may open any of
      * them, so the request's own `Host` is the only honest answer to "where are the tiles from
      * here". With no `Host` (not a browser), the server's own address is used.
      */
@@ -352,7 +352,7 @@ class WebEditorServer(
          * A path of its own rather than a field in the state document, because a search is a question
          * asked again and again - a name, a place - and the state document is the work as it stands.
          * The phone does the asking (see [WebEditorData.docSearch]): DOC's service is not something
-         * the operator's laptop is allowed to reach, and the phone is already the one that holds the
+         * the walker's laptop is allowed to reach, and the phone is already the one that holds the
          * rules about what a track is.
          */
         const val DOC_PATH = "/api/doc"
@@ -369,13 +369,13 @@ class WebEditorServer(
         /**
          * The longest track file the phone will take, in bytes of the file itself.
          *
-         * The file's own size, not the request's: the page checks the size of the file the operator
+         * The file's own size, not the request's: the page checks the size of the file the walker
          * picked. The body it sends is larger, because the file's bytes travel base64-encoded - which
          * is why the socket's own cap (`HttpServer.MAX_BODY_BYTES`) sits above this to give the
-         * encoding room. Stated here so the page can say the limit in words, in the operator's own
+         * encoding room. Stated here so the page can say the limit in words, in the walker's own
          * term, before a file is sent.
          *
-         * Two megabytes, raised from a quarter of one because an operator's own GPS export was
+         * Two megabytes, raised from a quarter of one because a walker's own GPS export was
          * refused: a long ride's GPX is commonly past half a megabyte, and a file that is refused
          * for its size alone is a track somebody has to trim before it can be brought in.
          */
@@ -509,9 +509,9 @@ interface WebEditorData {
     /**
      * `POST /api/gpx`: a track file read as the paths of a track that is not on the phone yet.
      *
-     * The body is the file the operator dropped on the desk, as JSON, because that is the only body
+     * The body is the file the walker dropped on the desk, as JSON, because that is the only body
      * either server takes. **Nothing is written**: the answer is the line and its side tracks, and the
-     * page draws them as its own drawing - which the operator then names and saves through the same
+     * page draws them as its own drawing - which the walker then names and saves through the same
      * write every drawn track goes through. So a file dropped by mistake costs a page reload and
      * nothing else, and there is one way into the database rather than two.
      */

@@ -10,9 +10,8 @@ import nz.mckenzie.trailday.domain.asset.AssetShape
  * carries: a hut as a roof over walls, a campsite as a tent, a waypoint as a dot in a ring. The list
  * and the map agree about what the walker is looking at.
  *
- * **The colour is the kind's, not the traffic light's.** The map used to colour every place by when
- * it was next due, which said something about the spraying rather than about the place; it now says
- * what the place *is*, and the shape says it too. See [AssetColors.forKind].
+ * **The colour is the kind's.** Every place is drawn in the colour of its kind, so what the map
+ * says is what the place *is* - and the shape says it too. See [AssetColors.forKind].
  *
  * **Every marker wears a thin white edge** - [MARKER_OUTLINE_DP] of it, round every shape. A marker
  * has to lift off whatever is behind it and imagery is as often dark as not, but white enough to be

@@ -16,7 +16,7 @@ import androidx.compose.ui.Modifier
  * on the notification-permission warning in Settings. Everywhere else a delete was drawn
  * in the same green as Save, which made the one irreversible tap on the screen the one
  * that looked like the safe one. That matters here more than it would in a form on a desk:
- * this is a job done one-handed, with gloves on, next to a spray tank.
+ * this is a job done one-handed, with gloves on, out on the track.
  *
  * The two colour functions are separate from the two buttons because the confirm button of
  * a dialog is already written out, and there only the colours change.

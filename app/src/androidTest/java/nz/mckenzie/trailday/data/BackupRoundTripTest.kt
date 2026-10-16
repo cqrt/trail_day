@@ -103,7 +103,7 @@ class BackupRoundTripTest {
                 recordedAtEpochMs = 1_788_000_001_000L
             )
         )
-        // One pause, and one the operator never carried on from: both have to survive the file.
+        // One pause, and one the walker never carried on from: both have to survive the file.
         db.recordingDao().insertBreak(
             RecordedBreakEntity(
                 sessionId = session,

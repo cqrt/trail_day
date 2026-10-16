@@ -30,7 +30,7 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * Choosing an offline area by hand: what the operator picks on the map is what gets
+ * Choosing an offline area by hand: what the walker picks on the map is what gets
  * stored and downloaded - the box, the zoom range, and the name.
  */
 @RunWith(AndroidJUnit4::class)
@@ -164,7 +164,7 @@ class OfflineAreaPickerTest {
         viewModel.download()
 
         assertTrue(
-            "the operator should be told what is missing: ${viewModel.error.value}",
+            "the walker should be told what is missing: ${viewModel.error.value}",
             viewModel.error.value?.contains("two opposite corners") == true
         )
         assertTrue(db.offlineAreaDao().getAll().isEmpty())

@@ -62,11 +62,11 @@ data class RecordedPointEntity(
 )
 
 /**
- * A stretch of a pass the operator was paused for.
+ * A stretch of a pass the walker was paused for.
  *
  * Pausing stops the fixes, so a pass that carries on jumps from the last fix before the pause
  * to the first one after it. That jump is the one kind of gap in a recording that is not
- * ground the pass crossed - the operator had stopped - so it is written down rather than
+ * ground the pass crossed - the walker had stopped - so it is written down rather than
  * inferred later from the fixes, which cannot tell a pause from a dropped signal.
  * The recorded line reads it: see [nz.mckenzie.trailday.domain.geo.RecordingBreak].
  *

@@ -51,7 +51,7 @@ object BackupFormat {
     }
 
     /**
-     * The counts shown before and after a restore. The operator is about to replace
+     * The counts shown before and after a restore. The walker is about to replace
      * everything in the app, so they get to see both sides of it in numbers.
      */
     fun summarise(document: BackupDocument): BackupSummary = BackupSummary(
@@ -69,10 +69,10 @@ data class BackupSummary(
 ) {
     val isEmpty: Boolean get() = assets == 0 && recordings == 0
 
-    /** "2 assets, 1 recording" - for a person to check against. */
+    /** "2 places, 1 trip" - for a person to check against. */
     fun describe(): String = listOf(
-        count(assets, "asset"),
-        count(recordings, "recording")
+        count(assets, "place"),
+        count(recordings, "trip")
     ).joinToString(", ")
 
     private fun count(value: Int, noun: String): String = "$value $noun" + if (value == 1) "" else "s"

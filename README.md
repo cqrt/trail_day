@@ -1,808 +1,255 @@
 # Trail Day
 
-> **This app is being converted.** It was Spray Day, a spray-recording tool, and it is becoming
-> Trail Day — a companion for walking and riding DOC tracks and huts. This build is the first step:
-> the name, the app id and the package are the new ones, and everything below still describes what
-> the app does today, because the spraying is still here. The plan for the rest is in
-> [docs/trail-day-conversion.md](docs/trail-day-conversion.md).
+A map for walking and riding the New Zealand backcountry: **DOC's tracks**, the places you keep,
+and the **walks and rides you record**, all working with no reception.
 
-GPS track planning and spray records for set spray tracks — built for the way
-rural tracks actually get sprayed: the same lines, roughly three times a year.
-
-The point of the app is the map: open it and see at a glance **which assets are
-due**, coloured green (not due), yellow (due soon) or red (overdue / never
-sprayed). A box in the map's corner counts what is due and says what the whole
-area comes to — how long it is and how much ground it covers. The computer's page
-carries the same box over the same work, and the two agree because every figure in
-them is worked out the one way, on the phone.
+The point of the app is the map. Open it and see your tracks and places over the ground itself —
+imagery you have downloaded, names you have looked at, your own dot on it — and nothing else in the
+way. Everything the app knows is worked out on the phone, and the phone serves a page to a laptop
+when you want a bigger screen.
 
 ## What it does
 
-- **Basemap of your choice** — LINZ aerial imagery (New Zealand) by default, or
-  OpenStreetMap for roads, tracks, gates and names, which needs no key and keeps working
-  the day a LINZ key expires. Whichever is chosen, the credit its licence requires is
-  shown permanently on every map, and **offline areas** download aerial imagery so the
-  map still works where there is no reception. **Where you are** is a dot on **every** map — the
-  map, the recorder, the drawing screen, an asset's own map, the offline picker —
-  ringed by the accuracy the fix was actually good to: a fix under trees is drawn as
-  the uncertainty it is, and a fix with no accuracy is drawn as a dot with no ring,
-  because unknown is not the same as small. A **locate** button puts the camera back
-  on you, and is where the map asks for location permission — on a tap, not on the
-  way in. The dot follows you while a map is open and stops when you leave it, so it
-  costs nothing to keep on.
-- **Settings** with the LINZ key field, so an expired key is fixed on the phone
-  rather than by shipping a new build. **Check** asks LINZ about the key in force
-  and reports LINZ's own answer — accepted, expired, or rate limited.
-- **Assets** — tracks, roads, fencelines, ground with an edge, and the places you stop at, in one list:
-  import GPX, KML, KMZ or GeoJSON, draw them by tapping the map, or record them by driving the line. The drawing screen
-  asks what you are making as you make it, and that answer decides the shape: a track, a road or a
-  fenceline is tapped out as a line, a carpark is tapped out corner by corner and joined up when it is
-  saved, and a shed, a sign, a seat, a table or anything else you stop at is placed with a single tap.
-  Each row carries a coloured icon of
-  what the asset is, next to the colour that says when it is due. A track that came in from a file
-  **keeps the heights the file carried**: its own page shows the range — *≈520–664 m, up 140 m* — and a
-  small profile of how it climbs, on the phone and on the computer's page too. A track drawn on a map
-  has no heights, and says nothing about one rather than a zero.
+- **Basemaps of your choice** — LINZ aerial imagery (New Zealand) by default, or OpenStreetMap for
+  roads, tracks and names, which needs no key and keeps working the day a LINZ key expires.
+  Whichever is chosen, the credit its licence requires is shown permanently on every map, and
+  **offline areas** download imagery so the map still works where there is no reception. **Where you
+  are** is a dot on **every** map, ringed by the accuracy the fix was actually good to: a fix under
+  trees is drawn as the uncertainty it is, and a fix with no accuracy is drawn as a dot with no ring,
+  because unknown is not the same as small. A **locate** button puts the camera back on you, and is
+  where the map asks for location permission — on a tap, not on the way in. The dot follows you
+  while a map is open and stops when you leave it.
+- **Places** — the tracks, huts, campsites and spots you keep, in one list. There are five kinds and
+  **the kind decides the shape**: a **track** and a **bike track** are lines you travel along, and a
+  **hut**, a **campsite** and a **waypoint** are single spots you stop at. Each row carries a coloured
+  glyph of what the place is, its length where it has one, and how far away it is. Import **GPX,
+  KML, KMZ or GeoJSON**, draw them by tapping the map, or record a line by walking or riding it. A
+  line that came in from a file **keeps the heights the file carried**: its own page shows the range
+  — *≈520–664 m, up 140 m* — and a small profile of how it climbs. A line drawn on a map has no
+  heights, and says nothing about one rather than a zero.
 - **DOC tracks, straight from DOC** — the Department of Conservation publishes its track network as
   a web service, so a **DOC tracks** screen searches it at the source: type part of a name, turn on
-  **Near me** within a distance you set, and import the tracks you tick as ordinary assets, each named
-  **place-first**. Every row shows that name — *Catlins Coast Historic House Walk* — so a site the app
-  names wrongly is seen before the import, with the kind, the **track type** (*One way*, *Loop*) and the
-  distance to the phone beneath it. Narrow the list by kind and by how it is walked — the filters the
-  search itself returned, under labelled **Filter** and **Sort** controls rather than a row of chips —
-  and order it by distance to the phone. A track already on the phone is shown but cannot be imported
-  twice. Searching
-  happens at DOC, so the phone asks for the few tracks you want rather than the 3,255 there are;
-  nothing is written until you import. The computer editor has the same browser, and the phone does
-  the searching there too — the laptop never reaches DOC itself; its map can be the search area
-  instead, and the radius is set beside Near me. The **Offline areas** screen has an **Imagery** tab
-  and a **DOC tracks** tab — independent caches, each choosing an area on the map, and each listing
-  showing the cached ground on a small map — so the browser
-  imports DOC's tracks with no reception: a cache, cleared without a warning, needing no LINZ key. The
-  place in an imported track's name comes from the app's own `FlocID` map, because a DOC record carries
-  no place name of its own. The
-  service is named in one place (`DocTracksUrl.SERVICE_URL`), so when DOC replaces the current —
-  deprecated — dataset it is one line to change.
+  **Near me** within a distance you set, and import the tracks you tick, each named **place-first**.
+  Narrow the list by kind and by how a track is walked, order it by distance to the phone, and see
+  at a glance which tracks are already here. Searching happens at DOC, so the phone asks for the few
+  tracks you want rather than the 3,255 there are; nothing is written until you import.
+- **Recording a walk or a ride** — start a recording and the phone follows you: distance, elapsed
+  time, the fixes, and a pause written down as a pause rather than as a gap in the signal. A
+  recording can be a line of its own, or a walk along a place you already have. It is kept as a
+  **trip**, with the line it drew, its distance and its time.
+- **Drawing and tidying a line** — draw a line by tapping the map, or hang a **side track** off one
+  that exists; the length counts every path once, and every path is drawn. A line can be changed
+  later from *Change the line*, and the whole drawing is saved at once.
 - **Drawing from a computer** — a laptop on the same Wi-Fi can be served the same work the phone
-  holds, and change it. A track's details can be changed from its card; its line can be tidied by
-  hand, by dragging the handles, clicking the line to put a vertex in the middle of it, clicking
-  past its end to carry the line on, Delete to take one off and Ctrl+Z to take a step back — none of
-  which reaches the phone until you press Enter; a whole new track can be drawn from scratch; and a
-  mis-drawn one that has nothing recorded
-  against it can be deleted, while one with sprays on it says so in numbers and sends you to the
-  phone. The work is read across the list: the name, **how it is sprayed**, **how many passes** the
-  job takes, and when it is next due — so a knapsack job, or a line that takes two passes, can be
-  picked out of the whole list rather than a card at a time. Picking one out marks it on the map with a
-  **white edge** under the line, so the one the card is about is the one you can see — white because it is
-  the one colour the app uses for nothing else, which leaves a line free to go on saying when it is due.
-  Closing the card takes the edge away. A line is laid two ways: **click** where a corner is, or **hold
-  the button down and follow the fence on the imagery** — the two mix, and a traced fence is one Ctrl+Z
-  rather than twenty. **Several assets can be changed at once**: tick the rows in the list — or the tick
-  over it, for every row the list is showing — and one form changes the same thing on all of them, whether
-  that is a paddock's worth of fencelines wanting one spray method, a morning's drawing wanting putting
-  into a block, or an interval that was wrong on everything in one block. A field the picked rows do not
-  agree on is left empty and has to be ticked and chosen, because one form cannot say "as each of you
-  was"; and the phone changes **all of them or none**, so a row somebody has since edited on the phone
-  stops the whole thing rather than being written over. A line that was drawn somewhere else — walked with
-  a handheld, exported from QGIS
-  or Google Earth — comes in as a **track file**: a **GPX**, **KML**, zipped **KMZ** or **GeoJSON** file, dropped on the map or
-  chosen from **Import a GPX, KML, KMZ or GeoJSON file**, and the
-  phone reads it and puts it on the map as a drawing. It is a file that arrived as a *track*, so it is
-  read by the phone's own rule rather than by a second one kept in the browser: a file whose own track
-  segments meet becomes the line with its **side tracks**, and one whose segments do not meet is joined
-  up into a single line and **says so**, because a track with a jump in it is worth seeing before it is
-  saved. From there it is a drawing like any other: the counts and the metres are the phone's, the line
-  can be tidied or carried on with a click, the name starts as the file's own name and can be typed over,
-  and it becomes a track when you save it. Nothing is written until then, so a file dropped by mistake
-  costs a reload. What the map is doing while a line is drawn — the counts, the one thing it is in
-  the middle of, and the keys — is a small box in the map's own corner rather than a bar over the work,
-  in the phone's own words where the phone has them. Where you were looking is remembered on the
-  computer itself, so a refresh, or a switch of basemap on the phone, comes back to the same corner at
-  the same zoom rather than to the whole area again. The map draws the **phone's own imagery**: the
-  tiles already downloaded for the tractor, and anything else the phone goes and fetches from LINZ as
-  you browse. The phone holds itself awake while it is serving for that reason — and on a phone whose
-  radio sleeps when its screen does, there is a switch on the Settings card, **Keep this phone awake
-  while it is serving**, which keeps the screen on, dimmed, at the cost of battery. The sure answer
-  either way for ground with no reception at all is to download that area to the phone first. A
-  carpark reads there as it does on the phone:
-  the same ground drawn in the same colour, *Round it* and its metres on the card, and **Carpark** in
-  the Type list. From v0.6.54 it can be **drawn there too**: *What it is* is asked while a new asset is
-  drawn, so picking Carpark turns the job into *Draw the boundary* — the box counts its corners, its
-  metres and its ground as they go, draws the closing side nobody clicked, and offers no side-track
-  buttons; the form asks it for no swath width or pass count and says why in one line; and the card's
-  second button says *Change the boundary*.
-  Everything is judged by the phone's own rules and written to the phone's own database, so
-  the laptop and the phone cannot disagree about what is on the area. It is served from the moment
-  the app is opened — the switch is on by default, and turning it off is remembered — and what the
-  card shows is a plain address unless **"Only this address can open it"** is turned on, which makes
-  it end in a secret code the phone checks. With the code off, anyone on the Wi-Fi can open the
-  editor and change your tracks, so the card says that in as many words.
-- **Per-asset settings**: each asset carries its own spray interval (120 days is
-  only the default), its **kind** — a track, a road, a fenceline, a carpark, a building, a sign, a
-  bench seat, a picnic table, or other place — and the kind decides whether it is a line, a ring of
-  ground, or a single spot, so that is not a second question. A carpark is not asked for a swath width
-  or a pass count, and says why in one line: those two are line ideas, and a carpark's ground is
-  measured from its own corners rather than estimated from a width. Every other kind is asked how it is
-  sprayed (**boom** or **knapsack**, which offers the
-  usual width for that method), the swath width for a treated-area estimate, how many
-  passes finish the job (**one**, or **two** for a line walked up one side and back
-  down the other — see [A line that is sprayed twice](#a-line-that-is-sprayed-twice)),
-  a **block or group** to work it with (assets sharing one fold into a single tile in the
-  list), and notes. The interval is what the traffic light uses,
-  so a block sprayed on a shorter cycle turns yellow on its own schedule.
-- **Spray records**: pick an asset, enter the products and the **mL of each**,
-  save. The asset turns green and its history starts. Amounts are remembered per
-  asset, so the next pass is a confirmation rather than a retype.
-- **A spray record you can correct**: the bin beside an entry in an asset's history takes that
-  spray off — one logged against the wrong asset, or with the amounts mistyped — and the asset's
-  colour is worked out again, so removing the only one puts the line back to red.
-  **Clear spray history**, in the asset's own actions, does the same to the whole record, for
-  starting an asset again. The asset, its line and its recordings stay where they are: what goes
-  is the record of what was sprayed, and the colour the line was earning from it.
-- **Due reminders**: a notification when an asset comes due, so a spray window is not
-  discovered a fortnight late. Nothing repeats daily, and a line drawn this morning
-  is not nagged about.
-- **Handover record**: the season as a CSV — one row per product per spray, with the
-  asset, its group and spray method, the amount, water, distance, area, and the recording
-  that proves it. The area is the ground the spray covered: **measured from a carpark's own
-  boundary**, and an estimate from the swath width for a line. Dates are ISO so a spreadsheet sorts
-  them, and the file carries a
-  byte-order mark so Excel opens accented names correctly.
-- **The map is the home screen**: every asset drawn in its traffic-light colour, and
-  each of the three lines drawn differently — solid for tracks, dashed for roads, dotted for
-  fencelines — and **a marker for anything that is a spot** rather than a path, in
-  the same traffic-light colour and the same picture the asset's row carries: a roof
-  over walls for a building, a plate on a post for a sign, a bench seat, a picnic
-  table, a dot in a ring. A **carpark is drawn as the ground it is**: a solid edge in the
-  kind's own colour with the ground inside in a light fill of the same colour, so it reads as a
-  surface from a distance rather than as a fence round nothing — and a **hairline of white outside
-  that edge**, so the ground can be found over dark winter imagery without borrowing the colour that
-  says when it is due. A
-  **part-sprayed track is drawn in parts**: what the pass covered in the colour it
-  earned, and what is still waiting for a tank in red, so "half this line is left" is
-  visible without opening anything — and the same goes for a carpark's edge, where **the north
-  side being missed is worth seeing**. A tap
-  on an asset opens it, a tap **inside** a carpark opens the carpark, and the tap radius follows the
-  zoom, so it is tappable zoomed
-  out over the area as well as at spray height. The map does not rotate: north is up,
-  which is one less thing to get wrong with gloves on.
-- **Layers you can switch off**: the layers button on the map lists one switch per kind of thing it
-  draws — tracks, roads, fencelines and stopbanks, carparks, buildings, signs, bench seats, picnic
-  tables, pole gates and
-  other places — and hides any of them on its own, so a block with forty troughs on it can be cleared
-  down to the two sheds that are the reason for looking. A carpark's switch takes both of its layers,
-  the edge and the ground, because one without the other is not the thing that was hidden. The choice
-  is remembered between visits, and
-  it is the home map's own: a spot being drawn still appears while it is being drawn, and an asset's
-  page still draws that asset. A preference stored by a build from before the switches were split
-  reads *places* back as all six place kinds, because that is what it meant.
-- **Backup and restore**: one JSON file holding the whole season — assets and their
-  lines, every spray with its amounts, the groups and the product catalogue, the
-  amounts each asset remembers, and every GPS recording. A restore replaces, and says
-  what is on both sides of that before it does anything. Files written before groups
-  existed still restore: their "block or area" becomes a group of that name.
-- **Off-site copy**: the same backup, written by the app itself — to a file you chose, or
-  to a private GitHub repository where every backup is a commit, so the copy from before a
-  mistake is still there. An empty database is never written over it, so a phone that has
-  been wiped cannot destroy the last record of the season.
-- **Updates from inside the app**: nothing else will ever mention a new version, because
-  this is not installed from a store — so it asks GitHub once a day, says so with a
-  notification, and installs the release from Settings, handed to Android's own installer.
-- **GPS recording** via a `location`-type foreground service, with every fix
-  written to the database as it arrives, and a pause written down as a pause — so a
-  stopped pass leaves ground that reads as unsprayed, while a gap where the fixes
-  only went missing is ground the pass drove.
-- **Spraying while recording**: pick the asset, type the amounts as they go in,
-  and watch a live **coverage percentage** of the planned line — with the line
-  itself turning green where this pass has sprayed it and staying red where it
-  has not, and the track's own length beside the number, so a track shorter than
-  the job it is being driven for is visible before it is driven. The map **follows
-  you** while a pass is being driven, so the line you are on stays under the screen
-  without a hand on it; dragging the map hands it back to you, and the follow button
-  at the top right says whether it is following and puts the camera back on you when
-  tapped — while a pass is being driven. Pause, and the button goes with the following:
-  the map is yours to read while you are stopped, and carrying on turns following back
-  on by itself. Finishing saves the recording and the spray together, linked by session id,
-  so the traffic light updates, the spray history carries the distance actually
-  driven, and a line that was only part done comes back on the map in two colours.
-  **The pass is the spray**: amounts are there for the record's sake, and a pass over
-  the chosen asset records the spray whether or not any were typed — a line driven
-  with the sprayer on is a line that has been sprayed. The one exception is a line
-  that takes two passes, where the spray waits for the pass that finishes the job.
-  **The pass stays on the screen after it is saved** — the line in its two colours,
-  the distance, the time, the points, the coverage and the track's length — so the
-  screen a second after Save is the record of what was just done rather than a blank.
-  It is kept for as long as you are on the recorder and no longer: move to another tab,
-  or put the phone down, and the next visit opens **ready to record** instead of still
-  carrying the last job's numbers and the sentence about saving it.
-- **GPX in and out** of any asset, shareable to QGIS/Google Earth/forestry tools. GPX carries tracks
-  rather than areas, so a carpark goes out as its **corners** — a closed track, which is what any
-  other tool reads it as — and comes back as a line; one edit turns it into a carpark again, because
-  the app does not guess at the shape on the way in. A file — GPX, KML, KMZ (a zipped KML) or GeoJSON —
-  comes in from the phone's own **Import GPX, KML, KMZ or GeoJSON**
-  or by being dropped on the map of the computer editor, and both of them read it the same way, by the
-  same rule, so the same file makes the same track whichever door it came through. A GeoJSON file is a
-  collection of tracks rather than one, so each feature becomes its own asset, named from the feature
-  where the file names it; the computer editor, which draws one at a time, brings in the first and says
-  how many more the file held.
-- **Recordings browser**: every GPS recording kept as evidence, showing the line
-  that was driven, the plan it was for, and how much of the planned line it
-  covered. Deleting a plan never deletes the recording.
-- **Product catalogue you can keep tidy**: rename a product without breaking its
-  history, or archive one so it stops being offered without losing what was
-  sprayed with it.
+  holds, and change it: the map, the list of places, tidying a line by dragging its handles, and the
+  same **DOC tracks** browser. It is served from the moment the app is opened, and what the card
+  shows is a plain address unless **"Only this address can open it"** is turned on.
+- **GPX in and out** of any place, shareable to QGIS, Google Earth or forestry tools — and the same
+  readers for a file dropped on the laptop's map.
+- **Backup and restore** — one JSON file holding everything: the places and their lines, and every
+  trip. A restore replaces, and says what is on both sides of that before it does anything.
+- **Off-site copy** — the same backup, written by the app itself, to a file you chose or to a private
+  GitHub repository where every backup is a commit. An empty database is never written over it.
+- **Updates from inside the app** — the app asks GitHub once a day for a newer version of itself and
+  hands the download to Android's installer from Settings.
 
 ## Basemaps
 
-Two maps can be drawn under the work, chosen in **Settings** and used everywhere a map is: the
-map itself, the recorder, the drawing screen, an asset's map and a pass's own map.
+Two maps can be drawn under the work, chosen in **Settings** and used everywhere a map is.
 
 | Basemap | What it is | Key | Offline |
 | --- | --- | --- | --- |
-| **Aerial imagery** (LINZ) | A photograph of the ground — what a spray decision is made from | LINZ Basemaps key | downloadable |
+| **Aerial imagery** (LINZ) | A photograph of the ground — what a route decision is made from | LINZ Basemaps key | downloadable |
 | **OpenStreetMap** | A drawn map: roads, tracks, gates and names | none | browsed as you look at it |
 
-OpenStreetMap is in the app for one reason above all: the day a LINZ key expires, the map is
-still a map. It shows nothing about what is growing, so it is not a replacement for imagery —
-it is a floor under it, and it is also the map to read when the question is which gate a
-fenceline starts at.
+OpenStreetMap is in the app for one reason above all: the day a LINZ key expires, the map is still a
+map. It also shows the gates and the roads somebody else has already written down.
 
 ### Names over the imagery
 
-A photograph says nothing about what anywhere is called, which is a real question at a kitchen
-table — *that paddock is beside which town?* So **place names can be drawn over the imagery**: a
-switch in the map's own **What the map draws** sheet, **off by default**. They are LINZ's own names
-for cities, towns, villages and localities — for **lakes and bays** (which in Fiordland means the
-sounds: Milford, Doubtful and Dusky are all filed as bays), for **peaks**, and for **rivers**, the one
-thing whose name is written along it rather than at a point — from the same service, the same key and
-the same licence as the imagery, written white with a dark outline so they read over a photograph, and
-appearing as you zoom in: towns, lakes and bays from a wide view, the finer names and the summits once
-you are close, and the rivers when you are closer still.
+A photograph says nothing about what anywhere is called. So **place names can be drawn over the
+imagery**: a switch in the map's own **What the map draws** sheet, **off by default**. They are
+LINZ's own names for cities, towns, villages and localities — for **lakes and bays** (which in
+Fiordland means the sounds), for **peaks**, and for **rivers**, the one thing whose name is written
+along it rather than at a point — written white with a dark outline so they read over a photograph,
+and appearing as you zoom in.
 
 They go through the app's own tile server like everything else, so anywhere you have looked at keeps
-its names with no reception, and the desk draws them from the phone as it draws the imagery. The
-whole feature is [docs/place-names.md](docs/place-names.md).
+its names with no reception, and the laptop page draws them from the phone as it draws the imagery.
+The whole feature is [docs/place-names.md](docs/place-names.md).
 
 ### OpenStreetMap's terms, and what they mean here
 
-Their [tile usage policy](https://operations.osmfoundation.org/policies/tiles/) is a licence
-term rather than a preference, and three parts of it shaped the code:
+Their [tile usage policy](https://operations.osmfoundation.org/policies/tiles/) is a licence term
+rather than a preference, and three parts of it shaped the code:
 
-- **No bulk downloading, and no offline packs.** **Download area** is therefore aerial imagery
-  only, the offline screens say so, and `Basemap.prefetchable` is `false` for OpenStreetMap — the
-  rule sits in the data, where the next feature has to read it, rather than in a comment. Tiles
-  the operator has actually looked at are still cached as they are looked at, which is what the
-  same policy requires.
-- **A `User-Agent` naming the application.** The map never talks to `tile.openstreetmap.org`:
-  their tiles are fetched by the app's own tile server, and `OsmTileFetcher` sends
-  `TrailDay/<version> (+https://github.com/cqrt/trail_day)`. A library's default user agent is
-  exactly what their policy names as not enough.
+- **No bulk downloading, and no offline packs.** **Download area** is therefore aerial imagery only,
+  the offline screens say so, and the OpenStreetMap entry says `prefetchable = false` — the rule
+  sits in the data, where the next feature has to read it, rather than in a comment. Tiles you have
+  actually looked at are still cached as you look at them, which is what the same policy requires.
+- **A `User-Agent` naming the application.** The map never talks to `tile.openstreetmap.org`: their
+  tiles are fetched by the app's own tile server, and `OsmTileFetcher` sends
+  `TrailDay/<version> (+https://github.com/cqrt/trail_day)`.
 - **Attribution that is visible.** `© OpenStreetMap contributors` links to
-  [openstreetmap.org/copyright](https://www.openstreetmap.org/copyright), in the same
-  always-visible strip the imagery credit uses, and Settings carries their
-  [Report a map issue](https://www.openstreetmap.org/fixthemap) link — a gate that is missing
-  from the map is the sort of thing an operator would know about.
+  [openstreetmap.org/copyright](https://www.openstreetmap.org/copyright), in the same always-visible
+  strip the imagery credit uses, and Settings carries their
+  [Report a map issue](https://www.openstreetmap.org/fixthemap) link.
 
 ### Where the tiles live
 
-Each basemap is one `TileSource` in the same loopback server, so the map has one tile path
-whatever it is drawing: `http://127.0.0.1:<port>/tiles/<source>/{z}/{x}/{y}<suffix>`. The source
-in the path is what keeps two licences, two suffixes and two caches apart:
+Each basemap is one entry in a table of sources, so the map has one tile path whatever it is
+drawing: `http://127.0.0.1:<port>/tiles/<source>/{z}/{x}/{y}<suffix>`. The source in the path is what
+keeps two licences, two suffixes and two caches apart:
 
-- `filesDir/tiles/{z}/{x}/{y}.webp` — **aerial imagery**, at exactly the path it has always had,
-  so a season of downloaded imagery is not re-fetched by this feature existing. It is what
-  offline areas are downloaded into, and it is deliberately kept.
-- `cacheDir/tiles-cache-osm/{z}/{x}/{y}.png` — **the drawn map**: a cache of what has been looked
-  at, which Android may reclaim under storage pressure and which nothing but the map itself ever
-  asks for.
+- `filesDir/tiles/{z}/{x}/{y}.webp` — **aerial imagery**, which is what offline areas are downloaded
+  into;
+- `cacheDir/tiles-cache-osm/{z}/{x}/{y}.png` — **the drawn map**: a cache of what has been looked at,
+  which Android may reclaim under storage pressure.
 
-Everything that differs between basemaps — the tile URL, the suffix on disk, the content type,
-the zoom the source publishes to, whether a key is needed, whether it may be fetched ahead of
-time, and the credit its licence requires — is one entry in
+Everything that differs between basemaps — the tile URL, the suffix on disk, the content type, the
+zoom the source publishes to, whether a key is needed, whether it may be fetched ahead of time, and
+the credit its licence requires — is one entry in
 [`domain/tiles/Basemap.kt`](app/src/main/java/nz/mckenzie/trailday/domain/tiles/Basemap.kt).
-Adding a basemap is that entry, a store decision in `TileServerHolder`, and a fetcher if the
-source is not one of the two already there.
 
 ## How offline imagery works
 
-The map never talks to a map service directly — LINZ or OpenStreetMap. Tiles are served by a
-small HTTP server inside the app, bound to `127.0.0.1`, which:
+The map never talks to a map service directly — LINZ or OpenStreetMap. Tiles are served by a small
+HTTP server inside the app, bound to `127.0.0.1`, which:
 
-- serves a tile from that source's on-disk store when it is held, so downloaded areas —
-  and imagery you have simply browsed — work with no reception;
-- otherwise fetches it from LINZ (using the key in Settings) and stores it on the way
-  through, so ordinary use of the map builds up offline coverage;
-- answers 404 for a tile that is neither held nor available, so the map shows
-  its background colour rather than an error.
+- serves a tile from that source's on-disk store when it is held, so downloaded areas — and imagery
+  you have simply browsed — work with no reception;
+- otherwise fetches it from LINZ (using the key in Settings) and stores it on the way through;
+- answers 404 for a tile that is neither held nor available, so the map shows its background colour
+  rather than an error.
 
-**Download area** fetches exactly the tiles the zoom pyramid needs: the tile
-count shown before you commit is the count downloaded, verified on a device
-(304 planned, 304 stored, ~5 MB). It resumes rather than restarts, and a killed
-download picks up where it stopped.
+**Download area** fetches exactly the tiles the zoom pyramid needs, and the tile count shown before
+you commit is the count downloaded. It resumes rather than restarts, and a killed download picks up
+where it stopped. **Choose an area on the map** does the same by hand: tap two opposite corners, set
+the shallowest and deepest zoom, and give the area a name to find it by later.
 
-The area offered is centred on the operator, never on a guess: the device's
-current position if the app may know it, otherwise the middle of the operator's
-own assets, and if neither is known the screen says so rather than quietly
-caching somewhere they have never been. The screen names the centre in degrees
-and draws the box on a map, because "Spray area" with no location is not an
-answer to "what am I downloading?".
-
-**Choose an area on the map** does the same by hand, for a block that is not
-where the phone happens to be: tap two opposite corners, then set the shallowest
-and deepest zoom levels to cache - the tile count and download size move as the
-sliders do, so the cost of another level of detail is visible before committing -
-and give the area a name to find it by later. Exactly those tiles are fetched,
-and the area's progress is in the list on the way back.
-
-Tiles are plain `{z}/{x}/{y}.webp` files under `filesDir/tiles`, at the path they have always
-had — the source is in the URL rather than in imagery's own path, see **[Basemaps](#basemaps)** —
-rather than MapLibre's offline database, which keeps them inspectable, resumable tile by tile, and
-servable straight back to the map. That matters because MapLibre's own downloader, pointed at
-LINZ's hosted style, pulled ~10x the needed tiles (3,175 resources for a ~304-tile area) by walking
-style sources the imagery layers never use.
-
-One subtlety worth knowing: MapLibre gates HTTP requests on device connectivity,
-so with no reception it requests nothing at all — including from our local
-server, which is precisely where the offline imagery is. The app therefore tells
-MapLibre it is connected (`MapLibre.setConnected(true)`); the server, not the
-radio, decides what is available.
+One subtlety worth knowing: MapLibre gates HTTP requests on device connectivity, so with no reception
+it requests nothing at all — including from our local server, which is precisely where the offline
+imagery is. The app therefore tells MapLibre it is connected; the server, not the radio, decides what
+is available.
 
 ### What a dead key actually looks like
 
-Worth knowing, because it is confusing in the field and it shaped the Settings
-screen. LINZ serves tiles through a CDN that keys its cache on the path alone, so
-a tile anyone has already fetched keeps coming back `HTTP 200` whatever key is
-sent with it. Measured directly: a popular tile answered with **byte-identical**
-imagery for a bogus key, for the real key, and for no key at all, at zoom 12 and
-zoom 16. Cold tiles are enforced — a zoom-19 tile over rural Southland returns
-`400` for a bogus key and `200` for the real one.
+LINZ serves tiles through a CDN that keys its cache on the path alone, so a tile anyone has already
+fetched keeps coming back `HTTP 200` whatever key is sent with it. So an expired key shows up as
+imagery that still works where you have already been and is blank somewhere new, rather than as an
+obviously broken map. That is why **Check** in Settings probes LINZ's hosted *style* document
+instead of a tile: the style is enforced per key even on a path everyone requests.
 
-So an expired key shows up as imagery that still works where you have already
-been and is blank somewhere new, rather than as an obviously broken map. That is
-also why **Check** probes LINZ's hosted *style* document instead of a tile: the
-style is enforced per key even on a path everyone requests (`400` bogus, `200`
-real), whereas a tile probe calls a dead key good.
+## The kinds of place
 
-## Reminders
+There are five, and **the kind decides the shape**: a **track** and a **bike track** are lines you
+travel along, and a **hut**, a **campsite** and a **waypoint** are single spots. The app never asks
+the second question — a hut that was also a line would be a marker drawn along a valley.
 
-The same check runs twice a day in the background (WorkManager, so it survives a
-reboot and waits for the phone to come out of Doze) and on demand from **Check now**
-in Settings — which is also how you find out what the background job would do.
+**The glyph says which kind.** A track is a wandering line, a bike track a bicycle, a hut a roof over
+walls, a campsite a tent, and a waypoint a dot in a ring — the catch-all, whose picture says only
+"something is here". Each kind is drawn in its own colour, so a line reads as what it is at a glance
+over imagery.
 
-The rules live in one place, `DueReminderPlanner`, because they are the whole feature:
+**Finding one kind of it.** The places list carries a row of chips: **All** first, then the five
+kinds. Tapping one shows only that kind — the rows *and* the counts — and tapping the chip already
+showing brings everything back. It is deliberately **not remembered**, unlike the map's layer
+switches: those are a way of working, while "where are my huts?" is a question asked and put down.
 
-- an asset is mentioned when it first becomes due, again if it goes from *due soon* to
-  *overdue* (that escalation is the news), and after that at most once a week while it
-  stays due;
-- a never-sprayed asset is left alone until it is as old as the lead time: a line drawn
-  this morning has not been missed, it has just been drawn;
-- nothing is recorded as "already said" unless the notification actually appeared, so
-  turning notifications on later does not find a week of reminders already spent.
+**The map draws the kinds too.** Each kind has its own marker or line, drawn in its own colour, so
+the picture beside a name in the list and the marker on the map are one drawing and cannot drift
+apart. Every marker wears a thin white edge, because a marker has to lift off whatever is behind it.
 
-Android 13 and later need `POST_NOTIFICATIONS`. Settings asks for it and says plainly
-when it is missing, because a reminder system that is silently not permitted is worse
-than no reminder system at all.
+## A line with a side track
 
-## The kinds of asset
-
-There are ten, and **the kind decides the shape**: a **track**, a **road** and a **fenceline** are
-lines you travel along, a **carpark** is a ring of ground with an edge, and a **building**, a **sign**,
-a **bench seat**, a **picnic table**, a **pole gate** and
-**other place** are single spots. That is why the app never asks the second question — a track that
-was also a spot would be a line drawn across a paddock, with nothing on the screen saying the two
-answers disagreed.
-
-**A carpark is the one kind whose size the app knows.** Its boundary is a **ring** — the corners you
-tap, joined up when it is saved, so the last corner is the first one again. That ring is stored closed
-rather than left for each reader to close for itself, because an unclosed one would make the metres
-round it, the ground inside it, the tap test and the backup all ask what shape they are holding. The
-ground is **measured from those corners** — a carpark is metres across, so reckoning it flat is out by
-less than a square metre — and it is the only area in the app that is measured rather than estimated.
-So the card says *Round it 2.09 km · 27.0 ha of ground*, with no "about" in front of it, and a spray
-recorded on a carpark carries that ground rather than a swath width somebody typed.
-
-**The glyph says which kind; the colour says which family.** Blue for a track, purple for a road, teal
-for a fenceline and for every kind of place, and a family of its own for ground — because the colour's
-job is to say which of the three it is, and a carpark is neither a line you travel along nor a place
-you stop at. Ten distinct colours at the size of a list icon is
-where two of them start looking alike, so the picture carries the detail and the colour carries the
-family — and neither of them is the green, amber or red, which are for when something is due.
-
-**Other place** is the catch-all, and its glyph is a dot in a ring: it says something is here and
-claims nothing more, which is the honest thing to say about a trough, a tank or a standpipe.
-
-**Nothing already recorded is rewritten.** Every fenceline, trough, shed and table in an area sprayed
-before the kinds existed was stored as one word — *infrastructure* — with the shape beside it. The
-app reads that by the shape: a line of it is a fenceline, and a spot is a place nobody named, so it
-reads as *other place*. The row keeps the old word until somebody edits it, and the first edit of any
-field settles it onto one of the ten. The backup file and the database are unchanged by all of this —
-and a phone on a build from before carparks existed reads one as a **track**, because a kind it has
-never heard of is read by the shape beside it, which is a line.
-
-**Finding one kind of it.** The asset list carries a row of chips between *Draw* and the list: **All**
-first, then the ten kinds in the picker's own words. Tapping one shows only that kind — the rows
-*and* the counts on the blocks, so a block with none of it leaves the list — and tapping the chip
-already showing brings everything back, which is what *All* does too. A kind with nothing in it says
-so in one line rather than showing an empty list. Old rows come along: a fenceline stored as
-*infrastructure* is found under **Fenceline** when it is a line and under **Other place** when it is a
-spot, because the filter reads a row exactly the way the rows, the picker and the map do.
-
-It is deliberately **not remembered**, unlike the map's layer switches. Those are a way of working —
-an operator who hides the places wants them hidden tomorrow — while "where are my buildings?" is a
-question asked, answered and put down. Nothing stored also means a phone whose chips are never tapped
-looks exactly as it did before the chips existed.
-
-The desk has the same idea beside its search box, as a **Type** list: *Anything*, then the phone's own
-ten, and the list shows what matches both the typed words and the type. The phone sends each asset's
-kind already read back, so the page holds no second copy of the old-word rule. **The map draws the
-same answer as the list** - what narrows the rows narrows the map, and a search that matches nothing
-empties it - because a name on a list is not a place: an operator who has asked for the buildings is
-looking at the map to see *where* they are, and forty tracks around them are the wrong answer. The
-phone still sends everything and the page still holds all of it, for the card, the row colours and the
-snapping; it is only what the map is drawn from that is narrowed.
-
-**The map draws the kinds too.** A place is no longer one house whatever it is: every kind has its own
-marker — a building is a roof over walls, a sign a plate on a post, a bench seat two bars over straight
-legs, a picnic table one top on splayed legs, and an other place a dot in a ring — and each is drawn in
-the colour its traffic light shows, which is the same rule the lines follow. The picture beside a name
-in the list and the marker on the map are one drawing, at a thin weight in the row and a fatter one over
-imagery, so the two cannot drift apart. Every marker wears a **thin white edge** — one dp of it. A marker
-has to lift off whatever is behind it, and imagery is as often dark as not; but two dp around every kind
-made the markers read as white shapes with a colour inside them, and with no edge at all a red marker was
-hard to find over winter imagery. The desk draws the phone's own pictures rather than its own copy of
-them: the phone renders each marker at the size the browser asks for and the page fetches it by name.
-
-## Blocks
-
-A **block** is the named collection of assets worked together: the estuary road, the lagoon and
-the lower track, sprayed and reported on as one thing. The code calls them groups — `groups`,
-`groupId`, `GroupEntity` — and the field on an asset says "Block or group" so that the word in
-the table and the word on the screen are recognisably the same thing.
-
-The asset list folds by block. A block's assets are drawn as one tile until it is opened, and
-the tile answers what would otherwise need the rows:
-
-```
-● Estuary                                            ⌄
-  5 assets · 3.40 km · about 1.5 ha
-  2 of 5 left to spray (40%) · 1.80 km
-```
-
-- The **dot** is the most urgent asset in the block, never an average: one overdue line is not
-  made up for by four that are not due.
-- The **length and the area** are totals of the block, and each is left out when it is not
-  known rather than shown as a zero — a block of troughs has no length, and saying "0 m" about
-  it would read like a measurement. The area is called an estimate, and when only some lines
-  record a swath width the tile says how many it came from. A tile holding a carpark says **about**
-  its area like any other, because a total mixing measured ground in with estimated ground is only as
-  good as its weakest part.
-- The **share left** is counted in assets, with the distance left beside it. Counting metres
-  would let a block whose only due asset is a trough report "0% left" directly above a line
-  saying something is left; the bar shows the work done in the dot's colour, so the two agree.
-- Blocks are **closed to begin with**, ordered most urgent first and then by name. Assets in no
-  block follow, in name order.
-
-Blocks are made by typing a name into **Block or group** on an asset, and taken apart by
-blanking it. Names are unique regardless of case, so "estuary" and "Estuary" are one block. The
-field offers the blocks that already exist as you type, and says which of the two things the name
-is about to do — *In the block "Estuary"*, or *Starts a new block called "Estuary flats"* —
-because a misspelling used to be a new block with one asset in it and nothing anywhere saying so.
-
-**Blocks**, from the asset list's top bar, is where they are kept tidy: rename one, write down
-what it is for, or delete it. Deleting a block never touches the assets in it — they simply come
-out of it, and the confirmation says how many, by name — and a block that nobody is in any more
-is listed as holding nothing rather than quietly disappearing, because clearing it up is the
-reason to open the screen at all.
-
-## A line that was only part sprayed
-
-Running out of spray halfway along a track used to leave a problem you could only find by
-opening the record: the map drew the whole line in one colour, so a half-sprayed track looked
-done and the other half could sit untouched until it was a fortnight overdue.
-
-The map now colours each **stretch** of a line by its own last spray, using the same interval
-and lead time the asset's own light uses, and the recording is what says which stretch that
-was. Six things follow from that, and they are the whole behaviour:
-
-- **Half sprayed today is half green and half red.** The recorded pass covers the stretch that
-  was driven; the rest reads as still to spray, which is what it is.
-- **A gap in the fixes is ground the pass drove.** The recording is read as the line it drew,
-  not as the fixes it happens to hold: a fix rejected under trees, or a minute with no fix in a
-  gully, is not a stretch that went unsprayed — the machine that crossed it sprayed it, and both
-  the number and the colour count it. A pass walked with a fix every fifty metres used to read
-  as a quarter of the line sprayed.
-- **A pause is a break, and it stays red.** Pausing stops the fixes, so a paused pass leaves the
-  same hole in the recording a dropped signal does — and they mean opposite things. The app
-  writes the pause down when the button is pressed (`recorded_breaks`, kept in a backup too), so
-  the ground the operator was stopped over stays red, and the recording's own line is drawn in
-  two pieces rather than joined across the trip to the water tank.
-- **Two halves on two days is a sprayed line.** Each stretch keeps its own date, so the half
-  done a fortnight ago is still green rather than being reddened by a pass that happened not
-  to drive it. A map that cries shortfall over work that was done is a map that stops being
-  believed.
-- **A spray logged by hand covers the whole line.** It has no fixes to disagree with, and
-  logging it was the operator saying they did it. Without this rule, every track sprayed
-  without a recording would turn red the day this existed.
-- **The recording is the evidence, and it wins.** If a pass was recorded and the phone never
-  came within the tolerance of the line, the line reads as still to spray - the same thing the
-  recording's own screen says about it. A green line because somebody typed a number in is
-  the failure this replaced.
-
-Nothing about it is stored. The stretches are recomputed from the planned line against the
-recordings whenever the map is drawn, so a line that has been edited since is cut up as it is
-now: the same rule the coverage percentage has always followed.
-
-Only the sprays that could still matter are read - a pass older than the asset's own interval
-cannot change a colour, because whatever it covered is due again anyway - so a map with a
-season behind it does not load a season of fixes to draw itself.
-
-## A line that is sprayed twice
-
-Half the tracks on the place are walked up one side and back down the other, and a road is done an
-edge at a time. For those, one pass is not half sprayed: it is not sprayed at all. Read as a single
-pass - which is what the app did until now - a track walked once went green, its traffic light went
-out for four months, and the other side was never done.
-
-So an asset can be told that it takes **two passes**, on the edit form, and how far apart those two
-passes run if the operator knows. Everything else in the app is unchanged: a line that has never
-been told otherwise is one pass, and behaves exactly as it always did. A **carpark is never asked**:
-it is one run round one boundary, so the question of doing both sides cannot arise on one.
-
-What the app then claims is decided from the fixes, in this order:
-
-- **Opposite directions.** Up one side and back down the other walks the same metres twice heading
-  opposite ways. Direction needs no accuracy at all: consecutive fixes either head along the line or
-  back along it, and five metres of sideways GPS wander does not touch that.
-- **Opposite sides.** One side and then the other, both times the same way along, is two passes at
-  two offsets from the line - but only where those offsets are far enough apart to be real. Three
-  metres on a road is two strips the app can see; a metre apart on a knapsack track is inside the
-  noise of a phone in a pocket, and there the app does not pretend.
-- **The operator's word, when neither of those can tell.** Two passes the same way along, on sides
-  too close together to separate, is the one case the fixes cannot settle. Finishing such a pass
-  asks: *did you do both sides?* Yes writes the spray and closes the job; no leaves the line owing
-  the other pass. The answer is stored with the pass it was given for (`recorded_sessions`,
-  `bothSidesClaimed`, carried in a backup), so the question is asked once and not on every screen.
-
-Four consequences worth knowing:
-
-- **One spray record for the job, written when it is done.** A pass over a line that takes two is
-  saved as a recording but records no spray, because there is no job yet to record: the asset's
-  light stays as it was and the recorder says *one pass still to go*. When the second pass finishes
-  it - in the same walk or a fortnight later - one spray is written, carrying the ground driven over
-  both legs, and the line turns green then.
-- **A line that is walked once is not a line that needs attention either.** Its colour stays on the
-  last completed job's date, so a two-pass track sprayed 130 days ago and walked once today is due
-  again - which is what makes the second side worth going back for.
-- **Treated area counts both passes.** The second pass runs beside the first rather than over it, so
-  a 1 km track walked twice with a 1.5 m knapsack treats 3,000 m², and the area in a block's total
-  and in a handover says so.
-- **The app cannot see the swath.** It can see that a line has been walked twice, in two directions
-  or on two sides, and it will say that rather than claiming more. Two walks up the same side, a
-  metre apart, with the two passes recorded as one run, read as two passes it cannot tell apart -
-  so it asks, and the answer is what counts.
-
-## A track with a side track
-
-A track on the ground is not always one path: a fenceline has a spur into a gully, a lane has a
-gateway you have to drive up and back. Drawn as one line, the only way to draw the spur was to walk
-up it and back down it inside the line - and that costs twice. The spur's metres were in the length
-twice, and the two-pass reading saw the same ground walked in opposite directions and called a dead
-end *both sides done*, which was the right answer for the wrong reason.
-
-So an asset's geometry is a **line and the side tracks hanging off it**. Path 0 is the line and the
-rest are side tracks in the order they were drawn, which is the order the database keeps them in.
+A track on the ground is not always one path: a fence has a spur into a gully, a lane has a gateway
+you drive up and back. So a place's geometry is a **line and the side tracks hanging off it**.
 
 - **Draw the line to the junction, press *Side track*, tap along the spur, press *Back to the
-  track*, carry on.** That is how a track is drawn from scratch, one point after another. **Or tap
-  the track where the spur branches off** — the point goes into the line there and the next *Side
-  track* hangs off it — which is how a side track is added to a track that already exists. The side
-  track's first point is a point of the line itself - the same two numbers, not a copy, which is what
-  makes it a join rather than two lines that happen to be near each other.
-  For that tap to mean "here, on the line" it has to be **on** the line: the app measures it against
-  the drawn line's own width, where choosing a track on the map is measured against a fingertip. A
-  tap further out than a line's width carries the line on instead, and a tap at the end of the line
-  always carries it on - otherwise every tap made while drawing, which is by nature near the line,
-  would be read as a tap on it, and the line would never grow.
-- **The length counts every path once.** A 222 m track with a 111 m spur is 333 m of ground if you
-  drive it as two paths, not the 444 m walking the spur twice reads as - and that number is the
-  handover figure and the coverage denominator.
-- **Every path is coloured by its own spray.** A pass that drove the line and never went up the spur
-  leaves the spur red, and the coverage percentage agrees with the colour, because both are worked
-  out path by path.
-- **A tap on the spur opens the track it hangs off.** The map draws one feature per path and both
-  carry the asset's id.
-- **A side track is one trip, not two sides.** A job with two sides is a *line*: up one side and back
-  down the other. A side track is a strip you drive up and back in one go, so one trip up it dates it,
-  and it never owes a second pass - which is the rule that stops a dead end reading as finished for a
-  reason that has nothing to do with the spur. On the card, a side track counts as done once every
-  stretch of it carries a date: the junction is shared with the line, so a pass along the line is
-  always within tolerance of the first few metres of a spur leaving it.
-- **One level only.** A side track hangs off the line; it has no side tracks of its own.
-- **A GPX file carries them both ways.** A track with a spur is written as one `<trkseg>` per path -
-  which is what a GPX track's segments are for - and a file whose segments each start on the first is
-  read back as a track with that many side tracks. A file whose segments do not meet (a tool that cuts a
-  line up for its own reasons) is read the old way, every point joined into one line, and the sentence
-  says so rather than the import failing or the difference going unmentioned.
+  track*, carry on** — or tap the track where the spur branches off, so the junction is a point of
+  the line itself.
+- **The length counts every path once**, so a 222 m track with a 111 m spur is 333 m of ground.
+- **A GPX file carries them both ways**: a track with a spur is written as one `<trkseg>` per path,
+  and a file whose segments each start on the first is read back as a track with that many side
+  tracks. A file whose segments do not meet is joined into one line and **says so**.
 
-**Changing a track that is already drawn** is *Change the line* on the track's own page, which opens
-the same drawing screen on the stored geometry. The camera opens on the **track** rather than on the
-phone, because an operator changing a track is usually nowhere near it; the name, kind and block are
-not on that screen at all, since those are the details form's; and Save writes the whole geometry at
-once with the length it adds up to. Back without saving leaves the track exactly as it was.
+## Recording a walk or a ride
 
-Tracks drawn before any of this existed are exactly the line they were - the migration puts every
-vertex on path 0 and changes nothing else - and a track that was drawn the old way with an up-and-back
-spur stays a doubled line with an overstated length until somebody re-draws it with *Change the line*.
-The app does not go looking for the shape of one: that would be guessing at ground the operator knows
-better.
+A recording is a `location`-type foreground service writing every fix to the database as it arrives,
+so a crash, a kill or a flat battery cannot lose more than a single point. A **pause is written
+down as a pause** rather than as a gap in the signal, so a stop for lunch does not read as ground
+that was travelled.
 
-The desk can read a track's side tracks, because the drawing it fetches has one feature per path, and it
-is **handed** them as data too (the record's `paths`, line first). From v0.6.31 it can also **draw one and
-take one off**: with a track's shape open, *Side track* starts one, the clicks and traces go onto it, *Back
-to the track* hands the line back, and *Remove this side track* takes it off again — the phone's own two
-moves, in the phone's own words. A spur drawn on a computer is a write like any other: the phone judges it
-by the same rules as one drawn on the phone, and keeps it.
+A recording is kept as a **trip**: the line it drew, its distance, its elapsed time, and its points.
+It can be a line of its own — a route you walked and saved — or a walk along a place you already
+have, in which case the trip names the place it followed.
 
-From v0.6.32 it leaves the track **where you click it**: click the track at the point the spur branches
-off, and that point becomes the junction — shown as a filled dot, and said in the bar — so a fence that
-meets a track halfway along no longer waits for the far end. Clicking the track puts a point in it, which
-is what a junction has to be for the phone to take the write.
+## DOC tracks
 
-From v0.6.33 a side track can be **worked on like the line**: click it and it becomes the path in hand —
-its own points get the handles, a drag moves them, Del takes them off, and *Remove this side track* takes
-the whole strip off. The cursor says which of the two a click will do (a grab over a handle, a pointer
-over another path), and the bar says which path is in hand. Dragging the point a side track hangs off
-moves that point of the *line*, because that is what a junction is — and every side track hanging off it
-comes along.
+The browser is described in full in [docs/doc-tracks.md](docs/doc-tracks.md). In short:
 
-What cannot happen is a page losing a spur it never saw: a write carrying a **single path** for a track
-that has side tracks is refused as a page that is out of date (*"Reload the page and try again"*), and a
-write carrying `paths` is taken whatever number of them it holds. Changing the details of such a track
-saves as it always did.
+- DOC publishes its tracks as a hosted **ArcGIS Feature Service** (CC-BY 4.0, Crown copyright), and
+  the app searches it **at the source** — a name, or **Near me** within a radius — rather than
+  downloading the network.
+- The kinds and track types offered as filters come from what the search actually returned, and
+  **Nearest to phone** needs no second request: the phone sends each track's distance.
+- Importing writes an exact **source reference** (`doc:<OBJECTID>`) against the place, so a renamed
+  track is still recognised as already imported, and deleting it makes it importable again.
+- **Offline**, the app falls back to the tracks already downloaded: the search is filtered by name,
+  and the list says *Could not reach DOC. Showing N downloaded tracks.*
+- The service URL is named in exactly one place, so the day DOC replaces its current — deprecated —
+  dataset it is one line to change.
 
-## The name beside a track
+**Huts, campsites and bike tracks are not searched at DOC yet.** They are kinds you can keep
+yourself — drawn on the map or brought in from a GPX file — and reading DOC's hut, campsite and
+mountain-bike services the way its tracks are read is the next piece of work.
 
-From v0.6.57 every track's name is written on the map beside it, roughly half way along, turned to follow the
-line rather than laid across it, in small white letters with a thin dark edge. Both maps write it the same
-way, from the same numbers, and the letters come from the phone.
+## The laptop page
 
-From v0.6.58 a name is written only once the map is zoomed in close: level 17 or closer at first, and level 16
-or closer from v0.6.59, the operator's own easing of it after living with the floor. On a wide view the names
-of several tracks crowded the screen and read as a muddle, which is what the operator found after living with
-the first version. The tracks themselves are drawn at every zoom; it is only their names that wait. The views
-the app opens on are wider than that - the work framed, or the phone and the work together - so a name is read
-by zooming in.
+The phone serves a page to a laptop on the same Wi-Fi, drawn from the phone's own data so the two
+cannot disagree. It shows the map with the same places over the same imagery, the list of places
+with a search and a type filter, drawing a new line and tidying one that exists by dragging its
+handles or clicking to add a vertex, importing a file, and the **DOC tracks** browser. What the
+phone's own rules say about a write is what decides it, so a mis-drawn line on a laptop is a drawing
+like any other.
 
-The app marks one stretch of the track, and only that stretch carries the name. The phone's own map writes it
-once. The desk's map draws names with a web map's own engine, which names a long line piece by piece, so a
-track whose every bend is gentle enough to be marked whole can carry its name more than once there - the
-counts and the reasoning are in `build/verify/track-names.txt`.
+With the phone's screen off the page still works: a switch on the Settings card, **Keep this phone
+awake while it is serving**, holds the screen on, dimmed, at the cost of battery.
 
-Two of those decisions were made by looking at what a map does rather than by reasoning about it, and both
-are worth knowing because the code is shaped by them:
+## Backup and restore
 
-- **The name goes on one stretch of the track, not on the whole of it.** Asked for a name over a whole
-  line, the map writes it more than once - it cuts a long line into pieces of its own at some zooms, and
-  every piece gets its own name - and it drops a name it cannot fit along the line, or one that would have
-  to turn more sharply than its letters are allowed to. So the app picks the stretch itself: the longest
-  gentle run around the middle of the track, taken from the track's own points so the name still follows
-  the shape. That stretch is handed over marked, in the track's own colour, and the line layers leave it
-  alone - which is what keeps a half-sprayed track two colours with one name written beside it.
-- **The letters travel with the app.** A map is not given a font the phone has installed: it draws text
-  from files of letter shapes, one file per range of letters, and one set of files per lettering. Three
-  ranges of Noto Sans are shipped - the everyday letters, the accented ones, and the marks and symbols
-  beside them, which is where the macrons in Māori names live - and the app's own little server hands them
-  out on the same address as the tiles. So a name appears with no network at all, and the desk draws its
-  names from the phone rather than from whatever the laptop happens to have. A name in another script
-  draws nothing until its range is added, which is a file and a line of code.
+**Back up everything** writes one JSON file to wherever you choose — Downloads, a USB stick, an
+email — holding the whole of what the app knows: the places and their geometry, and every trip with
+its fixes. Ids are carried through in both directions, so a place and the trip recorded against it
+stay joined.
 
-The *Tracks* switch hides the names along with the tracks, because a name left behind by its track would
-be a label on nothing. Names are never hidden by each other, for the same reason the place markers are
-not: a name that vanishes behind another one reads as a track that has lost its name.
+**Restore from a backup** reads the file, shows what it holds beside what the app holds now, and only
+then replaces. Replacement rather than merge, because half of one set of places and half of another
+is not a state to discover on a hill. It runs in a single transaction, so an interrupted restore
+leaves the previous data untouched.
 
-The reading behind all of this - the pictures, the counts of how bright the letters came out, and the two
-things it changed - is in `build/verify/names-look-first.txt`, what was checked in the release is in
-`build/verify/track-names.txt`, the published build's own check is in the entry beside it, what the
-waiting level was checked with is in `build/verify/track-names-zoom.txt`, the published build's own
-check of that is in the entry beside that one, and the waiting level coming in to 16, with its own
-check on the published build, is in `build/verify/track-names-zoom16.txt` and
-`build/verify/track-names-zoom16-released.txt` beside them.
+Downloaded offline imagery is deliberately absent: it describes tiles on one phone, and the tiles can
+be fetched again. The switches travel, but the LINZ key and the GitHub token do not, because both are
+credentials rather than records.
 
-## Backup files
-
-**Back up everything** writes one JSON file to wherever the operator chooses —
-Downloads, a USB stick, an email — holding the whole of what the app knows: assets and
-their geometry, spray events and the amounts that went out, the product catalogue, the
-amounts each asset remembers, and every GPS recording with its fixes.
-
-Ids are carried through in both directions, deliberately. An asset, its geometry, its
-sprays and the recording that proves them are joined by id, so a restore that
-renumbered them would produce a database that looks right and connects nothing.
-
-**Restore from a backup** reads the file, shows what it holds beside what the app
-holds now, and only then replaces. Replacement rather than merge, because half of one
-season and half of another is not a state to discover in a paddock. It runs in a single
-transaction, so an interrupted restore leaves the previous data untouched.
-
-Downloaded offline imagery is deliberately absent: it describes tiles on one phone, and
-the tiles can be fetched again. The switches travel, so a restored phone comes back set up
-rather than factory-fresh — reminders, the update check, and where the off-site copy goes —
-but the LINZ key and the GitHub token do not, because both are credentials rather than
-records, and a backup file may be read by whoever finds it.
-
-Files are versioned (`"format": "trail-day-backup"`, `"version": 2`). An older file
-restores into a newer build, since missing fields fall back to defaults; a file from a
-newer build is refused with an explanation rather than half-read. The switches arrived
-without a version bump for the same reason: a file written before they existed simply has
-no such key. A carpark's **measured ground travels beside its length** the same way: a file written
-before carparks existed has no such key, and an absent one reads as no ground rather than as an error.
+Files are versioned (`"format": "trail-day-backup"`, `"version": 1`).
 
 ### The copy that is not on the phone
 
-A file you keep still depends on you keeping it, and the phone holding the season is
-exactly the thing that gets lost, wiped, or dropped in the creek. So the same backup is
-written somewhere else as well, down the same seam: a `BackupTarget`, which is a file
-(through the picker above) or a private GitHub repository.
+A file you keep still depends on you keeping it, and the phone holding your trips is exactly the
+thing that gets lost, wiped, or dropped in the creek. So the same backup is written somewhere else
+as well: a `BackupTarget`, which is a file or a private GitHub repository. Each phone writes its own
+file (`trail-day-<model>.json`), so two phones pointed at one repository cannot overwrite each
+other's copy.
 
-**Where the copy goes** chooses between nowhere, a file, and a repository. The repository
-is the one that keeps history without being asked: every backup is a commit, so the copy
-from before a mistake is still there. Each phone writes its own file
-(`trail-day-<model>.json`), so two phones pointed at one repository cannot overwrite each
-other's copy, and a copy says which phone it came from.
-
-The token is a fine-grained GitHub token with **Contents: read and write** on that one
-repository. It is kept on the phone and never written into a backup — the copy lives in
-the very repository the token can write to, and a file carrying the token would hand over
-the repository with it. **Test** asks GitHub what the repository is and what the token may
-do, and refuses a public one: a season of spray records is not a thing to publish.
-
-One rule decides whether a copy is written at all: **an empty database is never written
-over the copy.** After a wipe this phone holds nothing, and the copy off-site may be the
-only record left — so the write is refused, the screen says so in as many words, and the
-way forward is **Restore from the copy**. There is no override, because "my phone is
-empty, so empty it shall be written" is not a thing anybody means.
-
-Restoring from the copy is the same dialog as restoring from a file: both sides counted,
-and counted again at the moment of confirming rather than remembered from when the list
-was drawn, because which side is which is the only thing that has to be got right.
-
-Unattended, the copy is written once a week (WorkManager, network required) and a failure
-is said out loud at most once every three days — a backup failing quietly since spring is
-the failure that costs a season, and a notification a day about the same expired token is
-the one that gets turned off.
-
-## Handover records
-
-**Handover record (CSV)**, in the same Settings card, writes the season as a spreadsheet
-for somebody else: one row per product per spray, oldest first.
-
-| Date | Asset | Group | Method | Product | Amount | Unit | Water (L) | Distance (km) | Area (ha) | Operator | Notes | Recording |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-
-Three decisions worth knowing about:
-
-- **One row per product, not per spray.** "1.5 L of Glyphosate on Home block on the
-  14th" is the unit an auditor, a client or the next operator asks about, and it is the
-  only shape that adds up in a spreadsheet.
-- **ISO dates** (`2026-09-14 20:50`), because a spreadsheet sorts ISO and has to be
-  told what "14 Sep 2026" means. And **numbers without units in them**: a cell reading
-  `2.35 km` is text to a spreadsheet and cannot be added up.
-- **Escaping is the part that must be right.** A block called `Home, north` or a note
-  containing a quote must not shift every later column, which is worse than a visibly
-  broken file because it still looks like data. That is what the tests here are about.
-
-A UTF-8 byte-order mark is written at the front, which is what stops Excel turning
-"M\u0101ori" into mojibake on Windows.
-
-The record covers sprays, which is what a handover is checked against. The plans
-themselves are in the backup file, and what is still due is on the map.
+One rule decides whether a copy is written at all: **an empty database is never written over the
+copy.** After a wipe this phone holds nothing, and the copy off-site may be the only record left — so
+the write is refused, the screen says so in as many words, and the way forward is **Restore from the
+copy**. Unattended, the copy is written once a week.
 
 ## Build
 
-Requires JDK 17–23 (this project is developed on JDK 23; Gradle 8.13 cannot run
-on the JBR 25 that Android Studio 2026.1.x bundles, so the daemon is pinned in
-`~/.gradle/gradle.properties`). Android SDK with platform 36 and build-tools
-36.0.0.
+Requires JDK 17–23 and the Android SDK with platform 36 and build-tools 36.0.0.
 
 Add your LINZ Basemaps key to `local.properties` (gitignored):
 
@@ -811,11 +258,10 @@ sdk.dir=/path/to/Android/Sdk
 LINZ_API_KEY=your_key_here
 ```
 
-Get a free standard-access key from <https://basemaps.linz.govt.nz> (no
-registration; note that standard keys **expire every 90 days**). The key in
-`local.properties` is only the default: the app takes a key entered at runtime
-under **Settings**, so an expired key is fixed in the paddock, and the same
-screen will tell you whether LINZ accepts it.
+Get a free standard-access key from <https://basemaps.linz.govt.nz> (no registration; note that
+standard keys **expire every 90 days**). The key in `local.properties` is only the default: the app
+takes a key entered at runtime under **Settings**, so an expired key is fixed on the hill, and the
+same screen will tell you whether LINZ accepts it.
 
 ```bash
 ./gradlew assembleDebug testDebugUnitTest lint        # CI runs exactly this
@@ -825,8 +271,8 @@ screen will tell you whether LINZ accepts it.
 
 ## Release
 
-Pushing a `v*.*.*` tag builds, signs and publishes a GitHub Release with the APK
-and AAB attached. Signing comes from repository secrets:
+Pushing a `v*.*.*` tag builds, signs and publishes a GitHub Release with the APK and AAB attached.
+Signing comes from repository secrets:
 
 | Secret | Meaning |
 | --- | --- |
@@ -836,86 +282,37 @@ and AAB attached. Signing comes from repository secrets:
 | `KEY_PASSWORD` | key password |
 | `LINZ_API_KEY` | baked into the release build as the default key |
 
-Locally, the same values can live in a gitignored `keystore.properties`. Keep a
-backup of the keystore: without it you cannot ship an update that installs over
-an existing install.
+Each release carries one APK per architecture plus a universal one, so a phone downloads ~15 MB
+(arm64) rather than ~50 MB of native libraries for four architectures it will never use.
 
-Each release carries one APK per architecture plus a universal one, so a phone
-downloads ~15 MB (arm64) rather than ~50 MB of native libraries for four
-architectures it will never use. Take the `arm64-v8a` APK for any phone from the
-last few years; the universal APK runs anywhere.
-
-Pushing a tag like `v0.6.12` stamps `versionName 0.6.12` and `versionCode 612`
-(major × 10000 + minor × 100 + patch), so release codes are predictable and
-always increase — a locally built test APK can be installed over, and can itself
-be replaced by, a release.
-
-**The tag is what ships**: every push to `main` that changes more than the words is tagged,
-so the code and the release never drift apart and what is on a phone is always a commit
-that can be found by name. Take the next version in the sequence — patch + 1 — rather than
-reusing one: a tag points at the code that was built from it, and a number that has been
-published cannot be moved without lying about what somebody already has installed.
-
-A code change does not wait for the next release: **it is committed, pushed and tagged as its
-own version**, in that order, before anything else is started. Work sitting in the working
-tree is work that cannot be found by name, and a fix that is only on this machine is a fix
-the phone has not got — the version number is cheap, while a batch of changes shipped
-together is a batch that has to be untangled together if one of them turns out to be wrong.
-
-**A change to the documentation alone is not a release.** The README, and comments, are
-committed and pushed straight away so that they are never only on this machine, but they
-carry no version of their own: they go out under the next code release's tag, which is the
-release they describe. Publishing APKs because a paragraph was reworded tells every install
-there is a new version to download and tap through for nothing — the update check asks
-GitHub for the newest release, and the file it would fetch would be the one already there.
-
-```bash
-git add -A && git commit -m "..."                          # one change, one commit
-git push origin main                                       # code: tag it, docs: let it ride
-git tag -a v0.6.18 -m "..." && git push origin v0.6.18     # ships the release
-```
+Pushing a tag like `v0.1.0` stamps `versionName 0.1.0` and `versionCode 100` (major × 10000 + minor ×
+100 + patch). **The tag is what ships**: a code change is committed, pushed and tagged as its own
+version. Work sitting in the working tree is work that cannot be found by name. A change to the
+documentation alone is not a release.
 
 ## Getting a new version
 
-The app is not installed from a store, so nothing else will ever mention that a new version
-exists. It asks GitHub for the newest release of itself once a day instead — WorkManager,
-network required, and the switch in Settings turns it off — and says so with a notification
-when there is one. The same check is on a button, so you can ask now rather than wait.
+The app is not installed from a store, so nothing else will ever mention that a new version exists.
+It asks GitHub for the newest release of itself once a day — WorkManager, network required, and the
+switch in Settings turns it off — and says so with a notification when there is one.
 
-**Settings → Updates** shows which version this is, whether there is a newer one, and one
-button that downloads it and hands it to Android's installer. The download is the APK built
-for *this* phone's architecture: each release carries one per ABI plus a universal build,
-and the universal one is about four times the size, so the size shown before you commit is
-the size you get.
-
-Three things the platform decides rather than this app:
-
-- Android asks you to confirm every install, and needs **install unknown apps** allowed for
-  Trail Day before it will even offer to. Settings says when that is missing, and has the
-  button that goes to the screen where it is granted.
-- Play Protect may scan a sideloaded APK before it installs, because it has not seen it
-  before. That is Google's check, not this app's, and it happens after the download.
-- An APK signed with a different key is refused by the installer, which is the protection
-  against a tampered or substituted download rather than anything in this code. The same
-  property means an update cannot cross between a debug build and a release build.
-
-Worth knowing while developing: a debug build reports `versionName 0.1.0` unless it is
-stamped (`-PversionName=0.6.2`), so it will always claim there is a newer version; and
-being debug-signed it cannot install a release APK. Both show up as the installer refusing
-rather than as a fault in the download.
+**Settings → Updates** shows which version this is, whether there is a newer one, and one button that
+downloads it and hands it to Android's installer. Android asks you to confirm every install, and
+installing needs **install unknown apps** allowed for Trail Day; Play Protect may scan a sideloaded
+APK, and an APK signed with a different key is refused by the installer.
 
 ## Data attribution
 
-Basemap imagery is licensed **CC BY 4.0** and provided by LINZ. Every map screen
-shows `LINZ CC BY 4.0 © Imagery Basemap contributors`, linking to LINZ's
+Basemap imagery is licensed **CC BY 4.0** and provided by LINZ. Every map screen shows
+`LINZ CC BY 4.0 © Imagery Basemap contributors`, linking to LINZ's
 [attribution page](https://www.linz.govt.nz/products-services/data/licensing-and-using-data/attributing-linz-basemaps-data).
-With **place names** switched on, the same strip adds `© Topographic data` — the same publisher and
-the same licence, so what is added is the part that is new: that LINZ's topographic data is on the map
-as well as their imagery.
+With **place names** switched on, the same strip adds `© Topographic data`.
+
+DOC data is **CC BY 4.0**, Crown copyright: the tracks shown as searched or imported are DOC's, not
+the app's.
 
 OpenStreetMap data is © OpenStreetMap contributors, under the
 [Open Database Licence](https://www.openstreetmap.org/copyright). Where the drawn map is chosen,
-every map screen instead shows `© OpenStreetMap contributors`, linking to that copyright page —
-the credit is never behind a toggle, which their guidelines require in as many words, and their
-[tile usage policy](https://operations.osmfoundation.org/policies/tiles/) is what keeps offline
-areas to imagery only.
+every map screen shows `© OpenStreetMap contributors`, linking to that copyright page, and their
+[tile usage policy](https://operations.osmfoundation.org/policies/tiles/) is what keeps offline areas
+to imagery only.

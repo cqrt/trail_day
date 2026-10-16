@@ -7,7 +7,7 @@
  * it and neither must anything else the phone owns.
  *
  * The other half of what is being held is the safe direction of failure. A desk that cannot remember is a
- * desk that opens on the whole farm, which is what the page did before any of this existed; a desk that
+ * desk that opens on the whole map, which is what the page did before any of this existed; a desk that
  * believes a corrupted store opens on blank ocean with no work on it, which looks like a broken phone. So
  * everything doubtful reads as no memory at all, and that is most of what is tested here.
  */
@@ -39,7 +39,7 @@ function mapLookingAt({ lng, lat, zoom = 14.5, bearing = 0, pitch = 0 }) {
   };
 }
 
-test('a browser that has never been here has no camera, so the desk opens on the whole farm', () => {
+test('a browser that has never been here has no camera, so the desk opens on the whole map', () => {
   assert.equal(recall(store()), null, 'an empty store is no memory');
   assert.equal(recall(null), null, 'and a browser that hands over no store at all is no memory either');
 });

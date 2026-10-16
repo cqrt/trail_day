@@ -24,7 +24,7 @@ sealed interface DocDownloadResult {
  *
  * The service answers at most 2,000 tracks a request, so an area with more is read by asking again
  * from where the last page ended - which is why [DocTrackQuery.offset] exists. The total is capped:
- * a box over a whole island is not an offline area for spraying a block, and a runaway download is
+ * a box over a whole island is not an offline area for a walk, and a runaway download is
  * worse than a short one.
  *
  * Kept apart from storage so the paging can be tested against a fake service with no network and no

@@ -39,7 +39,7 @@ import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.viewmodel.AssetListViewModel
 
 /**
- * The asset library: what assets exist and how long they are. Tracks can be
+ * The place library: what places exist and how long they are. Tracks can be
  * imported from GPX or drawn on the map.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -65,7 +65,7 @@ fun AssetListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Assets") },
+                title = { Text("Places") },
                 actions = {
                     IconButton(onClick = onOpenSettings) {
                         AppIcon(IconGlyph.SETTINGS, contentDescription = "Settings")
@@ -82,7 +82,7 @@ fun AssetListScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Two ways to make an asset, and only two: recording, the recordings list and
+            // Two ways to make a place, and only two: recording, the recordings list and
             // settings used to be buttons here, and are now the tabs in the bar below and
             // the icon in the bar above. Drawing gets the filled treatment because it is
             // what happens standing in the paddock, which is the commoner case.
@@ -133,7 +133,7 @@ fun AssetListScreen(
             if (assets.isEmpty()) {
                 EmptyState(
                     glyph = IconGlyph.ASSETS,
-                    title = "No assets yet",
+                    title = "No places yet",
                     body = "Import a GPX, KML, KMZ or GeoJSON file, or draw one on the map.",
                     actionLabel = "Draw one",
                     onAction = onDrawAsset
@@ -147,7 +147,7 @@ fun AssetListScreen(
                     style = MaterialTheme.typography.bodyMedium
                 )
             } else {
-                // Rows rather than a card each: a list of assets is a list, and a card per
+                // Rows rather than a card each: a list of places is a list, and a card per
                 // row made five paddocks look like five unrelated things.
                 LazyColumn {
                     itemsIndexed(shown, key = { _, item -> item.id }) { index, item ->
@@ -199,7 +199,7 @@ private fun AssetRow(
 }
 
 /**
- * What the row says under an asset's name.
+ * What the row says under a place's name.
  *
  * A spot has no length, and a line that has not been drawn on yet has none either, so in both
  * cases the length is left out rather than printed as "0 m".

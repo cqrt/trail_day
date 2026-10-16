@@ -10,14 +10,14 @@
  *
  * **A line is laid two ways, and they mix.** Clicking the map puts a vertex where the click was, which is
  * how a corner is described exactly. Holding the button down and moving traces the pointer along the
- * fence on the imagery, which is how a boundary that is already drawn on the ground is followed rather
+ * fence on the imagery, which is how a line that is already drawn on the ground is followed rather
  * than guessed at - and both of them add to the same line, in any order, because to this file they are
- * the same thing: a place, snapped, in the order the operator said them.
+ * the same thing: a place, snapped, in the order the walker said them.
  *
  * **The module is imported with the token on the end of its URL**, because every request the phone
  * answers needs one and a browser asks for an `import` with no query unless it is told otherwise - the
  * same trap `index.html` documents for its own stylesheet. So this file finds the token in the address
- * the operator opened, exactly as `app.js` does, and asks for `./geometry.mjs?k=...` - or for the module
+ * the walker opened, exactly as `app.js` does, and asks for `./geometry.mjs?k=...` - or for the module
  * with no query at all when the phone is serving with no token, which is the other kind of run.
  *
  * **Nothing here talks to the phone.** A vertex is moved in the page's own memory, undone from the
@@ -33,13 +33,11 @@ const geometry = await import(
 
 const {
   TRACE_PX,
-  RING_CORNERS,
   activePath,
   add,
   backToLine,
   canRedo,
   canUndo,
-  corners,
   createPaths,
   dropSideTrack,
   hold,
@@ -67,7 +65,7 @@ const {
   verticesOf
 } = geometry;
 
-/** The page's own drawing furniture, deliberately not one of the due colours or a kind's. */
+/** The page's own drawing furniture, deliberately not one of the kinds' colours. */
 const INK = '#212121';
 const PAPER = '#ffffff';
 
@@ -106,14 +104,13 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
   let dragging = null;
 
   /**
-   * What is being drawn: a line, a place, or ground with an edge.
+   * What is being drawn: a line, or a single place.
    *
    * The page hands this in - the kind decides it on the phone (`AssetKind.shape`), and the desk is
-   * given the same answer in the state document's own kind list - and everything the shape changes
-   * follows from it here: whether the closing side is drawn, whether the box counts ground instead of
-   * metres, and whether a side track is on offer at all. `LINE` is the default because it is what this
-   * drawing has always been, so a page that knows nothing about shapes draws exactly what it drew
-   * before.
+   * given the same answer in the state document's own kind list - and what the shape changes follows
+   * from it here: whether a click carries the path on, or moves the one point a place is. `LINE` is
+   * the default because it is what this drawing has always been, so a page that knows nothing about
+   * shapes draws exactly what it drew before.
    */
   let shape = 'LINE';
 
@@ -134,7 +131,7 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
   /**
    * The line vertex a side track will hang off, or null for the track's own end.
    *
-   * Picked by clicking the line, which is where an operator standing in front of a fence that meets a track
+   * Picked by clicking the line, which is where a walker standing in front of a fence that meets a track
    * would put their finger - and it is the *index*, not the place, because a junction is a vertex of the
    * line rather than a point near it. Cleared when the drawing starts or stops, and validated where it is
    * used (`startSideTrack` falls back to the end), because an Undo can take the vertex away underneath it.
@@ -204,10 +201,10 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
   /**
    * How far off the traced shape a point may be dropped, in metres.
    *
-   * Half the sampling step, worked out from the view the operator is tracing in: a pixel at zoom 17 over
+   * Half the sampling step, worked out from the view the walker is tracing in: a pixel at zoom 17 over
    * the ground is about 0.9 m, so a wobble smaller than a pixel is the hand and one bigger than a pixel is
    * the fence. That is the whole idea of tracing a line off the imagery - the line is as good as what
-   * the operator could see and no better - and it is why this is read off the map rather than fixed.
+   * the walker could see and no better - and it is why this is read off the map rather than fixed.
    */
   function toleranceM() {
     const centre = map.getCenter();
@@ -215,12 +212,9 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
   }
 
   function paint() {
-    // Ground with an edge is drawn closed: the sides that have been laid, and the closing side the
-    // phone will store. See `toFeature`'s own note for why the page draws a side nobody clicked.
-    const ground = shape === 'AREA';
     const source = map.getSource(SOURCE_ID);
     if (source) {
-      const data = pathsFeature(pathsNow(), ground);
+      const data = pathsFeature(pathsNow());
       const marker = junctionFeature(junctionPoint());
       if (marker) data.features.push(marker);
       source.setData(data);
@@ -235,7 +229,6 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
       // What the phone calls the number, and what the phone counts: a line is measured along itself.
       lengthM: lengthMeters(drawing.paths),
       shape,
-      ringCorners: RING_CORNERS,
       junction: junctionPoint(),
       canUndo: canUndo(drawing),
       canRedo: canRedo(drawing),
@@ -286,7 +279,7 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
         type: 'circle',
         source: SOURCE_ID,
         // The junction is drawn as a filled dot rather than an open one, so a side track about to hang off
-        // it says so: an operator who has clicked the wrong part of a line can see it before drawing.
+        // it says so: a walker who has clicked the wrong part of a line can see it before drawing.
         filter: ['!=', ['get', 'junction'], true],
         paint: {
           'circle-radius': 6,
@@ -433,18 +426,14 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
 
     // A click on the path in hand splits it: the vertex goes in between the two it was clicked between. Only
     // that path - a click on the line while a side track is in hand adds to the side track, because the side
-    // track is what the operator has hold of.
+    // track is what the walker has hold of.
     const at = segmentAt(activePath(drawing), place.screen, project);
     if (at >= 0) {
       drawing = insert(drawing, at, spot(place.ground));
-      // A vertex put into the **line** is where a side track will leave it: the operator has just pointed at
+      // A vertex put into the **line** is where a side track will leave it: the walker has just pointed at
       // that part of the track, so that is the junction rather than the far end of the line. This is the whole
       // answer to "I clicked beside the fence I want to branch off and the spur started miles away".
-      //
-      // Not for ground with an edge, which has no spurs to hang off it: a click on a boundary puts a
-      // corner in - that is the whole gesture, and it is how a boundary is changed from the desk - and saying
-      // "a side track will leave the line here" over a boundary is a sentence about a move the phone refuses.
-      if (!sideTrackInHand(drawing) && shape !== 'AREA') junction = at;
+      if (!sideTrackInHand(drawing)) junction = at;
       paint();
       return;
     }
@@ -464,8 +453,8 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
     // A click on the paddock carries the line on: the point goes onto the end of the path in hand,
     // whether the line is a new one or a track the phone already has. That is the phone's own rule, and
     // the desk used to differ - a track that existed was kept to its handles alone, so a track could be
-    // tidied from the desk but never extended, and the operator asked for the phone's answer. A stray
-    // click puts a vertex somewhere the operator can see, and one Ctrl+Z takes it straight back - the
+    // tidied from the desk but never extended, and the walker asked for the phone's answer. A stray
+    // click puts a vertex somewhere the walker can see, and one Ctrl+Z takes it straight back - the
     // same bargain the phone's own undo offers.
     if (shape === 'POINT') {
       // A place is one point, and does not grow: the phone moves it to wherever it was tapped, so the
@@ -495,7 +484,7 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
 
   document.addEventListener('keydown', (event) => {
     if (!live()) return;
-    // Not while the operator is typing: the form has its own Escape, and a Delete key pressed in the
+    // Not while the walker is typing: the form has its own Escape, and a Delete key pressed in the
     // notes field means the notes.
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
 
@@ -524,7 +513,7 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
       return;
     }
     // `B` starts a side track where the line ends, and `L` goes back to the line: the two moves the page's
-    // own buttons make, for an operator working with one hand on the mouse.
+    // own buttons make, for a walker working with one hand on the mouse.
     if (key === 'b' && !command) {
       event.preventDefault();
       startFromTheLine();
@@ -536,7 +525,7 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
       return;
     }
     if (event.key === 'Delete' || event.key === 'Backspace') {
-      // The one the operator last had hold of, or the end of the path being drawn.
+      // The one the walker last had hold of, or the end of the path being drawn.
       const active = activePath(drawing);
       const which = hovered >= 0 ? hovered : active.length - 1;
       if (which >= 0) {
@@ -552,9 +541,6 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
 
   /** Starts a side track from the vertex picked out on the line, or from where the track ends. */
   function startFromTheLine() {
-    // Ground with an edge has no spurs to hang off it: the phone refuses a write that carries one
-    // (`AssetPathEdits`), and a page that offered the move would be offering a refusal.
-    if (shape === 'AREA') return;
     drawing = startSideTrack(drawing, junction);
     junction = null;
     paint();
@@ -581,14 +567,7 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
     mode = nextMode;
     editingId = id;
     shape = nextShape;
-    // A ring is opened on its **corners**: how it is stored - the first corner repeated at the end - is
-    // the phone's own way of saying "this closes", and a handle on that repeat would be a point that can
-    // be dragged off the boundary it closes. The closing side comes back from the shape, drawn and then
-    // stored again by the phone, so nothing is lost by taking it off here.
-    const opened = shape === 'AREA'
-      ? paths.map((path, index) => (index === 0 ? corners(path) : path))
-      : paths;
-    drawing = createPaths(opened);
+    drawing = createPaths(paths);
     dragging = null;
     stroke = null;
     swallowClick = false;
@@ -621,7 +600,6 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
       activePoints: 0,
       lengthM: 0,
       shape,
-      ringCorners: RING_CORNERS,
       canUndo: false,
       canRedo: false,
       hovered: -1,
@@ -630,7 +608,7 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
   }
 
   /**
-   * The operator is done: the paths go to the page, which decides what that means.
+   * The walker is done: the paths go to the page, which decides what that means.
    *
    * A new track has a form to fill in; a track already on the phone has a save to make. Either way the
    * drawing stops here, and this is the only place a finished drawing leaves the map - which is why the
@@ -649,7 +627,7 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
   }
 
   /**
-   * The operator has given up on this drawing, and everything is as it was.
+   * The walker has given up on this drawing, and everything is as it was.
    *
    * For a new track that is the end of it. For an asset the phone already has, the page's provisional
    * line is simply hidden: the phone was never asked to change anything, so there is nothing to put
@@ -665,15 +643,14 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
      * A new line, starting empty: it snaps onto every place the phone already has.
      *
      * Paths can be handed in, which is how the form's Cancel comes back to a drawing that was already
-     * made rather than to a blank map - the line is the operator's work, and a form opened over it is
+     * made rather than to a blank map - the line is the walker's work, and a form opened over it is
      * not a reason to lose it. The shape comes back the same way, so cancelling out of the form for a
-     * closed drawing returns to one being drawn rather than to a line named as one.
+     * place returns to a place being drawn rather than to a line named as one.
      */
     startNew: (paths = [], shape = 'LINE') => start('new', null, paths, shape),
 
     /**
-     * A track the phone already has, opened on the whole of its drawing: the line and its side tracks -
-     * or, for a kind that is ground, its boundary's corners.
+     * A track the phone already has, opened on the whole of its drawing: the line and its side tracks.
      *
      * The paths come from the state document's own record rather than from the feature the map is
      * drawing, because the feature is one path per asset and the desk has to be able to hand back every

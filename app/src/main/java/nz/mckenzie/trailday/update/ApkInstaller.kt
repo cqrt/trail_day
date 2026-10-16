@@ -17,9 +17,9 @@ import java.net.URL
 sealed interface InstallResult {
 
     /**
-     * Android has the file: either it is asking the operator to confirm, or it has already
+     * Android has the file: either it is asking the walker to confirm, or it has already
      * put the new version in place. That is the normal outcome rather than a failure - no
-     * app can install anything on Android without the operator's tap.
+     * app can install anything on Android without the walker's tap.
      */
     data object HandedToInstaller : InstallResult
 
@@ -35,11 +35,11 @@ sealed interface InstallResult {
  * there is no file provider to declare, and there is never a moment where an APK sits in a
  * directory something else could read.
  *
- * Downloading and installing are one operation for the same reason. On a farm connection a
+ * Downloading and installing are one operation for the same reason. On a slow connection a
  * dropped download abandons the session, rather than leaving half an APK behind for
  * something that cannot tell whether it is whole to install later.
  *
- * What protects the operator from a tampered download is Android itself: the installer
+ * What protects the walker from a tampered download is Android itself: the installer
  * refuses an APK whose signing certificate is not the one already on the device, so a
  * substituted file fails at the last step rather than being trusted by this code.
  */
@@ -79,7 +79,7 @@ class ApkInstaller(private val context: Context) {
             }
 
             // The installer answers within a second or two: either that it needs the
-            // operator, or the reason it will not install this at all.
+            // walker, or the reason it will not install this at all.
             when (val status = withTimeoutOrNull(ANSWER_TIMEOUT_MS) { answer.await() }) {
                 null -> InstallResult.Failed("Android's installer did not answer")
                 else -> interpret(status)
@@ -100,12 +100,12 @@ class ApkInstaller(private val context: Context) {
         context,
         sessionId,
         Intent(context, UpdateInstallReceiver::class.java),
-        // Mutable, because the installer fills in the intent that asks the operator to
+        // Mutable, because the installer fills in the intent that asks the walker to
         // confirm. That is also the reason the receiver is not exported.
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
     )
 
-    /** Turns the installer's answer into something the operator can act on. */
+    /** Turns the installer's answer into something the walker can act on. */
     private fun interpret(answer: Intent): InstallResult {
         val status = answer.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
         val detail = answer.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE).orEmpty()
@@ -149,7 +149,7 @@ class ApkInstaller(private val context: Context) {
     }
 
     /**
-     * The intent that asks the operator to confirm, checked before it is launched.
+     * The intent that asks the walker to confirm, checked before it is launched.
      *
      * The status carries an intent for this app to start, and starting whatever an intent
      * happens to name is how an app can be made to talk someone into installing something

@@ -95,7 +95,7 @@ class SettingsViewModel(
     private val probe: LinzKeyProbe = LinzKeyProbe(),
     /** Injected so tests never reach LINZ. */
     private val checkKey: suspend (String) -> KeyCheck = { probe.check(it) },
-    /** Backup files: chosen by the operator, read and written by the app. */
+    /** Backup files: chosen by the walker, read and written by the app. */
     private val backup: BackupController? = null,
     /**
      * The off-site copy, built fresh from the settings each time it is used so that a
@@ -103,7 +103,7 @@ class SettingsViewModel(
      * destination, which is also what the screen reports as "not set up yet".
      */
     private val offsite: (suspend () -> OffsiteBackup?)? = null,
-    /** Takes a lasting permission on the file the operator chose, so it survives a restart. */
+    /** Takes a lasting permission on the file the walker chose, so it survives a restart. */
     private val keepFileAccess: (Uri) -> Unit = {},
     /** The chosen file's name, for the screen to say where the copy goes. */
     private val fileLabel: (Uri) -> String = { uri -> uri.lastPathSegment.orEmpty() },
@@ -123,7 +123,7 @@ class SettingsViewModel(
     val keyText: StateFlow<String> = _keyText
 
     /**
-     * True once the operator has touched the field, so the seeding read below cannot
+     * True once the walker has touched the field, so the seeding read below cannot
      * land late and wipe a key that is half typed. This is a real race, not a
      * theoretical one: the field is seeded from DataStore, and on a slow device the
      * read can take longer than it takes to start typing.
@@ -150,7 +150,7 @@ class SettingsViewModel(
         )
 
     /**
-     * Which basemap the operator has chosen for their maps.
+     * Which basemap the walker has chosen for their maps.
      *
      * Seeded with the default rather than left empty, like the key label above: DataStore answers
      * in a frame, and a card whose selection is briefly wrong is better than one that is briefly
@@ -176,7 +176,7 @@ class SettingsViewModel(
     /**
      * The switch.
      *
-     * Turning it on starts a foreground service, which Android only allows from an app the operator
+     * Turning it on starts a foreground service, which Android only allows from an app the walker
      * is actually looking at - which is here, and is why the editor is started from the launcher
      * activity and from nowhere else. The answer is written before the service is told, so a phone
      * put down mid-press agrees with the switch rather than with the default when it comes back.
@@ -287,7 +287,7 @@ class SettingsViewModel(
 
     /** Where a copy being restored came from. */
     sealed interface RestoreSource {
-        /** The file the operator chose in the system picker. */
+        /** The file the walker chose in the system picker. */
         data class File(val uri: Uri) : RestoreSource
 
         /** A copy in the off-site destination, by the name it is kept under. */
@@ -353,7 +353,7 @@ class SettingsViewModel(
     /** "trail-day-backup-2026-09-14.json" - offered as the file name in the picker. */
     fun backupFileName(): String = backup?.suggestedFileName() ?: "trail-day-backup.json"
 
-    /** Writes everything the app holds to the file the operator chose. */
+    /** Writes everything the app holds to the file the walker chose. */
     fun exportBackupTo(uri: Uri) {
         val controller = backup ?: return
         viewModelScope.launch {
@@ -428,7 +428,7 @@ class SettingsViewModel(
     private val _offsiteCheck = MutableStateFlow<OffsiteCheckState>(OffsiteCheckState.Idle)
     val offsiteCheck: StateFlow<OffsiteCheckState> = _offsiteCheck
 
-    /** Set only when the destination holds more than one copy: the operator picks. */
+    /** Set only when the destination holds more than one copy: the walker picks. */
     private val _copiesToChoose = MutableStateFlow<List<StoredBackup>?>(null)
     val copiesToChoose: StateFlow<List<StoredBackup>?> = _copiesToChoose
 
@@ -594,7 +594,7 @@ class SettingsViewModel(
      * Asks the destination whether it will take the copy - and whether it is private.
      *
      * The privacy answer cannot be got any other way, and it matters: a repository that
-     * accepts the token and is public would put a farm's records in public, and nothing else
+     * accepts the token and is public would put your records in public, and nothing else
      * in the app would ever mention it.
      */
     fun testOffsite() {
@@ -615,7 +615,7 @@ class SettingsViewModel(
                             !answer.isPrivate -> OffsiteCheckState.Worked(
                                 note = "${answer.fullName} answered, and the token can write to it.",
                                 warning = "That repository is public, so anyone can read your " +
-                                    "tracks and recordings. Make it private before " +
+                                    "tracks and trips. Make it private before " +
                                     "backing up."
                             )
 
@@ -700,7 +700,7 @@ class SettingsViewModel(
         }
     }
 
-    /** The operator has picked which of several copies to restore. */
+    /** The walker has picked which of several copies to restore. */
     fun chooseOffsiteCopy(stored: StoredBackup) {
         _copiesToChoose.value = null
         viewModelScope.launch {
@@ -717,7 +717,7 @@ class SettingsViewModel(
     /**
      * Reads the copy's counters and hands them to the same dialog the file path uses.
      *
-     * The copy is fetched again when the operator confirms rather than held in memory: a
+     * The copy is fetched again when the walker confirms rather than held in memory: a
      * season of recordings is not worth keeping in the heap to save one download, and the
      * second read is what makes the dialog's numbers true of what is actually restored.
      */

@@ -4,7 +4,7 @@ package nz.mckenzie.trailday.domain.update
  * A version of the app, as the release tags name them: `v0.6.2` is 0.6.2.
  *
  * Compared as numbers rather than as text, which is the whole point of having this type.
- * "0.6.10" is newer than "0.6.9", and a string comparison says the opposite - an operator
+ * "0.6.10" is newer than "0.6.9", and a string comparison says the opposite - a walker
  * on an old build would be told they were up to date, which is the one failure an update
  * check cannot afford.
  */

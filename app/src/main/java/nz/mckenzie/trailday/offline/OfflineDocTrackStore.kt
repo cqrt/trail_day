@@ -18,7 +18,7 @@ import nz.mckenzie.trailday.domain.tiles.LatLngBounds
  *
  * The same shape as [OfflineAreaManager]: a download pulls what the service has for a box, and this
  * records it so the browser can offer it with no reception. It is a cache rather than the record of
- * the farm - clearing it costs nothing but the download - so it is not backed up and not joined to
+ * the map - clearing it costs nothing but the download - so it is not backed up and not joined to
  * anything.
  *
  * Stored globally rather than per area: a track is the same track wherever it was downloaded from, and
@@ -107,7 +107,7 @@ private fun DocTrack.toEntity(at: Long) = OfflineDocTrackEntity(
     downloadedAtEpochMs = at
 )
 
-/** The sentence a download's track count earns, in the operator's own terms. */
+/** The sentence a download's track count earns, in the walker's own terms. */
 fun docDownloadedMessage(count: Int): String = when {
     count == 0 -> "No DOC tracks were in that area."
     count == 1 -> "Downloaded 1 DOC track."

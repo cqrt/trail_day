@@ -1,9 +1,9 @@
 /*
  * The desk page's own styling.
  *
- * Plain, and with no palette of its own: the only things that carry colour are the due dots and the
- * lines themselves, and a row's dot takes the colour the phone painted that asset's feature - so
- * there is one place in the world that decides what "due soon" looks like.
+ * Plain, and with no palette of its own: the only things that carry colour are the row dots and the
+ * lines themselves, and a row's dot takes the colour the phone painted that place's feature - so
+ * there is one place in the world that decides what a kind looks like.
  *
  * Light is the default, and there is a dark theme beside it, chosen by the button in the bar and
  * kept in the browser's own store. The two themes are the same variables with different values, so a
@@ -19,8 +19,8 @@
 
   /*
    * The page's own accent and danger colours, said once so the dark theme can re-say them rather
-   * than a rule being written twice. The due dots and the save button's green stay as they are in
-   * both themes: the dots are the phone's own traffic light, and the save button is the one fixed
+   * than a rule being written twice. The row dots and the save button's green stay as they are in
+   * both themes: the dots are the phone's own kind colours, and the save button is the one fixed
    * colour this page has.
    */
   --danger: #8c2f22;
@@ -43,8 +43,8 @@
 
   /*
    * One column, the name: the desk keeps a list of places to open and draw. The figures that used to
-   * sit beside a name - how it is sprayed, how many passes, when it is next due - went with the
-   * spraying, and a column that held them would be a column of empty cells.
+   * sit beside a name went with the old app, and a column that held them would be a column of empty
+   * cells.
    */
   --content-columns: minmax(0, 1fr);
   --list-columns: var(--content-columns);
@@ -315,7 +315,7 @@ main { flex: 1; display: flex; min-height: 0; position: relative; }
 
 #doc-list .doc-row .name { font-size: 13.5px; }
 
-/* A track the phone already has: shown, not tickable, and plainly not the operator's to choose. */
+/* A track the phone already has: shown, not tickable, and plainly not the walker's to choose. */
 #doc-list .doc-row.imported { cursor: default; opacity: 0.6; }
 
 /*
@@ -374,7 +374,7 @@ main { flex: 1; display: flex; min-height: 0; position: relative; }
 }
 
 /*
- * The farm at a glance: the phone's own corner box, on a desk. Plain, and carrying no colour of its
+ * The map at a glance: the phone's own corner box, on a desk. Plain, and carrying no colour of its
  * own: the dots take the colours the phone sent with the document, and every figure is the phone's
  * own arithmetic. A rule that sets the display beats the browser's own `hidden`, so the attribute is
  * said too.
@@ -426,7 +426,7 @@ main { flex: 1; display: flex; min-height: 0; position: relative; }
 
 /*
  * A track file over the map. The hint is the page's own words about what letting go will do, and it sits
- * in the map's corner rather than its middle: the operator is watching the line they are about to land
+ * in the map's corner rather than its middle: the walker is watching the line they are about to land
  * there, not reading a message.
  */
 #drop-hint {
@@ -506,7 +506,7 @@ main { flex: 1; display: flex; min-height: 0; position: relative; }
   color: var(--ink);
 }
 
-/* The keys: one short row each, the key itself in the operator's own letters ("Del", "Ctrl+Z"). */
+/* The keys: one short row each, the key itself in the walker's own letters ("Del", "Ctrl+Z"). */
 #drawing-keys {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -656,7 +656,7 @@ main { flex: 1; display: flex; min-height: 0; position: relative; }
  * The card's elevation profile: the phone's heights, drawn by the page. The SVG's own grid is a
  * fixed 100 by 30 (see `CARD_ELEVATION_WIDTH` in app.js) and the stylesheet stretches it to the
  * card's width, so the drawing knows nothing about how wide the card is. A neutral grey rather than
- * the green or the due colours, because a height says nothing about what is due. The stroke keeps
+ * the green or a kind's colour, because a height says nothing about what kind of place it is. The stroke keeps
  * its own width as the box stretches (`vector-effect`), which a non-uniform stretch would otherwise
  * pull thin.
  */
@@ -841,7 +841,7 @@ main { flex: 1; display: flex; min-height: 0; position: relative; }
 #edit-buttons #edit-save:disabled,
 #together-buttons #together-save:disabled { opacity: 0.6; cursor: default; }
 
-/* The phone's own sentence about what it refused, where the operator is looking when it happens. */
+/* The phone's own sentence about what it refused, where the walker is looking when it happens. */
 #edit-words,
 #together-words {
   margin: 10px 0 0;
@@ -870,8 +870,8 @@ main { flex: 1; display: flex; min-height: 0; position: relative; }
 
 #together .field > .label {
   margin: 0;
-  /* Wide enough for the longest name a field has - "Days between sprays" - so the controls all start at
-     the same place rather than at whatever their own label happens to measure. */
+  /* Wide enough for the longest label, so the controls all start at the same place rather than at
+     whatever their own label happens to measure. */
   flex: 0 0 118px;
   font-size: 13px;
   color: var(--quiet);
@@ -892,7 +892,7 @@ main { flex: 1; display: flex; min-height: 0; position: relative; }
 
 /*
  * The control itself greys out while its tick is off, and the tick does not: a control that is off is
- * one the operator has not asked to change, while the tick is the only thing on the row that does. A
+ * one the walker has not asked to change, while the tick is the only thing on the row that does. A
  * row of choices has no `disabled` of its own, because disabling a fieldset would disable its legend -
  * so the dimming is read off the tick beside it.
  */

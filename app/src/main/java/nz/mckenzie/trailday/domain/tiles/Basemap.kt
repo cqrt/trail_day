@@ -5,11 +5,11 @@ package nz.mckenzie.trailday.domain.tiles
  *
  * There are two kinds of thing here, and the difference matters more than the code:
  *
- *  - **Aerial imagery** (LINZ): a photograph of the ground, which is what a spray decision is
- *    made from, and which the app may *download ahead of time* into the offline store. Keys are
+ *  - **Aerial imagery** (LINZ): a photograph of the ground, which is what a route is planned
+ *    from, and which the app may *download ahead of time* into the offline store. Keys are
  *    per-source, and LINZ's expire every 90 days.
  *  - **A drawn map** (OpenStreetMap): roads, tracks, gates, streams and names, which is what the
- *    operator reads to find a way in or to say where they are. It needs no key and works the day
+ *    walker reads to find a way in or to say where they are. It needs no key and works the day
  *    a LINZ key has expired - but it shows nothing about what is growing, and its tiles may only
  *    be fetched as they are looked at. See [prefetchable].
  *
@@ -23,7 +23,7 @@ enum class Basemap(
     val id: String,
     /** What the picker calls it. */
     val displayName: String,
-    /** One line for the picker, in the operator's terms. */
+    /** One line for the picker, in the walker's terms. */
     val summary: String,
     /** Whether tiles cannot be served at all without a key from the provider. */
     val needsKey: Boolean,
@@ -37,7 +37,7 @@ enum class Basemap(
      * Whether the app may fetch these tiles **before** anyone looks at them.
      *
      * True for imagery, which is what offline areas are for: a block is downloaded once, on
-     * purpose, and the operator drives around it with no reception. **False for OpenStreetMap,
+     * purpose, and the walker drives around it with no reception. **False for OpenStreetMap,
      * and this is a licence term rather than a preference**: their tile usage policy prohibits
      * pre-emptive fetching - "bulk downloading" - and offline packs, and points anyone who wants
      * offline tiles at self-hosted ones instead. The tiles that have been looked at are still
@@ -108,7 +108,7 @@ enum class Basemap(
     fun attributionHtml(): String = "<a href='$attributionLink'>$attribution</a>"
 
     companion object {
-        /** What the map draws until the operator chooses otherwise. */
+        /** What the map draws until the walker chooses otherwise. */
         val DEFAULT: Basemap = LINZ_AERIAL
 
         const val LINZ_HOST = "https://basemaps.linz.govt.nz"
@@ -136,7 +136,7 @@ enum class Basemap(
         /** Where OpenStreetMap's attribution must point, as the table has it. */
         val OSM_COPYRIGHT_LINK: String get() = OPENSTREETMAP.attributionLink
 
-        /** Their recommended way for an operator to report a wrong road or a missing gate. */
+        /** Their recommended way for a walker to report a wrong road or a missing gate. */
         const val OSM_REPORT_LINK = "https://www.openstreetmap.org/fixthemap"
 
         /**

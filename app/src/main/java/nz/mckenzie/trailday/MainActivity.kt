@@ -84,13 +84,13 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // The editor serves itself from the moment the app is opened, unless the operator
+                // The editor serves itself from the moment the app is opened, unless the walker
                 // has turned it off - which is what "on by default" has to mean for a service that
                 // Android only lets an app on screen start. Read here rather than in the
                 // application, where the same code would run for a scheduled job that started the
                 // process with no screen behind it and no right to start a service at all. Left
                 // alone when a run is already going, because starting again would build a new run
-                // and hand the operator a new address under a page they are already reading.
+                // and hand the walker a new address under a page they are already reading.
                 LaunchedEffect(Unit) {
                     val settings = SettingsRepository(applicationContext)
                     if (settings.webEditorEnabled.first() && !WebEditorState.isOn) {
@@ -171,7 +171,7 @@ class MainActivity : ComponentActivity() {
 
                     // Editing is a screen rather than a dialog, and it asks for the same view
                     // model the screen behind it uses: that one is keyed by asset id, so the
-                    // form opens on the asset that was just on screen, and saving updates it.
+                    // form opens on the place that was just on screen, and saving updates it.
                     Destination.ASSET_EDIT -> {
                         val assetId = selectedAssetId
                         if (assetId == null) {

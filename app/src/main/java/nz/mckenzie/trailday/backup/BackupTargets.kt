@@ -12,7 +12,7 @@ import nz.mckenzie.trailday.domain.backup.OffsiteBackupRules
 /**
  * The destination the settings describe.
  *
- * Null is a real answer and the common one: the operator may have turned the off-site copy
+ * Null is a real answer and the common one: the walker may have turned the off-site copy
  * on but not yet given it a token, or not yet chosen the file. The screen says which of the
  * two is missing, rather than the app quietly doing nothing.
  *

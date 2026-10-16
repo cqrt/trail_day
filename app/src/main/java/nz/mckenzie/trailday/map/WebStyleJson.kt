@@ -16,7 +16,7 @@ import nz.mckenzie.trailday.domain.tiles.PlaceLabels
  * The style the editor's page loads, built from the same tables the app's own map is built from.
  *
  * The alternative - a `style.json` sitting in `assets/web` with the layer ids, the dash patterns
- * and the due colours written out a second time - is a copy of four decisions that drifts the first
+ * and the colours written out a second time - is a copy of four decisions that drifts the first
  * time one of them changes, and the drift shows up as a desk that draws a bike track solid while the
  * phone draws it dashed. So the page is handed what the phone already knows: [AssetLayerIds] for
  * the layer ids (the very ones the map's own switches hide), [AssetLineStyles] for the dashes,
@@ -41,7 +41,7 @@ object WebStyleJson {
      *
      * The map drops a name that cannot have this much to itself, which is what keeps two towns from
      * being written on top of one another - the app's own track names are never dropped, and the
-     * difference is deliberate: a track's name is something the operator put there.
+     * difference is deliberate: a track's name is something the walker put there.
      */
     private const val PLACE_NAME_PADDING = 4
 
@@ -60,7 +60,7 @@ object WebStyleJson {
      * on the Wi-Fi, so the page never sees the LINZ key and a downloaded area is drawn from the
      * same store the app draws it from. [assetsUrl] is where the page reads the work itself.
      *
-     * [placeNamesUrl] is where LINZ's place-name tiles come from, or null when the operator has not
+     * [placeNamesUrl] is where LINZ's place-name tiles come from, or null when the walker has not
      * asked for them on the phone - see
      * [nz.mckenzie.trailday.domain.tiles.PlaceLabels]. The desk draws them where the phone does,
      * from the phone, for the reason everything else on the desk goes through the phone: one store,
@@ -191,7 +191,7 @@ object WebStyleJson {
                 // `["literal", [ ... ]]`: a `literal` takes **one** argument, which here is the
                 // array of kinds. Written as `["literal", "city", "town"]` it is refused outright
                 // by both renderers, and a style refused is a desk with a blank rectangle where the
-                // farm should be - see `WebStyleJsonTest`, which now checks the expression shapes
+                // map should be - see `WebStyleJsonTest`, which now checks the expression shapes
                 // rather than a string that was written by hand from the builder.
                 add(
                     buildJsonArray {
@@ -285,7 +285,7 @@ object WebStyleJson {
      * The places: one marker layer per kind, named by the feature.
      *
      * One layer per kind so that a kind can be hidden on its own - the app's own map does the same,
-     * and the two must agree about which layer an operator's switch hides. The feature says which
+     * and the two must agree about which layer a walker's switch hides. The feature says which
      * marker it wants, exactly as it does on the phone, and a kind or colour nothing was drawn for
      * gets the grey ring: a place drawn in the wrong colour is a wrong answer and a place not drawn
      * at all is a missing one, which is worse.

@@ -48,7 +48,7 @@ data class AvailableUpdate(
  *
  * Releases are published per architecture plus a universal build (see the release
  * workflow), so picking the file is a decision rather than a detail: the universal APK is
- * about four times the size, which on a farm connection is the difference between a
+ * about four times the size, which on a slow connection is the difference between a
  * download and an abandoned one.
  */
 object ReleaseCatalog {
@@ -63,7 +63,7 @@ object ReleaseCatalog {
      * The update to offer, or null when there is nothing newer *and installable*.
      *
      * Null covers all of these on purpose, because the screen says the same thing about
-     * each of them - "you are up to date" - and the operator does not need to know which
+     * each of them - "you are up to date" - and the walker does not need to know which
      * one it was: no release, a draft, a pre-release, a tag that is not a version, a
      * version that is not newer, or a release with no APK this phone can install.
      */

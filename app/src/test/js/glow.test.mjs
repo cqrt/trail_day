@@ -8,8 +8,8 @@
  * Two things are being held. The shape: a mark is built out of one of the phone's layers, and the one thing
  * it must not do is change what that layer says - a fenceline is dotted because a fenceline is a series of
  * short things, and an edge wide enough to fill in the gaps between the dots would draw it solid. And the
- * colour: the edge under a line is the page's own white, which none of the three due colours is, so a line
- * goes on saying when it is due while the edge says only "this is the one in hand".
+ * colour: the edge under a line is the page's own white, so a line goes on saying what it is while the edge
+ * says only "this is the one in hand".
  */
 
 import assert from 'node:assert/strict';
@@ -19,9 +19,6 @@ import { NO_ASSET, haloId, haloLayer, pickOut, wantsHalo } from '../../main/asse
 
 /** The page's own paper: the white a line's edge is drawn in. */
 const WHITE = '#ffffff';
-
-/** The phone's own traffic light, from `AssetColors`: green, amber, red - and the edge may wear none of them. */
-const DUE_COLOURS = ['#2E7D32', '#F9A825', '#C62828'];
 
 /** A track's own layer, as `WebStyleJson` builds it: solid, 5 px, the feature's own colour. */
 const track = {
@@ -61,7 +58,7 @@ test('a line that is picked out gets a white edge under it, wider than the line 
   assert.ok(edge.paint['line-opacity'] > 0.7, 'nearly solid, or the imagery reads straight through it');
 });
 
-test('the edge does not wear the line\'s own colour, so it cannot claim a state the line does not have', () => {
+test('the edge does not wear the line\'s own colour, so it cannot be mistaken for the line', () => {
   const green = { ...track, paint: { ...track.paint } };
   const red = { ...track, paint: { ...track.paint } };
 
@@ -69,10 +66,6 @@ test('the edge does not wear the line\'s own colour, so it cannot claim a state 
 
   assert.equal(edgeOf(green, 7), edgeOf(red, 8), 'the same white for a track of any colour');
   assert.notDeepEqual(edgeOf(green, 7), ['get', 'stroke'], 'and not the feature\'s own colour');
-  assert.ok(
-    DUE_COLOURS.every((due) => due !== edgeOf(green, 7).toUpperCase()),
-    'nor one of the three the traffic light uses, which would read as the line\'s own state'
-  );
 });
 
 /** The dashes a layer draws, in pixels: a dasharray is in multiples of that layer's own width. */
@@ -196,7 +189,7 @@ test('the names beside tracks get no halo: a disc there sits on every corner of 
   // The track-names layer, as `WebStyleJson` builds it: a symbol, over the one stretch of the track
   // that carries the name. It is a symbol like a place's marker, which is how it came to be given a
   // place's halo - and its features are a stretch of line, so the disc landed on every corner of that
-  // stretch, in the track's own due colour. That was the red glow an operator reported on a picked-out
+  // stretch, in the track's own colour. That was the red glow a walker reported on a picked-out
   // track. A symbol layer is a place's only when it is named for a place.
   const names = {
     id: 'trailday-assets-line-track-names',

@@ -17,8 +17,8 @@ import androidx.compose.ui.unit.dp
  * What a list says when there is nothing in it yet.
  *
  * An empty list used to be one grey sentence on a blank page, which reads like something
- * went wrong rather than like nothing has been done yet - and on the recordings screen,
- * which is evidence the operator will go looking for, that is the wrong thing to say.
+ * went wrong rather than like nothing has been done yet - and on the trips screen,
+ * which is evidence the walker will go looking for, that is the wrong thing to say.
  *
  * Material 3's answer is what this is: a large icon, a headline, a sentence saying what
  * would appear here, and the action that would put something here. The action is the point

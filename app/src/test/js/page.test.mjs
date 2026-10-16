@@ -9,7 +9,7 @@
  *
  * So the rule is stated where it can be tested without a browser: **a control that starts disabled must
  * be named here as one the page's code turns on**, and the page's code must actually say so. A button
- * that starts off and is never turned on cannot be pressed by anybody, which is not a state any operator
+ * that starts off and is never turned on cannot be pressed by anybody, which is not a state any walker
  * can work out for themselves.
  */
 

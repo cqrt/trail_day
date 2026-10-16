@@ -76,7 +76,7 @@ fun SettingsScreen(
     val installState by updateViewModel.install.collectAsStateWithLifecycle()
     val autoUpdateChecks by updateViewModel.autoCheckEnabled.collectAsStateWithLifecycle()
     // Android's permission to install this is granted on a system screen this app sends
-    // the operator to, so it is state rather than a value read once: a plain read leaves
+    // the walker to, so it is state rather than a value read once: a plain read leaves
     // the warning on screen after they have already granted it.
     var canInstallUpdates by remember { mutableStateOf(updateViewModel.canInstall()) }
     LifecycleResumeEffect(Unit) {
@@ -106,7 +106,7 @@ fun SettingsScreen(
     val tokenText by viewModel.tokenText.collectAsStateWithLifecycle()
 
     // The file the off-site copy is written to. Created through the same picker as the
-    // manual backup, so it can be anywhere the operator can reach: a Downloads folder, a
+    // manual backup, so it can be anywhere the walker can reach: a Downloads folder, a
     // stick, or a folder another app syncs.
     val offsiteFileLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
@@ -166,7 +166,7 @@ fun SettingsScreen(
         )
     }
 
-    // More than one phone has backed up to the same place, so the operator says which one.
+    // More than one phone has backed up to the same place, so the walker says which one.
     // The ordinary case is a single copy and never reaches this.
     copiesToChoose?.let { copies ->
         AlertDialog(
@@ -239,7 +239,7 @@ fun SettingsScreen(
                     }
 
                     // Their tile usage policy asks for a way to report a problem, and a gate that
-                    // is not on the map is exactly the sort of thing the operator would know about.
+                    // is not on the map is exactly the sort of thing the walker would know about.
                     if (basemap == Basemap.OPENSTREETMAP) {
                         TextButton(onClick = { uriHandler.openUri(Basemap.OSM_REPORT_LINK) }) {
                             Text("Report a map issue to OpenStreetMap")
@@ -253,7 +253,7 @@ fun SettingsScreen(
             // the address under it is the one to open on the computer. The switch is read from the
             // address, so it can never say on with nothing listening, while the choice behind it is
             // stored - on by default, and off stays off, because a phone that served again after the
-            // operator had turned it off would be the app putting itself back on the network.
+            // walker had turned it off would be the app putting itself back on the network.
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -282,7 +282,7 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
 
-                    // The default said out loud, because a phone serving without the operator
+                    // The default said out loud, because a phone serving without the walker
                     // having thrown anything is exactly the sort of thing that must not arrive as a
                     // surprise - and because this is the switch they may well want the other way.
                     Text(
@@ -300,7 +300,7 @@ fun SettingsScreen(
                     }
 
                     // The token is what makes the switch above safe to throw on a network nobody
-                    // vouches for, so turning it off is offered in the operator's own terms and with
+                    // vouches for, so turning it off is offered in the walker's own terms and with
                     // what it gives away said out loud - not as a word like "token" on its own.
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -332,7 +332,7 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
 
-                    // The phone staying awake. On the card because it costs something the operator
+                    // The phone staying awake. On the card because it costs something the walker
                     // should be the one to choose: a screen that stays lit all afternoon is a flat
                     // battery, and most of the work at the desk needs nothing fetched at all.
                     Row(
@@ -565,7 +565,7 @@ fun SettingsScreen(
                     Text("Your data", style = MaterialTheme.typography.titleMedium)
                     Text(
                         text = "Everything the app holds: the places and their lines, and " +
-                            "every GPS recording.",
+                            "every GPS trip.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     FlowRow(

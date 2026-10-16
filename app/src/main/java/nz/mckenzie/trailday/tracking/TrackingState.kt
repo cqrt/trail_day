@@ -37,7 +37,7 @@ object TrackingState {
      * Starts mirroring a session.
      *
      * [pointCount] and [distanceM] are for a session that already has something in it:
-     * reattaching to a recording that is still going must not say the operator has just
+     * reattaching to a recording that is still going must not say the walker has just
      * started, because the coverage beside those numbers is measured from the whole
      * pass - and it is the coverage that is right.
      */

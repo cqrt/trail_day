@@ -13,7 +13,7 @@ import org.junit.Test
  */
 class StyleExpressionsTest {
 
-    /** The exact shape the operator's desk refused, in the words it refused it with. */
+    /** The exact shape the desk refused, in the words it refused it with. */
     @Test
     fun `the literal that MapLibre refused is found`() {
         val wrong = """{"layers":[{"id":"linz-place-towns",""" +

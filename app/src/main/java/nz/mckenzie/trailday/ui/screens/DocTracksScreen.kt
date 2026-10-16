@@ -52,11 +52,11 @@ import nz.mckenzie.trailday.viewmodel.DocTracksViewModel
  *
  * DOC publishes its tracks as a hosted service rather than a file, so this screen asks that service
  * for a page of tracks - by name, by where the phone is, or both - and imports the ticked ones as
- * ordinary assets. It is a deliberate detour from the fence line, which is why it is a screen of its
+ * ordinary places. It is a deliberate detour from the fence line, which is why it is a screen of its
  * own and not part of the map: you come here to bring tracks in, then go back to the work.
  *
  * The chrome is deliberately thin - two rows of search, a Filter and a Sort - because the list is what
- * the operator is here for, and it takes the rest of the screen. The filters are labelled menus rather
+ * the walker is here for, and it takes the rest of the screen. The filters are labelled menus rather
  * than a row of sliding chips, which said nothing about what they filtered and scrolled the list away.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -337,7 +337,7 @@ private fun DocTrackRow(
 ) {
     ListItem(
         // A track already on the phone is not something to tick: the box and the row are both off, and
-        // the line says why rather than leaving the operator to wonder.
+        // the line says why rather than leaving the walker to wonder.
         modifier = Modifier.clickable(enabled = !imported, onClick = onToggle),
         leadingContent = {
             Checkbox(checked = checked, onCheckedChange = { onToggle() }, enabled = !imported)
@@ -355,7 +355,7 @@ private fun DocTrackRow(
                 listOfNotNull(
                     track.kind,
                     // How the track is walked, in place of a vertex count: "584 points" says nothing
-                    // an operator uses, where one-way tells them what they are taking on.
+                    // a walker uses, where one-way tells them what they are taking on.
                     track.trackType,
                     formatDistance(track.lengthM),
                     // How far away it is, from the phone's own fix - so "Near me" can be seen to be

@@ -43,10 +43,10 @@ import nz.mckenzie.trailday.domain.tiles.PlaceLabels
  * Where the map opens when there is nothing better to show: the whole country, at a
  * zoom that shows both islands.
  *
- * It used to be a farm near Blenheim, which was a reasonable guess for exactly one
- * person - an operator in Invercargill opened the app looking at Marlborough. The
+ * It used to be a fixed default near Blenheim, which was a reasonable guess for exactly one
+ * person - a walker in Invercargill opened the app looking at Marlborough. The
  * map prefers the device's own position (see `MapViewModel.startBounds`) and the
- * operator's own tracks, and only falls back to this.
+ * walker's own tracks, and only falls back to this.
  */
 val DEFAULT_CAMERA_TARGET = LatLng(-41.5, 172.8)
 const val DEFAULT_CAMERA_ZOOM = 6.0
@@ -83,7 +83,7 @@ private const val BOUNDS_PADDING_PX = 96
  * How long the camera takes to glide to the next fix while following.
  *
  * Fixes arrive every couple of seconds, so a glide of about a second reads as the map moving
- * along with the phone; a jump from fix to fix reads as the map twitching, and the operator
+ * along with the phone; a jump from fix to fix reads as the map twitching, and the walker
  * has both hands on a quad bike.
  */
 private const val FOLLOW_DURATION_MS = 900
@@ -98,7 +98,7 @@ private const val FOLLOW_DURATION_MS = 900
 @Composable
 fun BasemapView(
     /**
-     * Which map to draw under the work. Imagery unless the operator says otherwise; see
+     * Which map to draw under the work. Imagery unless the walker says otherwise; see
      * [nz.mckenzie.trailday.domain.tiles.Basemap].
      */
     basemap: Basemap,
@@ -116,14 +116,14 @@ fun BasemapView(
      * Whether the camera should keep the phone in the middle of the screen.
      *
      * Set while a pass is being driven, when the map is being watched rather than read.
-     * Following gives way the moment the operator drags the map - see [onFollowBroken] -
+     * Following gives way the moment the walker drags the map - see [onFollowBroken] -
      * because a camera that swings back to the phone at every fix is a camera you cannot look
-     * at a block with. The zoom is always the operator's: following moves the map, it does
+     * at a block with. The zoom is always the walker's: following moves the map, it does
      * not zoom it.
      */
     follow: Boolean = false,
     /**
-     * The operator dragged the map, which is them saying "let me look at this instead".
+     * The walker dragged the map, which is them saying "let me look at this instead".
      *
      * The screen turns following off and says so, rather than the map fighting the drag on
      * the next fix.
@@ -141,11 +141,11 @@ fun BasemapView(
      * is never cut off to satisfy a number.
      *
      * Null, the default, means no cap - which is what every map that is not about one asset
-     * wants, because there the operator has asked for the whole farm.
+     * wants, because there the walker has asked for the whole map.
      */
     fitBoundsMaxZoom: Double? = null,
     /**
-     * Whether the operator may move this map.
+     * Whether the walker may move this map.
      *
      * True on every map the work is read on. False for a **preview** - the thumbnail in a listing
      * that says where a downloaded area is - where there is nothing to explore and a drag would only
@@ -163,18 +163,18 @@ fun BasemapView(
     /**
      * The layers of the work this map is not drawing.
      *
-     * Empty by default, which is what every map that is not the operator's own home map wants: a
+     * Empty by default, which is what every map that is not the walker's own home map wants: a
      * screen that is *about* something - one asset's own line, a pass being recorded, a spot being
      * drawn - has to show it whatever the switches on the home map say. Hiding a layer is a
      * property of the style's layers rather than a reload, so the camera, the tiles and the zoom
-     * stay exactly where the operator left them.
+     * stay exactly where the walker left them.
      */
     hiddenLayers: Set<AssetLayer> = emptySet(),
     /**
      * Whether LINZ's place names are drawn over the imagery - see
      * [nz.mckenzie.trailday.domain.tiles.PlaceLabels].
      *
-     * Off by default, and off for every map that is not the operator's own home map, for the same
+     * Off by default, and off for every map that is not the walker's own home map, for the same
      * reason [hiddenLayers] is empty there: a map that is *about* one asset is about that asset.
      * Unlike a layer being hidden, this changes what the style *is* - a source the map would
      * otherwise never fetch - so switching it reloads the style. That is a rare tap (it is a
@@ -183,7 +183,7 @@ fun BasemapView(
      */
     placeNames: Boolean = false,
     /**
-     * A camera move the operator asked for. The bounds say where; [recentreCount] is what says
+     * A camera move the walker asked for. The bounds say where; [recentreCount] is what says
      * it is a new request rather than the same one arriving twice, so the second tap on
      * "where am I" moves the map again.
      */
@@ -277,7 +277,7 @@ fun BasemapView(
                             true
                         }
                     }
-                    // A drag is the operator asking for the map rather than the phone, so
+                    // A drag is the walker asking for the map rather than the phone, so
                     // following gives way to them. Only a gesture counts: the map's own
                     // camera moves arrive here too, and treating those as a drag would stop
                     // following the first time it followed anything.
@@ -316,7 +316,7 @@ fun BasemapView(
     //
     // The place names are in this key rather than applied to the loaded style like a hidden layer,
     // because they are a source the style either has or has not got - a style with no vector source
-    // in it has nothing to show. It is a preference the operator sets once, not a switch they flip
+    // in it has nothing to show. It is a preference the walker sets once, not a switch they flip
     // while reading the map, and the tiles come from the app's own server either way.
     LaunchedEffect(basemap, apiKey, tileUrlTemplate, placeNames) {
         val map = mapState.value
@@ -341,10 +341,10 @@ fun BasemapView(
         styleState.value?.getSourceAs<GeoJsonSource>(ASSETS_SOURCE)?.setGeoJson(assetGeoJson)
     }
 
-    // A layer the operator has switched off, applied to the style that is already loaded. This is a
+    // A layer the walker has switched off, applied to the style that is already loaded. This is a
     // property of a layer rather than a new style, so the camera, the tiles and the zoom are all
     // left exactly where they were - which is what makes the switch usable while reading the map
-    // rather than something that sends you back to the farm gate every time you touch it.
+    // rather than something that sends you back to the start every time you touch it.
     LaunchedEffect(hiddenLayers, styleState.value) {
         val style = styleState.value ?: return@LaunchedEffect
         applyLayerVisibility(style, hiddenLayers)
@@ -357,7 +357,7 @@ fun BasemapView(
         styleState.value?.getSourceAs<GeoJsonSource>(POSITION_SOURCE)?.setGeoJson(positionGeoJson)
     }
 
-    // Following: the phone stays in the middle, at the zoom the operator chose, while the pass
+    // Following: the phone stays in the middle, at the zoom the walker chose, while the pass
     // is being driven. Every fix glides the camera and a newer fix replaces the glide in
     // flight, so the map moves with the phone rather than jumping from fix to fix. Turning
     // following on moves the map at once, rather than waiting for the next fix to arrive.
@@ -371,12 +371,12 @@ fun BasemapView(
             FOLLOW_DURATION_MS
         )
         // Following settles the question of the first frame in the same way an asked-for move
-        // does: an operator who starts recording before the tracks' bounds come back off the
+        // does: a walker who starts recording before the tracks' bounds come back off the
         // database must not be dragged off their own pass a second later.
         boundsApplied = true
     }
 
-    // A recentre asked for by the operator. The map reads the work more than it reads the
+    // A recentre asked for by the walker. The map reads the work more than it reads the
     // phone, so it stays where it was put unless it is following a pass or is asked to move.
     LaunchedEffect(recentreBounds, recentreCount, mapState.value) {
         val map = mapState.value ?: return@LaunchedEffect
@@ -384,7 +384,7 @@ fun BasemapView(
 
         map.animateCamera(cameraFor(map, bounds))
         // An asked-for camera move settles the question of the first frame. Without this, an
-        // operator quick enough to tap "where am I" before the tracks' bounds come back off the
+        // walker quick enough to tap "where am I" before the tracks' bounds come back off the
         // database is dragged from their own paddock to the work a few seconds later, having
         // done nothing wrong.
         boundsApplied = true
@@ -509,7 +509,7 @@ internal fun MapLibreMap.loadTrailDayStyle(
             )
         }
         // The switches, applied to the style that has just been built, so that the first frame is
-        // already the map the operator asked for rather than one that flashes everything and then
+        // already the map the walker asked for rather than one that flashes everything and then
         // hides half of it.
         applyLayerVisibility(style, hiddenLayers)
         onLoaded(style)
@@ -714,7 +714,7 @@ private fun partIs(part: String): Expression =
  *
  * One place rather than three, because three things now ask for exactly this: the first frame
  * on the work, the first frame on the phone when there is no work, and the recentre the
- * operator asks for by tapping.
+ * walker asks for by tapping.
  *
  * With a [maxZoom] in hand the camera is worked out here rather than by the library, because
  * the cap is a statement about the zoom the fit lands on, and a [CameraUpdate] does not know

@@ -113,7 +113,7 @@ test('a file read as one line says how many points it has', () => {
 
   assert.match(note, /gully track\.gpx/);
   assert.match(note, /one line of 2 points/);
-  assert.match(note, /Give it a name/, 'and says what the operator does next');
+  assert.match(note, /Give it a name/, 'and says what the walker does next');
 });
 
 test('a file with side tracks says how many, in the drawing\'s own words', () => {
@@ -147,14 +147,14 @@ test('a file whose segments did not meet is said to have been joined up', () => 
 test('a file the phone read as nothing at all is still answered about', () => {
   // Not a case the phone produces today - a file with no line in it is refused rather than answered
   // with - but the note is built from the reading, and a reading with no paths in it must not throw
-  // in front of the operator with a file already dropped.
+  // in front of the walker with a file already dropped.
   assert.match(importedNote('odd.gpx', { paths: [] }), /one line of 0 points/);
   assert.match(importedNote('odd.gpx', undefined), /one line of 0 points/);
 });
 
 test('a file of several tracks says how many more it held, rather than shrinking to its first', () => {
   // The desk draws one track at a time. A GeoJSON collection is many, so the note has to say the rest
-  // are there and where to get them - otherwise the operator sees one drawing and thinks that was all.
+  // are there and where to get them - otherwise the walker sees one drawing and thinks that was all.
   const read = {
     paths: [[{ lat: -46.6, lng: 168.3 }, { lat: -46.61, lng: 168.31 }]],
     sideTracks: 0,

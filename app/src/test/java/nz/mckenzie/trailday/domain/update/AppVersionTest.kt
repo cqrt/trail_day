@@ -8,7 +8,7 @@ import org.junit.Test
 /**
  * How versions are read and ordered.
  *
- * The ordering is the part that matters: this decides whether an operator is told there is
+ * The ordering is the part that matters: this decides whether a walker is told there is
  * a newer build, so "10" has to beat "9" even though "10" sorts before it as text.
  */
 class AppVersionTest {

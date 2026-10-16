@@ -46,7 +46,7 @@ sealed interface InstallState {
 
     data class Downloading(val progress: Float) : InstallState
 
-    /** Android has it: it is either asking the operator to confirm or already installing. */
+    /** Android has it: it is either asking the walker to confirm or already installing. */
     data object HandedToInstaller : InstallState
 
     data class Failed(val message: String) : InstallState
@@ -54,7 +54,7 @@ sealed interface InstallState {
 
 /**
  * The updates card in Settings: what version this is, whether there is a newer one, and the
- * download-and-install the operator asked for.
+ * download-and-install the walker asked for.
  *
  * The check itself is [UpdateCheck] rather than anything here, so the button and the daily
  * background job are the same code and cannot report different things.
@@ -80,7 +80,7 @@ class UpdateViewModel(
     /**
      * Whether Android would let an update be installed right now.
      *
-     * Read on demand rather than remembered, because the operator leaves for the system
+     * Read on demand rather than remembered, because the walker leaves for the system
      * screen that grants it and comes back.
      */
     fun canInstall(): Boolean = context.packageManager.canRequestPackageInstalls()
@@ -111,7 +111,7 @@ class UpdateViewModel(
     /**
      * Downloads the release and hands it to Android's installer.
      *
-     * The progress is kept because this is a 15 MB download on a farm connection, and a
+     * The progress is kept because this is a 15 MB download on a slow connection, and a
      * screen that says nothing for a minute looks broken.
      */
     fun install(update: AvailableUpdate) {
@@ -128,7 +128,7 @@ class UpdateViewModel(
         }
     }
 
-    /** Sends the operator to the one Android switch this app cannot flip for them. */
+    /** Sends the walker to the one Android switch this app cannot flip for them. */
     fun openInstallPermission() {
         context.startActivity(
             Intent(

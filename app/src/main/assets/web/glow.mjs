@@ -75,7 +75,7 @@ export function pickOut(phoneFilter, id) {
  *
  * The **names** beside tracks are a symbol layer like a place's marker, but they are about the work rather
  * than of it, and their features are a stretch of the line - so the disc a halo would build from them sits
- * on every corner of that stretch. That was the glow an operator reported on a picked-out track, so a
+ * on every corner of that stretch. That was the glow a walker reported on a picked-out track, so a
  * symbol layer is a place's only when it is named for a place: the phone names a place's layer for its
  * kind under one prefix, and a place's house has to wear no halo at all rather than borrow the names'.
  */
@@ -121,7 +121,7 @@ export function haloLayer(phoneLayer, id = NO_ASSET) {
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
       // The page's own paper rather than the feature's colour: the edge says "this is the line you picked",
-      // and the line under it keeps saying when that line is due.
+      // and the line under it keeps saying which line it is.
       'line-color': CASING_COLOUR,
       'line-width': width + CASING_WIDTH_EXTRA,
       'line-blur': CASING_BLUR,

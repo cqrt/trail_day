@@ -6,7 +6,7 @@
  *
  * The rule matters because of what happens when it is wrong. A write carrying one path for a track that
  * has a side track is refused by the phone (rather than silently dropping the spur) - so a page that sent
- * the wrong shape for a track with side tracks could not save that track's line at all, and the operator
+ * the wrong shape for a track with side tracks could not save that track's line at all, and the walker
  * would be told to reload a page that was already right.
  */
 
@@ -45,7 +45,7 @@ test('a track with a side track sends its paths, the line first', () => {
   assert.deepEqual(body.paths[1], spur);
 });
 
-test('a side track the operator has just drawn on the desk travels with the line', () => {
+test('a side track the walker has just drawn on the desk travels with the line', () => {
   const drawn = [
     { lat: -41.5, lng: 173.9 },
     { lat: -41.5, lng: 173.92 }

@@ -11,7 +11,7 @@
  * wrong - the only way it can be wrong is if the snapshot was, which a test sees at once.
  *
  * **The phone is never asked to undo.** Nothing in here talks to the phone: the line is sent when the
- * operator is finished with it, so an hour of tidying a track is one write rather than fifty - and each
+ * walker is finished with it, so an hour of tidying a track is one write rather than fifty - and each
  * of those writes is a whole path either way, which is what `WebEditorEdit`'s `points` means on the
  * other end of it.
  */
@@ -24,15 +24,6 @@ export const HANDLE_PX = 10;
 
 /** How close, in pixels, the cursor has to be to something to snap onto it. */
 export const SNAP_PX = 12;
-
-/**
- * How many corners make a ring, which is the phone's own least for one.
- *
- * `Ring.MIN_CORNERS`. Under three there is no ground inside, which is what makes two corners a line
- * and not a fenced-off thing - the phone refuses the save with its own sentence, and this is the
- * drawing saying the same before it is asked.
- */
-export const RING_CORNERS = 3;
 
 /**
  * A drawing of the paths given: path 0 the line, the rest its side tracks.
@@ -85,7 +76,7 @@ export function sideTrackInHand(state) {
  * Puts a path in hand, without touching the drawing.
  *
  * Not a step of the history, deliberately: taking hold of a side track changes nothing about the track, and
- * an operator who has just dragged a corner wants Ctrl+Z to take *that* back rather than a click that
+ * a walker who has just dragged a corner wants Ctrl+Z to take *that* back rather than a click that
  * selected something. The drawing's undo stack is snapshots of `{paths, active}`, so a selection followed by
  * an edit is still one step, and undoing it hands back the path that was in hand when the edit was made.
  */
@@ -99,7 +90,7 @@ export function hold(state, index) {
  * one.
  *
  * A screen position and a `z` are still dropped - they are about the map, not the ground - but a
- * height that came from a file is the operator's own track and travels with it, so a desk edit does
+ * height that came from a file is the walker's own track and travels with it, so a desk edit does
  * not flatten a line's heights. A point made by a click has none, so it says nothing rather than
  * zero. Comparing two vertices compares the two numbers the place is, as it always has.
  */
@@ -177,7 +168,7 @@ export function add(state, point) {
  * Dragging a **line** vertex takes any junction on it along: a side track's first vertex is that very
  * vertex, so the two paths stay met exactly while the corner they meet at is moved. The alternative is a
  * drag that quietly leaves the side track hanging off nothing, which is a drawing the phone refuses - and
- * refusing would be no good here, because an operator moving a corner has done nothing wrong.
+ * refusing would be no good here, because a walker moving a corner has done nothing wrong.
  */
 export function move(state, index, point) {
   const path = activePath(state);
@@ -185,13 +176,13 @@ export function move(state, index, point) {
   const moved = path.slice();
   moved[index] = vertex(point);
   // A drag that ends where it began is a click that went nowhere rather than a step, and a history
-  // full of those would have the operator pressing Ctrl+Z twice to undo one thing.
+  // full of those would have the walker pressing Ctrl+Z twice to undo one thing.
   if (samePlace(path[index], moved[index])) return state;
 
   // The first point of a side track **is** a vertex of the line - that is what a junction is - so dragging
   // it is dragging that line vertex, which is the only way to take a junction somewhere else without letting
   // go of the side track first. The line's own move takes every side track hanging off it with it, this one
-  // included, and the side track goes back into the operator's hand afterwards.
+  // included, and the side track goes back into the walker's hand afterwards.
   if (state.active > 0 && index === 0) {
     const onTheLine = line(state).findIndex((one) => samePlace(one, path[0]));
     if (onTheLine >= 0) {
@@ -258,7 +249,7 @@ export function insert(state, index, point) {
  * what the phone's own drawing does and what its rules ask for: the two paths meet at a vertex, rather than
  * being two lines that happen to be near each other.
  *
- * [junctionIndex] is the vertex the operator picked out on the line, and the fallback is the track's own
+ * [junctionIndex] is the vertex the walker picked out on the line, and the fallback is the track's own
  * end. The fallback matters twice: drawing a track from scratch has no choice to offer, and a picked vertex
  * can stop existing (Undo, a delete) between picking it and using it - in which case hanging the side track
  * off the end is the only honest answer, rather than a path that starts nowhere.
@@ -276,7 +267,7 @@ export function startSideTrack(state, junctionIndex = null) {
  * The junction as a feature of its own, or null when the side track would leave the track's end.
  *
  * The map has to be able to show which vertex a side track is about to hang off, because otherwise a
- * picked one is invisible and the operator has no way to see that the click took. It is a Point with a
+ * picked one is invisible and the walker has no way to see that the click took. It is a Point with a
  * property rather than a path, so the drawing's own layers can pick it out, and `[lng, lat]` - which is the
  * one thing in this file that is not the map's problem to remember.
  */
@@ -293,7 +284,7 @@ export function junctionFeature(point) {
  * Back to the line.
  *
  * A side track that never got a second point is taken off rather than kept: it is one click with nothing
- * on the map, and leaving it there would be a path the phone refuses to store and the operator cannot see.
+ * on the map, and leaving it there would be a path the phone refuses to store and the walker cannot see.
  */
 export function backToLine(state) {
   if (!sideTrackInHand(state)) return state;
@@ -304,7 +295,7 @@ export function backToLine(state) {
  * Takes the side track being drawn off, whatever is on it.
  *
  * The way to have second thoughts about one that is already two points long. A side track that is *not*
- * the one being drawn is left alone: this is about the path under the operator's hand, which is the only
+ * the one being drawn is left alone: this is about the path under the walker's hand, which is the only
  * one the map can point at.
  */
 export function dropSideTrack(state) {
@@ -340,85 +331,6 @@ function metresBetween(a, b) {
   const dx = (b.lng - a.lng) * METRES_PER_DEGREE * Math.cos(midLat);
   const dy = (b.lat - a.lat) * METRES_PER_DEGREE;
   return Math.hypot(dx, dy);
-}
-
-/**
- * A ring's corners: the closing vertex taken off, when the last one repeats the first.
- *
- * The phone stores a ring **closed** - the last vertex is the first corner again - so that everything
- * that reads the geometry afterwards gets the closing side without asking what shape it is holding,
- * and so a shape can be read as a ring by looking at it alone. The desk's drawing is not one of those
- * readers: a handle on the repeated corner is a point that can be dragged off on its own, which would
- * turn one boundary into a boundary and a stray line, so a ring opened for editing is opened on its
- * corners. The closing side comes back from the shape's own rule ([ring]) and, from there, from the
- * phone, which closes what it is given whether it arrived open or closed.
- *
- * The comparison is exact, as it is everywhere in this file: the desk snaps a vertex onto another by
- * copying its coordinates, so a corner that is meant to be the same place *is* the same two numbers.
- */
-export function corners(points) {
-  if (points.length >= 2 && samePlace(points[0], points[points.length - 1])) {
-    return points.slice(0, -1);
-  }
-  return points;
-}
-
-/**
- * A ring as it is drawn: the sides that have been laid, and the closing side.
- *
- * Nothing closes until there are [RING_CORNERS] corners, because nothing is enclosed until then: two
- * points drawn back to each other is the same side twice, and showing it would be the page claiming a
- * boundary the phone is about to refuse. This is the one place the page adds a side the operator did
- * not click - the same side the phone adds when it stores the ring.
- */
-export function ring(points) {
-  const around = corners(points);
-  if (around.length < RING_CORNERS) return around;
-  return [...around, around[0]];
-}
-
-/**
- * The ground a ring encloses, in square metres - the phone's own arithmetic, to the metre.
- *
- * The shoelace formula on the flat taken at the ring's own mean latitude, which is what the app's own
- * maths does and for the same reason: a shape like this is tens of metres across, where a degree of
- * longitude is the same length at both ends to within a hand's width. It is worked out from the
- * **corners** rather than from what is drawn, so a ring opened for editing measures the same before
- * and after its closing side is put back - and zero for fewer than three corners, which is the honest
- * answer for a path and the number the drawing shows until there is a ring.
- */
-export function areaSqm(points) {
-  const around = corners(points);
-  if (around.length < RING_CORNERS) return 0;
-
-  const meanLat = around.reduce((total, point) => total + point.lat, 0) / around.length;
-  const metresPerDegLng =
-    METRES_PER_DEG_LNG_AT_EQUATOR * Math.cos((meanLat * Math.PI) / 180);
-
-  let twiceTheArea = 0;
-  for (let index = 0; index < around.length; index++) {
-    const here = around[index];
-    const next = around[(index + 1) % around.length];
-    twiceTheArea +=
-      here.lng * metresPerDegLng * (next.lat * METRES_PER_DEG_LAT) -
-      next.lng * metresPerDegLng * (here.lat * METRES_PER_DEG_LAT);
-  }
-  return Math.abs(twiceTheArea) / 2;
-}
-
-/**
- * The metres round a ring: its sides and the closing side.
- *
- * What the phone's own "Round it" measures, and what the box in the map's corner counts while a
- * boundary is being drawn. The corners alone would be one side short, which is the kind of figure
- * nobody would notice until a rate per metre was worked out from it. It walks [ring] rather than the
- * corners so the figure is the length of the line the map is drawing: below three corners there is no
- * closing side to count, because there is nothing enclosed to close.
- */
-export function perimeterMeters(points) {
-  const drawn = ring(points);
-  if (drawn.length < 2) return 0;
-  return lengthMeters([drawn]);
 }
 
 /**
@@ -488,25 +400,22 @@ export function segmentAt(points, cursor, project, tolerancePx = HANDLE_PX) {
 /**
  * The path as the map's own source wants it, or nothing at all when there is nothing drawn yet.
  *
- * `closed` is for a shape that is ground: the first corner is repeated at the end, which is the closing
- * side drawn as a line like every other side, and it is the same corner list the phone stores. Left
- * false, a ring being drawn would show its sides with a gap where the ground's edge comes back to where
- * it started - and the gap would close itself, unannounced, at the moment of saving.
+ * One path is one feature: a Point of a single vertex, a LineString of many, and nothing at all of
+ * none.
  */
-export function toFeature(points, closed = false) {
-  const drawn = closed ? ring(points) : points;
-  const coordinates = drawn.map((point) => [point.lng, point.lat]);
+export function toFeature(points) {
+  const coordinates = points.map((point) => [point.lng, point.lat]);
   return {
     type: 'FeatureCollection',
     features:
-      drawn.length === 0
+      points.length === 0
         ? []
         : [
             {
               type: 'Feature',
               properties: {},
               geometry:
-                drawn.length === 1
+                points.length === 1
                   ? { type: 'Point', coordinates: coordinates[0] }
                   : { type: 'LineString', coordinates }
             }
@@ -516,16 +425,12 @@ export function toFeature(points, closed = false) {
 
 /**
  * Every path as one FeatureCollection: the line and its side tracks, in one source.
- *
- * `closed` belongs to the **first** path, which is the line - or, for a kind that is ground, the
- * boundary itself. A side track is a strip off a line and a ring has none (`AssetPathEdits` refuses
- * them), so there is no second path to close.
  */
-export function pathsFeature(paths, closed = false) {
+export function pathsFeature(paths) {
   return {
     type: 'FeatureCollection',
     features: paths
-      .map((path, index) => toFeature(path, closed && index === 0).features[0])
+      .map((path) => toFeature(path).features[0])
       .filter(Boolean)
   };
 }
@@ -533,7 +438,7 @@ export function pathsFeature(paths, closed = false) {
 /**
  * The path a click landed on, the one in hand aside, or -1.
  *
- * A click that lands on a path the operator is **not** holding takes hold of it rather than changing it, and
+ * A click that lands on a path the walker is **not** holding takes hold of it rather than changing it, and
  * this is how a side track's own points are reached at all: only the path in hand offers handles, so without
  * this there is no gesture that makes a side track the path in hand. The path in hand is left out on purpose
  * - a click on *it* means "put a point in here", which the caller asks `segmentAt` about first.
@@ -607,7 +512,7 @@ export const TRACE_PX = 4;
  *
  * This is what turns a screen measurement into a ground one, and it is the only place the page's own
  * drawing has anything to say about the size of the earth: a traced line is simplified to what the
- * operator could *see* while tracing, and what they could see is measured in pixels, so the tolerance
+ * walker could *see* while tracing, and what they could see is measured in pixels, so the tolerance
  * has to be worked out from the view they traced in. Ported rather than imported because the phone's
  * own maps use the same projection, so the two agree about what a pixel is worth.
  */
@@ -641,7 +546,7 @@ export function trace(stroke, point, project, tolerancePx = TRACE_PX) {
  * vertices that are *far from the straight line between their neighbours*, so a corner survives at full
  * sharpness and the wobble along a straight run disappears - including the position the run ends at.
  * A smoothing filter would instead round the corner off, and a fenced corner is exactly what the
- * operator was tracing.
+ * walker was tracing.
  *
  * [toleranceM] is in metres on the ground - see [metresPerPixel] for where a screen measurement turns
  * into one. Distances inside the search are measured on the plane the line is nearly flat in: over a
@@ -689,23 +594,10 @@ export function simplify(points, toleranceM) {
 const METRES_PER_DEGREE = 111_320;
 
 /**
- * The phone's own pair, for the one figure that has to come out equal to the phone's.
- *
- * `METRES_PER_DEGREE` above is one number used for both directions, which is what the page's own
- * metres have always been measured with and is right to a metre over a fence. A ring's ground is not
- * that: it is the number the phone stores and the card shows, and a
- * desk that previewed a different one would be showing a figure the phone replaces the moment it is
- * asked to save. So the area uses the phone's two - `GeoUtils.METRES_PER_DEG_LAT` and
- * `METRES_PER_DEG_LNG_AT_EQUATOR`, the same as `Ring.areaSqm`.
- */
-const METRES_PER_DEG_LAT = 111_132;
-const METRES_PER_DEG_LNG_AT_EQUATOR = 111_320;
-
-/**
  * The path being worked on with a whole traced stroke on the end - as **one** step of the history.
  *
  * This is the difference between tracing and clicking, and it is the reason a stroke is gathered up
- * before it is put on the line: an operator who has just followed a fence for a hundred metres wants
+ * before it is put on the line: a walker who has just followed a fence for a hundred metres wants
  * Ctrl+Z to take the fence back, not to walk back along it one sample at a time. A stroke of **one**
  * point is a press rather than a trace, so it is not a step at all - the click the browser sends after
  * it is what adds a vertex, which is what a click has always meant here.

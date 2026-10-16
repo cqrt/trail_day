@@ -64,7 +64,7 @@ class ElevationProfileTest {
     }
 
     @Test
-    fun `the range is said in metres an operator reads`() {
+    fun `the range is said in metres a walker reads`() {
         val profile = ElevationProfile.of(listOf(at(0, 553.6), at(1, 663.6), at(2, 560.0)))!!
 
         assertEquals("≈554–664 m, up 110 m", ElevationPhrase.range(profile))

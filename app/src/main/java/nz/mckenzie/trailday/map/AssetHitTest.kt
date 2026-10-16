@@ -5,7 +5,7 @@ import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.distanceToPolylineMeters
 
 /**
- * Working out which track an operator tapped.
+ * Working out which track a walker tapped.
  *
  * A track is a thin line and a fingertip is wide, so this is not "was the tap on the
  * line" but "which line was the tap nearest, if any". The map already holds every
@@ -48,7 +48,7 @@ object AssetHitTest {
     /**
      * Metres on the ground that a fingertip covers at [zoom], so tapping a track works
      * zoomed right out as well as zoomed in. A fixed tolerance cannot: 40 m is generous
-     * at spray height and narrower than a pixel at country scale.
+     * at walking height and narrower than a pixel at country scale.
      */
     fun toleranceForZoom(zoom: Double, latitude: Double): Double =
         (metresPerPixel(zoom, latitude) * FINGERTIP_PX).coerceAtLeast(DEFAULT_TOLERANCE_M)

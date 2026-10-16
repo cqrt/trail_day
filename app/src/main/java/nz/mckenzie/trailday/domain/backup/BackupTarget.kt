@@ -15,7 +15,7 @@ import kotlinx.serialization.Serializable
  */
 interface BackupTarget {
 
-    /** For the screen: "GitHub", or the file the operator chose. */
+    /** For the screen: "GitHub", or the file the walker chose. */
     val label: String
 
     /** Writes [text] as this device's copy, replacing the one it wrote last time. */
@@ -65,9 +65,9 @@ data class BackupSettingsRecord(
     val destination: String? = null
 )
 
-/** Where the off-site copy is kept, as the operator chose it. */
+/** Where the off-site copy is kept, as the walker chose it. */
 enum class BackupDestination {
-    /** Nowhere: the file the operator exports by hand stays the only copy. */
+    /** Nowhere: the file the walker exports by hand stays the only copy. */
     OFF,
 
     /** A file this app writes to, in a place the system file picker allows. */

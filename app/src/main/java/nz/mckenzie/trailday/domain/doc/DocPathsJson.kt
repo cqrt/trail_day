@@ -8,7 +8,7 @@ import nz.mckenzie.trailday.domain.geo.GeoPoint
 /**
  * An offline track's paths as text, for the cache row.
  *
- * A cache is not the record of the farm, so its geometry travels as **one JSON column** rather than
+ * A cache is not the record of the work, so its geometry travels as **one JSON column** rather than
  * as a points table: it is written once when a track is downloaded and read whole when the browser
  * wants it, and nothing ever joins to it. Each point is a `[lat, lng]` pair, and each path is a list
  * of them, so a track with side tracks is the same shape it is everywhere else in the app.

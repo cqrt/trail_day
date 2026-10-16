@@ -18,7 +18,7 @@ import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 data class OfflineArea(
     val id: Long,
     val name: String,
-    /** The box the operator chose on the map, so the list can show where the area is. */
+    /** The box the walker chose on the map, so the list can show where the area is. */
     val bounds: LatLngBounds,
     val plannedTiles: Int,
     val storedTiles: Int,

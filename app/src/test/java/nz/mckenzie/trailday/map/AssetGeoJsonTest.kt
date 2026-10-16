@@ -140,7 +140,7 @@ class AssetGeoJsonTest {
     }
 
     @Test
-    fun `a half-sprayed track is still named once, from the whole track`() {
+    fun `a half-recorded track is still named once, from the whole track`() {
         val partSprayed = line(
             name = "Pump paddock track",
             points = listOf(GeoPoint(-41.0, 174.0), GeoPoint(-41.0, 174.002))
@@ -257,7 +257,7 @@ class AssetGeoJsonTest {
     }
 
     @Test
-    fun `a half-sprayed track is two features, one per stretch, opening the same asset`() {
+    fun `a half-recorded track is two features, one per stretch, opening the same asset`() {
         val halfSprayed = AssetLine(
             assetId = 7L,
             name = "Track 4",

@@ -8,7 +8,7 @@
  * **The phone's words, not a second opinion.** The formatter here is the phone's own
  * (`formatDistance`), so a length read off a phone and a length read off a desk are the same figure
  * said the same way. Anything a desk totalled its own way would be a second answer to one question,
- * and the operator is the one who would catch it.
+ * and the walker is the one who would catch it.
  */
 
 /**

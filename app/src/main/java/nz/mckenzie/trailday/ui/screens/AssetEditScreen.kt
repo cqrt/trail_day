@@ -32,14 +32,14 @@ import nz.mckenzie.trailday.ui.AssetEdits
 import nz.mckenzie.trailday.viewmodel.AssetDetailViewModel
 
 /**
- * Editing one asset, on a screen of its own.
+ * Editing one place, on a screen of its own.
  *
  * A screen rather than a dialog, so the form, the keyboard, the notes field and the one
  * decision that matters at the end of it all fit.
  *
  * What was typed is checked by [AssetEdits] rather than here: this screen collects it,
  * and a refused edit stays on screen with the reason under it. Closing instead would leave
- * the operator believing a change had been stored.
+ * the walker believing a change had been stored.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -49,7 +49,7 @@ fun AssetEditScreen(
 ) {
     val asset by viewModel.editDraft.collectAsStateWithLifecycle()
 
-    // Nothing until the asset is here: a form that opened with a blank name would save
+    // Nothing until the place is here: a form that opened with a blank name would save
     // that name over a real one.
     val current = asset ?: return
 
@@ -61,7 +61,7 @@ fun AssetEditScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Edit asset") },
+                title = { Text("Edit place") },
                 navigationIcon = { IconButton(onClick = onDone) { AppIcon(IconGlyph.BACK, contentDescription = "Back") } },
                 actions = {
                     TextButton(onClick = {

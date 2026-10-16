@@ -7,7 +7,7 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** "850 m" / "2.35 km" - operator-facing distances. */
+/** "850 m" / "2.35 km" - walker-facing distances. */
 fun formatDistance(meters: Double): String = when {
     meters < 0.0 -> "-"
     meters < 1000.0 -> "${meters.roundToInt()} m"
@@ -40,7 +40,7 @@ fun formatShortDate(epochMs: Long, zone: ZoneId = ZoneId.systemDefault()): Strin
  * "46.4130°S, 168.3480°E" - where something is, in a form that works offline.
  *
  * A place name would read better, but reverse geocoding needs a connection and can
- * fail exactly when the operator is deciding what to cache *because* they are about
+ * fail exactly when the walker is deciding what to cache *because* they are about
  * to lose reception.
  */
 fun formatCoordinates(lat: Double, lng: Double): String = String.format(

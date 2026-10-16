@@ -24,7 +24,7 @@ sealed interface OffsiteResult {
 data class OffsitePreview(
     val stored: StoredBackup,
     val summary: BackupSummary,
-    /** What is on this phone, for the comparison the operator is about to act on. */
+    /** What is on this phone, for the comparison the walker is about to act on. */
     val here: BackupSummary,
     /** When the copy was written, read from inside the file rather than guessed from the clock. */
     val savedAtEpochMs: Long
@@ -35,12 +35,12 @@ data class OffsitePreview(
  *
  * The guard at the top of [backUpNow] is the whole reason this is a class rather than three
  * lines in the screen: a phone that has just been wiped, or a fresh install, holds nothing,
- * and a backup that ran before the operator restored would replace the only remaining copy
+ * and a backup that ran before the walker restored would replace the only remaining copy
  * of a season with an empty file. Nothing else here is allowed to make that decision, and
  * this one always answers no.
  *
  * Restoring reads the copy twice - once to show what it holds, once to replace everything
- * with it - rather than holding a season's worth of JSON in memory while the operator
+ * with it - rather than holding a season's worth of JSON in memory while the walker
  * decides. The second read is cheap next to the mistake of restoring something stale.
  */
 class OffsiteBackup(
@@ -84,7 +84,7 @@ class OffsiteBackup(
      * Asks the destination whether it will take the copy, and whether it is private.
      *
      * Null for a destination that cannot answer: a file can only be tested by writing to it,
-     * and the question the operator actually needs answered - is this somewhere nobody else
+     * and the question the walker actually needs answered - is this somewhere nobody else
      * can read? - only arises for a repository.
      */
     suspend fun check(): RepoCheck? = (target as? GitHubBackupTarget)?.check()

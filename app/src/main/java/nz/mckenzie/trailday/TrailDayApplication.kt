@@ -37,7 +37,6 @@ class TrailDayApplication : Application() {
         DevicePosition.start(this)
 
         // The switches below have to actually stop the job they name, or the setting is a lie.
-        // (The reminder schedule this used to keep in step went with the spraying.)
         val settings = SettingsRepository(this)
 
         // The same for the update check: the switch that turns it off has to actually

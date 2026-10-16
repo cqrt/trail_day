@@ -1,14 +1,14 @@
 package nz.mckenzie.trailday.domain.geo
 
 /**
- * A stretch of a pass the operator was paused for.
+ * A stretch of a pass the walker was paused for.
  *
  * Pausing stops the fixes, so a pass that carries on always jumps from the last fix before
  * the pause to the first one after it. Every other jump of that kind is the fixes going
  * missing rather than the driving stopping - under trees, in a gully, with the phone in a
  * pocket - and the ground between two fixes the pass drove is ground it covered, so the
  * recorded line is drawn through it. A pause is different in the one way that matters: the
- * operator said they had stopped, so the recorded line is drawn in two pieces there.
+ * walker said they had stopped, so the recorded line is drawn in two pieces there.
  *
  * [toEpochMs] is null while the pass is still paused, and for a pass that was finished while
  * paused - which reads as a stop that runs to the end of the recording, as it should.
@@ -20,7 +20,7 @@ data class RecordingBreak(
 ) {
 
     /**
-     * Whether this break falls between two fixes: whether the operator was stopped at some
+     * Whether this break falls between two fixes: whether the walker was stopped at some
      * point on the way from one to the other.
      *
      * A break that never ended is taken to run to the end of the recording. A pass finished

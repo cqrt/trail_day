@@ -8,7 +8,7 @@ import org.junit.Test
 /**
  * How GitHub's answers are read.
  *
- * The refusals are the cases that have to be right: from the operator's side an expired
+ * The refusals are the cases that have to be right: from the walker's side an expired
  * token, a repository that does not exist and a token that was never given access to it all
  * look the same - a button that does nothing - unless something turns the status code into a
  * sentence that says which of the three to go and fix.

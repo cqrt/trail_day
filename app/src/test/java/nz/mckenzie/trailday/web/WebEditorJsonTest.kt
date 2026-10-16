@@ -19,12 +19,11 @@ import org.junit.Test
  *
  * Two things are being held here. One is that the desk is told enough to draw and to answer a
  * question: the kind, the line, the box the work is in and where the phone is. The other is that
- * nothing the operator typed on the phone is quietly dropped on the way out - the mapping into the
+ * nothing the walker typed on the phone is quietly dropped on the way out - the mapping into the
  * backup vocabulary is written out in [WebEditorJson], and a column forgotten there is a column the
  * desk never sees.
  *
- * What is *not* in the document is held as firmly: the spray fields the app no longer has - the
- * method, the interval, the swath width, the pass count and the last-sprayed date - never travel
+ * What is *not* in the document is held as firmly: the fields the app no longer has never travel
  * to the desk at all.
  */
 class WebEditorJsonTest {
@@ -126,17 +125,16 @@ class WebEditorJsonTest {
     }
 
     @Test
-    fun `nothing about how a place is sprayed reaches the desk`() {
+    fun `nothing the old app knew about a place reaches the desk`() {
         val text = WebEditorJson.build(documentWith(everyField))
 
-        // The method, the interval, the swath width, the pass count and the last-sprayed date were the
-        // desk's own once; they are gone from the app, and a document that still carried them would be
+        // The fields the old app had are gone, and a document that still carried them would be
         // one the page could show without meaning to.
         assertTrue("no method: $text", !text.contains("method"))
         assertTrue("no interval: $text", !text.contains("intervalDays"))
         assertTrue("no swath width: $text", !text.contains("swathWidthM"))
         assertTrue("no count of passes: $text", !text.contains("passesRequired"))
-        assertTrue("no last-sprayed date: $text", !text.contains("lastSprayedAtEpochMs"))
+        assertTrue("no last-walked date: $text", !text.contains("lastSprayedAtEpochMs"))
     }
 
     @Test
@@ -232,11 +230,11 @@ class WebEditorJsonTest {
         val recorded = roundTrip(documentWith(everyField, recordings = 1)).assets.single()
         assertFalse(recorded.removal.allowed)
         assertTrue(
-            "counts the recording: ${recorded.removal.sentence}",
-            recorded.removal.sentence.contains("1 recording")
+            "counts the trip: ${recorded.removal.sentence}",
+            recorded.removal.sentence.contains("1 trip")
         )
         assertTrue(
-            "and sends the operator to the phone: ${recorded.removal.sentence}",
+            "and sends the walker to the phone: ${recorded.removal.sentence}",
             recorded.removal.sentence.contains("Delete it on the phone")
         )
     }

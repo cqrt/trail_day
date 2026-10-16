@@ -8,7 +8,7 @@ import org.junit.Test
 
 /**
  * The two decisions inside `EditorAwake`: which Wi-Fi lock a phone of this API level is given, and
- * which wake lock a run takes for the operator's answer about the screen.
+ * which wake lock a run takes for the walker's answer about the screen.
  *
  * The locks themselves are the phone's business and are checked on a phone - `dumpsys power` shows
  * them by tag, and that they are given back when the run stops. What is decided here is the part a
@@ -46,7 +46,7 @@ class EditorAwakeTest {
     @Suppress("DEPRECATION")
     @Test
     fun aRunThatIsKeepingTheScreenOnTakesTheScreenWithIt() {
-        // The operator's switch, for the phone whose radio sleeps when its screen does: a screen that
+        // The walker's switch, for the phone whose radio sleeps when its screen does: a screen that
         // stays lit keeps the phone out of that state and out of Doze, and is the one thing they can
         // see is happening. Dimmed, because a lit screen all afternoon is a flat battery.
         assertEquals(PowerManager.SCREEN_DIM_WAKE_LOCK, wakeLockLevelFor(keepTheScreenOn = true))

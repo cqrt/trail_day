@@ -26,13 +26,13 @@ import java.util.Base64
  * sentences that explain a refusal are the app's own rather than a second copy kept in step by
  * hand. A field the desk does not send cannot be lost, because the edit is applied to the row as
  * the phone holds it now and the repository writes that row back: the desk cannot overwrite a
- * last-sprayed date or an archived flag it never heard of.
+ * last-walked date or an archived flag it never heard of.
  *
  * **And the fields the desk no longer shows are the row's own.** Only a name, a kind, the notes
  * and the drawing ever come from the body.
  *
  * **Why a fingerprint and not a version column.** The desk has to be able to say "I am changing the
- * asset I read" and the phone has to be able to answer "that is not the asset you read any more".
+ * place I read" and the phone has to be able to answer "that is not the place you read any more".
  * A column would cost a Room migration and a field in the backup's vocabulary - a shape an older
  * build has to tolerate - to carry a number derived from the very row it sits in. So the version is
  * derived instead: [WebEditorVersion] hashes the fields the desk may write, the state document
@@ -222,7 +222,7 @@ sealed interface WebEditorWrite {
     /**
      * Tracks from DOC were made into assets on the phone, and how many.
      *
-     * The desk searched DOC through the phone and the operator ticked rows; making them is the
+     * The desk searched DOC through the phone and the walker ticked rows; making them is the
      * phone's own write, so what comes back is the count and the phone's sentence, and the page reads
      * the work again rather than being handed each new asset.
      */
@@ -262,7 +262,7 @@ object WebEditorVersion {
         paths: List<List<GeoPoint>> = emptyList()
     ): String {
         // Named fields, one to a line. A hash of joined values would read "Estuary" and "3" the same
-        // as "Estuary 3" and nothing, which is a collision an operator could type by accident.
+        // as "Estuary 3" and nothing, which is a collision a walker could type by accident.
         val fields = listOf(
             "id" to asset.id.toString(),
             "name" to asset.name,
@@ -296,7 +296,7 @@ object WebEditorEdits {
      * every edit has, or not saying which version it was written against.
      *
      * One sentence rather than one per missing field, because a body that arrived half-formed is a
-     * fault in the page rather than something the operator typed and can put right - while a field
+     * fault in the page rather than something the walker typed and can put right - while a field
      * they *did* type, out of range, is answered by the rules below in the app's own words.
      */
     private const val UNREADABLE = "That edit could not be read, so nothing was saved."

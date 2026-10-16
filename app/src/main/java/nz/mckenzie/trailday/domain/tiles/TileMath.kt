@@ -101,7 +101,7 @@ const val FRAME_HALF_WIDTH_DEGREES = 0.01
  * around it has no width and no height.
  *
  * A camera told to fit a box with no size goes to the deepest zoom the map has - measured on
- * the asset page at 25.5, against imagery that stops at 22 - and what the operator is left
+ * the asset page at 25.5, against imagery that stops at 22 - and what the walker is left
  * with is the style's dark green background and the marker on it, instead of their paddock
  * (`build/verify/bug1-camera.txt`). A track drawn between two taps a few metres apart is
  * the same box with the same ending.

@@ -47,7 +47,7 @@ import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.viewmodel.AssetDetailViewModel
 
 /**
- * One track or place: where it is, what shape it is, and the recordings made on it.
+ * One track or place: where it is, what shape it is, and the trips recorded on it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,11 +102,11 @@ fun AssetDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(track?.name ?: "Asset") },
+                title = { Text(track?.name ?: "Place") },
                 navigationIcon = { IconButton(onClick = onBack) { AppIcon(IconGlyph.BACK, contentDescription = "Back") } },
                 actions = {
                     // Everything that is not the line itself lives behind this: editing the
-                    // asset, exporting it, deleting it. Material puts those in a sheet rather
+                    // place, exporting it, deleting it. Material puts those in a sheet rather
                     // than as three buttons competing for the top bar.
                     IconButton(onClick = { actionsOpen = true }) {
                         AppIcon(IconGlyph.MORE, contentDescription = "More actions")
@@ -136,8 +136,8 @@ fun AssetDetailScreen(
                         fitBounds = bounds,
                         // How close this little map is allowed to sit. Asked for in as many words:
                         // the page was landing at the deepest zoom the map has, where the imagery
-                        // runs out, and 15 is the view the operator asked for - a paddock with the
-                        // asset in it. An asset too big to fit at 15 still gets its whole self on
+                        // runs out, and 15 is the view the walker asked for - a paddock with the
+                        // place in it. A place too big to fit at 15 still gets its whole self on
                         // the card, because that is the fit it always had.
                         fitBoundsMaxZoom = ASSET_PAGE_MAX_ZOOM,
                         modifier = Modifier.fillMaxSize()
@@ -185,11 +185,11 @@ fun AssetDetailScreen(
 
             message?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
 
-            Text("Recordings", style = MaterialTheme.typography.titleSmall)
+            Text("Trips", style = MaterialTheme.typography.titleSmall)
             if (recordings.isEmpty()) {
                 EmptyState(
                     glyph = IconGlyph.RECORDINGS,
-                    title = "No recording for this asset",
+                    title = "No trip for this place",
                     body = "Recording while walking or riding this line leaves the evidence " +
                         "of what was actually followed."
                 )
@@ -216,8 +216,8 @@ fun AssetDetailScreen(
     if (confirmingDelete) {
         AlertDialog(
             onDismissRequest = { confirmingDelete = false },
-            title = { Text("Delete this asset?") },
-            text = { Text("Its recordings stay, but lose their link to it. This cannot be undone.") },
+            title = { Text("Delete this place?") },
+            text = { Text("Its trips stay, but lose their link to it. This cannot be undone.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmingDelete = false
@@ -231,14 +231,14 @@ fun AssetDetailScreen(
         )
     }
 
-    // The secondary actions, in a sheet. The asset is re-read from the database when it is
+    // The secondary actions, in a sheet. The place is re-read from the database when it is
     // opened rather than copied once, so a rename made from the edit screen cannot be saved
     // back here as a stale name.
     if (actionsOpen) {
         ModalBottomSheet(onDismissRequest = { actionsOpen = false }) {
             Column(modifier = Modifier.padding(bottom = 24.dp)) {
                 // A menu with a way out that is written down. Swiping the sheet away or
-                // pressing back both work, and neither of them is anything the operator can
+                // pressing back both work, and neither of them is anything the walker can
                 // see: a sheet of destructive choices should say how to leave it.
                 TextButton(
                     onClick = { actionsOpen = false },
@@ -269,7 +269,7 @@ fun AssetDetailScreen(
                 ListItem(
                     modifier = Modifier.clickable {
                         actionsOpen = false
-                        exportLauncher.launch("${track?.name ?: "asset"}.gpx")
+                        exportLauncher.launch("${track?.name ?: "place"}.gpx")
                     },
                     headlineContent = { Text("Export GPX") },
                     supportingContent = {
@@ -285,9 +285,9 @@ fun AssetDetailScreen(
                     headlineContent = {
                         // The irreversible one, in the colour that says so rather than in the
                         // same green as Save.
-                        Text("Delete this asset", color = MaterialTheme.colorScheme.error)
+                        Text("Delete this place", color = MaterialTheme.colorScheme.error)
                     },
-                    supportingContent = { Text("Recordings stay, but lose their link to it") },
+                    supportingContent = { Text("Trips stay, but lose their link to it") },
                     leadingContent = {
                         AppIcon(glyph = IconGlyph.TRASH, tint = MaterialTheme.colorScheme.error)
                     }
@@ -298,14 +298,14 @@ fun AssetDetailScreen(
 }
 
 /**
- * How close this page's little map may sit on its asset.
+ * How close this page's little map may sit on its place.
  *
- * The fit on its own is only as good as the asset's box, and a place is one coordinate: the
+ * The fit on its own is only as good as the place's box, and a place is one coordinate: the
  * camera went to the deepest zoom the map has, where the imagery has run out, and the card came
- * up as bare background with the marker on it. Fifteen is the view the operator asked for by
- * name - close enough to see the paddock the asset is in, wide enough to see the ground around
+ * up as bare background with the marker on it. Fifteen is the view the walker asked for by
+ * name - close enough to see the paddock the place is in, wide enough to see the ground around
  * it. It is a ceiling rather than a setting: the fit still says where, and this only stops the
- * camera going closer than 15, so an asset whose own fit is already wider than that - a long
+ * camera going closer than 15, so a place whose own fit is already wider than that - a long
  * line - is shown whole rather than cut off to satisfy a number.
  */
 private const val ASSET_PAGE_MAX_ZOOM = 15.0

@@ -3,8 +3,8 @@ package nz.mckenzie.trailday.domain.doc
 /**
  * The DOC tracks downloaded for offline use.
  *
- * A **cache**, not the record of the farm: it holds tracks DOC published, so the browser can offer
- * them with no reception. The phone's own assets and their sprays are untouched by it, and clearing
+ * A **cache**, not the record of the work: it holds tracks DOC published, so the browser can offer
+ * them with no reception. The phone's own places and their trips are untouched by it, and clearing
  * it costs nothing but the download. That is why it lives beside the offline imagery rather than in
  * a backup.
  */
@@ -38,7 +38,7 @@ object EmptyDocTrackCache : DocTrackCache {
  * The downloaded tracks whose name contains [nameContains], case-insensitively.
  *
  * All of them when the words are blank, because a search with no name is "what have I downloaded?".
- * A cache holds only the area the operator asked for, so no place filter is applied here: the download
+ * A cache holds only the area the walker asked for, so no place filter is applied here: the download
  * is the place filter.
  */
 fun List<DocTrack>.matching(nameContains: String): List<DocTrack> {

@@ -84,7 +84,7 @@ const { kindText } = await import(
 /**
  * Every vertex of a feature, whatever its geometry nests: the desk's own arithmetic, tested under node.
  *
- * The card's list and the camera both need it, and a ring sits a level deeper than a line's.
+ * The card's list and the camera both need it, and a Polygon's coordinates sit a level deeper than a line's.
  */
 const { verticesOf } = await import(
   TOKEN ? `./geometry.mjs?k=${encodeURIComponent(TOKEN)}` : './geometry.mjs'
@@ -185,7 +185,7 @@ applyTheme(recallTheme(browserStore()));
 
 /**
  * Everything the phone serves is behind the token, and the token is in the address - except when the
- * operator has turned the token off on the phone, in which case the address has none and there is
+ * walker has turned the token off on the phone, in which case the address has none and there is
  * nothing to add.
  *
  * A path that already carries a query - a delete, whose version travels in one - gets the token joined
@@ -197,20 +197,20 @@ const withToken = (path) => TOKEN
 
 const notice = document.getElementById('notice');
 
-/** One line of plain English, in the operator's terms, instead of a console nobody is looking at. */
+/** One line of plain English, in the walker's terms, instead of a console nobody is looking at. */
 function showNotice(text) {
   notice.textContent = text;
   notice.hidden = false;
 }
 
 /**
- * What the page says when the imagery stops loading: the one thing about it an operator can act on.
+ * What the page says when the imagery stops loading: the one thing about it a walker can act on.
  *
  * The desk has no imagery of its own. Every tile it draws is the phone's - `GET /tiles/...` on the
  * phone's own server - and a tile the phone does not already hold is fetched from LINZ while that
  * request is being answered. So a tile that will not load is nearly always the phone asleep or off
  * the network rather than anything wrong with the map, and the ground already looked at still draws
- * because it is on disk. Without this the operator gets MapLibre's own line, once per failing tile,
+ * because it is on disk. Without this the walker gets MapLibre's own line, once per failing tile,
  * about one arbitrary URL: "AJAXError: Bad Gateway (502): .../14/16109/10269.webp" - true, useless,
  * and 30 of them.
  */
@@ -223,7 +223,7 @@ let imageryFailing = false;
 /** A tile that would not load. Told by `map.on('error')`, which fires once per tile. */
 function imageryFailed() {
   imageryFailing = true;
-  // Never over the top of something the operator asked for: a refusal of their own is worth more than
+  // Never over the top of something the walker asked for: a refusal of their own is worth more than
   // this, and a notice free again in a moment is soon enough to say it.
   if (notice.hidden || notice.textContent === IMAGERY_WORDS) showNotice(IMAGERY_WORDS);
 }
@@ -255,7 +255,7 @@ async function getJson(path) {
  * A write: one of the three the phone takes, sent with the token on its URL.
  *
  * A refusal is not an exception here. A 400, a 409 and a delete the phone will not take all arrive with
- * a document the phone wrote - the words to show the operator, and what kind of refusal it was - and all
+ * a document the phone wrote - the words to show the walker, and what kind of refusal it was - and all
  * are things to be said in those words rather than in a stack trace. What is thrown is a failure of the
  * arrangement rather than of the write: no token, a refused address, or an answer that is not a document
  * at all.
@@ -294,7 +294,7 @@ async function sendJson(path, method, body = null) {
  * Two things ask for the same picture within a frame of each other: the list of names this page
  * fetches up front, and the map's own "I am missing this picture" event, which fires for a name the
  * style asks for before the fetch has landed. Fetching twice is waste; adding the same image twice
- * is an error MapLibre reports to the operator, so a name is remembered while its fetch is in
+ * is an error MapLibre reports to the walker, so a name is remembered while its fetch is in
  * flight and forgotten when it lands - which is also what lets a later frame ask again after the
  * style has been rebuilt.
  */
@@ -386,7 +386,7 @@ async function boot() {
   // Nothing checks for a missing token here any more, and that is deliberate: the phone's gate hands
   // this page to a request that carried the token, or to a run that asks for none - so a page that
   // has loaded has already been let in. The 403 the documents below can still get is answered in the
-  // phone's own words, which is where the operator should be told about it.
+  // phone's own words, which is where the walker should be told about it.
   try {
     // The three documents the page needs, asked for at once: the work, its features, and the style
     // the phone builds for it.
@@ -472,7 +472,7 @@ async function boot() {
       onFinish: finishDrawing,
       onCancel: abandonDrawing,
       // The drawing is on the map but not in the hand while a form is open over it: the form is what
-      // the operator is working on, and a click behind it must not put a vertex on the line.
+      // the walker is working on, and a click behind it must not put a vertex on the line.
       locked: () => formIsOpen()
     });
     // The way into a drawing is opened by `onStyleLoaded`, not here: asking for the module is a round
@@ -559,13 +559,13 @@ function onStyleLoaded(style) {
  * opened at a slightly different zoom from one load to the next, which is not a wrong view of the work
  * but a *different* one, and every check that compares two pictures of the same area rests on it being
  * the same one. Waiting for the first frame means the fit is worked out from the size the map actually
- * has, which is the size the operator is about to look at.
+ * has, which is the size the walker is about to look at.
  *
- * The other two conditions are unchanged, and both are about not moving a camera the operator has already
+ * The other two conditions are unchanged, and both are about not moving a camera the walker has already
  * placed: a row picked out of the list before the imagery arrived (that click must not be undone by the
  * map finishing), and a view this desk remembered from last time (`camera.mjs`, handed to the map as it
  * was built - there is nothing left to fit). It runs once, because the first draw is the only one that is
- * the desk's rather than the operator's: a fit on every quiet moment would be a map that moved on its own.
+ * the desk's rather than the walker's: a fit on every quiet moment would be a map that moved on its own.
  */
 function fitTheWorkOnFirstDraw() {
   if (!state.bounds || selectedId !== null || rememberedCamera) return;
@@ -645,7 +645,7 @@ let glowFilters = new Map();
  * The ground's fill is passed over - see `wantsHalo` - so a boundary that is picked out wears the edge round
  * its own line rather than a disc at every one of its corners; the names beside tracks are passed over for
  * the same reason in the other shape - their features are a stretch of line, and a disc at every corner of
- * it was the red glow an operator reported on a picked-out track.
+ * it was the red glow a walker reported on a picked-out track.
  */
 function addGlowLayers(style) {
   const phoneLayers = (style.layers || []).filter(
@@ -752,7 +752,7 @@ function drawList() {
     const empty = document.createElement('p');
     empty.className = 'empty';
     empty.textContent = state.assets.length
-      ? 'No asset matches that.'
+      ? 'No place matches that.'
       : 'There is nothing here yet. Draw one here, or on the phone.';
     list.append(empty);
     return;
@@ -826,8 +826,8 @@ function flyToAsset(id) {
 /**
  * The card: what the place is, and the way into changing its details or its line.
  *
- * Everything on it is the phone's own: what the kind is called, how long the line is, how much ground a
- * ring encloses and what the heights are all arrive in the record.
+ * Everything on it is the phone's own: what the kind is called, how long the line is and what the
+ * heights are all arrive in the record.
  */
 function showCard(item) {
   document.getElementById('card-name').textContent = item.asset.name;
@@ -914,8 +914,8 @@ const CARD_ELEVATION_HEIGHT = 30;
  *
  * The **paths** the phone handed over are what is opened, not the feature the map is drawing: a feature
  * is one path per asset, and a line that is changed from here has to hand every path back - a spur is not
- * put back by a page that never held it. The shape travels with them so a closed drawing is drawn as
- * ground: the closing side shown, its corners the only handles, and no side-track furniture offered.
+ * put back by a page that never held it. The shape travels with them, so a place that is a single
+ * spot is opened as one rather than as a line.
  */
 function startShape(item) {
   if (!editor) return;
@@ -948,7 +948,6 @@ function showDrawing({
   sideTracks,
   sideTrackInHand,
   lengthM,
-  ringCorners,
   junction,
   canUndo,
   tracing
@@ -989,20 +988,14 @@ function showDrawing({
   // what the hand is doing at that moment: the whole fence lands at once, so letting go is not a
   // commitment to twenty vertices. Then which path the handles belong to, which is what decides what a
   // drag and Del do, and where a side track would leave from - a picked point is easy to miss on a map
-  // full of fences, and it is the one thing that decides where the spur starts. Ground has neither a
-  // side track nor a junction to say, and is told the one thing it does need: how many corners make a
-  // ring, and that the app closes it.
+  // full of fences, and it is the one thing that decides where the spur starts.
   const state = tracing
     ? 'Following the pointer - let go to put it down'
     : sideTrackInHand
       ? 'Working on the side track'
       : junction
         ? 'A side track will leave the line here'
-        : ground
-          ? count < ringCorners
-            ? `Click the corners - ${ringCorners} at least`
-            : 'The last corner joins the first'
-          : (sideTracks > 0 ? 'Click a side track to work on it' : '');
+        : (sideTracks > 0 ? 'Click a side track to work on it' : '');
   const words = field('drawing-state');
   words.textContent = state;
   words.hidden = !state;
@@ -1014,13 +1007,11 @@ function showDrawing({
   field('drawing-keys').classList.toggle('no-undo', !canUndo);
 
   // The side-track furniture, in the same states the drawing is in. *Remove this side track* is offered for
-  // any side track in hand, finished or not, because that is the other half of being able to edit one. A
-  // ring is offered none of the three: it has no spurs to hang off it, and the phone refuses a write that
-  // carries one, so a button here would be a button that ends in a refusal.
+  // any side track in hand, finished or not, because that is the other half of being able to edit one.
   const line = paths[0] ?? [];
-  field('drawing-side-track').hidden = ground || sideTrackInHand || line.length < 2;
-  field('drawing-back').hidden = ground || !sideTrackInHand;
-  field('drawing-drop').hidden = ground || !sideTrackInHand;
+  field('drawing-side-track').hidden = sideTrackInHand || line.length < 2;
+  field('drawing-back').hidden = !sideTrackInHand;
+  field('drawing-drop').hidden = !sideTrackInHand;
   box.hidden = false;
 }
 
@@ -1044,7 +1035,7 @@ async function finishDrawing(paths, wasEditing) {
 }
 
 /**
- * The operator has given up on a line.
+ * The walker has given up on a line.
  *
  * Nothing has to be put back, which is the whole reason this is cheap: the phone was never asked to
  * change anything, so for an asset it already has the provisional line is simply hidden, and for a new
@@ -1115,7 +1106,7 @@ async function importGpxFile(file) {
     closeForms();
     // The kind a file is, and the line it holds: a track file is a track on the ground, which is what
     // the phone makes of one. Both go to the drawing rather than straight to the form, so the line is
-    // on the map while the operator reads the form - a file with a jump in it or a spur in the wrong
+    // on the map while the walker reads the form - a file with a jump in it or a spur in the wrong
     // place is a thing to be seen before it is named, not after - and so a form given up on comes back
     // to the drawing, where it can be traced onto, extended and saved by the same Enter every other
     // drawing is saved by.
@@ -1337,7 +1328,7 @@ function drawDocList() {
     meta.className = 'meta';
     meta.textContent = [
       track.kind,
-      // How the track is walked, where a vertex count used to be: "584 points" is nothing an operator
+      // How the track is walked, where a vertex count used to be: "584 points" is nothing a walker
       // uses, where one-way tells them what they are taking on.
       track.trackType,
       metresText(track.lengthM),
@@ -1389,7 +1380,7 @@ async function importDocTracks() {
 }
 
 /**
- * Saves a line the operator has finished drawing.
+ * Saves a line the walker has finished drawing.
  *
  * The body is the row the card is showing with the new line in it, which is what the phone wants: one
  * write judged as a whole, so a moved vertex and the rest of the row cannot land without each other.
@@ -1451,7 +1442,7 @@ async function deleteAsset(item) {
 }
 
 /**
- * The body the form sends: what the operator typed, and the version the card was handed.
+ * The body the form sends: what the walker typed, and the version the card was handed.
  *
  * `version` and `points` are left out entirely when they do not apply, rather than sent empty: a body
  * that says nothing about the line leaves the line alone, which is what the details form means - and a
@@ -1547,7 +1538,7 @@ function fillChoices(id, choices, chosen) {
  * The shape a kind makes, from the phone's own answer.
  *
  * Each kind in the state document carries the shape the phone reads off it (`AssetKind.shape` - the same
- * word the record stores), so the desk draws ground as ground without a list of kind names of its own. A
+ * word the record stores), so the desk draws a spot as a spot without a list of kind names of its own. A
  * kind that is not in the document - a page from an older build, or a kind this phone has never heard of -
  * is drawn as a line, which is what every drawing here was before there was any other shape.
  */
@@ -1605,7 +1596,7 @@ function closeForms() {
 
 /**
  * The details form shut. The card, the drawing and the drawing's own words are not this function's
- * business: they belong to what the operator was doing before the form opened.
+ * business: they belong to what the walker was doing before the form opened.
  */
 function closeEdit() {
   editingId = null;
@@ -1641,7 +1632,7 @@ function openDraft(name = '') {
   editingId = null;
   drafting = true;
 
-  field('edit-title').textContent = 'New asset';
+  field('edit-title').textContent = 'New place';
   field('edit-name').value = name;
   field('edit-notes').value = '';
 
@@ -1658,7 +1649,7 @@ function openDraft(name = '') {
  * Backing out of the form.
  *
  * For a new track that means back to the drawing rather than back to nothing: the drawing is the
- * operator's work, and a change of mind about the name is not a reason to lose it. The paths go back to
+ * walker's work, and a change of mind about the name is not a reason to lose it. The paths go back to
  * the map, so finishing again is one key away - and giving up altogether is the Escape that follows.
  * The kind it was drawn as goes back with them: a boundary drawn as one kind returns as one, rather
  * than as a line that happens to have the same shape.
@@ -1674,7 +1665,7 @@ function cancelForm() {
   }
 }
 
-/** The phone's own words about what it refused, where the operator is looking when it happens. */
+/** The phone's own words about what it refused, where the walker is looking when it happens. */
 function showEditProblem(message) {
   const words = field('edit-words');
   words.textContent = message;
@@ -1716,9 +1707,9 @@ async function reloadWork() {
  * Saves the form to the phone: the details of a track, or a track that did not exist until now.
  *
  * The phone judges every field - the blank-means-unknown rules and the drawn line as well - and its
- * words are what the operator is shown, because they are the words the phone's own screen would use.
+ * words are what the walker is shown, because they are the words the phone's own screen would use.
  * What this function decides is only what to do with the answer: a save closes the form and redraws the
- * work from what came back, a refusal the operator can fix leaves the form open with the phone's
+ * work from what came back, a refusal the walker can fix leaves the form open with the phone's
  * sentence under it, and a refusal because the asset moved under the page closes the form and reloads
  * the lot, because the page's copy is the thing that is wrong.
  *
@@ -1800,7 +1791,7 @@ document.getElementById('import').addEventListener('click', () => field('import-
 
 document.getElementById('import-file').addEventListener('change', (event) => {
   const file = event.target.files && event.target.files[0];
-  // Asking the same file twice in a row is a thing operators do after fixing it: a file input keeps
+  // Asking the same file twice in a row is a thing walkers do after fixing it: a file input keeps
   // its own answer, and an input still holding the last file fires no change the second time.
   event.target.value = '';
   if (file) importGpxFile(file);
@@ -1809,7 +1800,7 @@ document.getElementById('import-file').addEventListener('change', (event) => {
 /*
  * DOC's tracks: the dialog's own controls, and the two acts it has - a search and an import. The
  * dialog closes on its corner, on Escape (below) or on a press on the dimmed page behind it, and not
- * on a press inside it, which is the operator working. The press, not the click: a click's target is
+ * on a press inside it, which is the walker working. The press, not the click: a click's target is
  * the nearest parent its press and its release share, so a drag that left the dialog would close it.
  */
 document.getElementById('doc-open').addEventListener('click', openDoc);
@@ -1827,7 +1818,7 @@ document.getElementById('doc-name').addEventListener('keydown', (event) => {
   }
 });
 // The two "where" answers are one answer: turning one on turns the other off, so a search never
-// carries a phone's place and a map view at once and the operator is never unsure which it used.
+// carries a phone's place and a map view at once and the walker is never unsure which it used.
 document.getElementById('doc-near').addEventListener('change', (event) => {
   if (event.target.checked) field('doc-view').checked = false;
 });
@@ -1934,7 +1925,7 @@ window.addEventListener('keydown', (event) => {
  * "Where is the phone?" asks the phone, rather than the browser.
  *
  * A browser on plain `http://` refuses a page its location, and the phone's fix is the one the
- * operator means anyway: the phone is the thing in the paddock. Asking for the state document again
+ * walker means anyway: the phone is the thing in the paddock. Asking for the state document again
  * is what makes this the phone's *newest* fix rather than the one from when the page was opened.
  */
 document.getElementById('locate').addEventListener('click', async () => {

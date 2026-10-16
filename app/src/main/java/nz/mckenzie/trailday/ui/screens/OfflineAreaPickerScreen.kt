@@ -46,7 +46,7 @@ import kotlin.math.roundToInt
  *
  * Every imagery choice shows its cost immediately. That matters more than it sounds: the difference
  * between caching to zoom 16 and to zoom 17 is the difference between a minute and a quarter of an
- * hour on a farm connection, and the operator is the only one who knows whether they need to see
+ * hour on a rural connection, and the walker is the only one who knows whether they need to see
  * individual rows.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,7 +72,7 @@ fun OfflineAreaPickerScreen(
     LaunchedEffect(saved) {
         if (saved) {
             // Consume before leaving, so a reused view model does not bounce the
-            // operator straight back out next time.
+            // walker straight back out next time.
             viewModel.consumeSaved()
             onSaved()
         }
@@ -91,7 +91,7 @@ fun OfflineAreaPickerScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Aerial imagery, whichever basemap the operator reads their own maps on: it is what an
+            // Aerial imagery, whichever basemap the walker reads their own maps on: it is what an
             // imagery area downloads, and it is a fine thing to draw a DOC area on besides.
             BasemapView(
                 basemap = Basemap.LINZ_AERIAL,

@@ -15,7 +15,7 @@ import android.os.PowerManager
  * from LINZ while the request is being answered, and a phone whose CPU has suspended cannot finish it:
  * the fetch overruns its timeout, the tile route answers 502, and the desk draws nothing over ground
  * nobody has looked at yet - while the ground it has already been over still draws, because that is
- * on disk. That is the fault an operator describes as *"the imagery stops working when the phone goes
+ * on disk. That is the fault a walker describes as *"the imagery stops working when the phone goes
  * to sleep"*.
  *
  * Two locks, and neither is enough on its own:
@@ -34,13 +34,13 @@ import android.os.PowerManager
  * for half an hour has its app network suspended whatever it holds. That half of the fault is
  * answered by downloading the ground first, on the Offline areas screen - which is what makes the
  * desk draw an area with no network at all. It is also why the locks are held only for the life of
- * the run: the editor being on is a switch the operator threw to work from a computer, and turning it
+ * the run: the editor being on is a switch the walker threw to work from a computer, and turning it
  * off gives the phone back its sleep.
  *
- * **And on some phones neither lock is enough anyway.** An operator reported exactly that: the imagery
+ * **And on some phones neither lock is enough anyway.** A walker reported exactly that: the imagery
  * went on failing a few minutes after the screen went off with both locks held, which is a phone whose
  * radio sleeps when its screen does - a few minutes is far too soon for Doze, so it is the phone's own
- * idea of sleep rather than Android's. What answers that is [hold]'s `keepTheScreenOn`, the operator's
+ * idea of sleep rather than Android's. What answers that is [hold]'s `keepTheScreenOn`, the walker's
  * own switch: a phone whose screen is on never enters either state, and the cost is said on the card.
  */
 internal class EditorAwake(private val context: Context) {
@@ -52,11 +52,11 @@ internal class EditorAwake(private val context: Context) {
      * Holds the phone awake. Safe to ask for twice - a run being built again asks again - and the
      * second ask finds the locks already in hand rather than taking a second pair.
      *
-     * [keepTheScreenOn] is the operator's switch: the screen stays on, dimmed, so the phone is awake in
+     * [keepTheScreenOn] is the walker's switch: the screen stays on, dimmed, so the phone is awake in
      * the way that no phone disagrees about. It costs battery and is off unless they ask for it.
      *
      * No timeout on the wake lock, which is what lint would rather see: the run's own stop is the
-     * release, and a run is served for as long as the operator is at the computer - which is hours,
+     * release, and a run is served for as long as the walker is at the computer - which is hours,
      * not minutes. A timed lock would simply expire and put the fault back. Nothing outlives the
      * process in any case: the kernel drops a wake lock with the process that took it, so the worst a
      * kill can leave behind is a run that is no longer serving. The tag is what makes one visible in
@@ -123,7 +123,7 @@ internal fun wifiLockModeFor(sdk: Int): Int? =
  * [PowerManager.PARTIAL_WAKE_LOCK] is the CPU without the screen, which is the whole of what the app
  * needs when everything being asked of the phone is already on it. Keeping the screen on needs
  * [PowerManager.SCREEN_DIM_WAKE_LOCK]: the screen stays lit at its dimmest, which is enough to keep
- * the phone out of both the radio-sleeping state and Doze, and is the one thing an operator can *see*
+ * the phone out of both the radio-sleeping state and Doze, and is the one thing a walker can *see*
  * is happening. Both of the screen levels are deprecated in Android's own SDK - the advice is a window
  * flag on an activity - but the phone is in a pocket with no activity on show, so a wake lock is the
  * only way to say it from a service.

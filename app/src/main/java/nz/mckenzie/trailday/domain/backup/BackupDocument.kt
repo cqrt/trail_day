@@ -6,7 +6,7 @@ import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
 
 /**
- * Everything the operator would lose if the phone went in the creek.
+ * Everything the walker would lose if the phone went in the creek.
  *
  * These records mirror the database rather than the screens, because a backup that
  * cannot be restored exactly is worse than no backup: it looks like safety and is
@@ -75,7 +75,7 @@ data class AssetRecord(
      * Optional and added without a version bump, like the side tracks before it: a file written
      * before this has no such key, and an asset restored from one simply has no source - which is
      * exactly what an asset drawn or imported from a file has. It travels in the backup so that
-     * restoring does not lose which DOC tracks are already on the farm.
+     * restoring does not lose which DOC tracks are already on the map.
      */
     val sourceRef: String? = null,
     val points: List<LinePointRecord> = emptyList(),

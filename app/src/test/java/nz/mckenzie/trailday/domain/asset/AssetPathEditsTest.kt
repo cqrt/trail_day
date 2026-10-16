@@ -11,7 +11,7 @@ import org.junit.Test
  * The desk's drawing is JavaScript and the phone's own drawing is Kotlin, so this is the border
  * between them: a page is a client, and a client that sends a line of one point, a place with five,
  * or a coordinate from a map that was asked to unproject before it had a size, is answered rather
- * than obeyed. The sentences are held here too, because they are what the operator reads.
+ * than obeyed. The sentences are held here too, because they are what the walker reads.
  */
 class AssetPathEditsTest {
 
@@ -80,7 +80,7 @@ class AssetPathEditsTest {
     }
 
     @Test
-    fun `two vertices a hair apart are the operator's own doing and are kept`() {
+    fun `two vertices a hair apart are the walker's own doing and are kept`() {
         // The desktop snaps a vertex onto another by copying its coordinates, so two vertices meant to
         // be the same place *are* the same two numbers. Rounding here instead - the way a recording's
         // fixes are filtered - would quietly move a line somebody drew by hand.
@@ -112,7 +112,7 @@ class AssetPathEditsTest {
 
     @Test
     fun `a file the phone's own import would take is not refused for its size`() {
-        // The operator's own export of a twelve-kilometre ride: 3,282 vertices, which the phone's own
+        // The walker's own export of a twelve-kilometre ride: 3,282 vertices, which the phone's own
         // file import stores without a word. The desk used to refuse it at a cap of 2,000.
         val imported = (0 until 3282).map { GeoPoint(-41.5, 173.8 + it * 0.00001) }
 

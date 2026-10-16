@@ -9,7 +9,7 @@ import nz.mckenzie.trailday.domain.backup.StoredBackup
  *
  * Separate from the target itself, and free of any connection, for the usual reason: a
  * refusal is the case that has to be right - an expired token and a misnamed repository look
- * identical from the operator's side unless something turns the status into a sentence - and
+ * identical from the walker's side unless something turns the status into a sentence - and
  * sentences are worth testing without a network.
  */
 internal object GitHubResponses {
@@ -39,7 +39,7 @@ internal object GitHubResponses {
     }
 
     /**
-     * A refusal in the operator's terms.
+     * A refusal in the walker's terms.
      *
      * GitHub's own words are appended by the caller when there are any, but they are never
      * the whole message: "Bad credentials" does not tell anybody which of the three things

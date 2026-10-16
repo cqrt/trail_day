@@ -62,7 +62,7 @@ class RecordingDetailViewModel(
     val apiKey: StateFlow<String> = settingsRepository.linzApiKey
         .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
-    /** Which map to draw the pass on: the operator's choice in Settings. */
+    /** Which map to draw the pass on: the walker's choice in Settings. */
     val basemap: StateFlow<Basemap> = settingsRepository.basemap
         .stateIn(viewModelScope, SharingStarted.Eagerly, Basemap.DEFAULT)
 
@@ -71,7 +71,7 @@ class RecordingDetailViewModel(
 
     /**
      * The recorded line, broken where the pass was paused and drawn straight through the gaps
-     * where the fixes only went missing: the recording is the evidence, and what the operator
+     * where the fixes only went missing: the recording is the evidence, and what the walker
      * stopped for is part of it.
      */
     val geoJson: StateFlow<String> = _detail
@@ -82,7 +82,7 @@ class RecordingDetailViewModel(
                 listOf(
                     AssetLine(
                         assetId = RECORDED_ID,
-                        name = detail?.name ?: "Recording",
+                        name = detail?.name ?: "Trip",
                         colorHex = AssetColors.RECORDED,
                         points = points,
                         stretches = points.splitAtBreaks(breaks).map { piece ->
@@ -106,7 +106,7 @@ class RecordingDetailViewModel(
     /**
      * True once the recording has been deleted. A one-shot signal: the screen
      * consumes it as it navigates away, otherwise a reused view model would bounce
-     * the operator straight back out on their next visit.
+     * the walker straight back out on their next visit.
      */
     val deleted: StateFlow<Boolean> = _deleted
 
@@ -122,7 +122,7 @@ class RecordingDetailViewModel(
         viewModelScope.launch {
             val session = recordings.getSession(sessionId)
             if (session == null) {
-                _message.value = "That recording is no longer on the device"
+                _message.value = "That trip is no longer on the device"
                 return@launch
             }
 
@@ -154,7 +154,7 @@ class RecordingDetailViewModel(
             runCatching { recordings.deleteRecording(sessionId) }
                 .onSuccess { _deleted.value = true }
                 .onFailure { failure ->
-                    _message.value = failure.message ?: "Could not delete the recording"
+                    _message.value = failure.message ?: "Could not delete the trip"
                 }
         }
     }

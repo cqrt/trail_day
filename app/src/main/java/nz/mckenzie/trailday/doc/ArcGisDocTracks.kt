@@ -15,7 +15,7 @@ sealed interface DocTracksResult {
     /** The tracks the search matched. Empty is a real answer: nothing matched. */
     data class Found(val tracks: List<DocTrack>) : DocTracksResult
 
-    /** The question could not be asked, and [message] says why in words the operator can read. */
+    /** The question could not be asked, and [message] says why in words the walker can read. */
     data class Failed(val message: String) : DocTracksResult
 }
 
@@ -35,7 +35,7 @@ interface DocTracksSource {
  *
  * The URL it is asked at is [DocTracksUrl]'s business; this only carries the request, reads the
  * answer, and hands it to [DocTracksJson]. A refused or unreachable service is a sentence for the
- * operator rather than an exception - the search was a deliberate act and its failure should read
+ * walker rather than an exception - the search was a deliberate act and its failure should read
  * like one.
  */
 class ArcGisDocTracks(

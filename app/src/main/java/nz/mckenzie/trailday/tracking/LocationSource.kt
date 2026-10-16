@@ -40,7 +40,7 @@ interface LocationSource {
  * Fused location from Google Play services.
  *
  * Fused is battery-aware (it fuses GPS with the device's other sensors), which
- * matters for a recorder that runs for the length of a spray run. Accuracy is
+ * matters for a recorder that runs for the length of a trip. Accuracy is
  * still filtered downstream by [nz.mckenzie.trailday.domain.geo.TrackPointFilter].
  */
 class FusedLocationSource(

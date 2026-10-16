@@ -10,7 +10,7 @@ import nz.mckenzie.trailday.domain.asset.AssetShape
 /**
  * The backup file itself: what goes in, what comes out, and what is refused.
  *
- * A backup is the operator's only copy of a season, so the interesting cases are the
+ * A backup is the walker's only copy of a season, so the interesting cases are the
  * awkward ones - text with quotes and macrons in it, an empty app, a file from the
  * wrong app, and a file from a future build.
  */
@@ -150,8 +150,8 @@ class BackupFormatTest {
 
     @Test
     fun `a file written before assets existed keeps its ids`() {
-        // Verbatim what 0.5.0 wrote: tracks and trackId. The spray and default lists are keys this
-        // build no longer has, and a restore ignores them rather than refusing the file.
+        // Verbatim what 0.5.0 wrote: tracks and trackId. The lists this build no longer has
+        // are ignored rather than refusing the file.
         val v1 = """
             {
               "format": "trail-day-backup",
@@ -168,7 +168,7 @@ class BackupFormatTest {
 
         assertEquals(1, restored.version)
         assertEquals(7L, restored.assets.single().id)
-        assertEquals("the spray and default lists are ignored, not refused", 1, restored.assets.size)
+        assertEquals("the lists this build no longer has are ignored, not refused", 1, restored.assets.size)
     }
 
     @Test
@@ -219,7 +219,7 @@ class BackupFormatTest {
 
         assertEquals(1, summary.assets)
         assertEquals(1, summary.recordings)
-        assertEquals("1 asset, 1 recording", summary.describe())
+        assertEquals("1 place, 1 trip", summary.describe())
     }
 
     @Test

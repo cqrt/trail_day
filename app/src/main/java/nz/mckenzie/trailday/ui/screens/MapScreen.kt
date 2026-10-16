@@ -97,7 +97,7 @@ fun MapScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 // Settings is the map's own key and switches. What used to be words up here -
-                // Assets, Offline - are tabs in the bar below now, which is where a place belongs;
+                // Places, Offline - are tabs in the bar below now, which is where a place belongs;
                 // and the key is set once, so the icon is enough.
                 actions = {
                     IconButton(onClick = { layersOpen = true }) {
@@ -120,17 +120,17 @@ fun MapScreen(
                 basemap = basemap,
                 apiKey = apiKey,
                 assetGeoJson = geoJson,
-                // What the operator has switched off. The home map is the one these apply to: a
-                // screen that is about one asset, or about the spot being drawn, draws it
+                // What the walker has switched off. The home map is the one these apply to: a
+                // screen that is about one place, or about the spot being drawn, draws it
                 // whatever is hidden here.
                 hiddenLayers = hiddenLayers,
-                // The place names, which the operator asks for in the same sheet: this is the map
-                // they read the farm on, and "which town is that" is asked here rather than on a
-                // screen that is about one asset.
+                // The place names, which the walker asks for in the same sheet: this is the map
+                // they read the map on, and "which town is that" is asked here rather than on a
+                // screen that is about one place.
                 placeNames = placeNames,
                 // The marker for the phone is the map's own business now, so this screen
                 // says nothing about it: it draws where you are wherever a map is drawn.
-                // The operator's own tracks first; failing that, where the device is;
+                // The walker's own tracks first; failing that, where the device is;
                 // failing that, the neutral country-wide default.
                 fitBounds = initialFrame,
                 // Where "show me" last asked the camera to be. Null until they ask: the map
@@ -209,13 +209,13 @@ fun MapScreen(
  *
  * A sheet rather than a settings screen, because the question "why is that not on the map" is
  * asked while looking at the map, and is answered by switches in front of you. It also says what
- * it does not do: the drawing screen still draws what is being drawn, and an asset's own page
- * still draws that asset, whatever is switched off here - a switch that left one of those blank
+ * it does not do: the drawing screen still draws what is being drawn, and a place's own page
+ * still draws that place, whatever is switched off here - a switch that left one of those blank
  * would have gone too far.
  *
  * **The content scrolls, and it has to.** Ten layers with a line under each is already taller than
  * a phone's screen minus the bars, so the last row was being cut off at the bottom of the sheet -
- * and when the place names were added below them, that cut-off row was the one the operator was
+ * and when the place names were added below them, that cut-off row was the one the walker was
  * looking for. Opened at its full height (`skipPartiallyExpanded`) *and* scrollable is what makes
  * every switch reachable: the height is so that the sheet does not open halfway up the screen with
  * a scroll nobody has been told about, and the scroll is so that a sheet taller than the screen is
@@ -245,7 +245,7 @@ private fun LayersSheet(
             Text("What the map draws", style = MaterialTheme.typography.titleMedium)
             Text(
                 text = "Switch off what you do not need to see. The map remembers, and it is " +
-                    "only this map: a spot being drawn, or an asset's own page, still draws it.",
+                    "only this map: a spot being drawn, or a place's own page, still draws it.",
                 style = MaterialTheme.typography.bodySmall
             )
             AssetLayer.ALL.forEach { layer ->
@@ -267,7 +267,7 @@ private fun LayersSheet(
             }
 
             // The place names, which are the one thing here that starts *off*: everything else in
-            // this sheet is the work, which is why the operator opened the app. A town name is
+            // this sheet is the work, which is why the walker opened the app. A town name is
             // furniture over their own ground, so it is asked for rather than arrived - and the row
             // says where it comes from, because it is the one switch here that fetches anything new.
             HorizontalDivider()
@@ -289,7 +289,7 @@ private fun LayersSheet(
 }
 
 /**
- * What to say when the operator has asked where they are and the app cannot answer.
+ * What to say when the walker has asked where they are and the app cannot answer.
  *
  * A card rather than a toast, because the reason is worth reading and acting on - location is
  * switched off for the app, or off altogether - and it stays until it has been read.
@@ -322,7 +322,7 @@ private fun MissingKeyCard(onOpenSettings: () -> Unit, modifier: Modifier = Modi
                 text = stringResource(R.string.linz_key_missing),
                 style = MaterialTheme.typography.bodySmall
             )
-            // The one place where the missing key is the operator's problem, so the fix
+            // The one place where the missing key is the walker's problem, so the fix
             // is a tap away rather than buried in another screen.
             TextButton(onClick = onOpenSettings) { Text("Open settings") }
         }

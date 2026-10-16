@@ -17,7 +17,7 @@ enum class DocTrackSort {
  * The metres from [point] to the nearest vertex of this track, or null when it has no vertices.
  *
  * Nearest vertex rather than the track's middle: a long line that passes beside the phone is near the
- * phone, and a centroid would call it far away. That is the distance an operator means by "close".
+ * phone, and a centroid would call it far away. That is the distance a walker means by "close".
  */
 fun DocTrack.distanceM(point: GeoPoint): Double? =
     reading.paths.flatten()
@@ -52,7 +52,7 @@ fun List<DocTrack>.typesPresent(): List<String> =
  *
  * The service's own filter is a **bounding box**, and a box reaches its corners about 1.4 times its
  * half-width, so a "50 km" box can hand back a track whose nearest point is 70 km away - and a long
- * track that only clips the corner can stretch far beyond it. This is the circle the operator
+ * track that only clips the corner can stretch far beyond it. This is the circle the walker
  * actually asked for, applied to what the service returned.
  */
 fun List<DocTrack>.within(radiusM: Double, from: GeoPoint?): List<DocTrack> {

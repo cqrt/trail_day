@@ -50,7 +50,7 @@ abstract class RecordingDao {
     abstract suspend fun setStatus(sessionId: Long, status: String)
 
     /**
-     * Records which planned asset a session is for. The operator may pick the asset
+     * Records which planned asset a session is for. The walker may pick the asset
      * after starting to record, so this is not only set at creation.
      */
     @Query("UPDATE recorded_sessions SET assetId = :assetId WHERE id = :sessionId")
@@ -89,7 +89,7 @@ abstract class RecordingDao {
     /**
      * Which assets any recording names, one row per recording.
      *
-     * The whole-farm version of [countForAsset], for the state document: every asset's delete sentence
+     * The whole-map version of [countForAsset], for the state document: every asset's delete sentence
      * counts recordings, and asking per asset would be a query per track for a number that one read
      * gives for all of them.
      */
@@ -104,7 +104,7 @@ abstract class RecordingDao {
 
     // --- Pauses ---------------------------------------------------------------------
 
-    /** Opens a break: the operator has stopped, and nothing in between is claimed as driven. */
+    /** Opens a break: the walker has stopped, and nothing in between is claimed as driven. */
     @Insert
     abstract suspend fun insertBreak(row: RecordedBreakEntity): Long
 

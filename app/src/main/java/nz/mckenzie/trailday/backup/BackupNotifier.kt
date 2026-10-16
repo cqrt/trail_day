@@ -16,13 +16,13 @@ import nz.mckenzie.trailday.R
  *
  * A backup nobody hears about is a backup that has been failing since March. This is the
  * one notification the off-site feature sends unprompted, and it exists because silence is
- * the failure mode that costs a season: the operator believes they are covered.
+ * the failure mode that costs a season: the walker believes they are covered.
  *
  * Tapping it opens Settings, where the destination and the last backup are.
  */
 class BackupNotifier(private val context: Context) {
 
-    /** Returns false when the operator has notifications turned off for the app. */
+    /** Returns false when the walker has notifications turned off for the app. */
     @SuppressLint("MissingPermission") // With the permission missing, posting does nothing and says nothing.
     fun notify(title: String, body: String): Boolean {
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false

@@ -38,9 +38,9 @@ import nz.mckenzie.trailday.tracking.DevicePosition
  * The DOC Tracks browser: search DOC's track network, tick the ones you work, import them.
  *
  * Searching happens at DOC's service, not on the phone - the whole dataset is 3,255 tracks and the
- * operator wants a handful - so a search is a name and/or a place, and what comes back is a page of
+ * walker wants a handful - so a search is a name and/or a place, and what comes back is a page of
  * tracks. Importing one is the same `createAsset` every drawn or imported track goes through, so a
- * DOC track is a track like any other the moment it lands: it can be edited and sprayed.
+ * DOC track is a track like any other the moment it lands: it can be edited and walked.
  */
 class DocTracksViewModel(
     private val assets: AssetRepository,
@@ -90,11 +90,11 @@ class DocTracksViewModel(
     /** The phone's newest fix, for a row that wants to say how far away its track is. */
     val phoneFix: StateFlow<GeoPoint?> = fix
 
-    /** The kinds the operator has filtered to; empty is "no filter". */
+    /** The kinds the walker has filtered to; empty is "no filter". */
     private val _kinds = MutableStateFlow<Set<String>>(emptySet())
     val kinds: StateFlow<Set<String>> = _kinds
 
-    /** The track types the operator has filtered to - "One way", "Loop", and the like; empty is all. */
+    /** The track types the walker has filtered to - "One way", "Loop", and the like; empty is all. */
     private val _types = MutableStateFlow<Set<String>>(emptySet())
     val types: StateFlow<Set<String>> = _types
 
@@ -270,7 +270,7 @@ class DocTracksViewModel(
     }
 
     companion object {
-        /** How far around the phone a "Near me" search looks, until the operator says otherwise. */
+        /** How far around the phone a "Near me" search looks, until the walker says otherwise. */
         private const val DEFAULT_RADIUS_KM = 25.0
 
         /** How long the derived flows stay warm after the screen stops looking. */

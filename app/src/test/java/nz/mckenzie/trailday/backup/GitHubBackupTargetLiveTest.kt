@@ -54,11 +54,11 @@ class GitHubBackupTargetLiveTest {
         delete(FILE_NAME)
 
         try {
-            // The token, the repository, and whether a farm's records would be readable by
+            // The token, the repository, and whether your records would be readable by
             // anyone who came across the repository.
             val check = target.check()
             assertEquals(repo, check.fullName)
-            assertTrue("this check writes farm data, so it refuses a public repository", check.isPrivate)
+            assertTrue("this check writes your data, so it refuses a public repository", check.isPrivate)
             assertTrue("the token cannot write to $repo", check.canPush)
 
             // A repository with no backup in it yet is not an error.
@@ -90,7 +90,7 @@ class GitHubBackupTargetLiveTest {
     /**
      * Deletes the file with a direct call.
      *
-     * The app itself has no reason to delete a copy - the operator's history is the point of
+     * The app itself has no reason to delete a copy - the walker's history is the point of
      * a repository - so this lives here rather than in [GitHubBackupTarget], and the file is
      * removed by the test that made it.
      */

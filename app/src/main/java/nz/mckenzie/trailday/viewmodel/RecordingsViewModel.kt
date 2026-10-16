@@ -63,7 +63,7 @@ class RecordingsViewModel(
     fun delete(sessionId: Long) {
         viewModelScope.launch {
             runCatching { recordings.deleteRecording(sessionId) }
-                .onFailure { _message.value = it.message ?: "Could not delete the recording" }
+                .onFailure { _message.value = it.message ?: "Could not delete the trip" }
         }
     }
 

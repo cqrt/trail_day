@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Extremes of every planned asset's geometry. Null columns when there is no geometry
- * at all, which is how "nothing planned yet" is told apart from "assets at 0,0".
+ * at all, which is how "nothing planned yet" is told apart from "places at 0,0".
  */
 data class AssetPointBounds(
     val minLat: Double?,
@@ -61,7 +61,7 @@ abstract class AssetDao {
     /**
      * Every vertex of every asset, in one query, grouped by the caller.
      *
-     * For the two documents that are built for the whole farm at once - the GeoJSON the map draws and
+     * For the two documents that are built for the whole map at once - the GeoJSON the map draws and
      * the state document, which needs each asset's points to say which version of the line a desk was
      * handed. One query rather than one per asset: the desk asks for both documents on opening, and a
      * per-asset read would be a query per track for points the map is about to ask for anyway.

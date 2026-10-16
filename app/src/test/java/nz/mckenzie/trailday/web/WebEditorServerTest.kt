@@ -24,7 +24,7 @@ import java.net.URL
  * The editor's server, over a real socket.
  *
  * What is being held here is the gate and the shape of the answers, and the gate is the reason this
- * file exists: this server is a door into the operator's own data on the farm's Wi-Fi, so "403
+ * file exists: this server is a door into the walker's own data on the same Wi-Fi, so "403
  * without the token, the page included" is a claim that has to be proved rather than assumed. The
  * database is faked, because what the documents contain is [WebEditorJsonTest]'s business, and the
  * tile route is faked, because that route is [nz.mckenzie.trailday.offline.LocalTileServerTest]'s
@@ -222,7 +222,7 @@ class WebEditorServerTest {
             return when (id) {
                 IN_USE_ID -> WebEditorWrite.Refused(
                     WebEditorRefusal.IN_USE,
-                    "\"Estuary road\" has 3 sprays on the phone, so it is not deleted from here."
+                    "\"Estuary road\" has 3 trips on the phone, so it is not deleted from here."
                 )
                 MISSING_ID -> WebEditorWrite.Refused(WebEditorRefusal.MISSING, "no such track")
                 else -> WebEditorWrite.Removed("Estuary road is gone from the phone.")
@@ -315,7 +315,7 @@ class WebEditorServerTest {
             const val STALE_ID = 409L
             const val MISSING_ID = 404L
 
-            /** The id the fake will not delete, because there are sprays on it. */
+            /** The id the fake will not delete, because there are trips on it. */
             const val IN_USE_ID = 423L
         }
     }
@@ -355,7 +355,7 @@ class WebEditorServerTest {
     }
 
     /**
-     * A run with no token is the operator's own choice, and this is what it means: the gate claims
+     * A run with no token is the walker's own choice, and this is what it means: the gate claims
      * nothing, so everything is served to anything that can reach the port - a token left over from
      * an earlier run included, because a bookmark from yesterday is not a reason to refuse a door
      * that is not locked.
@@ -550,7 +550,7 @@ class WebEditorServerTest {
     }
 
     @Test
-    fun `a refusal keeps its own status and carries the words for the operator`() {
+    fun `a refusal keeps its own status and carries the words for the walker`() {
         start()
 
         val stale = send("/api/assets/${FakeData.STALE_ID}", "PUT", writeBody)
@@ -672,7 +672,7 @@ class WebEditorServerTest {
         // a refusal that says nothing has moved.
         assertEquals(409, inUse.code)
         assertTrue("the reason is the delete's own: ${inUse.body}", inUse.body.contains("\"reason\":\"in-use\""))
-        assertTrue("and the count is in the words: ${inUse.body}", inUse.body.contains("3 sprays"))
+        assertTrue("and the count is in the words: ${inUse.body}", inUse.body.contains("3 trips"))
     }
 
     @Test
@@ -721,7 +721,7 @@ class WebEditorServerTest {
     fun `a track file past the old quarter-megabyte limit still arrives whole`() {
         start()
 
-        // The operator's own long ride is the case: a GPX of a few hundred kilobytes, sent
+        // The walker's own long ride is the case: a GPX of a few hundred kilobytes, sent
         // base64-encoded, is past the half megabyte the socket used to take. The largest file the page
         // will now state is two megabytes, so a body carrying one is about 2.7 MB - comfortably under
         // the socket's own cap, and comfortably over what used to be a wall about the request rather

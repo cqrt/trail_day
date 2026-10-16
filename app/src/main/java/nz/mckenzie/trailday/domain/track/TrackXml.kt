@@ -12,7 +12,7 @@ import javax.xml.parsers.DocumentBuilderFactory
  *
  * Both formats are XML and both are read with the same hardened parser: namespace-aware, and with
  * DOCTYPE declarations and external entities refused, because a track file is data somebody else
- * wrote and it is opened from wherever the operator got it. Keeping that setup in one place means a
+ * wrote and it is opened from wherever the walker got it. Keeping that setup in one place means a
  * second reader cannot quietly be written with a laxer one.
  */
 internal fun xmlDocument(xml: String): Document {

@@ -131,7 +131,7 @@ class RecordingRepository(private val db: TrailDayDatabase) {
         recordingDao.getPoints(sessionId).map { it.toGeoPoint() }
 
     /**
-     * Opens a break: the operator has paused, so nothing between here and the moment they
+     * Opens a break: the walker has paused, so nothing between here and the moment they
      * carry on is claimed as driven.
      *
      * Written the instant the button is pressed rather than when the pass carries on,

@@ -29,7 +29,7 @@ sealed interface FeedResult {
             HttpURLConnection.HTTP_NOT_FOUND -> Answer(null)
 
             // GitHub says 403 when the hourly limit for this address is used up, and 429
-            // when it has seen too many requests, which is the same story to the operator.
+            // when it has seen too many requests, which is the same story to the walker.
             HttpURLConnection.HTTP_FORBIDDEN, TOO_MANY_REQUESTS ->
                 Failed("GitHub is not answering this phone at the moment (HTTP $status): try again later")
 

@@ -53,6 +53,6 @@ export function rememberTheme(storage, theme) {
   try {
     storage.setItem(THEME_KEY, theme);
   } catch (error) {
-    // Nothing to do about it and nothing to say: the operator loses a convenience, not their work.
+    // Nothing to do about it and nothing to say: the walker loses a convenience, not their work.
   }
 }

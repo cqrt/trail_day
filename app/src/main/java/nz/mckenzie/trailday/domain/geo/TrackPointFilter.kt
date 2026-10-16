@@ -2,8 +2,8 @@ package nz.mckenzie.trailday.domain.geo
 
 /**
  * Thresholds used to decide whether a raw GPS fix is good enough to append to a
- * recorded track. Defaults are tuned for spraying tracks from a vehicle or on
- * foot: fixes worse than 30 m are dropped, points closer than 3 m are treated as
+ * recorded track. Defaults are tuned for tracks recorded on foot or from a
+ * vehicle: fixes worse than 30 m are dropped, points closer than 3 m are treated as
  * jitter, and implausibly fast jumps are rejected.
  */
 data class PointFilterConfig(
@@ -47,7 +47,7 @@ class TrackPointFilter(
      * Carries the filter on from a recording that already exists.
      *
      * Used when collection starts again against a session that has fixes behind it -
-     * the process was killed mid-spray, or the screen the operator was watching was
+     * the process was killed mid-trip, or the screen the walker was watching was
      * re-created. The first fix after that is compared against the ground actually
      * covered, and the point count goes on from where the recording got to, rather
      * than restarting at one on a track that is already half recorded.

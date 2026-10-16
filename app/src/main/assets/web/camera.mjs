@@ -14,7 +14,7 @@
  * **The browser's own store, not the phone.** Where a particular desk is looking is the desk's own
  * business: two laptops open on the same phone are two views rather than one, and the phone's own map has
  * a camera of its own that a page has no business moving. The plan's rule is that the desk's only write
- * is an asset, and this keeps it - the memory never leaves the machine the operator is sitting at.
+ * is an asset, and this keeps it - the memory never leaves the machine the walker is sitting at.
  *
  * **Only the camera is kept.** The store outlives the page and is readable by anything else served from
  * the same address, so what goes in it is five numbers and nothing else: no token, no asset, no name.
@@ -49,7 +49,7 @@ const MAX_BEARING = 180;
  *
  * The first version of this file rounded the camera to a centimetre of ground and a thousandth of a zoom
  * step, on the argument that a position is not a measurement to sixteen digits. The runs that verified the
- * memory showed what that costs: an operator's desk came back to the same *place* and drew a different
+ * memory showed what that costs: a walker's desk came back to the same *place* and drew a different
  * *picture* - a few hundred pixels of difference, along the tracks, because a line put a hundredth of a
  * pixel from where it was lands on different pixels. Nearly the same view is not what was asked for, and
  * it makes "the page came back to where it was" a claim no picture can settle. So the numbers are kept as
@@ -125,7 +125,7 @@ export function remember(storage, camera) {
       pitch: camera.pitch
     }));
   } catch (error) {
-    // Nothing to do about it and nothing to say: the operator loses a convenience, not their work.
+    // Nothing to do about it and nothing to say: the walker loses a convenience, not their work.
   }
 }
 

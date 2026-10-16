@@ -31,7 +31,7 @@ export function visibleAssets(assets, needle, kind) {
  * The work's features, narrowed to the rows the desk is showing.
  *
  * The list and the map are one answer to one question. Naming a kind beside a map still drawing all
- * of the work is the page arguing with itself: an operator who has asked to see the buildings is
+ * of the work is the page arguing with itself: a walker who has asked to see the buildings is
  * looking at the map to see *where* they are, and forty tracks around them is the wrong answer. So
  * what narrows the list narrows the map - both the type and the typed words - and this is the one
  * place that does it.

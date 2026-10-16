@@ -9,7 +9,7 @@ import org.junit.Test
 /**
  * Searching the tracks downloaded for offline use.
  *
- * No place filter is applied here: a cache only holds the areas the operator downloaded, so the
+ * No place filter is applied here: a cache only holds the areas the walker downloaded, so the
  * download *is* the place filter - which is what lets an offline search be a name and nothing more.
  */
 class DocTrackCacheTest {

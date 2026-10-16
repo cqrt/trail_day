@@ -106,7 +106,7 @@ internal fun AppIcon(
                 line(0.64f, 0.55f, 0.50f, 0.86f)
             }
 
-            // The asset library: rows, the way they will read on the screen.
+            // The place library: rows, the way they will read on the screen.
             IconGlyph.ASSETS -> {
                 listOf(0.28f, 0.50f, 0.72f).forEach { y ->
                     line(0.40f, y, 0.82f, y)

@@ -13,7 +13,7 @@ import org.junit.Test
  * The first frame a map opens on.
  *
  * Three screens ask the same question - where is the phone? - and the answer has to be
- * quick and safe: quick, because it is the first thing the operator sees, and safe,
+ * quick and safe: quick, because it is the first thing the walker sees, and safe,
  * because a map that hangs waiting for a fix is worse than one showing the country.
  *
  * This exists because the drawing and recording screens did not ask at all, and opened

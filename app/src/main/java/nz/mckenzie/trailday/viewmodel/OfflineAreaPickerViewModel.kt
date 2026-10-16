@@ -134,7 +134,7 @@ class OfflineAreaPickerViewModel(
 
     init {
         viewModelScope.launch {
-            // Open over the operator: their position, else the middle of their tracks.
+            // Open over the walker: their position, else the middle of their tracks.
             val fix = withTimeoutOrNull(LOCATION_TIMEOUT_MS) {
                 runCatching { locationSource.currentLocation() }.getOrNull()
             }
@@ -250,7 +250,7 @@ class OfflineAreaPickerViewModel(
                         _saved.value = true
                     }
                     // A download that stopped short still kept what arrived, so say both and stay,
-                    // so the operator can see it rather than being sent back with half an answer.
+                    // so the walker can see it rather than being sent back with half an answer.
                     is DocDownloadResult.Failed ->
                         _docMessage.value = "${result.message} ${docDownloadedMessage(result.tracks.size)}"
                 }

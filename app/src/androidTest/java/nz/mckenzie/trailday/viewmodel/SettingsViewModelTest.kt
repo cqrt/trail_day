@@ -233,7 +233,7 @@ class SettingsViewModelTest {
             viewModel.check.first { it is KeyCheckState.Failed }
         } as KeyCheckState.Failed
         assertTrue(
-            "the operator should read why, not just \"failed\": ${state.message}",
+            "the walker should read why, not just \"failed\": ${state.message}",
             state.message.contains("expired")
         )
     }
@@ -324,7 +324,7 @@ class SettingsViewModelTest {
      *
      * The same two halves as the token switch above, and the second is again the one worth having: a
      * run holds the phone awake in the way it was built with, so a switch thrown while one is going
-     * has to build that run again. Turning it on is the operator's own answer to a phone that sleeps
+     * has to build that run again. Turning it on is the walker's own answer to a phone that sleeps
      * through the desk's browsing, and it costs battery - which is exactly why the answer is theirs.
      */
     @Test
@@ -367,7 +367,7 @@ class SettingsViewModelTest {
      * The serving switch: the one that decides whether the desk comes up on its own.
      *
      * On when unset, and turning it off has to be **written down** - a phone that came back serving
-     * after the operator had said no would be the app putting itself back on the network against
+     * after the walker had said no would be the app putting itself back on the network against
      * their answer, which is the one thing a default may not do. The service is told in the same tap
      * and told *after* the write, so what is on disk is never behind what was just asked for: a phone
      * put down mid-press comes back agreeing with the switch.
@@ -398,7 +398,7 @@ class SettingsViewModelTest {
         // What the next launch reads is the answer rather than the default, which is the whole
         // reason the choice is stored at all.
         assertEquals(
-            "a launch after the operator said no must not find the desk on",
+            "a launch after the walker said no must not find the desk on",
             false,
             settings.webEditorEnabled.first()
         )

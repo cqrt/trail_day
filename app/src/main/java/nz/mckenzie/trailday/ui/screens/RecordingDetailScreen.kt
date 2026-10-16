@@ -43,7 +43,7 @@ import nz.mckenzie.trailday.viewmodel.RecordingDetailViewModel
 import kotlin.math.abs
 
 /**
- * One recording in full: the line that was walked or ridden, and which place it followed.
+ * One trip in full: the line that was walked or ridden, and which place it followed.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -72,7 +72,7 @@ fun RecordingDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(detail?.name ?: "Recording") },
+                title = { Text(detail?.name ?: "Trip") },
                 navigationIcon = { IconButton(onClick = onBack) { AppIcon(IconGlyph.BACK, contentDescription = "Back") } }
             )
         }
@@ -138,8 +138,8 @@ fun RecordingDetailScreen(
                             Text(
                                 text = when {
                                     recording.assetName != null -> "Followed for ${recording.assetName}"
-                                    recording.assetId != null -> "Its asset has since been deleted"
-                                    else -> "Not linked to a planned asset"
+                                    recording.assetId != null -> "Its place has since been deleted"
+                                    else -> "Not linked to a planned place"
                                 },
                                 style = MaterialTheme.typography.bodySmall
                             )
@@ -154,7 +154,7 @@ fun RecordingDetailScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    DestructiveOutlinedButton(text = "Delete recording", onClick = { confirmingDelete = true })
+                    DestructiveOutlinedButton(text = "Delete trip", onClick = { confirmingDelete = true })
                 }
             }
         }
@@ -163,7 +163,7 @@ fun RecordingDetailScreen(
     if (confirmingDelete) {
         AlertDialog(
             onDismissRequest = { confirmingDelete = false },
-            title = { Text("Delete this recording?") },
+            title = { Text("Delete this trip?") },
             text = {
                 Text(
                     "Its points go with it. This cannot be undone."

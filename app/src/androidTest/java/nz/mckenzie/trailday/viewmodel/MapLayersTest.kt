@@ -144,7 +144,7 @@ class MapLayersTest {
      * The one switch in that sheet that starts **off**, and the one that fetches something new.
      *
      * Everything else there is a layer of the work, which is why the app was opened; the names are
-     * furniture over the operator's own ground, and their tiles come from the internet on the way
+     * furniture over the walker's own ground, and their tiles come from the internet on the way
      * past - so the map draws what it already holds until somebody asks for more.
      */
     @Test

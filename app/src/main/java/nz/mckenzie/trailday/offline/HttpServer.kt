@@ -241,7 +241,7 @@ data class HttpRequest(
      * The body, decoded, or null when the request carried none.
      *
      * Text rather than bytes because the only body either server takes is a JSON document from the
-     * editor's page, and because bytes and characters part company the moment an operator types a
+     * editor's page, and because bytes and characters part company the moment a walker types a
      * macron into a track's name - which is why the declared length is counted in one of them and
      * the reading is counted in the other, down in `readBody`.
      */

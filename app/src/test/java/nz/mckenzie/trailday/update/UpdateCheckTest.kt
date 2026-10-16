@@ -14,7 +14,7 @@ import org.junit.Test
  * The decision inside one update check: is there something to install, and is it worth
  * saying so?
  *
- * Telling an operator about the same release every day would get the notification turned
+ * Telling a walker about the same release every day would get the notification turned
  * off, which costs them every later one - so "said once, and only when it was really said"
  * is the behaviour most worth pinning down here.
  */
@@ -89,7 +89,7 @@ class UpdateCheckTest {
 
         assertNotNull("there is something to install", outcome.available)
         assertEquals(AppVersion(0, 6, 3), outcome.available?.version)
-        assertTrue("and the operator was told", outcome.notified)
+        assertTrue("and the walker was told", outcome.notified)
         assertEquals("once", 1, h.announced.size)
         assertEquals("0.6.3", h.store.saved)
         assertTrue(

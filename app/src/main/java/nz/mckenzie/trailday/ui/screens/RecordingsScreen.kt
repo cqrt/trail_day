@@ -33,10 +33,10 @@ import nz.mckenzie.trailday.viewmodel.RecordingRow
 import nz.mckenzie.trailday.viewmodel.RecordingsViewModel
 
 /**
- * Every GPS recording on the device, newest first.
+ * Every GPS trip on the device, newest first.
  *
- * A recording is a walk or a ride, and it deliberately outlives the place it was
- * recorded against - so a recording whose place has been deleted is still listed,
+ * A trip is a walk or a ride, and it deliberately outlives the place it was
+ * recorded against - so a trip whose place has been deleted is still listed,
  * and says so.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,7 +51,7 @@ fun RecordingsScreen(
     var confirmingDelete by remember { mutableStateOf<RecordingRow?>(null) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Recordings") }) },
+        topBar = { TopAppBar(title = { Text("Trips") }) },
         bottomBar = { TrailDayNavBar(current = Tab.RECORDINGS, onSelect = onOpenTab) }
     ) { innerPadding ->
         Column(
@@ -71,8 +71,8 @@ fun RecordingsScreen(
             if (sessions.isEmpty()) {
                 EmptyState(
                     glyph = IconGlyph.RECORDINGS,
-                    title = "No recordings yet",
-                    body = "A recording is a walk or a ride: the line that was actually " +
+                    title = "No trips yet",
+                    body = "A trip is a walk or a ride: the line that was actually " +
                         "followed. Start one from the Record tab and it appears here.",
                     actionLabel = "Record a line",
                     onAction = { onOpenTab(Tab.RECORD) }
@@ -95,7 +95,7 @@ fun RecordingsScreen(
     confirmingDelete?.let { row ->
         AlertDialog(
             onDismissRequest = { confirmingDelete = null },
-            title = { Text("Delete this recording?") },
+            title = { Text("Delete this trip?") },
             text = {
                 Text(
                     "${row.name}: ${row.pointCount} points, " +
@@ -128,7 +128,7 @@ private fun RecordingListRow(row: RecordingRow, onOpen: () -> Unit, onDelete: ()
         },
         supportingContent = {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                // A recording still running says so, because that is what the operator is
+                // A trip still recording says so, because that is what the walker is
                 // looking for when they scroll back to find it.
                 recordingStatus(row)?.let { Text(it) }
                 Text(recordingDetail(row))
@@ -155,9 +155,9 @@ internal fun recordingDetail(row: RecordingRow): String =
     "${formatDate(row.startedAtEpochMs)} \u00b7 ${formatDistance(row.distanceM)} \u00b7 " +
         "${formatDuration(row.durationMs)} \u00b7 ${row.pointCount} points"
 
-/** Which asset a recording was made for, or that the link to it is gone. */
+/** Which place a trip was made for, or that the link to it is gone. */
 internal fun recordingAsset(row: RecordingRow): String = when {
     row.assetName != null -> "For ${row.assetName}"
-    row.assetWasDeleted -> "Its asset has since been deleted"
-    else -> "Not linked to an asset"
+    row.assetWasDeleted -> "Its place has since been deleted"
+    else -> "Not linked to a place"
 }

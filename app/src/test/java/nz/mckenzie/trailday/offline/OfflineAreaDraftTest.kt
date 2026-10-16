@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The maths behind the area picker: what the operator is told a download will cost,
+ * The maths behind the area picker: what the walker is told a download will cost,
  * while they are still choosing it.
  */
 class OfflineAreaDraftTest {
@@ -18,7 +18,7 @@ class OfflineAreaDraftTest {
     private val northEast = GeoPoint(-46.4100, 168.3550)
 
     /**
-     * A farm-sized block, ~11 km across. Cost tests need this: a 1 km box is one tile
+     * A large block, ~11 km across. Cost tests need this: a 1 km box is one tile
      * at both zoom 12 and zoom 13, which shows nothing about the fourfold step.
      */
     private fun bigDraft(minZoom: Int = 12, maxZoom: Int = 12) = OfflineAreaDraft(
@@ -136,7 +136,7 @@ class OfflineAreaDraftTest {
     }
 
     @Test
-    fun `the estimate is shown in the units an operator reads`() {
+    fun `the estimate is shown in the units a walker reads`() {
         val single = draft(minZoom = 12, maxZoom = 12)
         val deeper = bigDraft(minZoom = 10, maxZoom = 16)
 

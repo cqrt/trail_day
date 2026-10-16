@@ -9,7 +9,7 @@ sealed interface AssetEditResult {
     /** The asset to store. */
     data class Ok(val asset: AssetEntity) : AssetEditResult
 
-    /** What to tell the operator, in words that say what to fix. */
+    /** What to tell the walker, in words that say what to fix. */
     data class Invalid(val message: String) : AssetEditResult
 }
 

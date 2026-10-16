@@ -59,7 +59,7 @@ class TrackPointFilterTest {
     fun `implausible jumps are rejected as speed outliers`() {
         val filter = TrackPointFilter()
         assertTrue(filter.accept(point(timeMs = 0L)))
-        // ~111 m north in 1 second - not a spray vehicle.
+        // ~111 m north in 1 second - not a vehicle.
         assertFalse(filter.accept(point(lat = 0.001, timeMs = 1_000L)))
         assertEquals(1, filter.rejectedSpeedCount)
         assertEquals(1, filter.acceptedCount)

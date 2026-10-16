@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * only way to prove real imagery lands is to fetch some.
  *
  * The scratch directory is deliberately under `cacheDir`, never the app's real
- * tile store: a test must not wipe offline imagery the operator downloaded.
+ * tile store: a test must not wipe offline imagery the walker downloaded.
  */
 @RunWith(AndroidJUnit4::class)
 class OfflineAreaManagerTest {

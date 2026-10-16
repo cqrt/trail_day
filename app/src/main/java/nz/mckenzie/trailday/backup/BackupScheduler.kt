@@ -22,8 +22,8 @@ object BackupScheduler {
     /**
      * Once a week.
      *
-     * A season does not change by the hour, and what this costs the operator is their data
-     * allowance on a farm connection - so this is the shortest period that is still honestly
+     * A season does not change by the hour, and what this costs the walker is their data
+     * allowance on a slow connection - so this is the shortest period that is still honestly
      * called protection. Days are aligned so it does not run at an awkward hour.
      */
     private const val PERIOD_DAYS = 7L

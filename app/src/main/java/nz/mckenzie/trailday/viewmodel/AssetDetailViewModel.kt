@@ -40,7 +40,7 @@ class AssetDetailViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
     /**
-     * Which map to draw under the work: the operator's choice in Settings.
+     * Which map to draw under the work: the walker's choice in Settings.
      *
      * Read here rather than handed in per screen, so a map added later cannot quietly ignore it.
      */

@@ -61,9 +61,9 @@ import nz.mckenzie.trailday.viewmodel.RecordingViewModel
  * Records a walk or a ride.
  *
  * Location is requested here (rather than at app launch) so the permission prompt
- * arrives with an obvious reason. Choosing a place turns the recording into one that
+ * arrives with an obvious reason. Choosing a place turns the trip into one that
  * followed that line: the recorded line is drawn as it is made, and finishing saves
- * the recording with its soft link to the place.
+ * the trip with its soft link to the place.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,7 +101,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
         pendingTrackName?.let { assetNameDraft = it }
     }
 
-    // The pass that has just been saved is on the card while the operator is here to see it -
+    // The pass that has just been saved is on the card while the walker is here to see it -
     // that is what stops Save looking like it wiped the work - and is given up when they leave:
     // another tab, back to the map, or the app put down.
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.onScreenLeft() }
@@ -144,10 +144,10 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                 basemap = basemap,
                 apiKey = apiKey,
                 assetGeoJson = geoJson,
-                // Recording starts where the operator is, not on a view of the country.
+                // Recording starts where the walker is, not on a view of the country.
                 fitBounds = initialFrame,
                 // While a pass is being driven the map keeps the phone in the middle, so the
-                // operator can see the line they are on without touching the screen. A drag
+                // walker can see the line they are on without touching the screen. A drag
                 // takes the map off them - see the follow control - and nothing else moves it.
                 follow = followPhone,
                 onFollowBroken = viewModel::onMapPanned,
@@ -155,11 +155,11 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
             )
 
             // Following, and whether it is on. The map follows a pass by itself, so the
-            // question the operator actually has is the one this answers at a glance: is it
+            // question the walker actually has is the one this answers at a glance: is it
             // following me or not?
             //
             // Only while the pass is being driven. Paused, the map deliberately does not follow
-            // - the operator is stopped, with both hands free and the map theirs to read - so a
+            // - the walker is stopped, with both hands free and the map theirs to read - so a
             // control that said "Following the phone" while nothing moved was telling them
             // something untrue. Resume turns following back on by itself.
             if (state.status == RecordingStatus.RECORDING) {
@@ -360,9 +360,9 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "The line you recorded is saved as an asset, so it appears on " +
-                            "the Assets page. Cancelling leaves the recording going, so the line " +
-                            "can be named whenever you finish.",
+                        text = "The line you recorded is saved as a place, so it appears on " +
+                            "the Places page. Cancelling leaves the trip still recording, so the " +
+                            "line can be named whenever you finish.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     OutlinedTextField(

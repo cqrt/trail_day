@@ -38,7 +38,7 @@ import nz.mckenzie.trailday.viewmodel.DrawAssetViewModel
 
 /**
  * Draws a track by tapping the basemap, showing the running length so an
- * operator can sanity-check the line before saving it.
+ * walker can sanity-check the line before saving it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,7 +98,7 @@ fun DrawAssetScreen(viewModel: DrawAssetViewModel, onBack: () -> Unit) {
                 basemap = basemap,
                 apiKey = apiKey,
                 assetGeoJson = geoJson,
-                // Drawing happens where the operator is standing, so that is the frame.
+                // Drawing happens where the walker is standing, so that is the frame.
                 fitBounds = initialFrame,
                 onMapClick = { latitude, longitude, radiusM, onTheLineRadiusM ->
                     viewModel.addPoint(latitude, longitude, radiusM, onTheLineRadiusM)

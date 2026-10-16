@@ -345,7 +345,7 @@ class WebEditorEditTest {
     @Test
     fun `a new asset ignores a version, because it has nothing to be stale against`() {
         // The page builds both bodies with one function, so a create arrives carrying the version of
-        // whatever card the operator had been looking at. There is no row to compare it with: the
+        // whatever card the walker had been looking at. There is no row to compare it with: the
         // only thing that version could refuse is the making of a new track, which is nobody's intent.
         val withVersion = draftBody().dropLast(1) + ""","version":"a-card-from-before"}"""
 

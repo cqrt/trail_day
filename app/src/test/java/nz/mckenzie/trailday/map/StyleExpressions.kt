@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * The expression shapes MapLibre refuses, found in a style document before it is handed over.
  *
  * **Why this exists.** A style MapLibre refuses is not a warning on a map: the desk shows a blank
- * rectangle where the farm should be, and the only report of it is a line in a console nobody opens.
+ * rectangle where the map should be, and the only report of it is a line in a console nobody opens.
  * That is not hypothetical - v0.6.97 shipped `["literal", "city", "town"]`, where a `literal` takes
  * **one** argument and that argument is the array, and the operator's desk said
  * *"The map could not be drawn: layers[3].filter[2]: 'literal' expression requires exactly one

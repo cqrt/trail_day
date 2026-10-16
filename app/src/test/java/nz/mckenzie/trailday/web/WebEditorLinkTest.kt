@@ -6,10 +6,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Which address the operator is told to open, and what a token is.
+ * Which address the walker is told to open, and what a token is.
  *
- * This is the decision that decides whether the switch works at all: a phone on the farm's Wi-Fi
- * usually holds a mobile-data address too, and handing the operator that one produces a page that
+ * This is the decision that decides whether the switch works at all: a phone on the same Wi-Fi
+ * usually holds a mobile-data address too, and handing the walker that one produces a page that
  * never loads with nothing on screen explaining why. So the picking is a pure function of what the
  * interfaces say, and these are the cases that matter.
  */
@@ -91,7 +91,7 @@ class WebEditorLinkTest {
 
     @Test
     fun `a run with no token has no token in its address`() {
-        // What the operator reads off the card and types: no secret, and nothing left on the end
+        // What the walker reads off the card and types: no secret, and nothing left on the end
         // that looks like one. It is the same URL either way, which is why the card's address can
         // be copied and pasted as it stands.
         assertEquals(

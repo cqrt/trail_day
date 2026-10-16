@@ -80,7 +80,7 @@ class MapGeometryRefreshTest {
     @Test
     fun theCameraIsNotFramedOnThePhoneWhileTheTracksAreStillLoading(): Unit = runBlocking {
         // A track at 41.5S, and a phone that answers from 45S. The tracks must win the
-        // first frame: the frame is applied once, so getting it wrong means the operator
+        // first frame: the frame is applied once, so getting it wrong means the walker
         // opens the map a long way from their work and stays there.
         assetRepository.createAsset("Home block", homeLine)
         val viewModel = MapViewModel(

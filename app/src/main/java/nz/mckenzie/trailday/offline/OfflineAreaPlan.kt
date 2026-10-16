@@ -30,7 +30,7 @@ data class OfflineAreaPlan(
 
     companion object {
         /**
-         * Zoom 10-16 keeps a spray block in the tens of megabytes while still
+         * Zoom 10-16 keeps a walking area in the tens of megabytes while still
          * showing individual tracks clearly. The low zooms cost almost nothing
          * (one tile covers a whole block at zoom 10) but they matter: an offline
          * pack that starts at zoom 12 cannot render the zoom-11 overview the app

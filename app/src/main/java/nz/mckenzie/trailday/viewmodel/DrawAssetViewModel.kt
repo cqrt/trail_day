@@ -67,7 +67,7 @@ class DrawAssetViewModel(
     val apiKey: StateFlow<String> = settingsRepository.linzApiKey
         .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
-    /** Which map to draw the line on: the operator's choice in Settings. */
+    /** Which map to draw the line on: the walker's choice in Settings. */
     val basemap: StateFlow<Basemap> = settingsRepository.basemap
         .stateIn(viewModelScope, SharingStarted.Eagerly, Basemap.DEFAULT)
 
@@ -91,7 +91,7 @@ class DrawAssetViewModel(
      * Opens a track that is already drawn: its geometry, what it is, and a frame around it.
      *
      * The frame is the **track**, not the phone. Changing a line is not drawing where you are standing:
-     * the operator is looking at a track drawn weeks ago, and may be nowhere near it - which is the
+     * the walker is looking at a track drawn weeks ago, and may be nowhere near it - which is the
      * whole reason this screen can now be opened from the track's own page.
      */
     private suspend fun openForEditing(assetId: Long) {
@@ -115,7 +115,7 @@ class DrawAssetViewModel(
      *
      * A place is one coordinate and a two-vertex line is a straight edge, so the box is widened by the
      * same 0.01° the phone's own frame uses - about a kilometre each way. Opening the map onto a
-     * zero-area box would drop the operator at the deepest zoom the tiles have, looking at one pixel.
+     * zero-area box would drop the walker at the deepest zoom the tiles have, looking at one pixel.
      */
     private fun frameAround(points: List<GeoPoint>): LatLngBounds? {
         if (points.isEmpty()) return null
@@ -325,7 +325,7 @@ class DrawAssetViewModel(
         // wherever the finger landed. This is what makes a junction reachable in the middle of a track: the
         // point goes into the line there - a junction has to be a vertex of the line - and the next "Side
         // track" hangs the spur off it. Both tolerances are the map's own answers for the zoom the
-        // operator is working at.
+        // walker is working at.
         //
         // Two things keep this from swallowing the taps that meant to carry the line on, which is what it
         // did from v0.6.34 to v0.6.40 - a point counted, and nothing drawn:
@@ -376,7 +376,7 @@ class DrawAssetViewModel(
             _message.value = "Draw the track a little further first: a side track leaves it somewhere."
             return
         }
-        // The junction the operator tapped on, or the end of the line: a junction that is no longer a vertex
+        // The junction the walker tapped on, or the end of the line: a junction that is no longer a vertex
         // of the line (an Undo can take it away) falls back to the end rather than hanging a spur off nothing.
         val at = _junction.value?.takeIf { it in line.indices } ?: line.lastIndex
         _paths.value = _paths.value + listOf(listOf(line[at]))
@@ -402,7 +402,7 @@ class DrawAssetViewModel(
      * Takes the last point off.
      *
      * The point that *started* a side track is the line's own vertex, so taking it off takes the side
-     * track with it and hands the operator back to the line - which is what undoing it meant.
+     * track with it and hands the walker back to the line - which is what undoing it meant.
      */
     fun undo() {
         val paths = _paths.value
@@ -430,7 +430,7 @@ class DrawAssetViewModel(
     /**
      * What is saved is the track as it stands: the line, and every side track that got far enough
      * to be one. A side track still being drawn is dropped rather than refused - a single tap on
-     * the map is not something the operator meant to keep, and the line is what they came to save.
+     * the map is not something the walker meant to keep, and the line is what they came to save.
      */
     private fun normalisedPaths(): List<List<GeoPoint>> =
         _paths.value.filterIndexed { index, path -> index == 0 || path.size >= 2 }
@@ -468,7 +468,7 @@ class DrawAssetViewModel(
     /**
      * Writes a changed track back, and nothing else.
      *
-     * The geometry is **replaced**, the whole of it, because that is what the operator has just been
+     * The geometry is **replaced**, the whole of it, because that is what the walker has just been
      * looking at: the paths they moved and the spurs they added are the track now. One write means a
      * length can never belong to a shape it did not come from - `replaceGeometry` stores the vertices
      * and the length they add up to in one transaction, exactly as it does for a track drawn from

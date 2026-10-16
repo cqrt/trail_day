@@ -30,7 +30,7 @@ object BasemapStyles {
      * than broken, because there is nowhere to get the letters from.
      *
      * [placeNamesUrl] is where LINZ's place-name tiles come from - see [PlaceLabels] - or null when the
-     * operator has not asked for them. **Both** are needed: names are drawn where there is a server to
+     * walker has not asked for them. **Both** are needed: names are drawn where there is a server to
      * fetch the tiles from and letters to write them with, so a style pointed straight at a provider
      * draws no names at all rather than drawing boxes.
      */
@@ -109,7 +109,7 @@ object BasemapStyles {
      * Two things are the map's rather than the app's, and deliberately: a name that will not fit
      * without touching another is **dropped** rather than drawn on top of it (the opposite of how the
      * app treats its own track names, which are never allowed to vanish) - because a place name is
-     * furniture the operator did not ask for by name, and a screen of overlapping town names is worse
+     * furniture the walker did not ask for by name, and a screen of overlapping town names is worse
      * than a town name that is not there yet. Everything else - the size, when it appears, the colours,
      * the outline - comes from [PlaceLabels], so both maps write a town the same way.
      */

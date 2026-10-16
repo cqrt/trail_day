@@ -44,13 +44,13 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
      * Whether the app serves the editor to a computer - the first switch on the card.
      *
      * Stored, and **on when unset**. Stored because the two questions a card like this asks are
-     * different ones: this is what the operator asked for, and the address under it is what is
+     * different ones: this is what the walker asked for, and the address under it is what is
      * actually happening. On, because the desk is how the work gets drawn, and a switch that has to
      * be thrown on the phone before a man can sit down at the computer is a switch that stops the
      * feature being used - which is why the phone now serves from the moment the app is opened.
      *
      * The default is also why turning it off has to be remembered: a phone restarted into serving,
-     * after the operator said no, would be the app putting itself back on the farm's network, and
+     * after the walker said no, would be the app putting itself back on the network, and
      * that is not a thing a default may do.
      */
     private val webEditorEnabledPref = booleanPreferencesKey("web_editor_enabled")
@@ -86,7 +86,7 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     fun hasBuildTimeKey(): Boolean = BuildConfig.LINZ_API_KEY.isNotBlank()
 
     /**
-     * Which map the operator draws under the work.
+     * Which map the walker draws under the work.
      *
      * Aerial imagery by default, which is what every existing install has been looking at: a new
      * basemap is an addition to the app, not a change to somebody's maps mid-season. The list of
@@ -140,12 +140,12 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     /**
      * Whether LINZ's place names are drawn over the imagery - the map's own "Place names" switch.
      *
-     * **Off when unset**, and the argument is what the app is for: the operator is looking at their
+     * **Off when unset**, and the argument is what the app is for: the walker is looking at their
      * own paddock, and a town name over it is something asked for rather than something that
      * arrives. It is also the honest default for a layer whose tiles are fetched from the internet
      * on the way past: until somebody asks, this app draws what it already holds and nothing more.
      *
-     * Stored, because it is a property of the map rather than of a visit - an operator who has asked
+     * Stored, because it is a property of the map rather than of a visit - a walker who has asked
      * to see which town that is wants the answer tomorrow too. See
      * [nz.mckenzie.trailday.domain.tiles.PlaceLabels] for where the names come from, and why they
      * cost nothing to look at twice: the tiles are kept in the same store as the imagery.
@@ -163,14 +163,14 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
      * can open it".
      *
      * **Off when unset.** That reverses the promise this switch shipped with in v0.6.25, and the
-     * argument for reversing it is the network it is served on: the desk is for the farm's own Wi-Fi,
-     * where every device on it is the operator's, so the secret buys them little and costs them a
+     * argument for reversing it is the network it is served on: the desk is for your own Wi-Fi,
+     * where every device on it is the walker's, so the secret buys them little and costs them a
      * paste - while a switch that has to be found and turned on before the desk can be used is a
      * switch that stops the desk being used. What it costs is said on the card in as many words:
      * with it off, anyone on the Wi-Fi can open the editor and change the tracks.
      *
      * Turned on, it is what stops the other devices on the Wi-Fi - a visitor's phone, a tablet in the
-     * ute, a printer - and, more to the point, any web page open on the operator's own computer, from
+     * ute, a printer - and, more to the point, any web page open on the walker's own computer, from
      * reaching a door that can change and delete the work. None of that is a router's business, which
      * is why the token is what makes the switch safe to throw on a network nobody vouches for.
      */
@@ -183,7 +183,7 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     }
 
     /**
-     * Whether the operator wants the editor served - the card's first switch.
+     * Whether the walker wants the editor served - the card's first switch.
      *
      * The other half of the same question: the address on the card says what is happening, and this
      * says what was asked for. Both are needed, because "on by default" and "off stays off" cannot
@@ -205,7 +205,7 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
      * a lot more than one that is allowed to sleep, and most of the work at the desk fetches nothing -
      * it is read, drawn, and saved from what the phone already holds.
      *
-     * On is for the case the operator hits when the computer browses onto ground the phone has never
+     * On is for the case the walker hits when the computer browses onto ground the phone has never
      * downloaded. That is the one thing the desk cannot answer out of the phone's own store: the phone
      * has to go to LINZ for it, and a phone whose screen has gone off is a phone whose radio is going
      * to sleep - and no lock the app may hold reliably stops that. Half an hour still and unplugged it
@@ -240,7 +240,7 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     }
 
     /**
-     * The version the operator has already been told about.
+     * The version the walker has already been told about.
      *
      * Remembered so a daily check does not become a daily notification about the same
      * release. Stored rather than inferred, so it survives a restart.
@@ -255,7 +255,7 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     /**
      * Where the off-site copy goes. Off by default.
      *
-     * Not on by default because the off-site half needs something from the operator - a
+     * Not on by default because the off-site half needs something from the walker - a
      * file to write to, or a repository and a token - and a setting that looks enabled and
      * quietly does nothing is worse than one that is plainly off.
      */
@@ -296,7 +296,7 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
         }
     }
 
-    /** The file the operator chose, as a `Uri` string. Empty when none has been chosen. */
+    /** The file the walker chose, as a `Uri` string. Empty when none has been chosen. */
     val backupFileUri: Flow<String> =
         context.settingsDataStore.data.map { prefs -> prefs[backupFileUriPref].orEmpty() }
 
@@ -304,7 +304,7 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     val backupFileName: Flow<String> =
         context.settingsDataStore.data.map { prefs -> prefs[backupFileNamePref].orEmpty() }
 
-    /** Records the file the operator chose, with its name, in one write. */
+    /** Records the file the walker chose, with its name, in one write. */
     suspend fun setBackupFile(uri: String, name: String) {
         context.settingsDataStore.edit { prefs ->
             if (uri.isBlank()) {
@@ -322,7 +322,7 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
      *
      * Weekly, not daily: a backup is protection against losing a season, and a season does
      * not change by the hour a man is on a tractor. Off by default, and only ever on with a
-     * destination chosen, because what it costs the operator is their data allowance.
+     * destination chosen, because what it costs the walker is their data allowance.
      */
     val backUpAutomatically: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
         prefs[backUpAutomaticallyPref] ?: false

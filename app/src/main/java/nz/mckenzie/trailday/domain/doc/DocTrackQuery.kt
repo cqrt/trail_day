@@ -12,7 +12,7 @@ import kotlin.math.cos
  * that can answer them without downloading all 3,255 tracks. A name is a substring match on
  * `TechObjectName`; [near] with [radiusKm] is an envelope around a fix; [bounds] is the map's own
  * view, for a desk that has panned to the paddock it means. [bounds] wins when it is given, because
- * it is the operator's own answer to "where".
+ * it is the walker's own answer to "where".
  */
 data class DocTrackQuery(
     val nameContains: String = "",

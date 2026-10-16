@@ -18,7 +18,7 @@ import nz.mckenzie.trailday.domain.tiles.withMinimumSpan
 /**
  * The place list, its geometry, and the shape of a place.
  *
- * "Asset" is the wider word on purpose: the list holds tracks, huts, campsites and the walker's own
+ * The list holds tracks, huts, campsites and the walker's own
  * waypoints, and they differ only in their kind and shape.
  */
 class AssetRepository(
@@ -29,7 +29,7 @@ class AssetRepository(
 
     // --- Assets ----------------------------------------------------------------------
 
-    /** The places the operator works from, name-ordered. */
+    /** The places the walker works from, name-ordered. */
     fun observeActiveAssets(): Flow<List<AssetEntity>> = assetDao.observeActiveAssets()
 
     fun observeAsset(assetId: Long): Flow<AssetEntity?> = assetDao.observeAsset(assetId)
@@ -51,7 +51,7 @@ class AssetRepository(
     /**
      * Every asset's geometry, keyed by asset id, in one query.
      *
-     * The two whole-farm documents the desk reads both need this: the GeoJSON is the geometry, and
+     * The two whole-map documents the desk reads both need this: the GeoJSON is the geometry, and
      * the state document needs it to say which version of a line a card was handed. An asset with no
      * geometry simply has no key, which the callers read as "nothing drawn" - the same as an empty
      * [AssetGeometry] from [getAssetGeometry].
@@ -61,25 +61,25 @@ class AssetRepository(
             .groupBy(keySelector = { it.assetId }, valueTransform = { it })
             .mapValues { (_, rows) -> rows.toAssetGeometry() }
 
-    /** How many recordings name this asset. Part of what a delete would take with it. */
+    /** How many trips name this place. Part of what a delete would take with it. */
     suspend fun recordingCountFor(assetId: Long): Int = recordingDao.countForAsset(assetId)
 
     /**
-     * How many recordings name each asset, for the whole farm at once.
+     * How many trips name each place, for the whole map at once.
      *
-     * The document's own version of [recordingCountFor]: every asset on the desk carries a sentence
+     * The document's own version of [recordingCountFor]: every place on the desk carries a sentence
      * about what deleting it would take, and one read of the recordings says that for all of them.
-     * Assets nothing is recorded against are simply absent, which the caller reads as none - the same
-     * as a zero from the single-asset count.
+     * Places nothing is recorded against are simply absent, which the caller reads as none - the same
+     * as a zero from the single-place count.
      */
     suspend fun recordingCounts(): Map<Long, Int> =
         recordingDao.assetIds().groupingBy { it }.eachCount()
 
     /**
-     * The box containing every planned asset, if there is any geometry yet. Used to
-     * centre things on the operator's own work rather than a guessed location.
+     * The box containing every planned place, if there is any geometry yet. Used to
+     * centre things on the walker's own work rather than a guessed location.
      *
-     * A farm whose only asset is a place comes back as a frame rather than as a single
+     * A map whose only place is a single spot comes back as a frame rather than as a single
      * coordinate: see [withMinimumSpan], which is what stops every map that opens on this -
      * the map itself, the offline picker, the desk - being asked for a box with no size.
      */

@@ -120,7 +120,7 @@ object TileServerHolder {
      * The cache directory rather than the app's own files, and the difference is the one
      * [store] draws for the drawn map: nothing here is downloaded on purpose yet, so it is not a
      * thing to carry in a backup or to keep under storage pressure - it is what the map picked up on
-     * its way past. Anywhere the operator has looked at, the names are there for good; anywhere they
+     * its way past. Anywhere the walker has looked at, the names are there for good; anywhere they
      * have not, they arrive as they look at it.
      */
     fun labelsStore(context: Context): OfflineTileStore = OfflineTileStore(
@@ -134,7 +134,7 @@ object TileServerHolder {
      * The two live in different places on purpose, and it is the licence that decides it:
      *
      *  - **Aerial imagery** goes in the app's own files as it always has, because it is the thing
-     *    offline areas are downloaded *into*: deliberate, kept until the operator clears it, and
+     *    offline areas are downloaded *into*: deliberate, kept until the walker clears it, and
      *    carried in a phone backup with everything else. The path is unchanged, so a season of
      *    downloaded imagery is not re-fetched by this feature existing.
      *  - **Any other basemap** is a cache of what has been looked at, so it goes in the cache

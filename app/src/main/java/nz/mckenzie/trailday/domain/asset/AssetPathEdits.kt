@@ -15,7 +15,7 @@ sealed interface AssetPathResult {
     /** The paths to store, line first and its side tracks after it, already cleaned up. */
     data class Ok(val paths: List<List<GeoPoint>>) : AssetPathResult
 
-    /** What to tell the operator, in words that say what to fix. */
+    /** What to tell the walker, in words that say what to fix. */
     data class Invalid(val message: String) : AssetPathResult
 }
 
@@ -35,7 +35,7 @@ object AssetPathEdits {
      * How many vertices one line may have.
      *
      * A drawn track is tens of points; a track that came off a recording or a handheld is a few
-     * thousand, and the operator's own export of a twelve-kilometre ride was 3,282. So this is a
+     * thousand, and the walker's own export of a twelve-kilometre ride was 3,282. So this is a
      * bound on what the phone will draw and measure from one desk write, set well above what a real
      * track holds rather than around a small one: a file the phone's own import would take must not
      * be refused here for its size. Twenty thousand vertices is about 800 KB of wire - a fifth of
@@ -56,14 +56,14 @@ object AssetPathEdits {
      * Vertices that repeat exactly are dropped, which is what a double click on one spot means. The
      * comparison is exact on purpose: the desktop snaps a vertex onto another by copying its
      * coordinates, so two vertices that are meant to be the same place *are* the same two numbers,
-     * while two vertices a hair apart are the operator's own doings - a
+     * while two vertices a hair apart are the walker's own doings - a
      * [nz.mckenzie.trailday.domain.geo.TrackPointFilter]-style rounding belongs where a recording is
      * filtered, not here, where it would silently move a line somebody drew.
      *
      * **A side track has one rule of its own**: it has to start *on* the line it hangs off. Not near
      * it - on it. The phone's own drawing snaps the first vertex of a side track onto a vertex of the
      * line, so the join is the very same pair of numbers in both paths, and a path whose first vertex
-     * is on nothing is a stray line the operator cannot see the join of. A line with one point is
+     * is on nothing is a stray line the walker cannot see the join of. A line with one point is
      * therefore the only thing a side track may not be.
      */
     fun applyPaths(shape: AssetShape, paths: List<List<GeoPoint>>): AssetPathResult {
@@ -88,7 +88,7 @@ object AssetPathEdits {
         if (total > MAX_POINTS) {
             return AssetPathResult.Invalid(
                 "That is $total points, and the phone keeps up to $MAX_POINTS on one " +
-                    "track. A track that came off a recording is filtered on the phone instead."
+                    "track. A track that came off a trip is filtered on the phone instead."
             )
         }
 

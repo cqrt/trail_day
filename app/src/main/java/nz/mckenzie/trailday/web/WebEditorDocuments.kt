@@ -59,7 +59,7 @@ class WebEditorDocuments(
     /**
      * Whether the desk should draw LINZ's place names - the phone's own "Place names" switch, read
      * at the moment the style is asked for rather than fixed when the run is built, because a style
-     * is asked for on every page load and the operator may have changed their mind in between.
+     * is asked for on every page load and the walker may have changed their mind in between.
      */
     private val placeNames: suspend () -> Boolean = { false },
     /** One file of the page, from the APK's own assets, or null when it ships no such file. */
@@ -79,7 +79,7 @@ class WebEditorDocuments(
 
     override suspend fun state(authority: String): String {
         val work = activeAssets()
-        // Once for the farm rather than once per asset: every record carries the version of the line
+        // Once for the map rather than once per asset: every record carries the version of the line
         // it was handed and a sentence about what deleting it would take, and both are built from
         // these two reads.
         val paths = assets.allAssetGeometry()
@@ -105,7 +105,7 @@ class WebEditorDocuments(
 
     override suspend fun assets(): String {
         val work = activeAssets()
-        // One read for every asset's vertices rather than a query each: the whole farm is what this
+        // One read for every asset's vertices rather than a query each: the whole map is what this
         // document is, and the state document asks for the same read in the same breath.
         val paths = assets.allAssetGeometry()
 
@@ -267,7 +267,7 @@ class WebEditorDocuments(
      */
     override suspend fun gpx(body: String?): WebEditorWrite {
         // A body the phone cannot read is not an empty file: it is a request made of something else,
-        // and saying "there was no track in that" would send the operator looking at the file.
+        // and saying "there was no track in that" would send the walker looking at the file.
         val file = WebEditorEdits.readTrackFile(body) ?: return refused(
             WebEditorRefusal.INVALID,
             "That request did not carry a track file, so nothing was read."
@@ -360,7 +360,7 @@ class WebEditorDocuments(
      *
      * The geometry the search returned comes straight back and is created by the same `createAsset`
      * every drawn track goes through - so a DOC track is an asset like any other the moment it lands,
-     * and there is no second trip to DOC that could put a different line on the farm. The whole request
+     * and there is no second trip to DOC that could put a different line on the map. The whole request
      * is capped: a page that asked to import a thousand tracks is a page to refuse, not to obey.
      */
     override suspend fun docImport(body: String?): WebEditorWrite {
@@ -420,7 +420,7 @@ class WebEditorDocuments(
      * One asset as the wire carries it, with the two reads its record needs.
      *
      * The geometry for the version, and the recordings for the delete sentence. Both are single-asset
-     * reads on purpose: this answers one write about one asset, where the whole-farm reads in `state`
+     * reads on purpose: this answers one write about one asset, where the whole-map reads in `state`
      * would be work nobody asked for.
      */
     private suspend fun recordOf(item: AssetEntity): WebEditorAssetRecord =

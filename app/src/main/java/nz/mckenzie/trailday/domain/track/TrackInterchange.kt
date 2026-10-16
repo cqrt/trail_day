@@ -16,7 +16,7 @@ import nz.mckenzie.trailday.domain.geo.GeoPoint
  * The format is not the caller's business: a `{` or `[` says GeoJSON, and an XML root of `<kml>` or
  * `<gpx>` says which XML reader to use, and every one of them hands back the same kind of paths.
  * It decides nothing itself: the paths it hands back are the paths to store, and what to say about
- * the file is left to the caller, whose words are the ones the operator is looking at.
+ * the file is left to the caller, whose words are the ones the walker is looking at.
  *
  * **A file may hold more than one track.** A GeoJSON FeatureCollection is a set of named tracks, and
  * each feature becomes its own asset rather than being flattened with the rest - see [readFile]. A
@@ -38,7 +38,7 @@ object TrackInterchange {
          *
          * Kept apart from "no side tracks" on purpose: a file that never had a second path and a
          * file whose second path starts somewhere else entirely are both read as one line, and
-         * only the second is worth telling the operator about. False for a file that became side
+         * only the second is worth telling the walker about. False for a file that became side
          * tracks, because none of its paths were flattened.
          */
         val segmentsDidNotMeet: Boolean

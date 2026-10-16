@@ -9,7 +9,7 @@ import kotlin.math.min
 /**
  * An offline area being chosen on the map, before anything is downloaded.
  *
- * Pure data plus tile maths, so the cost the operator sees while moving a zoom slider
+ * Pure data plus tile maths, so the cost the walker sees while moving a zoom slider
  * is unit tested rather than discovered on a hillside with one bar of signal.
  */
 data class OfflineAreaDraft(

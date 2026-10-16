@@ -14,13 +14,13 @@ import nz.mckenzie.trailday.R
 /**
  * Posts "there is a newer version".
  *
- * Tapping it opens Settings, which is where the update is. The operator asked to be told,
- * not to have a download start behind their back on a farm connection - so the notification
+ * Tapping it opens Settings, which is where the update is. The walker asked to be told,
+ * not to have a download start behind their back on a slow connection - so the notification
  * is news, and the tap that follows is the decision.
  */
 class UpdateNotifier(private val context: Context) {
 
-    /** Returns false when the operator has notifications turned off for the app. */
+    /** Returns false when the walker has notifications turned off for the app. */
     @SuppressLint("MissingPermission") // With the permission missing, posting does nothing and says nothing.
     fun notify(title: String, body: String): Boolean {
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false
@@ -29,7 +29,7 @@ class UpdateNotifier(private val context: Context) {
 
         // A request code of its own, because pending intents are matched without their
         // extras: sharing the reminder's code would mean this one replacing the reminder's
-        // "open the asset list" tap with "open Settings", or the other way round.
+        // "open the place list" tap with "open Settings", or the other way round.
         val openSettings = PendingIntent.getActivity(
             context,
             REQUEST_CODE,
