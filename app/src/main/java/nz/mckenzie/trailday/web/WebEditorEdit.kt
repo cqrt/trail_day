@@ -8,7 +8,6 @@ import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetPathEdits
 import nz.mckenzie.trailday.domain.asset.AssetPathResult
 import nz.mckenzie.trailday.domain.asset.AssetShape
-import nz.mckenzie.trailday.domain.asset.BulkAssetEdits
 import nz.mckenzie.trailday.domain.asset.SprayMethod
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
@@ -29,6 +28,12 @@ import java.util.Base64
  * hand. A field the desk does not send cannot be lost, because the edit is applied to the row as
  * the phone holds it now and the repository writes that row back: the desk cannot overwrite a
  * last-sprayed date or an archived flag it never heard of.
+ *
+ * **And the fields the desk no longer shows are the row's own.** The block, the spray method, the
+ * interval, the swath width, the pass count and the pass separation are read straight off [current]
+ * and handed to [AssetEdits] as they are, so a save from the desk cannot wipe any of them by not
+ * mentioning it - which is the one rule this arrangement has to keep. Only a name, a kind, the notes
+ * and the drawing ever come from the body.
  *
  * **Why a fingerprint and not a version column.** The desk has to be able to say "I am changing the
  * asset I read" and the phone has to be able to answer "that is not the asset you read any more".
@@ -54,18 +59,16 @@ import java.util.Base64
  *
  * Every number arrives as the text the field held, for the reason [AssetEdits] exists: what a
  * blank, a comma or a stray space means is decided in one place, and it is not decided here.
+ *
+ * Only what the desk actually shows is here. The block, the method, the interval, the swath width,
+ * the pass count and the pass separation are left out on purpose: they are the phone's own, the desk
+ * never touches them, and [WebEditorEdits.judge] puts the row's current values back where the rules
+ * expect them.
  */
 @Serializable
 data class WebEditorEdit(
     val name: String,
     val kind: String,
-    val method: String,
-    /** The block the field named, or absent for an asset on its own. */
-    val blockName: String? = null,
-    val intervalDays: String,
-    val swathWidthM: String = "",
-    val passesRequired: Int = AssetEntity.DEFAULT_PASSES_REQUIRED,
-    val passSeparationM: String = "",
     val notes: String? = null,
     /**
      * The line the desk has drawn, when this write is about where the asset goes.
@@ -112,50 +115,6 @@ data class WebEditorPoint(
      */
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val altitudeM: Double? = null
-)
-
-/**
- * The same edit made to several assets at once, as the desk sends it.
- *
- * One form's worth of values and the rows it is about, in one body, because the two together are what
- * the request *means*: there is no edit without fields and no edit without a row to put them on, and a
- * body that named rows and no values would be a write asking the phone to guess.
- *
- * Every row quotes its own version, so the same one-at-a-time guarantee an ordinary save has holds for
- * the whole batch: a track changed on the phone while the list was ticked stops the request rather than
- * being written over with what the desk last saw.
- */
-@Serializable
-data class WebEditorBulkEdit(
-    /** What the operator ticked, in the order it was ticked - the order they are changed in, too. */
-    val assets: List<WebEditorBulkEntry> = emptyList(),
-    val fields: WebEditorBulkFields? = null
-)
-
-/** One row of a bulk edit: which asset, and the fingerprint of the row the desk read. */
-@Serializable
-data class WebEditorBulkEntry(val id: Long, val version: String)
-
-/**
- * The fields a bulk edit puts on every row, in the same text an ordinary edit sends.
- *
- * One shape with no "absent means unchanged": the desk fills in, for every field it did not tick, the
- * value that row already has - which it knows, because the row came from the phone in the first place.
- * That is deliberate, because it makes a bulk edit and a single edit **the same judgement**: the same
- * [nz.mckenzie.trailday.ui.AssetEdits] call, the same sentences, one row at a time. A second shape with
- * holes in it would be a second set of rules about what a missing field means.
- */
-@Serializable
-data class WebEditorBulkFields(
-    val name: String = "",
-    val kind: String = "",
-    val method: String = "",
-    val blockName: String = "",
-    val intervalDays: String = "",
-    val swathWidthM: String = "",
-    val passesRequired: Int = AssetEntity.DEFAULT_PASSES_REQUIRED,
-    val passSeparationM: String = "",
-    val notes: String = ""
 )
 
 /**
@@ -277,14 +236,6 @@ sealed interface WebEditorWrite {
      * the work again rather than being handed each new asset.
      */
     data class DocImported(val count: Int, val message: String) : WebEditorWrite
-
-    /**
-     * Several assets changed together, and the phone's own sentence about it.
-     *
-     * The whole set, or this would be a [Refused]: there is no partial answer to a bulk edit, which is
-     * the point of sending one request rather than six.
-     */
-    data class EditedTogether(val count: Int, val message: String) : WebEditorWrite
 
     data class Refused(val refusal: WebEditorRefusal, val message: String) : WebEditorWrite
 }
@@ -420,7 +371,7 @@ object WebEditorEdits {
             )
         }
 
-        return judge(edit, current)
+        return judge(edit, current, blockName)
     }
 
     /**
@@ -428,13 +379,15 @@ object WebEditorEdits {
      *
      * Judged against a blank row so every rule still comes from the phone: [AssetEdits] is handed a
      * row with nothing in it, which is what a new asset is, and answers in its own words about the
-     * name it was not given, the interval that is not a number, and so on. The id is the repository's
-     * to issue and the date is the phone's clock rather than the laptop's.
+     * name it was not given. The blank row's own defaults are the phone's starting values for a new
+     * place, so the interval, method and pass count the desk never sends are the ones the phone fills
+     * in for itself. The id is the repository's to issue and the date is the phone's clock rather than
+     * the laptop's.
      */
     fun create(body: String?, nowEpochMs: Long): WebEditorCreateResult {
         val edit = parse(body) ?: return CreateRefused(UNREADABLE)
 
-        val judged = judge(edit, AssetEntity(name = "", createdAtEpochMs = nowEpochMs))
+        val judged = judge(edit, AssetEntity(name = "", createdAtEpochMs = nowEpochMs), null)
         return when (judged) {
             is WebEditorEditResult.Refused ->
                 WebEditorCreateResult.Refused(judged.refusal, judged.message)
@@ -457,104 +410,20 @@ object WebEditorEdits {
     }
 
     /**
-     * The same edit on several assets, judged whole.
-     *
-     * **Every row is judged before any is written**, which is the whole reason this exists rather than
-     * the desk sending six ordinary edits: a loop of six saves refuses on the fourth and leaves three
-     * changed with nothing on the screen saying which. The judgement itself is
-     * [nz.mckenzie.trailday.domain.asset.BulkAssetEdits]'s - this only reads the body, hands it the
-     * rows and turns the answer into the wire's own outcomes.
-     *
-     * [current] and [paths] are the phone's reads, handed in rather than reached for, so this stays
-     * pure enough to test without a database; [save] is the one write, and it is only reached with rows
-     * that have already been judged.
-     */
-    suspend fun editTogether(
-        body: String?,
-        current: suspend (Long) -> BulkAssetEdits.AssetRow?,
-        paths: suspend (Long) -> List<List<GeoPoint>>,
-        save: suspend (List<BulkAssetEdits.AssetEdit>) -> Unit
-    ): WebEditorWrite {
-        val bulk = parseBulk(body) ?: return WriteRefused(
-            "That edit could not be read, so nothing was changed."
-        )
-        val fields = bulk.fields ?: return WriteRefused(
-            "That edit did not say what to change, so nothing was changed."
-        )
-
-        val outcome = BulkAssetEdits.apply(
-            entries = bulk.assets.map { BulkAssetEdits.Entry(id = it.id, version = it.version) },
-            fields = BulkAssetEdits.Fields(
-                name = fields.name,
-                kind = fields.kind,
-                method = fields.method,
-                blockName = fields.blockName,
-                intervalDays = fields.intervalDays,
-                swathWidthM = fields.swathWidthM,
-                passesRequired = fields.passesRequired,
-                passSeparationM = fields.passSeparationM,
-                notes = fields.notes
-            ),
-            find = current,
-            paths = paths,
-            // What a fingerprint is made of belongs here rather than in the rules about fields: one
-            // asset's own edit and a bulk edit must compare the desk's quote against the same thing.
-            isCurrent = { entry, row, geometry ->
-                entry.version == WebEditorVersion.of(row.asset, row.blockName, geometry)
-            },
-            save = save
-        )
-
-        return when (outcome) {
-            is BulkAssetEdits.Outcome.Edited -> WebEditorWrite.EditedTogether(
-                count = outcome.count,
-                message = BulkAssetEdits.editedMessage(outcome.count)
-            )
-            is BulkAssetEdits.Outcome.Stale -> WriteRefused(
-                "Somebody changed one of those tracks on the phone while they were open here, so " +
-                    "nothing was changed. Reload the page and try again.",
-                WebEditorRefusal.STALE
-            )
-            is BulkAssetEdits.Outcome.Unreadable -> WriteRefused(outcome.message)
-            is BulkAssetEdits.Outcome.Missing -> WriteRefused(
-                "There is no track or place with that number on the phone, so nothing was changed.",
-                WebEditorRefusal.MISSING
-            )
-            is BulkAssetEdits.Outcome.Refused -> WriteRefused(
-                // Named, because "a field is wrong" is no help at all about six rows: the sentence says
-                // which asset stopped it, in the app's own words about the field.
-                "\"${outcome.name}\": ${outcome.message}",
-                WebEditorRefusal.INVALID
-            )
-        }
-    }
-
-    /**
-     * A refusal about a bulk edit, which is a write's refusal rather than an edit's.
-     *
-     * The two refusal types are one sentence and one status each and exist apart because one is the
-     * answer to a body being judged and the other the answer to a request; a bulk edit is the second.
-     */
-    private fun WriteRefused(
-        message: String,
-        refusal: WebEditorRefusal = WebEditorRefusal.INVALID
-    ): WebEditorWrite = WebEditorWrite.Refused(refusal, message)
-
-    /** The bulk body, or null when it is not JSON or is not shaped like one. */
-    private fun parseBulk(body: String?): WebEditorBulkEdit? {
-        if (body.isNullOrBlank()) return null
-        return runCatching { json.decodeFromString(WebEditorBulkEdit.serializer(), body) }.getOrNull()
-    }
-
-    /**
      * The row a body describes, added to [current] and judged by the app's own rules.
      *
      * One function for both writes on purpose: a new asset and an edit of one differ in the row they
      * are applied to and in whether a version must be quoted, and in nothing else. Two copies of
      * these rules would be two copies to keep in step, and the one that fell behind would be
      * whichever of the two writes is the rarer.
+     *
+     * **Every field the desk no longer shows is taken from [current]**, so a save that does not
+     * mention the block, the method, the interval, the swath width, the pass count or the pass
+     * separation writes each row's own value straight back. That is the one rule this whole
+     * arrangement has to keep: a desk save cannot wipe them by not mentioning them. For a new asset
+     * [current] is a blank row, and its defaults are the phone's starting values.
      */
-    private fun judge(edit: WebEditorEdit, current: AssetEntity): WebEditorEditResult {
+    private fun judge(edit: WebEditorEdit, current: AssetEntity, blockName: String?): WebEditorEditResult {
 
         // Named states rather than typed ones, so an unknown name is a refusal and not a silent
         // fallback onto a default: a kind the page made up must not become a track. "Infrastructure"
@@ -564,19 +433,19 @@ object WebEditorEdits {
         // still edits a fenceline as a fenceline, and what it writes back is the settled kind.
         val kind = AssetKind.known(edit.kind, AssetShape.fromStorage(current.shape))
             ?: return Refused("The phone does not know what kind of thing \"${edit.kind}\" is.")
-        val method = SprayMethod.entries.firstOrNull { it.name == edit.method }
-            ?: return Refused("The phone does not know a spray method called \"${edit.method}\".")
 
         val fields = AssetEditFields(
             name = edit.name,
-            groupName = edit.blockName.orEmpty(),
+            groupName = blockName.orEmpty(),
             kind = kind,
-            method = method,
-            intervalDays = edit.intervalDays,
-            swathWidthM = edit.swathWidthM,
+            // Each read off the row the phone holds now, and as the number it is rather than rounded:
+            // the desk shows none of these, so the row's own are what its edit keeps, to the bit.
+            method = SprayMethod.fromStorage(current.method),
+            intervalDays = current.intervalDays.toString(),
+            swathWidthM = current.swathWidthM?.toString().orEmpty(),
             notes = edit.notes.orEmpty(),
-            passesRequired = edit.passesRequired,
-            passSeparationM = edit.passSeparationM
+            passesRequired = current.passesRequired,
+            passSeparationM = current.passSeparationM?.toString().orEmpty()
         )
 
         // The app's own answer, message and all. The row it hands back is the row the phone holds

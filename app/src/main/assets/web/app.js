@@ -1,10 +1,10 @@
 /*
  * The desk: the phone's own work, drawn and changed on a computer.
  *
- * It draws, and it writes four things: the details of a track or a place, the line a track follows, a
- * track that did not exist until somebody drew it, and - when there is nothing recorded against it - its
- * removal. What a write may hold, what a refusal says, and what a block name becomes are all decided on
- * the phone, in Kotlin, by the same rules the app's own screens use. This page fills a form in, draws a
+ * It draws, and it writes four things: the details of a place - its name, its kind and its notes - the
+ * line a track follows, a track that did not exist until somebody drew it, and - when there is nothing
+ * recorded against it - its removal. What a write may hold and what a refusal says are decided on the
+ * phone, in Kotlin, by the same rules the app's own screens use. This page fills a form in, draws a
  * line, and sends them.
  *
  * The drawing itself - the handles, the drags, the undo stack - is `edit.js`, with the arithmetic in
@@ -13,10 +13,15 @@
  *
  * Everything it shows comes from the phone on the same Wi-Fi, and it shows it without deciding anything
  * itself: the style is the one the phone builds (the same layer ids, the same dashes, the same houses),
- * the features are the ones the phone's own map draws, a due colour is whatever colour the phone painted
- * that feature, the form's options are the phone's own words, and whether a track may be deleted at all
- * is the phone's own answer. So there is one place in the world that decides what "due soon" looks like,
- * what a track may be called and what may go, and this file is not it.
+ * the features are the ones the phone's own map draws, a line's colour is the colour of its kind, the
+ * form's choices are the phone's own words, and whether a place may be deleted at all is the phone's
+ * own answer. So there is one place in the world that decides what a track may be called and what may
+ * go, and this file is not it.
+ *
+ * **What is not here is the phone's business.** When a place is next due, the block it sits in, how it
+ * is sprayed, how often, how wide, how many passes, how many times it has been over and what was in
+ * the tank are all fields the desk neither shows nor sends - so a save from this page cannot wipe any
+ * of them. See `WebEditorEdit` for where the phone keeps them.
  */
 
 const params = new URLSearchParams(location.search);
@@ -73,7 +78,7 @@ const { DARK, LIGHT, recallTheme, rememberTheme } = await import(
  * the phone's own word for it, and a word kept here as well as on the phone is a word that falls behind
  * - which is what made a building read as "building, a place".
  */
-const { kindText, methodText } = await import(
+const { kindText } = await import(
   TOKEN ? `./words.mjs?k=${encodeURIComponent(TOKEN)}` : './words.mjs'
 );
 
@@ -99,11 +104,11 @@ const { visibleAssets, visibleFeatures } = await import(
 );
 
 /**
- * What the whole farm comes to: the phone's own corner box, on a desk. The counts, the figures and
- * the words for a figure are all the phone's own, and the module is pure for the same reason
- * `find.mjs` is: the arithmetic is a rule, and a rule that a test can pin cannot drift.
+ * The phone's own words for a figure: "850 m" and "420 m²", on a desk. The formatter is the phone's
+ * own (`formatDistance` and `formatArea`), and the module is pure for the same reason `find.mjs` is:
+ * the words for a figure are a rule, and a rule that a test can pin cannot drift.
  */
-const { areaText, farmStats, farmStatsLines, metresText } = await import(
+const { areaText, metresText } = await import(
   TOKEN ? `./stats.mjs?k=${encodeURIComponent(TOKEN)}` : './stats.mjs'
 );
 
@@ -138,17 +143,6 @@ const { elevationChart, elevationWords } = await import(
  */
 const { docImportBody, docKindsOf, docSearchNote, docSearchPath, docShowing, docTypesOf } = await import(
   TOKEN ? `./doc.mjs?k=${encodeURIComponent(TOKEN)}` : './doc.mjs'
-);
-
-/**
- * Changing several assets with one form: which rows are picked, and what one form can say about them.
- *
- * The arithmetic behind a bulk edit - what a field means when it is about six assets, and the request
- * that carries them - is a rule rather than a screen, so it is a module node can run, like `find.mjs`
- * and `stats.mjs` beside it.
- */
-const { DIFFERENT, NOTHING, bulkBody, bulkFields, commonValue, picked, toggle } = await import(
-  TOKEN ? `./together.mjs?k=${encodeURIComponent(TOKEN)}` : './together.mjs'
 );
 
 /**
@@ -330,21 +324,6 @@ async function addPlaceIcon(map, name, markerDp) {
 }
 
 
-function dateText(epochMs) {
-  return epochMs ? new Date(epochMs).toLocaleDateString() : '';
-}
-
-/** When it is due, in the words an operator would use, from the phone's own arithmetic. */
-function dueText({ dueStatus, daysUntilDue }) {
-  if (dueStatus === 'NEVER_SPRAYED') return 'Never sprayed';
-  if (dueStatus === 'OVERDUE') {
-    return daysUntilDue === -1 ? 'One day overdue' : `${-daysUntilDue} days overdue`;
-  }
-  if (daysUntilDue === 0) return 'Due today';
-  if (daysUntilDue === 1) return 'Due tomorrow';
-  return `Due in ${daysUntilDue} days`;
-}
-
 let map;
 let state;
 let strokeById = new Map();
@@ -391,16 +370,6 @@ let workFeatures = null;
 let shownAssets = [];
 
 /**
- * The assets ticked in the list, in the order they were ticked.
- *
- * By **id** rather than by record, so the set survives every redraw: the list is drawn again for a
- * keystroke in the search box, a new type, a save and a reload, and a tick that went with the redraw
- * would be a tick the operator has to make again every time they narrow the list - which is the very
- * thing they are doing in order to find the rows they want to change.
- */
-let selectedIds = [];
-
-/**
  * The map's own data: the work, narrowed to what the desk is showing.
  *
  * The phone still sends everything, and everything stays in `featuresById` for the card, the colours
@@ -434,7 +403,7 @@ async function boot() {
 
     // The list is drawn from the phone's answer, before and regardless of the map. The work is what
     // this page is for and the map is the picture of it, so a browser that cannot draw the map - an
-    // old machine, WebGL switched off - still gets the list, the due dates and the card.
+    // old machine, WebGL switched off - still gets the list and the card.
     renderList();
 
     // Where this desk was looking when it was last open, if anywhere. Handed to the map as it is built
@@ -720,73 +689,12 @@ function placePhone(position) {
 let featuresById = new Map();
 
 /**
- * The farm at a glance: the phone's own corner box, on a desk.
+ * The work as a list, in the phone's own words.
  *
- * The whole farm, whatever the list below has been narrowed to: the box answers "what is there and
- * what needs doing about all of it", which is a question about the farm rather than about the typing.
- * Everything in it is the phone's own - the counts and the figures from `stats.mjs`, which is the
- * phone's own arithmetic, and the dots from the state document's own traffic light - so a desk and a
- * phone held side by side give one answer.
- */
-function fillFarmBox() {
-  const box = document.getElementById('farm');
-  const items = state?.assets ?? [];
-  box.hidden = !items.length;
-  if (!items.length) {
-    box.textContent = '';
-    return;
-  }
-
-  const stats = farmStats(items);
-  box.textContent = '';
-
-  const count = document.createElement('p');
-  count.className = 'count';
-  count.textContent = `${stats.count} asset${stats.count === 1 ? '' : 's'}`;
-  box.append(count);
-
-  // The key, one row per state. The colour comes from the document rather than from a feature
-  // because a state nothing is in has no feature to be painted by, and the row is there anyway -
-  // the phone's own box says "Overdue 0" rather than going quiet about it.
-  const key = [
-    ['Overdue', stats.overdue, 'OVERDUE'],
-    ['Due soon', stats.dueSoon, 'DUE_SOON'],
-    ['Not due', stats.notDue, 'NOT_DUE']
-  ];
-  for (const [label, amount, status] of key) {
-    const row = document.createElement('p');
-    row.className = 'key-row';
-    const dot = document.createElement('span');
-    dot.className = 'dot';
-    dot.style.background = state.dueColours?.[status] || '#757575';
-    row.append(dot, `${label} ${amount}`);
-    box.append(row);
-  }
-
-  const lines = farmStatsLines(stats);
-  if (lines.length) {
-    box.append(document.createElement('hr'));
-    for (const line of lines) {
-      const figure = document.createElement('p');
-      figure.className = 'stat';
-      figure.textContent = line;
-      box.append(figure);
-    }
-  }
-}
-
-/**
- * The work as a list, grouped by block.
- *
- * A block is how the work is talked about on a farm - "the estuary block" is a road, a lagoon and
- * three tracks - and forty names in one column is not a plan. What an asset is due is said in words
- * beside its name, and its colour is the colour the phone painted it: taken from the feature the map
- * is drawing, rather than from a second copy of the palette in this file.
- *
- * A row is read across: the name, how it is sprayed, how many passes that takes, and when it is next
- * due. The method and the passes are the two the desk used to keep behind a card, and they are in the
- * list because "which of these is a knapsack job, and which takes two passes" is a question asked of the
- * whole list rather than of one track at a time - the two things that decide how the day is planned.
+ * What an asset is, said beside its name, and its colour is the colour of its kind: taken from the
+ * feature the map is drawing, rather than from a second copy of the palette in this file. The list is
+ * narrowed by the search box and the type beside it - see `find.mjs` - and there is nothing else on a
+ * row, because everything else a place holds is the phone's business rather than the desk's.
  */
 function renderList() {
   document.getElementById('search').addEventListener('input', drawList);
@@ -795,9 +703,6 @@ function renderList() {
   // The same list, in the box in the map's corner: which kind a drawing is being made as. Filled here
   // because this is where the state document first has answers to give.
   fillDrawingKinds();
-  // The farm at a glance, from the same document and at the same moment: the box is the phone's
-  // own answer about the whole farm, and this is where that answer first arrives.
-  fillFarmBox();
   drawList();
 }
 
@@ -826,8 +731,6 @@ function fillTypeChoices() {
   });
 }
 
-const OTHERS = 'On their own';
-
 function drawList() {
   const list = document.getElementById('list');
   // What was typed, and which type is picked beside it; blank is *Anything*. The rule that turns the
@@ -842,80 +745,33 @@ function drawList() {
   // is given. Everywhere the desk changes its mind - a keystroke, a type, a save - comes through here.
   paintWork();
 
-  const shown = shownAssets;
+  const shown = [...shownAssets].sort((a, b) => a.asset.name.localeCompare(b.asset.name));
 
   list.textContent = '';
-
-  // The words over the columns go with the work: a column of "Boom" and a column of "2" say nothing at
-  // all without the word over each, and an empty list is not a table to be given headings.
-  document.getElementById('list-head').hidden = !shown.length;
 
   if (!shown.length) {
     const empty = document.createElement('p');
     empty.className = 'empty';
     empty.textContent = state.assets.length
-      ? 'No asset or block matches that.'
-      : 'There is nothing on the farm yet. Draw one here, or on the phone.';
+      ? 'No asset matches that.'
+      : 'There is nothing here yet. Draw one here, or on the phone.';
     list.append(empty);
     return;
   }
 
-  const blocks = new Map();
-  for (const item of shown) {
-    const block = item.groupName || OTHERS;
-    if (!blocks.has(block)) blocks.set(block, []);
-    blocks.get(block).push(item);
-  }
-
-  const names = [...blocks.keys()].sort((a, b) => a.localeCompare(b));
-  const others = names.indexOf(OTHERS);
-  if (others >= 0) {
-    names.splice(others, 1);
-    names.push(OTHERS);
-  }
-
-  for (const block of names) {
-    const heading = document.createElement('h3');
-    heading.textContent = block;
-    list.append(heading);
-
-    const rows = blocks.get(block).sort((a, b) => a.asset.name.localeCompare(b.asset.name));
-    for (const item of rows) list.append(listRow(item));
-  }
-
-  // The bar and the tick over the list are about the rows that are on the screen, so they are drawn
-  // after them rather than beside them: a filter that hides every picked row leaves nothing to say.
-  drawTogetherBar();
+  for (const item of shown) list.append(listRow(item));
 }
 
 /**
- * One row of the list: the tick that picks it out, the name, how it is sprayed, how many passes that
- * takes, and when it is next due.
+ * One row of the list: the name, with the colour of its kind in front of it.
  *
- * The tick and the name are two children of one row and two columns of the list's grid - the row itself
- * has no box of its own, which is what `display: contents` in the stylesheet is for - so a click on the
- * name still opens the asset and a click on the tick only ticks it.
- *
- * The cells are in the order the words over the list name them, and nothing else: the page keeps no
- * second list of its columns, so a cell cannot drift away from the heading it belongs under. The name
- * carries the dot the phone painted this asset's own feature, which is the row's colour and nothing
- * else's.
+ * A row is one thing - the name - and the name is a button, so clicking it opens the place. The dot
+ * is the same colour the phone painted this asset's own feature, so the list and the map agree about
+ * what a thing is without a second palette here.
  */
 function listRow(item) {
   const row = document.createElement('div');
   row.className = 'row';
-
-  const tick = document.createElement('label');
-  tick.className = 'tick';
-  const box = document.createElement('input');
-  box.type = 'checkbox';
-  box.checked = selectedIds.includes(item.asset.id);
-  box.setAttribute('aria-label', `Pick ${item.asset.name}`);
-  box.addEventListener('change', () => {
-    selectedIds = toggle(selectedIds, item.asset.id);
-    drawTogetherBar();
-  });
-  tick.append(box);
 
   const button = document.createElement('button');
   button.type = 'button';
@@ -930,25 +786,10 @@ function listRow(item) {
   dot.style.background = strokeById.get(item.asset.id) || '#757575';
 
   name.append(dot, item.asset.name);
-
-  const method = document.createElement('span');
-  method.className = 'method';
-  method.textContent = methodText(item.asset.method, state?.choices?.methods);
-
-  const passes = document.createElement('span');
-  passes.className = 'passes';
-  // The number on its own: the word over the column says what it is, and what two passes *mean* - how far
-  // apart they run, which is what the app's side-reading rests on - is the phone's own sentence on the card.
-  passes.textContent = String(item.asset.passesRequired);
-
-  const due = document.createElement('span');
-  due.className = 'due';
-  due.textContent = dueText(item);
-
-  button.append(name, method, passes, due);
+  button.append(name);
   button.addEventListener('click', () => selectAsset(item.asset.id, true));
 
-  row.append(tick, button);
+  row.append(button);
   return row;
 }
 
@@ -984,14 +825,15 @@ function flyToAsset(id) {
 }
 
 /**
- * The card: what the asset is and when it is next due, and the way into changing its details.
+ * The card: what the place is, and the way into changing its details or its line.
  *
- * Everything on it is the phone's own: the due date and the count of sprays are worked out on the
- * phone, so a card that says "3 sprays" says what the phone would say.
+ * Everything on it is the phone's own: what the kind is called, how long the line is, how much ground a
+ * ring encloses and what the heights are all arrive in the record. Nothing about when it is next due,
+ * what it is sprayed with or how often is here at all - those are the phone's and the desk never sees
+ * them.
  */
 function showCard(item) {
   document.getElementById('card-name').textContent = item.asset.name;
-  document.getElementById('card-due').textContent = dueText(item);
 
   const facts = document.getElementById('card-facts');
   facts.textContent = '';
@@ -1008,34 +850,17 @@ function showCard(item) {
   // and not the kind's - and since the kind decides the shape, that was one question answered twice:
   // "Other place" read as "Other place, a place", and a building as "building, a place".
   fact('What it is', kindText(item.asset.kind, state?.choices?.kinds));
-  fact('Block', item.groupName || OTHERS);
   // A line has a length and a ring has the metres round it; a place has neither. Which of the phone's
   // own words the card uses is the phone's decision, not the page's - see AssetPhrase.lengthLabel.
   fact(
     item.asset.shape === 'AREA' ? 'Round it' : 'Length',
     item.asset.shape !== 'POINT' ? metresText(item.asset.lengthM) : null
   );
-  // The ground, and the two ways the app knows one. A ring's area is **measured** from its own corners,
-  // which is the whole reason a carpark is a kind of its own; a line's is only ever an *estimate* from the
-  // swath width somebody typed, so the two are said differently - an estimate that reads like a survey is
-  // the kind of figure that ends up in a spray diary as though somebody had measured it (`AssetPhrase.areaPhrase`).
-  // A place encloses nothing and says nothing; a line with no width cannot be estimated at all.
-  const ground = item.asset.shape === 'AREA'
-    ? item.asset.areaM2
-    : item.asset.swathWidthM
-      ? item.asset.lengthM * item.asset.swathWidthM * item.asset.passesRequired
-      : 0;
-  fact(
-    'Ground',
-    ground ? (item.asset.shape === 'AREA' ? areaText(ground) : `about ${areaText(ground)}`) : null
-  );
-  fact('Spray every', `${item.asset.intervalDays} days`);
-  fact('Next due', dateText(item.dueAtEpochMs));
-  fact('Last sprayed', dateText(item.asset.lastSprayedAtEpochMs) || 'never');
-  fact('Sprays recorded', item.sprayCount ? String(item.sprayCount) : null);
-  fact('Method', methodText(item.asset.method, state?.choices?.methods));
-  fact('Swath', item.asset.swathWidthM ? `${item.asset.swathWidthM} m` : null);
-  fact('Passes', item.asset.passesRequired > 1 ? String(item.asset.passesRequired) : null);
+  // The ground a ring encloses is **measured** from its own corners, which is the whole reason a carpark
+  // is a kind of its own and the one area in this app that is not an estimate. A line's area would only
+  // ever be an estimate from a swath width somebody typed, which is a spray figure the desk does not
+  // show, so nothing is said about it here.
+  fact('Ground', item.asset.shape === 'AREA' && item.asset.areaM2 ? areaText(item.asset.areaM2) : null);
   fact('Notes', item.asset.notes);
 
   // The height, when the file the track came from said one: the phone's range, in the same words its
@@ -1225,7 +1050,7 @@ function showDrawing({
  * A finished drawing: a track the phone already has is saved; a new one is described first.
  *
  * Both end with the drawing inside a write, but only one of them can be written straight away. An asset
- * already on the phone has a name and an interval and only its paths have moved, while a new line is
+ * already on the phone has a name and a kind and only its paths have moved, while a new line is
  * nothing but its shape - so the form comes first and the drawing waits in `draftPaths`.
  */
 async function finishDrawing(paths, wasEditing) {
@@ -1658,12 +1483,6 @@ function formBody({ version = null, points = null, paths = null } = {}) {
   const body = {
     name: textOf('edit-name'),
     kind: selectedValue('edit-kind'),
-    method: selectedValue('edit-method'),
-    blockName: textOf('edit-block'),
-    intervalDays: textOf('edit-interval'),
-    swathWidthM: textOf('edit-swath'),
-    passesRequired: Number(selectedValue('edit-passes')),
-    passSeparationM: textOf('edit-separation'),
     notes: textOf('edit-notes')
   };
   if (version !== null) body.version = version;
@@ -1676,7 +1495,9 @@ function formBody({ version = null, points = null, paths = null } = {}) {
  * The body a line's save sends: the row the card is showing, with the drawn line in it.
  *
  * Built from the record rather than from the form's fields, because the form is not open - and the record
- * is the row the phone last handed over, so what goes back is what the operator is looking at.
+ * is the row the phone last handed over, so what goes back is what the operator is looking at. Only the
+ * name, the kind and the notes travel: the block, the method and the spray figures are the phone's own
+ * and the phone writes its own values back for them.
  *
  * Which of the two drawing shapes it carries - one path, or the line with the track's side tracks - is
  * `wire.mjs`'s decision, so that it can be tested without a browser.
@@ -1685,13 +1506,6 @@ function recordBody(item, paths) {
   return {
     name: item.asset.name,
     kind: item.asset.kind,
-    shape: item.asset.shape,
-    method: item.asset.method,
-    blockName: item.groupName || '',
-    intervalDays: String(item.asset.intervalDays),
-    swathWidthM: item.asset.swathWidthM === null ? '' : String(item.asset.swathWidthM),
-    passesRequired: item.asset.passesRequired,
-    passSeparationM: item.asset.passSeparationM === null ? '' : String(item.asset.passSeparationM),
     notes: item.asset.notes || '',
     version: item.version,
     ...drawingBody(paths)
@@ -1721,9 +1535,6 @@ let editingId = null;
  */
 let drafting = false;
 
-/** The swath width the method in the form came with, so a change of method can move the field. */
-let methodSwath = '';
-
 const field = (id) => document.getElementById(id);
 const textOf = (id) => field(id).value.trim();
 
@@ -1731,12 +1542,6 @@ const textOf = (id) => field(id).value.trim();
 function selectedValue(id) {
   const chosen = document.querySelector(`#${id} input:checked`);
   return chosen ? chosen.value : '';
-}
-
-function setSelected(id, value) {
-  for (const input of document.querySelectorAll(`#${id} input`)) {
-    input.checked = input.value === value;
-  }
 }
 
 /**
@@ -1798,385 +1603,15 @@ function openEdit(item) {
 
   field('edit-title').textContent = `Edit ${item.asset.name}`;
   field('edit-name').value = item.asset.name;
-  field('edit-block').value = item.groupName || '';
-  field('edit-interval').value = String(item.asset.intervalDays);
-  field('edit-swath').value = item.asset.swathWidthM === null ? '' : String(item.asset.swathWidthM);
-  field('edit-separation').value =
-    item.asset.passSeparationM === null ? '' : String(item.asset.passSeparationM);
   field('edit-notes').value = item.asset.notes || '';
 
   fillChoices('edit-kind', state.choices.kinds, item.asset.kind);
-  fillChoices('edit-method', state.choices.methods, item.asset.method);
-  fillChoices('edit-passes', state.choices.passes, String(item.asset.passesRequired));
-
-  const method = state.choices.methods.find((one) => one.value === item.asset.method);
-  methodSwath = (method && method.swathM) || '';
-
-  field('edit-swath-hint').textContent = state.choices.swathHint;
-  field('edit-separation-hint').textContent = state.choices.separationHint;
-  field('edit-ground-hint').textContent = state.choices.groundHint;
-
-  // The blocks that exist, so a name can be picked rather than typed again: a typed block is how a
-  // misspelling becomes a second block with one asset in it.
-  const blocks = field('edit-blocks');
-  blocks.textContent = '';
-  for (const block of state.groups) {
-    const option = document.createElement('option');
-    option.value = block.name;
-    blocks.append(option);
-  }
-
-  showSeparationRow();
-  updateBlockHint();
-  showKindRows();
 
   field('edit-words').hidden = true;
   field('edit').hidden = false;
   field('drawing').hidden = true;
   field('card').hidden = true;
   field('edit-name').focus();
-}
-
-/**
- * One pass has nothing to be apart from, so the separation field goes with it.
- *
- * The number would be cleared by the phone anyway (`AssetEdits` keeps no separation for a one-pass
- * job); clearing it here means the operator is not shown a field that would be thrown away.
- */
-function showSeparationRow() {
-  const two = Number(selectedValue('edit-passes')) >= 2;
-  field('edit-separation-row').hidden = !two;
-  if (!two) field('edit-separation').value = '';
-}
-
-/**
- * The three rows a **line** answers, for a kind that is ground.
- *
- * A carpark answers both of those questions itself: its area is measured from its own shape rather than
- * estimated from a swath width somebody typed, and one run round it is the whole job. The phone's own
- * form does not offer the fields at all - it puts `AssetEdits.GROUND_HINT` where they were, and that
- * sentence travels in the state document - and a desk that left them showing would let an operator type
- * a width the phone throws away without a word on the way in.
- */
-function showKindRows() {
-  const ground = shapeOfKind(selectedValue('edit-kind')) === 'AREA';
-  field('edit-swath-row').hidden = ground;
-  field('edit-passes-row').hidden = ground;
-  field('edit-ground-hint').hidden = !ground;
-  // The separation field is the passes row's own tail, so it goes with it - whether the reason is one
-  // pass or a kind that has no pass count to answer.
-  if (ground) {
-    field('edit-separation-row').hidden = true;
-    field('edit-separation').value = '';
-  } else {
-    showSeparationRow();
-  }
-}
-
-/**
- * What the block field is about to do, in the phone's own words.
- *
- * The rule is `AssetEdits.blockHint`'s, written out here because it depends on every keystroke - a
- * sentence fetched from the phone could be no fresher than the last request. What it decides is a
- * hint and nothing else: the block is resolved by the phone, in the same transaction as the save,
- * and a name that matches nothing yet starts one.
- */
-function updateBlockHint() {
-  const typed = textOf('edit-block');
-  const hint = field('edit-block-hint');
-  if (!typed) {
-    hint.textContent = state.choices.blockHint;
-    return;
-  }
-  const match = state.groups.find((block) => block.name.toLowerCase() === typed.toLowerCase());
-  hint.textContent = match
-    ? `In the block "${match.name}"`
-    : `Starts a new block called "${typed}"`;
-}
-
-/**
- * A change of spray method moves the swath field when the width in it is nobody's own.
- *
- * `AssetEdits.swathAfterMethodChange`'s rule, with the widths out of the phone's own table: a blank
- * field, or one still holding the previous method's default, moves with the choice; a width the
- * operator typed does not. Without this, choosing "Knapsack" here would leave a boom's three metres
- * on a backpack.
- */
-function onMethodChange() {
-  const chosen = state.choices.methods.find((one) => one.value === selectedValue('edit-method'));
-  const width = field('edit-swath');
-  const current = width.value.trim();
-  if (current === '' || current === methodSwath) width.value = (chosen && chosen.swathM) || '';
-  methodSwath = (chosen && chosen.swathM) || '';
-}
-
-/* ---- Changing several assets with one form ------------------------------------------ */
-
-/**
- * The one field of a bulk form and the tick that puts it in the change.
- *
- * Every field of the form is one of these, so the wiring is said once instead of nine times: which
- * control the tick is about, what reads the value out of it, and what writes the rows' own answer back
- * into it.
- */
-const BULK_FIELDS = [
-  { key: 'name', tick: 'together-tick-name', control: 'together-name', read: (item) => item.asset.name },
-  { key: 'block', tick: 'together-tick-block', control: 'together-block',
-    read: (item) => item.groupName || '' },
-  { key: 'kind', tick: 'together-tick-kind', choices: 'together-kind', read: (item) => item.asset.kind },
-  { key: 'interval', tick: 'together-tick-interval', control: 'together-interval',
-    read: (item) => String(item.asset.intervalDays) },
-  { key: 'method', tick: 'together-tick-method', choices: 'together-method',
-    read: (item) => item.asset.method },
-  { key: 'swath', tick: 'together-tick-swath', control: 'together-swath',
-    read: (item) => (item.asset.swathWidthM === null ? '' : String(item.asset.swathWidthM)) },
-  { key: 'passes', tick: 'together-tick-passes', choices: 'together-passes',
-    read: (item) => String(item.asset.passesRequired) },
-  { key: 'separation', tick: 'together-tick-separation', control: 'together-separation',
-    read: (item) => (item.asset.passSeparationM === null ? '' : String(item.asset.passSeparationM)) },
-  { key: 'notes', tick: 'together-tick-notes', control: 'together-notes',
-    read: (item) => item.asset.notes || '' }
-];
-
-/** What to call each field when the page has to say something about one. */
-const BULK_LABELS = {
-  name: 'Name',
-  block: 'Block or group',
-  kind: 'What it is',
-  interval: 'Days between sprays',
-  method: 'Spray method',
-  swath: 'Swath width',
-  passes: 'Passes to finish it',
-  separation: 'Two passes apart',
-  notes: 'Notes'
-};
-
-/**
- * The tick that turns a field into a change, and what that field then looks like.
- *
- * A control whose tick is off is **off** - not merely ignored - so an operator cannot type into a field
- * that is not part of the edit and then wonder why nothing happened. The tick itself is left alone: it
- * is the one thing on the row that is always live.
- *
- * **A row of choices is left with nothing chosen** when the picked assets disagreed about it. Defaulting
- * to the first pill would be the page choosing a kind for rows it has just finished saying it cannot
- * speak for, and the operator would be looking at "More than one" while a real choice sat under it.
- * What happens instead is that the save says the choice is missing - see `bulkProblem`.
- */
-function applyBulkTicks() {
-  for (const one of BULK_FIELDS) {
-    const on = field(one.tick).checked;
-    if (one.choices) {
-      for (const input of document.querySelectorAll(`#${one.choices} input`)) input.disabled = !on;
-    } else {
-      field(one.control).disabled = !on;
-    }
-  }
-}
-
-/**
- * Why this form cannot be sent yet, in the page's own words, or null when it can.
- *
- * Everything here is something the operator can put right without asking the phone, and saying it here
- * rather than letting the request be refused means the answer arrives at once and in terms of the form
- * rather than of a body. The phone's own rules are still the judge of every value.
- *
- * **A field the picked rows disagree on has to be ticked.** One form carries one value per field, and
- * the values a bulk edit does not set are supposed to be *each row's own* - so where the rows differ
- * there is nothing to send that means "leave that alone", and the honest answer is to ask rather than to
- * pick one: the tick was put there to be the way of saying it. The alternative, sending one row's value
- * for all of them, is a rename nobody typed.
- */
-function bulkProblem() {
-  if (!anyBulkTick()) {
-    return 'Tick at least one thing to change, or press Cancel.';
-  }
-  if (selectedIds.length > state.together.maxAssets) {
-    return `That is ${selectedIds.length} assets, and the phone changes up to ` +
-      `${state.together.maxAssets} at a time. Pick fewer and try again.`;
-  }
-
-  const items = picked(state.assets, selectedIds);
-  for (const one of BULK_FIELDS) {
-    if (field(one.tick).checked) {
-      // Ticked: it needs an answer, and a row of choices the rows disagreed on opens with none.
-      if (one.choices && !selectedValue(one.choices)) {
-        return `Pick the ${BULK_LABELS[one.key]} to change it to.`;
-      }
-      continue;
-    }
-    if (commonValue(items, one.read) !== DIFFERENT) continue;
-    return `The assets picked do not agree on the ${BULK_LABELS[one.key]}, so tick it and choose one ` +
-      '- or change them one at a time.';
-  }
-  return null;
-}
-
-/** Whether anything at all is being changed: a form with no tick on it would be a request with no edit. */
-function anyBulkTick() {
-  return BULK_FIELDS.some((one) => field(one.tick).checked);
-}
-
-/** What is being changed, in the page's own words, said over the form. */
-function bulkCountText() {
-  return selectedIds.length === 1
-    ? 'Changing one asset. Tick what to change.'
-    : `Changing ${selectedIds.length} assets. Tick what to change, and leave the rest as they are.`;
-}
-
-/**
- * The same form, about several rows at once.
- *
- * Every field is filled from the picked rows and every tick is off, so the form opens as a **report** of
- * what is there and becomes an instruction one tick at a time. Where the rows disagree the field says so
- * in the phone's own word for it - and **says it as a hint rather than as a value**, because a text box
- * holding "More than one" is a name nobody typed, and a body carrying it would rename six tracks to a
- * sentence about themselves. So a field they disagree on is left empty with the word beside it, and the
- * save asks for it to be ticked: see `bulkProblem`.
- */
-function openTogether() {
-  const items = picked(state.assets, selectedIds);
-  if (!items.length) return;
-
-  closeCard();
-  closeEdit();
-  field('together-what').textContent = bulkCountText();
-
-  for (const one of BULK_FIELDS) {
-    const shared = commonValue(items, one.read);
-    const disagree = shared === DIFFERENT;
-    if (one.choices) {
-      fillChoices(one.choices, choiceListFor(one.choices), disagree ? '' : shared);
-    } else {
-      field(one.control).value = disagree ? '' : shared;
-    }
-    field(one.tick).checked = false;
-    // The word itself, beside the field it is about, and only while the rows disagree.
-    field(`${one.tick}-note`).textContent = disagree ? state.together.different : '';
-  }
-
-  // The blocks that exist, so a name can be picked rather than typed again - the same reason the
-  // details form offers them.
-  const blocks = field('together-blocks');
-  blocks.textContent = '';
-  for (const block of state.groups) {
-    const option = document.createElement('option');
-    option.value = block.name;
-    blocks.append(option);
-  }
-
-  field('together-block-hint').textContent = state.choices.blockHint;
-  field('together-swath-hint').textContent = state.choices.swathHint;
-  field('together-separation-hint').textContent = state.choices.separationHint;
-  field('together-words').hidden = true;
-  applyBulkTicks();
-
-  field('together').hidden = false;
-  field('drawing').hidden = true;
-  field('together-tick-name').focus();
-}
-
-/** The phone's own list of choices for one of the bulk form's three choice rows. */
-function choiceListFor(id) {
-  if (id === 'together-kind') return state.choices.kinds;
-  if (id === 'together-method') return state.choices.methods;
-  return state.choices.passes;
-}
-
-function closeTogether() {
-  field('together').hidden = true;
-  field('together-words').hidden = true;
-}
-
-/**
- * Save: one request for all of it.
- *
- * The body carries every field the rows have - the ones not ticked as themselves - because that is what
- * makes a bulk edit and a single edit **one judgement on the phone**: the same rules, the same
- * sentences, one row at a time. And every row quotes its own version, so a row that has moved on the
- * phone stops the lot: the phone writes all of them or none.
- */
-async function saveTogether(event) {
-  event.preventDefault();
-
-  const problem = bulkProblem();
-  if (problem) {
-    showTogetherProblem(problem);
-    return;
-  }
-
-  const items = picked(state.assets, selectedIds);
-  if (items.length !== selectedIds.length) {
-    // A tick on a row the list is no longer showing - the filter moved under it - is a tick the page
-    // cannot fill in the values for: what that row holds now is not on the screen to send.
-    showTogetherProblem('One of the assets picked is not in the list any more. Clear and pick again.');
-    return;
-  }
-
-  const save = field('together-save');
-  save.disabled = true;
-  try {
-    const { status, answer } = await sendJson(
-      '/api/assets/together',
-      'POST',
-      bulkBody(items, bulkFields({
-        // A field nothing was picked for still has to carry a value, because the phone's rules read
-        // every field: the row's own is what that value is, and it is what the operator is looking at.
-        name: valueOf('together-name', 'together-tick-name'),
-        kind: valueOf(null, 'together-tick-kind', 'together-kind'),
-        method: valueOf(null, 'together-tick-method', 'together-method'),
-        blockName: valueOf('together-block', 'together-tick-block'),
-        intervalDays: valueOf('together-interval', 'together-tick-interval'),
-        swathWidthM: valueOf('together-swath', 'together-tick-swath'),
-        passesRequired: valueOf(null, 'together-tick-passes', 'together-passes') || '1',
-        passSeparationM: valueOf('together-separation', 'together-tick-separation'),
-        notes: valueOf('together-notes', 'together-tick-notes')
-      }))
-    );
-
-    if (status !== 200) {
-      showTogetherProblem(answer.message || 'The phone would not change them.');
-      // Either a stale row or a row the phone no longer has means the page's copy is the thing that is
-      // wrong, so the work is read again rather than argued with.
-      if (status === 409 || status === 404) {
-        closeTogether();
-        clearTicks();
-        await reloadWork();
-        showNotice(answer.message);
-      }
-      return;
-    }
-
-    closeTogether();
-    // Nothing is picked any more: what was picked has been changed, and a tick left on would make the
-    // next click on *Edit together* about the wrong rows.
-    clearTicks();
-    await reloadWork();
-    showNotice(answer.message);
-  } catch (error) {
-    showTogetherProblem(error.message);
-  } finally {
-    save.disabled = false;
-  }
-}
-
-/**
- * The value one field of the bulk form is sending.
- *
- * There is no branch on the tick here, and that is the point rather than an oversight: a field being
- * changed holds what the operator typed and a field that is not holds **that row's own answer**, which
- * `openTogether` put there. The phone's rules read every field - they refuse an asset with no name and
- * a blank interval is not a whole number - so the untouched ones travel as themselves and the row comes
- * out the other side identical in everything but what was ticked.
- */
-function valueOf(control, tick, choices = null) {
-  return choices ? selectedValue(choices) : field(control).value.trim();
-}
-
-function showTogetherProblem(message) {
-  const words = field('together-words');
-  words.textContent = message;
-  words.hidden = false;
 }
 
 /**
@@ -2188,7 +1623,6 @@ function showTogetherProblem(message) {
  */
 function closeForms() {
   closeEdit();
-  closeTogether();
 }
 
 /**
@@ -2203,51 +1637,23 @@ function closeEdit() {
 }
 
 /**
- * Whether a form is open.
+ * Whether the details form is open.
  *
- * The details form, the form for several assets and the drawing's own box are all about a different
- * thing, so no two of them are on the map at once: a form is opened by hiding the box (see
- * `showDrawing`), and the box comes back when the form's Cancel puts the drawing in hand again.
+ * The form and the drawing's own box are about different things, so no two of them are on the map at
+ * once: a form is opened by hiding the box (see `showDrawing`), and the box comes back when the form's
+ * Cancel puts the drawing in hand again.
  */
 function formIsOpen() {
-  return !field('edit').hidden || !field('together').hidden;
-}
-
-/**
- * What is ticked, said under the list, and the one way on with it.
- *
- * Drawn from `selectedIds` every time it changes rather than kept in step as rows are ticked: the list is
- * redrawn for a keystroke, a type, a save and a reload, and a bar that was only updated on a click would
- * be right until the first of those and wrong afterwards.
- */
-function drawTogetherBar() {
-  const bar = field('together-bar');
-  const count = selectedIds.length;
-
-  bar.hidden = count === 0;
-  // The tick over the list says whether every row the list is *showing* is picked, which is what "pick
-  // them all" means from there: the rows on the screen, not the whole farm behind a filter. Nothing to
-  // compare before the phone has answered, and nothing picked either.
-  const shown = shownAssets.map((item) => item.asset.id);
-  field('tick-all').checked = shown.length > 0 && shown.every((id) => selectedIds.includes(id));
-
-  if (count === 0) return;
-  field('together-count').textContent = count === 1 ? '1 asset picked' : `${count} assets picked`;
-}
-
-/** Nothing is picked any more. */
-function clearTicks() {
-  selectedIds = [];
-  drawTogetherBar();
+  return !field('edit').hidden;
 }
 
 /**
  * The form for a new track, opened over the line just drawn.
  *
- * Prefilled with the phone's own starting point for an asset - a track, following a path, one pass, the
- * default interval - because those are the answers the phone would fill in for itself. Everything else
- * here is the same form the card opens: the same fields, the same choices, the same rules underneath, and
- * the same sentences when the phone refuses something.
+ * Prefilled with the phone's own starting point for an asset - a track, drawn as the kind the box was
+ * set to - because that is the answer the phone would fill in for itself. Everything else here is the
+ * same form the card opens: the same fields, the same choices, the same rules underneath, and the same
+ * sentences when the phone refuses something.
  *
  * [name] is for a track that came out of a track file, which has a name to start with - the file's own,
  * which the phone's own importer uses too. A line drawn here starts with the field empty, because
@@ -2259,35 +1665,9 @@ function openDraft(name = '') {
 
   field('edit-title').textContent = 'New asset';
   field('edit-name').value = name;
-  field('edit-block').value = '';
-  field('edit-interval').value = state.newAsset.intervalDays;
-  field('edit-swath').value = '';
-  field('edit-separation').value = '';
   field('edit-notes').value = '';
 
   fillChoices('edit-kind', state.choices.kinds, draftKind || state.newAsset.kind);
-  fillChoices('edit-method', state.choices.methods, state.newAsset.method);
-  fillChoices('edit-passes', state.choices.passes, String(state.newAsset.passesRequired));
-
-  // No swath width of its own for a method nobody has set, which is the phone's own table saying so.
-  const method = state.choices.methods.find((one) => one.value === state.newAsset.method);
-  methodSwath = (method && method.swathM) || '';
-
-  field('edit-swath-hint').textContent = state.choices.swathHint;
-  field('edit-separation-hint').textContent = state.choices.separationHint;
-  field('edit-ground-hint').textContent = state.choices.groundHint;
-
-  const blocks = field('edit-blocks');
-  blocks.textContent = '';
-  for (const block of state.groups) {
-    const option = document.createElement('option');
-    option.value = block.name;
-    blocks.append(option);
-  }
-
-  showSeparationRow();
-  updateBlockHint();
-  showKindRows();
 
   field('edit-words').hidden = true;
   field('edit').hidden = false;
@@ -2332,8 +1712,8 @@ function replaceAsset(record) {
 /**
  * The work's features, re-read and handed to the map.
  *
- * A save can move a due date, and a due date is a colour, so the map's own source is given the
- * phone's new features rather than being left drawing the picture it had a moment ago.
+ * A save can change a place's name or its kind, and a kind is a colour, so the map's own source is
+ * given the phone's new features rather than being left drawing the picture it had a moment ago.
  */
 async function reloadFeatures() {
   const features = await getJson('/api/assets.geojson');
@@ -2348,14 +1728,6 @@ async function reloadFeatures() {
 /** The work as the phone holds it now: the document, the features, the list and the card. */
 async function reloadWork() {
   state = await getJson('/api/state');
-  // A tick on a row the phone no longer has is a tick on nothing, and a bar counting six assets when
-  // five of them are gone is a sentence that is not true - so what is picked is narrowed to what is
-  // there rather than cleared: an asset taken away on the phone is not a reason to lose the other five.
-  const ids = new Set(state.assets.map((item) => item.asset.id));
-  selectedIds = selectedIds.filter((id) => ids.has(id));
-  // The box first, because a save can move a due date and a due date is a count and a colour:
-  // the farm at a glance is the answer the operator saved to see.
-  fillFarmBox();
   await reloadFeatures();
   drawList();
   const item = state.assets.find((one) => one.asset.id === selectedId);
@@ -2365,12 +1737,12 @@ async function reloadWork() {
 /**
  * Saves the form to the phone: the details of a track, or a track that did not exist until now.
  *
- * The phone judges every field - the ranges, the blank-means-unknown rules, the block name, and the drawn
- * line as well - and its words are what the operator is shown, because they are the words the phone's own
- * screen would use. What this function decides is only what to do with the answer: a save closes the form
- * and redraws the work from what came back, a refusal the operator can fix leaves the form open with the
- * phone's sentence under it, and a refusal because the asset moved under the page closes the form and
- * reloads the lot, because the page's copy is the thing that is wrong.
+ * The phone judges every field - the blank-means-unknown rules and the drawn line as well - and its
+ * words are what the operator is shown, because they are the words the phone's own screen would use.
+ * What this function decides is only what to do with the answer: a save closes the form and redraws the
+ * work from what came back, a refusal the operator can fix leaves the form open with the phone's
+ * sentence under it, and a refusal because the asset moved under the page closes the form and reloads
+ * the lot, because the page's copy is the thing that is wrong.
  *
  * The two writes it can make are one line apart: a new track is a POST to the collection with the line
  * that was drawn, and everything else is a PUT of one asset with the version its card was handed.
@@ -2422,36 +1794,6 @@ document.getElementById('card-close').addEventListener('click', closeCard);
 document.getElementById('edit-close').addEventListener('click', cancelForm);
 document.getElementById('edit-cancel').addEventListener('click', cancelForm);
 document.getElementById('edit-form').addEventListener('submit', saveEdit);
-document.getElementById('edit-passes').addEventListener('change', showSeparationRow);
-document.getElementById('edit-method').addEventListener('change', onMethodChange);
-document.getElementById('edit-block').addEventListener('input', updateBlockHint);
-
-/* ---- What is ticked, and changing it ------------------------------------------------- */
-
-// Pick every row the list is showing, or none of them: the tick over the list is the desk's own
-// shortcut for the errand "all of these", which is what a filter is used to narrow to.
-document.getElementById('tick-all').addEventListener('change', (event) => {
-  const shown = shownAssets.map((item) => item.asset.id);
-  selectedIds = event.target.checked
-    ? [...new Set([...selectedIds, ...shown])]
-    : selectedIds.filter((id) => !shown.includes(id));
-  drawList();
-});
-
-document.getElementById('together-open').addEventListener('click', openTogether);
-
-document.getElementById('together-clear').addEventListener('click', () => {
-  clearTicks();
-  closeTogether();
-});
-
-for (const one of BULK_FIELDS) {
-  field(one.tick).addEventListener('change', applyBulkTicks);
-}
-
-document.getElementById('together-close').addEventListener('click', closeTogether);
-document.getElementById('together-cancel').addEventListener('click', closeTogether);
-document.getElementById('together-form').addEventListener('submit', saveTogether);
 
 /**
  * The way into drawing a track: an empty line, with nothing on the map to take hold of yet.
@@ -2591,14 +1933,10 @@ window.addEventListener('keydown', (event) => {
     closeDoc();
     return;
   }
-  // Escape backs out of a form first: they are on top, and they are the ones with unsaved typing in them.
-  // Turning several rows over at once is the newer of the two, so it goes first - and while a line is
-  // being drawn the drawing has the key itself (see `edit.js`), so this only runs when a form is open,
-  // which is what makes two Escapes in a row mean "back to the drawing, then give it up".
-  if (!field('together').hidden) {
-    closeTogether();
-    return;
-  }
+  // Escape backs out of the form first: it is on top, and it is the one with unsaved typing in it.
+  // While a line is being drawn the drawing has the key itself (see `edit.js`), so this only runs when
+  // the form is open, which is what makes two Escapes in a row mean "back to the drawing, then give it
+  // up".
   if (!field('edit').hidden) {
     if (drafting) {
       cancelForm();

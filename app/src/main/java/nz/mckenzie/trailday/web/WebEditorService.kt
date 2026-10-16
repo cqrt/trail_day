@@ -31,7 +31,6 @@ import nz.mckenzie.trailday.MainActivity
 import nz.mckenzie.trailday.R
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.SettingsRepository
-import nz.mckenzie.trailday.data.SprayRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.doc.ArcGisDocTracks
 import nz.mckenzie.trailday.doc.DocTrackDownloader
@@ -180,7 +179,6 @@ class WebEditorService : Service() {
 
         val documents = WebEditorDocuments(
             assets = AssetRepository(database),
-            sprays = SprayRepository(database),
             token = token,
             basemap = { settings.basemap.first() },
             position = { position.value },

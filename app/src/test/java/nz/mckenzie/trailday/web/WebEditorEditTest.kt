@@ -1,10 +1,8 @@
 package nz.mckenzie.trailday.web
 
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.domain.asset.AssetKind
-import nz.mckenzie.trailday.domain.asset.BulkAssetEdits
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -62,6 +60,11 @@ class WebEditorEditTest {
     /**
      * The body a page sends back after opening this asset and changing one or two things.
      *
+     * Only what the desk shows: a name, a kind, the notes and, when it is about the drawing, the line.
+     * The block, the method, the interval, the swath width and the pass count never travel - the phone
+     * keeps its own - so a body here does not carry them either, which is the whole point of the rule
+     * `a field the desk never sent survives the edit` holds.
+     *
      * [points] is whatever the desk has drawn, as JSON written by hand rather than built from
      * [WebEditorPoint]: a test that built its body from the class would keep passing after somebody
      * renamed a field, which is exactly the failure a page would see as "nothing saved".
@@ -70,20 +73,11 @@ class WebEditorEditTest {
         version: String = WebEditorVersion.of(asset, blockName, listOf(path)),
         name: String = asset.name,
         kind: String = asset.kind,
-        method: String = asset.method,
-        block: String? = blockName,
-        intervalDays: String = asset.intervalDays.toString(),
-        swathWidthM: String = asset.swathWidthM.toString(),
-        passes: Int = asset.passesRequired,
-        separation: String = asset.passSeparationM.toString(),
         notes: String? = asset.notes,
         points: List<GeoPoint>? = null,
         paths: List<List<GeoPoint>>? = null
     ): String = buildString {
-        append("""{"name":"$name","kind":"$kind","method":"$method",""")
-        append(""""blockName":${if (block == null) "null" else "\"$block\""},""")
-        append(""""intervalDays":"$intervalDays","swathWidthM":"$swathWidthM",""")
-        append(""""passesRequired":$passes,"passSeparationM":"$separation",""")
+        append("""{"name":"$name","kind":"$kind",""")
         append(""""notes":${if (notes == null) "null" else "\"$notes\""},""")
         if (points != null) append(""""points":${pointJson(points)},""")
         if (paths != null) append(""""paths":[${paths.joinToString(",") { pointJson(it) }}],""")
@@ -108,9 +102,7 @@ class WebEditorEditTest {
         kind: String = "TRACK",
         points: List<GeoPoint>? = path
     ): String = buildString {
-        append("""{"name":"$name","kind":"$kind","method":"UNSET",""")
-        append(""""blockName":null,"intervalDays":"120","swathWidthM":"",""")
-        append(""""passesRequired":1,"passSeparationM":"","notes":null""")
+        append("""{"name":"$name","kind":"$kind","notes":null""")
         if (points != null) append(""","points":${pointJson(points)}""")
         append("}")
     }
@@ -129,26 +121,49 @@ class WebEditorEditTest {
 
     @Test
     fun `a good edit comes back as the row to store, and the block it belongs in`() {
-        val result = ok(body(name = "Estuary road, lower", intervalDays = "90"))
+        val result = ok(body(name = "Estuary road, lower"))
 
         assertEquals("Estuary road, lower", result.asset.name)
-        assertEquals(90, result.asset.intervalDays)
-        assertEquals("Estuary", result.blockName)
+        assertEquals("the block is the phone's own and is kept as it stands", "Estuary", result.blockName)
         assertEquals("the id is the phone's, not the desk's to send", 7L, result.asset.id)
     }
 
     @Test
-    fun `a field the desk never sent survives the edit`() {
+    fun `the fields the desk never sends survive the edit as the row's own`() {
         val edited = ok(body(name = "Estuary road, lower")).asset
 
-        // The whole promise of writing through the row the phone holds now: the page changes details,
-        // not records. A spray logged on the phone while the card was open is still there afterwards,
-        // and so is everything else the page was never shown.
+        // The whole promise of writing through the row the phone holds now: the page changes the
+        // details it shows, not records. The block, the method, the interval, the swath width and the
+        // pass count are fields the desk no longer shows and never mentions - so a save cannot wipe
+        // any of them - and a spray logged on the phone while the card was open is still there too.
+        assertEquals("BOOM", edited.method)
+        assertEquals(120, edited.intervalDays)
+        assertEquals(12.5, edited.swathWidthM!!, 0.0)
+        assertEquals(2, edited.passesRequired)
+        assertEquals(3.0, edited.passSeparationM!!, 0.0)
         assertEquals(1_750_000_000_000L, edited.lastSprayedAtEpochMs)
         assertEquals(asset.active, edited.active)
         assertEquals(asset.createdAtEpochMs, edited.createdAtEpochMs)
         assertEquals(3300.0, edited.lengthM, 0.0)
         assertEquals(asset.groupId, edited.groupId)
+    }
+
+    @Test
+    fun `a swath width with more than one decimal keeps every digit through a save`() {
+        // The row's own number is handed to the rules as itself rather than rounded to the field's own
+        // one-decimal shape, so a width an operator typed as 12.55 is still 12.55 afterwards.
+        val precise = asset.copy(swathWidthM = 12.55, passSeparationM = 2.25)
+
+        val edited = WebEditorEdits.apply(
+            current = precise,
+            blockName = blockName,
+            paths = listOf(path),
+            body = body(version = WebEditorVersion.of(precise, blockName, listOf(path)))
+        )
+
+        assertTrue("expected this to be taken: $edited", edited is WebEditorEditResult.Ok)
+        assertEquals(12.55, (edited as WebEditorEditResult.Ok).asset.swathWidthM!!, 0.0)
+        assertEquals(2.25, edited.asset.passSeparationM!!, 0.0)
     }
 
     @Test
@@ -182,27 +197,21 @@ class WebEditorEditTest {
     @Test
     fun `a field out of range is refused in the app's own words`() {
         // These sentences are `ui/AssetEdits`'s, word for word: the desk does not get a second set of
-        // rules, and this is what holds the two together.
+        // rules, and this is what holds the two together. Only the name is a field the desk still
+        // sends that those rules can refuse - the range rules for a spray interval and a swath width
+        // are the phone's own fields, which the desk never mentions.
         assertEquals(
             "Give it a name so it can be found later",
             refused(body(name = "   ")).message
         )
-        assertEquals(
-            "Days between sprays must be a whole number",
-            refused(body(intervalDays = "every so often")).message
-        )
-        assertTrue(
-            "says what the range is: ${refused(body(swathWidthM = "300")).message}",
-            refused(body(swathWidthM = "300")).message.contains("100")
-        )
     }
 
     @Test
-    fun `a kind or a method the phone does not know is refused, not defaulted`() {
+    fun `a kind the phone does not know is refused, not defaulted`() {
         // Named states arrive already decided, so a name this build does not know is a refusal. Let
-        // through, each of these would quietly become a track or "not set".
+        // through, a made-up kind would quietly become a track. The spray method is not on the wire
+        // at all any more, so there is no method name for the phone to be offered.
         assertTrue(refused(body(kind = "PADDOCK")).message.contains("PADDOCK"))
-        assertTrue(refused(body(method = "DRONE")).message.contains("DRONE"))
     }
 
     @Test
@@ -264,10 +273,10 @@ class WebEditorEditTest {
     fun `a path the desk drew is taken, and comes back as the paths to store`() {
         val drawn = listOf(GeoPoint(-41.5, 173.8), GeoPoint(-41.55, 173.85), GeoPoint(-41.6, 173.9))
 
-        val result = ok(body(points = drawn, intervalDays = "90"))
+        val result = ok(body(points = drawn))
 
         assertEquals("the line is stored with the row", listOf(drawn), result.paths)
-        assertEquals("and the details in the same body came along with it", 90, result.asset.intervalDays)
+        assertEquals("and the row's own name is still there beside it", asset.name, result.asset.name)
     }
 
     @Test
@@ -360,7 +369,11 @@ class WebEditorEditTest {
 
         assertEquals("Gully track", draft.asset.name)
         assertEquals("TRACK", draft.asset.kind)
-        assertEquals(120, draft.asset.intervalDays)
+        assertEquals(
+            "the interval is the phone's own default for a new asset, which the desk never sends",
+            120,
+            draft.asset.intervalDays
+        )
         assertTrue("a new asset is active", draft.asset.active)
         assertEquals("the id is the database's to issue", 0L, draft.asset.id)
         assertEquals(
@@ -400,8 +413,8 @@ class WebEditorEditTest {
         assertEquals("Give it a name so it can be found later", createRefused(draftBody(name = "  ")).message)
         assertTrue(
             "and a kind this build does not know is still a refusal: " +
-                createRefused("""{"name":"X","kind":"PADDOCK","method":"UNSET","intervalDays":"120","points":[]}""").message,
-            createRefused("""{"name":"X","kind":"PADDOCK","method":"UNSET","intervalDays":"120","points":[]}""")
+                createRefused("""{"name":"X","kind":"PADDOCK","points":[]}""").message,
+            createRefused("""{"name":"X","kind":"PADDOCK","points":[]}""")
                 .message.contains("PADDOCK")
         )
     }
@@ -581,7 +594,7 @@ class WebEditorEditTest {
         )
     }
 
-    /* ---- Several assets at once --------------------------------------------------------- */
+    /* ---- A field a later page sends ----------------------------------------------------- */
 
     @Test
     fun `a field this build has never heard of does not stop a file being read`() {
@@ -593,139 +606,5 @@ class WebEditorEditTest {
         )
 
         assertArrayEquals(file.toByteArray(Charsets.UTF_8), WebEditorEdits.readTrackFile(body))
-    }
-
-    /** A row as the phone holds it, for a bulk edit to be judged against. */
-    private fun row(id: Long, name: String, kind: String = "TRACK", shape: String = "LINE") =
-        BulkAssetEdits.AssetRow(
-            asset = AssetEntity(id = id, name = name, kind = kind, shape = shape, createdAtEpochMs = 1L),
-            blockName = null
-        )
-
-    /** What a bulk edit wrote, which every refusal below has to have left empty. */
-    private var bulkWritten: List<BulkAssetEdits.AssetEdit> = emptyList()
-
-    private suspend fun bulk(body: String, rows: List<BulkAssetEdits.AssetRow>): WebEditorWrite {
-        bulkWritten = emptyList()
-        return WebEditorEdits.editTogether(
-            body = body,
-            current = { id -> rows.firstOrNull { it.asset.id == id } },
-            paths = { listOf(path) },
-            save = { bulkWritten = it }
-        )
-    }
-
-    /**
-     * The fields a bulk edit sends: every field, with the name, kind, method, interval and notes as the
-     * caller gives them - which is the shape a page fills in from each row's own values.
-     *
-     * A row's version defaults to the fingerprint the phone would hand out for that row, because that is
-     * what a desk quotes back; a caller that wants a stale one says so.
-     */
-    private fun bulkBody(
-        ids: List<Long>,
-        name: String = "Estuary road",
-        kind: String = "TRACK",
-        method: String = "UNSET",
-        interval: String = "120",
-        notes: String = "",
-        rows: List<BulkAssetEdits.AssetRow> = emptyList(),
-        versions: Map<Long, String> = emptyMap()
-    ): String {
-        val assets = ids.joinToString(prefix = "[", postfix = "]") { id ->
-            val known = rows.firstOrNull { it.asset.id == id }
-            val version = versions[id]
-                ?: known?.let { WebEditorVersion.of(it.asset, it.blockName, listOf(path)) }
-                ?: "v$id"
-            """{"id":$id,"version":"$version"}"""
-        }
-        return """{"assets":$assets,"fields":{"name":"$name","kind":"$kind","method":"$method",""" +
-            """"blockName":"","intervalDays":"$interval","swathWidthM":"","passesRequired":1,""" +
-            """"passSeparationM":"","notes":"$notes"}}"""
-    }
-
-    @Test
-    fun `several assets are changed by one body, and every row is judged first`() {
-        val rows = listOf(row(1L, "One"), row(2L, "Two"), row(3L, "Three"))
-
-        val answer = runBlocking {
-            bulk(bulkBody(ids = listOf(1L, 2L, 3L), name = "Estuary block", rows = rows), rows)
-        }
-
-        assertEquals(
-            WebEditorWrite.EditedTogether(3, "Changed all 3 assets together."),
-            answer
-        )
-        assertEquals(listOf(1L, 2L, 3L), bulkWritten.map { it.after.id })
-        assertTrue("and each one carries the new name", bulkWritten.all { it.after.name == "Estuary block" })
-    }
-
-    @Test
-    fun `a bulk edit is the same judgement as one asset's own, so its refusals are the app's own words`() {
-        // The point of sending every field: the phone runs the very same rules, so a field it will not
-        // take is refused here in the words the phone's own form would use - and named, because the
-        // operator is looking at a list rather than at one card.
-        val rows = listOf(row(1L, "One"), row(2L, "Two"))
-
-        val answer = runBlocking {
-            bulk(bulkBody(ids = listOf(1L, 2L), interval = "soon", rows = rows), rows)
-        }
-
-        assertEquals(
-            WebEditorWrite.Refused(
-                WebEditorRefusal.INVALID,
-                "\"One\": Days between sprays must be a whole number"
-            ),
-            answer
-        )
-        assertTrue("and nothing was written", bulkWritten.isEmpty())
-    }
-
-    @Test
-    fun `a row that moved on the phone stops the lot, as a stale card does`() {
-        val rows = listOf(row(1L, "One"), row(2L, "Two"))
-
-        val answer = runBlocking {
-            bulk(
-                bulkBody(ids = listOf(1L, 2L), rows = rows, versions = mapOf(2L to "somebody-else")),
-                rows
-            )
-        }
-
-        assertTrue("refused as stale: $answer", answer is WebEditorWrite.Refused)
-        assertEquals(WebEditorRefusal.STALE, (answer as WebEditorWrite.Refused).refusal)
-        assertTrue("and nothing was written", bulkWritten.isEmpty())
-    }
-
-    @Test
-    fun `a row the phone does not have is a 404, the same as one asset's own edit`() {
-        val answer = runBlocking { bulk(bulkBody(ids = listOf(1L, 9L), rows = listOf(row(1L, "One"))), listOf(row(1L, "One"))) }
-
-        assertEquals(WebEditorRefusal.MISSING, (answer as WebEditorWrite.Refused).refusal)
-        assertTrue("and nothing was written", bulkWritten.isEmpty())
-    }
-
-    @Test
-    fun `a body with no fields in it says so rather than changing every field to nothing`() {
-        // A body naming rows and no values is a page that has got its own state wrong, and guessing at
-        // it would be guessing with six rows rather than one.
-        val answer = runBlocking { bulk("""{"assets":[{"id":1,"version":"v1"}]}""", listOf(row(1L, "One"))) }
-
-        assertEquals(
-            WebEditorWrite.Refused(
-                WebEditorRefusal.INVALID,
-                "That edit did not say what to change, so nothing was changed."
-            ),
-            answer
-        )
-    }
-
-    @Test
-    fun `a body that is not a bulk edit at all is refused in words`() {
-        for (body in listOf("", "not json at all", """{"assets":"nonsense"}""")) {
-            val answer = runBlocking { bulk(body, listOf(row(1L, "One"))) }
-            assertTrue("refused: $body", answer is WebEditorWrite.Refused)
-            assertTrue("and nothing was written", bulkWritten.isEmpty())
-        }
     }
 }

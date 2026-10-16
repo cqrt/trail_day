@@ -59,7 +59,6 @@ class WebEditorSaveTest {
         recordings = RecordingRepository(db)
         documents = WebEditorDocuments(
             assets = assets,
-            sprays = sprays,
             token = "7f3a9c7f3a9c7f3a9c7f3a9c7f3a9c7f",
             // The style is the one document nothing here reads, and a lambda that says so beats a
             // value that pretends. The fix, on the other hand, *is* read - by `state`, and not by a
@@ -87,19 +86,18 @@ class WebEditorSaveTest {
      * The body a page sends, written out as JSON rather than built from [WebEditorEdit].
      *
      * Written by hand on purpose: a test that built its body from the class would keep passing after
-     * somebody renamed a field, which is precisely the failure a page would see as "nothing saved".
+     * somebody renamed a field, which is precisely the failure a page would see as "nothing saved". It
+     * carries only what the desk shows - a name, a kind, the notes and, when it is about the drawing,
+     * the line - because that is all a save from the desk sends.
      */
     private fun editBody(
         version: String,
         name: String = "Estuary road",
-        block: String = "Estuary",
-        intervalDays: String = "120",
+        notes: String = "Both edges",
         points: List<GeoPoint>? = null,
         paths: List<List<GeoPoint>>? = null
     ): String =
-        """{"name":"$name","kind":"ROAD","shape":"LINE","method":"BOOM","blockName":"$block",""" +
-            """"intervalDays":"$intervalDays","swathWidthM":"12.5","passesRequired":2,""" +
-            """"passSeparationM":"3.0","notes":"Both edges",""" +
+        """{"name":"$name","kind":"ROAD","notes":"$notes",""" +
             (if (points == null) "" else """"points":${pointsJson(points)},""") +
             (if (paths == null) "" else """"paths":[${paths.joinToString(",") { pointsJson(it) }}],""") +
             """"version":"$version"}"""
@@ -110,12 +108,9 @@ class WebEditorSaveTest {
      */
     private fun newAssetBody(
         name: String = "Gully track",
-        block: String? = null,
         points: List<GeoPoint> = line
     ): String =
-        """{"name":"$name","kind":"TRACK","shape":"LINE","method":"UNSET",""" +
-            """"blockName":${if (block == null) "null" else "\"$block\""},"intervalDays":"7",""" +
-            """"swathWidthM":"","passesRequired":1,"passSeparationM":"","notes":null,""" +
+        """{"name":"$name","kind":"TRACK","notes":null,""" +
             """"points":${pointsJson(points)}}"""
 
     private fun pointsJson(points: List<GeoPoint>): String =
@@ -146,17 +141,24 @@ class WebEditorSaveTest {
     @Test
     fun aSaveFromTheDeskChangesTheDetailsAndNothingElse() = runBlocking {
         val id = assets.createAsset(name = "Estuary road", geometry = line, groupName = "Estuary")
-        // A spray already logged on the phone, and a line already measured: the desk has heard of
-        // neither, and neither may be lost.
-        assets.updateAsset(assets.getAsset(id)!!.copy(lastSprayedAtEpochMs = 1_780_000_000_000L))
+        // A spray already logged on the phone, a line already measured, and the fields the desk no
+        // longer shows set to values of their own: the desk has heard of none of them, and none of
+        // them may be lost by a save from the desk.
+        assets.updateAsset(
+            assets.getAsset(id)!!.copy(
+                lastSprayedAtEpochMs = 1_780_000_000_000L,
+                method = "BOOM",
+                intervalDays = 90,
+                swathWidthM = 12.5,
+                passesRequired = 2,
+                passSeparationM = 3.0
+            )
+        )
         val version = stateRecord(id).version
 
-        val answer = saved(
-            documents.save(id, editBody(version, name = "Estuary road, lower", intervalDays = "90"))
-        )
+        val answer = saved(documents.save(id, editBody(version, name = "Estuary road, lower")))
 
         assertEquals("Estuary road, lower", answer.record.asset.name)
-        assertEquals("Estuary", answer.record.groupName)
         assertTrue(
             "the answer carries the version the next edit quotes: ${answer.record.version}",
             answer.record.version.isNotBlank()
@@ -164,8 +166,12 @@ class WebEditorSaveTest {
 
         val stored = assets.getAsset(id)!!
         assertEquals("Estuary road, lower", stored.name)
+        // The block, the method, the interval, the swath width and the pass count are the phone's own
+        // and the desk never mentions them, so a save leaves every one exactly as it was.
+        assertEquals("Estuary", assets.observeGroupName(id).first())
+        assertEquals("BOOM", stored.method)
         assertEquals(90, stored.intervalDays)
-        assertEquals("the swath the desk typed is the repository's write", 12.5, stored.swathWidthM!!, 0.0)
+        assertEquals(12.5, stored.swathWidthM!!, 0.0)
         assertEquals(2, stored.passesRequired)
         assertEquals(3.0, stored.passSeparationM!!, 0.0)
         assertEquals("ROAD", stored.kind)
@@ -210,17 +216,16 @@ class WebEditorSaveTest {
     }
 
     @Test
-    fun anEditCanMoveAnAssetIntoAnotherBlock() = runBlocking {
+    fun anEditLeavesTheBlockThePhoneHoldsAlone() = runBlocking {
         val id = assets.createAsset(name = "Estuary road", geometry = line, groupName = "Estuary")
         val version = stateRecord(id).version
 
-        val answer = saved(documents.save(id, editBody(version, block = "Home block")))
+        saved(documents.save(id, editBody(version, name = "Estuary road, lower")))
 
-        assertEquals("Home block", answer.record.groupName)
-        assertEquals("Home block", assets.observeGroupName(id).first())
-        // The block row is the repository's own work, so the phone's list folds the asset under it
-        // too - the desk started a block without a screen for blocks existing.
-        assertTrue(assets.observeBlockNames().first().contains("Home block"))
+        // The block is a field the desk no longer shows and never sends, so a save cannot move a place
+        // out of it - the row's own block is written straight back.
+        assertEquals("Estuary", assets.observeGroupName(id).first())
+        assertEquals(listOf("Estuary"), assets.observeBlockNames().first())
     }
 
     @Test
@@ -282,14 +287,19 @@ class WebEditorSaveTest {
 
     @Test
     fun aNewTrackFromTheDeskIsStoredLikeAnyOther() = runBlocking {
-        val answer = created(documents.create(newAssetBody(block = "Home block")))
+        val answer = created(documents.create(newAssetBody()))
 
         val id = answer.record.asset.id
         assertTrue("the answer is about a row that exists", id > 0)
         val stored = assets.getAsset(id)!!
         assertEquals("Gully track", stored.name)
         assertEquals("TRACK", stored.kind)
-        assertEquals("the interval the form sent, not a default", 7, stored.intervalDays)
+        assertEquals(
+            "the starting values the desk never sends are the phone's own defaults",
+            120,
+            stored.intervalDays
+        )
+        assertEquals("UNSET", stored.method)
         assertTrue("a new asset is active", stored.active)
         assertEquals(line, assets.getAssetGeometry(id).line)
         assertEquals(
@@ -298,9 +308,8 @@ class WebEditorSaveTest {
             stored.lengthM,
             0.5
         )
-        // The block was started by the name, exactly as it would be from the phone's own form.
-        assertEquals("Home block", assets.observeGroupName(id).first())
-        assertEquals("Home block", assets.observeBlockNames().first().single())
+        // The desk has no block field any more, so the new track stands on its own.
+        assertNull("no block was named, so it is on its own", assets.observeGroupName(id).first())
         assertTrue("the new track has a version for the desk to quote", stateRecord(id).version.isNotBlank())
     }
 
@@ -568,7 +577,6 @@ class WebEditorSaveTest {
         )
         val serving = WebEditorDocuments(
             assets = assets,
-            sprays = sprays,
             token = "7f3a9c7f3a9c7f3a9c7f3a9c7f3a9c7f",
             basemap = { error("nothing here reads the basemap") },
             position = { null },
@@ -604,7 +612,6 @@ class WebEditorSaveTest {
     fun theDocumentsCarryTheTokenWhenThereIsOneAndNothingWhenThereIsNot() = runBlocking {
         fun serving(token: String?) = WebEditorDocuments(
             assets = assets,
-            sprays = sprays,
             token = token,
             basemap = { Basemap.DEFAULT },
             position = { null },

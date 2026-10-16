@@ -5,40 +5,31 @@ import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetPhrase
 import nz.mckenzie.trailday.domain.asset.AssetShape
-import nz.mckenzie.trailday.domain.asset.MethodPhrase
-import nz.mckenzie.trailday.domain.asset.PassPhrase
-import nz.mckenzie.trailday.domain.asset.SprayMethod
-import nz.mckenzie.trailday.domain.backup.GroupRecord
-import nz.mckenzie.trailday.domain.backup.ProductRecord
-import nz.mckenzie.trailday.domain.due.DueCalculator
-import nz.mckenzie.trailday.domain.due.DueStatus
 import nz.mckenzie.trailday.domain.doc.DocTrack
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.track.TrackInterchange
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
-import nz.mckenzie.trailday.map.AssetColors
-import nz.mckenzie.trailday.ui.AssetEdits
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.ZoneId
 
 /**
  * The document the page is handed.
  *
  * Two things are being held here. One is that the desk is told enough to draw and to answer a
- * question: the traffic light, the day it is due, the block, the catalogue, the box the work is in
- * and where the phone is. The other is that nothing the operator typed on the phone is quietly
- * dropped on the way out - the mapping into the backup vocabulary is written out in
- * [WebEditorJson], and a column forgotten there is a column the desk never sees.
+ * question: the kind, the line, the box the work is in and where the phone is. The other is that
+ * nothing the operator typed on the phone is quietly dropped on the way out - the mapping into the
+ * backup vocabulary is written out in [WebEditorJson], and a column forgotten there is a column the
+ * desk never sees.
+ *
+ * What is *not* in the document is held as firmly: nothing about when a place is next due, the block
+ * it sits in, how it is sprayed or what was in the tank travels to the desk at all.
  */
 class WebEditorJsonTest {
 
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
-    private val zone = ZoneId.of("Pacific/Auckland")
-    private val now = 1_758_000_000_000L
 
     /** An asset with every field a value of its own, so a dropped column cannot hide. */
     private val everyField = AssetEntity(
@@ -59,14 +50,6 @@ class WebEditorJsonTest {
         lengthM = 3300.0
     )
 
-    private fun dueOf(asset: AssetEntity) = DueCalculator.calculate(
-        lastSprayedAtEpochMs = asset.lastSprayedAtEpochMs,
-        intervalDays = asset.intervalDays,
-        leadDays = AssetEntity.DEFAULT_LEAD_DAYS,
-        nowEpochMs = now,
-        zoneId = zone
-    )
-
     private fun roundTrip(document: WebEditorDocument): WebEditorDocument =
         json.decodeFromString(WebEditorDocument.serializer(), WebEditorJson.build(document))
 
@@ -79,11 +62,9 @@ class WebEditorJsonTest {
         recordings: Int = 0,
         sprays: Int = 4
     ) = WebEditorDocument(
-        nowEpochMs = now,
         assets = listOf(
             WebEditorJson.record(
                 asset = asset,
-                due = dueOf(asset),
                 sprayCount = sprays,
                 groupName = groupName,
                 paths = listOf(path),
@@ -146,11 +127,9 @@ class WebEditorJsonTest {
         // rather than dropping them.
         val spur = listOf(path.last(), GeoPoint(-41.55, 173.85))
         val record = WebEditorDocument(
-            nowEpochMs = now,
             assets = listOf(
                 WebEditorJson.record(
                     asset = everyField,
-                    due = dueOf(everyField),
                     sprayCount = 4,
                     groupName = "Estuary",
                     paths = listOf(path, spur),
@@ -167,11 +146,9 @@ class WebEditorJsonTest {
     @Test
     fun `an asset with nothing drawn carries no paths at all`() {
         val record = WebEditorDocument(
-            nowEpochMs = now,
             assets = listOf(
                 WebEditorJson.record(
                     asset = everyField,
-                    due = dueOf(everyField),
                     sprayCount = 4,
                     groupName = "Estuary",
                     paths = emptyList(),
@@ -184,26 +161,16 @@ class WebEditorJsonTest {
     }
 
     @Test
-    fun `the asset carries the traffic light and the day it is next due`() {
-        val due = dueOf(everyField)
-        val record = roundTrip(documentWith(everyField)).assets.single()
+    fun `nothing about when a place is next due reaches the desk`() {
+        val text = WebEditorJson.build(documentWith(everyField))
 
-        assertEquals(due.status.name, record.dueStatus)
-        assertEquals(due.dueDateEpochMs, record.dueAtEpochMs)
-        assertEquals(due.daysUntilDue, record.daysUntilDue)
-        assertEquals(4, record.sprayCount)
-        assertEquals("Estuary", record.groupName)
-    }
-
-    @Test
-    fun `an asset never sprayed says so, and has no due day to show`() {
-        val never = everyField.copy(lastSprayedAtEpochMs = null)
-
-        val record = roundTrip(documentWith(never)).assets.single()
-
-        assertEquals(DueStatus.NEVER_SPRAYED.name, record.dueStatus)
-        assertNull(record.dueAtEpochMs)
-        assertNull(record.daysUntilDue)
+        // The traffic light, the day it is due and the count of sprays were the desk's own once; they
+        // are the phone's business now, and a document that still carried them would be one the page
+        // could show without meaning to.
+        assertTrue("no due status: $text", !text.contains("dueStatus"))
+        assertTrue("no due day: $text", !text.contains("dueAtEpochMs"))
+        assertTrue("no count of sprays: $text", !text.contains("sprayCount"))
+        assertTrue("no block name: $text", !text.contains("groupName"))
     }
 
     @Test
@@ -247,7 +214,6 @@ class WebEditorJsonTest {
         )
         val withHeights = WebEditorJson.record(
             asset = everyField,
-            due = dueOf(everyField),
             sprayCount = 0,
             groupName = null,
             paths = listOf(climbed),
@@ -271,26 +237,8 @@ class WebEditorJsonTest {
     }
 
     @Test
-    fun `blocks and products travel in the backup's own vocabulary`() {
-        val document = WebEditorDocument(
-            nowEpochMs = now,
-            groups = listOf(GroupRecord(id = 3L, name = "Estuary", notes = "The lower block")),
-            products = listOf(
-                ProductRecord(id = 1L, name = "Roundup", unit = "mL", rateText = "10 mL/L"),
-                ProductRecord(id = 2L, name = "Spray oil", archived = true)
-            )
-        )
-
-        val restored = roundTrip(document)
-
-        assertEquals(document.groups, restored.groups)
-        assertEquals(document.products, restored.products)
-    }
-
-    @Test
     fun `the box the work is in and the phone's fix are both offered`() {
         val document = WebEditorDocument(
-            nowEpochMs = now,
             bounds = WebEditorBounds.of(
                 LatLngBounds(minLat = -41.6, minLng = 173.8, maxLat = -41.4, maxLng = 174.1)
             ),
@@ -341,31 +289,17 @@ class WebEditorJsonTest {
     }
 
     @Test
-    fun `the desk's form is offered the phone's own words`() {
+    fun `the desk's form is offered the phone's own kinds`() {
         val choices = roundTrip(documentWith(everyField)).choices
 
-        // Not a second copy of the vocabulary: the phone's own phrase tables, value and label, so a
-        // kind added on the phone appears on the desk with nothing to remember here.
+        // Not a second copy of the vocabulary: the phone's own phrase table, value and label, so a
+        // kind added on the phone appears on the desk with nothing to remember here. The kinds are
+        // all the form offers: a place's spray method, interval and pass count are the phone's own
+        // fields and never travel to the desk.
         assertEquals(
             AssetPhrase.kinds.map { it.name to AssetPhrase.kind(it) },
             choices.kinds.map { it.value to it.label }
         )
-        assertEquals(
-            MethodPhrase.choices.map { it.name to MethodPhrase.choice(it) },
-            choices.methods.map { it.value to it.label }
-        )
-        assertEquals(
-            PassPhrase.choices.map { it.toString() to PassPhrase.choice(it) },
-            choices.passes.map { it.value to it.label }
-        )
-        // And the sentences under the fields, which are the phone's own - including the one a kind
-        // that is ground gets *instead* of a swath field, exactly as the phone's own screen shows it.
-        assertEquals(PassPhrase.SEPARATION_HINT, choices.separationHint)
-        assertEquals(AssetEdits.SWATH_HINT, choices.swathHint)
-        assertEquals(AssetEdits.BLOCK_HINT, choices.blockHint)
-        assertEquals(AssetEdits.GROUND_HINT, choices.groundHint)
-        // There is no shape list to offer: whether a thing is a line or a place is what its kind
-        // means (`AssetKind.shape`), so the desk is offered the phone's kinds and no second question.
     }
 
     @Test
@@ -379,67 +313,25 @@ class WebEditorJsonTest {
         assertEquals("AREA", kinds.getValue(AssetKind.CARPARK.name).shape)
         assertEquals("LINE", kinds.getValue(AssetKind.TRACK.name).shape)
         assertEquals("POINT", kinds.getValue(AssetKind.OTHER_PLACE.name).shape)
-        // Nothing else carries one: picking a method or a pass count makes no shape at all.
-        assertNull(WebEditorChoices.ofApp().methods.first().shape)
-        assertNull(WebEditorChoices.ofApp().passes.first().shape)
     }
 
     @Test
-    fun `a new asset is offered the phone's own starting point`() {
+    fun `a new asset is offered the phone's own starting kind`() {
         val fresh = roundTrip(documentWith(everyField)).newAsset
 
-        // What a track somebody draws from scratch starts as, taken from the phone's own table rather
-        // than written into the page: a default copied into JavaScript is a default that drifts, and the
-        // one that drifts is the interval.
+        // What a track somebody draws from scratch starts as: the phone's own default kind, rather
+        // than a name written into the page. The interval, method and pass count it starts with are
+        // the phone's own fields and never travel to the desk.
         assertEquals(AssetKind.TRACK.name, fresh.kind)
-        assertEquals(SprayMethod.UNSET.name, fresh.method)
-        assertEquals("120", fresh.intervalDays)
-        assertEquals(AssetEntity.DEFAULT_PASSES_REQUIRED, fresh.passesRequired)
-        assertEquals(
-            "and it is the same default `createAsset` fills in",
-            AssetEntity.DEFAULT_INTERVAL_DAYS.toString(),
-            fresh.intervalDays
-        )
-    }
-
-    @Test
-    fun `a spray method carries the swath width picking it implies`() {
-        val methods = WebEditorChoices.ofApp().methods.associateBy { it.value }
-
-        // The phone's own table, so the desk can move the field the way the phone's form does when a
-        // boom becomes a knapsack.
-        assertEquals("3", methods.getValue(SprayMethod.BOOM.name).swathM)
-        assertEquals("1", methods.getValue(SprayMethod.KNAPSACK.name).swathM)
-        assertNull("a method nobody has recorded implies no width", methods.getValue(SprayMethod.UNSET.name).swathM)
-        // Nothing else carries one: picking a kind does not imply a width.
-        assertNull(WebEditorChoices.ofApp().kinds.first().swathM)
-    }
-
-    @Test
-    fun `the traffic light's colours travel under the names the page looks them up by`() {
-        val restored = roundTrip(
-            WebEditorDocument(
-                nowEpochMs = now,
-                dueColours = DueStatus.entries.associate { it.name to AssetColors.forStatus(it) }
-            )
-        )
-
-        // The phone's own red, amber and green - the ones its map paints lines with - so the page's
-        // key is the phone's, and a state nothing is in still has its colour rather than a grey dot.
-        assertEquals(AssetColors.RED, restored.dueColours.getValue(DueStatus.OVERDUE.name))
-        assertEquals(AssetColors.RED, restored.dueColours.getValue(DueStatus.NEVER_SPRAYED.name))
-        assertEquals(AssetColors.YELLOW, restored.dueColours.getValue(DueStatus.DUE_SOON.name))
-        assertEquals(AssetColors.GREEN, restored.dueColours.getValue(DueStatus.NOT_DUE.name))
     }
 
     @Test
     fun `an empty farm is a document with no assets, not a missing document`() {
-        val text = WebEditorJson.build(WebEditorDocument(nowEpochMs = now))
+        val text = WebEditorJson.build(WebEditorDocument())
 
         val restored = json.decodeFromString(WebEditorDocument.serializer(), text)
 
         assertTrue(restored.assets.isEmpty())
-        assertEquals(now, restored.nowEpochMs)
         // The page is handed every key every time, so nothing it reads is ever ambiguous.
         assertTrue(text.contains("\"bounds\":null"))
         assertTrue(text.contains("\"position\":null"))

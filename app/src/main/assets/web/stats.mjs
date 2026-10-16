@@ -1,17 +1,14 @@
 /*
- * What the whole farm comes to: the phone's own corner box, on a desk.
+ * The phone's own words for a figure, on a desk.
  *
  * Pure, and separate from `app.js` for the same reason `find.mjs` is separate: node runs the very
- * file the browser does (`app/src/test/js/stats.test.mjs`, which CI runs), so the counts and the
- * figures the desk puts in its corner are pinned by a test rather than read by eye.
+ * file the browser does (`app/src/test/js/stats.test.mjs`, which CI runs), so the words the desk puts
+ * beside a length or a piece of ground are pinned by a test rather than read by eye.
  *
- * **The phone's arithmetic, not a second opinion.** Every figure here is the rule the phone's own
- * map box uses: the length of every line added up, and an area made of a ring's own ground and a
- * line's estimates (never one read as the other). The two formatters are here
- * too, and for the same reason: they are the phone's own words for a figure (`formatDistance` and
- * `formatArea` on the phone), and a copy kept in `app.js` as well would be a second copy to fall
- * behind. A desk that totalled the farm its own way would be a second answer to one question, and
- * the operator is the one who would catch it.
+ * **The phone's words, not a second opinion.** The two formatters here are the phone's own
+ * (`formatDistance` and `formatArea`), so a number read off a phone and a number read off a desk are
+ * the same figure said the same way. Anything a desk totalled its own way would be a second answer to
+ * one question, and the operator is the one who would catch it.
  */
 
 /**
@@ -37,59 +34,4 @@ export function areaText(squareMetres) {
   return squareMetres >= 10_000
     ? `${(squareMetres / 10_000).toFixed(1)} ha`
     : `${Math.round(squareMetres)} m²`;
-}
-
-/**
- * What the whole farm comes to, from the assets the phone carries.
- *
- * [items] is `state.assets` as the phone sends it: each one its asset, with its shape, length, swath
- * width and passes, and its own due state. The rules are the phone's own, item by item:
- *
- *  - a never-sprayed asset counts with the overdue ones, because both need going over and the map
- *    paints them the same colour;
- *  - an area is a ring's own **measured** ground, or a line's **estimate** from a swath width, and
- *    both passes of a two-pass line are ground rather than the same ground twice;
- *  - a place encloses nothing and has no length, so it adds to the counts and to nothing else.
- */
-export function farmStats(items) {
-  const all = items ?? [];
-  const inState = (status) => all.filter((item) => item.dueStatus === status).length;
-
-  // The phone's own question about a ring: does it enclose ground it has measured? A line or a place
-  // answers no, and a ring whose corners measure nothing is not measured either.
-  const isGround = (item) => item.asset.shape === 'AREA' && (item.asset.areaM2 ?? 0) > 0;
-  const isEstimated = (item) =>
-    !isGround(item) && item.asset.swathWidthM && (item.asset.lengthM ?? 0) > 0;
-
-  return {
-    count: all.length,
-    overdue: inState('OVERDUE') + inState('NEVER_SPRAYED'),
-    dueSoon: inState('DUE_SOON'),
-    notDue: inState('NOT_DUE'),
-    lengthM: all.reduce((total, item) => total + (item.asset.lengthM ?? 0), 0),
-    areaSqm: all.reduce((total, item) => {
-      if (isGround(item)) return total + item.asset.areaM2;
-      if (isEstimated(item)) {
-        return total + item.asset.lengthM * item.asset.swathWidthM * item.asset.passesRequired;
-      }
-      return total;
-    }, 0),
-    areaAssetCount: all.filter((item) => isGround(item) || isEstimated(item)).length
-  };
-}
-
-/**
- * The farm's figures, said the way the phone's own box says them.
- *
- * Two lines, and no more: how long the farm is and how much ground it covers. Every line is left out
- * when it is not known rather than shown as a zero - a farm of places has no length at all - and the
- * area is one plain figure rather than a claim about how many assets it covers. Whether anything is
- * still to be driven is not said here: the counts above already say how much of the farm is left, and
- * a line repeating them is a line the desk and the phone both pay map for.
- */
-export function farmStatsLines(stats) {
-  const lines = [];
-  if (stats.lengthM > 0) lines.push(`Total length ${metresText(stats.lengthM)}`);
-  if (stats.areaSqm > 0) lines.push(`Total area ${areaText(stats.areaSqm)}`);
-  return lines;
 }

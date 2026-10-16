@@ -4,18 +4,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.AssetWithDue
-import nz.mckenzie.trailday.data.SprayRepository
-import nz.mckenzie.trailday.data.db.GroupEntity
-import nz.mckenzie.trailday.data.db.ProductEntity
 import nz.mckenzie.trailday.doc.ArcGisDocTracks
 import nz.mckenzie.trailday.doc.DocTracksResult
 import nz.mckenzie.trailday.doc.DocTracksSource
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetRemovalRules
 import nz.mckenzie.trailday.domain.asset.AssetShape
-import nz.mckenzie.trailday.domain.asset.BulkAssetEdits
-import nz.mckenzie.trailday.domain.backup.GroupRecord
-import nz.mckenzie.trailday.domain.backup.ProductRecord
 import nz.mckenzie.trailday.domain.doc.DocBounds
 import nz.mckenzie.trailday.domain.doc.DocPlaces
 import nz.mckenzie.trailday.domain.doc.DocTrackCache
@@ -24,7 +18,6 @@ import nz.mckenzie.trailday.domain.doc.EmptyDocTrackCache
 import nz.mckenzie.trailday.domain.doc.docSourceRef
 import nz.mckenzie.trailday.domain.doc.matching
 import nz.mckenzie.trailday.domain.doc.within
-import nz.mckenzie.trailday.domain.due.DueStatus
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
@@ -40,8 +33,8 @@ import nz.mckenzie.trailday.offline.HttpResponse
  * The documents the editor serves, built from the same repository calls the app's own screens use.
  *
  * Nothing here invents anything, and every write it serves is applied to the row the phone holds now
- * and saved through the repository: the due colours are the ones the map colours its lines with
- * ([AssetColors.forStatus], on the phone's own clock), the features are the ones the map draws
+ * and saved through the repository: the colours are the ones the map colours a line with
+ * ([AssetColors.forKind], one colour per family of kind), the features are the ones the map draws
  * ([AssetGeoJson], geometry included), the style is the phone's own layer tables ([WebStyleJson]),
  * and the page is the copy inside the APK. That is the whole reason the editor is
  * served by the phone rather than shipped as a separate thing: one database, one clock, one set of
@@ -49,17 +42,15 @@ import nz.mckenzie.trailday.offline.HttpResponse
  *
  * It is kept free of Android so the shape of the wire can be tested on the JVM; the wiring - a real
  * repository, the real assets, the real position - happens where the service is started. What it is
- * *allowed* to read or change is decided here and nowhere else: assets, blocks, products and the
- * phone's own fix may be read, an active asset's own details and its line may be changed through the
- * edit rules, a track may be drawn on a computer, and a track with nothing recorded against it may be
- * taken away. The counts behind that last rule are *read* here and never written: sprays, recordings
- * and due dates are the phone's business, and an editor that could reach them would be a management
- * application, which the plan says this is not. Deleting the asset the counts belong to is as close as
- * the desk comes to them, and that is refused whenever there is anything to lose.
+ * *allowed* to read or change is decided here and nowhere else: the places and the phone's own fix
+ * may be read, a place's name, kind, notes and line may be changed through the edit rules, a track
+ * may be drawn on a computer, and a place with nothing recorded against it may be taken away. The
+ * counts behind that last rule are *read* here and never written: sprays and recordings are the
+ * phone's business, and the block a place sits in and the interval it is sprayed on are the phone's
+ * too - a desk save never mentions them, so it cannot wipe them.
  */
 class WebEditorDocuments(
     private val assets: AssetRepository,
-    private val sprays: SprayRepository,
     /**
      * The token, because the documents contain URLs and those have to carry it too - or null when
      * this run asks for none, in which case the URLs it hands out carry nothing.
@@ -89,9 +80,9 @@ class WebEditorDocuments(
 ) : WebEditorData {
 
     override suspend fun state(authority: String): String {
-        val nowMs = now()
-        // The same read the map makes, on the same clock: an asset is the colour the phone would
-        // draw it, not the colour a laptop worked out for itself.
+        // The block name and the spray count are read here without being shown: the version a card
+        // quotes is hashed with the block, and the delete sentence counts the sprays, so both have to
+        // travel out - they are the phone's own and the desk never has to look at either.
         val work = withDue()
         // Once for the farm rather than once per asset: every record carries the version of the line
         // it was handed and a sentence about what deleting it would take, and both are built from
@@ -101,23 +92,17 @@ class WebEditorDocuments(
 
         return WebEditorJson.build(
             WebEditorDocument(
-                nowEpochMs = nowMs,
                 assets = work.map { item ->
                     WebEditorJson.record(
                         asset = item.asset,
-                        due = item.due,
                         sprayCount = item.sprayCount,
                         groupName = item.groupName,
                         paths = paths[item.asset.id]?.paths.orEmpty(),
                         recordingCount = recordings[item.asset.id] ?: 0
                     )
                 },
-                groups = assets.observeGroups().first().map { it.toRecord() },
-                products = sprays.observeProducts().first().map { it.toRecord() },
                 bounds = assets.assetBounds()?.let { WebEditorBounds.of(it) },
                 position = position()?.let { WebEditorPosition(lat = it.lat, lng = it.lng) },
-                // The phone's own traffic light, so the page's key is the phone's - see the field.
-                dueColours = DueStatus.entries.associate { it.name to AssetColors.forStatus(it) },
                 // The phone's own words for the form the desk is about to build, from the phone's own
                 // phrase tables rather than from a list kept in JavaScript.
                 choices = WebEditorChoices.ofApp()
@@ -131,20 +116,20 @@ class WebEditorDocuments(
         // document is, and the state document asks for the same read in the same breath.
         val paths = assets.allAssetGeometry()
 
-        // The same lines the map draws, so a track is where the phone says it is. The stretches of a
-        // half-sprayed line are not here yet: that needs the recorded passes, which is later work,
-        // and a line drawn whole in its traffic light's colour is what the map showed before that
-        // feature existed.
+        // The same lines the map draws, so a track is where the phone says it is. Each is drawn in the
+        // colour of its kind - the same colour the phone's own map paints that kind - so a place's
+        // family is what the desk's map says, and nothing here works a colour out for itself.
         val lines = work.map { item ->
             val geometry = paths[item.asset.id] ?: AssetGeometry.NONE
             val shape = AssetShape.fromStorage(item.asset.shape)
+            val kind = AssetKind.fromStorage(item.asset.kind, shape)
             AssetLine(
                 assetId = item.asset.id,
                 name = item.asset.name,
-                colorHex = AssetColors.forStatus(item.due.status),
+                colorHex = AssetColors.forKind(kind),
                 points = geometry.line,
                 sideTracks = geometry.sideTracks,
-                kind = AssetKind.fromStorage(item.asset.kind, shape),
+                kind = kind,
                 shape = shape
             )
         }
@@ -155,14 +140,14 @@ class WebEditorDocuments(
      * `PUT /api/assets/<id>`: the desk's edit, judged against the row the phone holds now.
      *
      * The row is read through [withDue] rather than straight from the table because that is where the
-     * block name lives - and the block name is part of the version the desk quoted back, so moving an
-     * asset into another block is a change the desk has to have seen.
+     * block name lives - and the block name is part of the version the desk quoted back, even though
+     * the desk never shows it.
      *
-     * After the write the asset is read a second time and the answer is built from that read. Both
-     * halves of the record need it: the due colour has to be the phone's own arithmetic *after* the
-     * edit - an interval is one of the fields, and it can move a traffic light - and the version has
-     * to be the one the next edit must quote back, so saving twice without reloading the page is not
-     * refused as stale.
+     * After the write the asset is read a second time and the answer is built from that read, so what
+     * the desk is told is what the phone holds: the version it must quote on the next edit, and the
+     * sentence about what deleting it would take. The fields the desk no longer sends - the block, the
+     * method, the interval, the swath width and the pass count - are taken from the row the phone holds
+     * now (see [WebEditorEdits]), so a save from the desk cannot wipe any of them.
      */
     override suspend fun save(id: Long, body: String?): WebEditorWrite {
         val before = withDue().firstOrNull { it.asset.id == id }
@@ -216,7 +201,7 @@ class WebEditorDocuments(
      * the block and stores the geometry and its length in one transaction - and the answer is the row as
      * the phone holds it afterwards, read back the same way a save's is. So a desk's new track is
      * indistinguishable, from that moment on, from one drawn by tapping on the phone: same table, same
-     * points, same due arithmetic on the next page load.
+     * points, same rules on the next page load.
      */
     override suspend fun create(body: String?): WebEditorWrite {
         return when (val result = WebEditorEdits.create(body, now())) {
@@ -443,33 +428,6 @@ class WebEditorDocuments(
     }
 
     /**
-     * `POST /api/assets/together`: several assets changed by one form.
-     *
-     * The rules live in [BulkAssetEdits] - every row judged before any is written - and this is the
-     * four reads and the one write they are handed: the row the phone holds now, its geometry (half of
-     * the version the desk quotes), the fingerprint check itself, and `saveAssetEditsAll`, which is one
-     * transaction. Nothing here decides anything about a field; that is `ui/AssetEdits`' business, by
-     * the same call one asset's own edit makes, so a width or an interval means the same thing whether
-     * the operator ticked one row or six.
-     */
-    override suspend fun editTogether(body: String?): WebEditorWrite {
-        // The whole farm's rows and geometry, read once each: a bulk edit names its own rows but the
-        // versions it quotes are made of paths, and reading them one at a time would be one query per
-        // row inside the judgement rather than one for the lot.
-        val work = withDue().associateBy { it.asset.id }
-        val geometries = assets.allAssetGeometry()
-
-        return WebEditorEdits.editTogether(
-            body = body,
-            current = { id ->
-                work[id]?.let { BulkAssetEdits.AssetRow(asset = it.asset, blockName = it.groupName) }
-            },
-            paths = { id -> geometries[id]?.paths.orEmpty() },
-            save = { edits -> assets.saveAssetEditsAll(edits) }
-        )
-    }
-
-    /**
      * One asset as the wire carries it, with the two reads its record needs.
      *
      * The geometry for the version, and the recordings for the delete sentence. Both are single-asset
@@ -479,7 +437,6 @@ class WebEditorDocuments(
     private suspend fun recordOf(item: AssetWithDue): WebEditorAssetRecord =
         WebEditorJson.record(
             asset = item.asset,
-            due = item.due,
             sprayCount = item.sprayCount,
             groupName = item.groupName,
             paths = assets.getAssetGeometry(item.asset.id).paths,
@@ -494,11 +451,12 @@ class WebEditorDocuments(
         WebEditorWrite.Refused(refusal, message)
 
     /**
-     * Every active asset with its due status, read the way the app's own map reads it.
+     * Every active asset with the two fields the desk carries invisibly: the block name the version is
+     * hashed with, and the spray count the delete sentence counts.
      *
-     * On the phone's clock and through the phone's own repository call: the spray summaries, the
-     * block names and the due arithmetic are folded in there, so a document built from this says what
-     * the phone says - and a save answered from it agrees with the next `GET /api/state`.
+     * Read through the phone's own repository call, which folds in the summaries, the block names and
+     * the due arithmetic - the desk uses neither the due date nor the colour, but the read is the one
+     * the app's own map makes, so a document built from it says what the phone says.
      */
     private suspend fun withDue(): List<AssetWithDue> =
         assets.observeAssetsWithDue(nowProvider = flowOf(now())).first()
@@ -537,17 +495,6 @@ class WebEditorDocuments(
 
     private fun contentTypeOf(name: String): String =
         CONTENT_TYPES[name.substringAfterLast('.', "").lowercase()] ?: DEFAULT_CONTENT_TYPE
-
-    private fun GroupEntity.toRecord() = GroupRecord(id = id, name = name, notes = notes)
-
-    private fun ProductEntity.toRecord() = ProductRecord(
-        id = id,
-        name = name,
-        unit = unit,
-        rateText = rateText,
-        notes = notes,
-        archived = archived
-    )
 
     companion object {
         /** What the page file is called inside the APK's `web/` directory. */

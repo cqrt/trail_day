@@ -9,42 +9,35 @@ import nz.mckenzie.trailday.domain.asset.AssetPhrase
 import nz.mckenzie.trailday.domain.asset.AssetRemoval
 import nz.mckenzie.trailday.domain.asset.AssetRemovalRules
 import nz.mckenzie.trailday.domain.asset.AssetShape
-import nz.mckenzie.trailday.domain.asset.BulkAssetEdits
-import nz.mckenzie.trailday.domain.asset.MethodPhrase
-import nz.mckenzie.trailday.domain.asset.PassPhrase
-import nz.mckenzie.trailday.domain.asset.SprayMethod
 import nz.mckenzie.trailday.domain.backup.AssetRecord
-import nz.mckenzie.trailday.domain.backup.GroupRecord
-import nz.mckenzie.trailday.domain.backup.ProductRecord
 import nz.mckenzie.trailday.domain.doc.DocPlaces
 import nz.mckenzie.trailday.domain.doc.DocTrack
 import nz.mckenzie.trailday.domain.doc.distanceM
-import nz.mckenzie.trailday.domain.due.DueInfo
 import nz.mckenzie.trailday.domain.geo.ElevationProfile
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.track.TrackInterchange
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
-import nz.mckenzie.trailday.ui.AssetEdits
 
 /**
  * What the page is told about the work: the document behind `GET /api/state`, and what a write
  * answers with.
  *
- * It is the backup's own vocabulary - [AssetRecord], [GroupRecord], [ProductRecord], already
- * versioned, already restored by an older build and read by a newer one - rather than a second
- * asset shape invented for the web. A second shape is a second mapping to keep right, and the one
- * that would quietly fall behind is the one nobody looks at. What is added on top is the view
- * fields the page cannot work out for itself: which traffic light the asset is under, when it is
- * next due, and the version an edit has to quote back - all decided by the phone.
+ * It is the backup's own vocabulary - [AssetRecord], already versioned, already restored by an older
+ * build and read by a newer one - rather than a second asset shape invented for the web. A second
+ * shape is a second mapping to keep right, and the one that would quietly fall behind is the one
+ * nobody looks at. What is added on top is the view fields the page cannot work out for itself: the
+ * version an edit has to quote back, and the sentence a delete would answer with - both decided by
+ * the phone.
  *
- * **The geometry is not in here.** It travels once, in the GeoJSON the style's own source reads
- * (`/api/assets.geojson`, built by [nz.mckenzie.trailday.map.AssetGeoJson]) - the same document the
- * app's own map draws, so the desk and the phone cannot disagree about where a line goes. A record
- * here carries `points` empty, and its `lengthM` still says how long it is.
+ * **The geometry and the colours are not in here.** They travel once, in the GeoJSON the style's own
+ * source reads (`/api/assets.geojson`, built by [nz.mckenzie.trailday.map.AssetGeoJson]) - the same
+ * document the app's own map draws, so the desk and the phone cannot disagree about where a line goes
+ * or what colour its kind is. A record here carries `points` empty, and its `lengthM` still says how
+ * long it is.
  *
- * The clock is the phone's, not the laptop's: `nowEpochMs` is what every due colour in the document
- * was worked out against, so a page whose owner has their clock a day out still agrees with the
- * tractor about what is due.
+ * Nothing about when a place is next due travels here any more, and neither does a block, a spray
+ * method, an interval or a pass count: they are the phone's own fields, and the desk neither shows nor
+ * sends them.
  */
 object WebEditorJson {
 
@@ -71,12 +64,14 @@ object WebEditorJson {
      * desk still has to be told which *line* it was handed, or a card would go on talking about a track
      * that has since been moved, or that has grown a spur while the card was open.
      *
-     * [recordingCount] is here for the same kind of reason: it is not shown, it is what the delete
-     * sentence counts.
+     * [sprayCount] and [groupName] are here for the same kind of reason: neither is shown, one is what
+     * the delete sentence counts and the other is half of the version, and the block a place sits in is
+     * a field the desk no longer sends an edit for - so the row's own is the one that is hashed.
+     *
+     * [recordingCount] is the other half of that first one: it is what the delete sentence counts.
      */
     fun record(
         asset: AssetEntity,
-        due: DueInfo,
         sprayCount: Int,
         groupName: String?,
         paths: List<List<GeoPoint>>,
@@ -108,11 +103,6 @@ object WebEditorJson {
             areaM2 = asset.areaM2,
             points = emptyList()
         ),
-        dueStatus = due.status.name,
-        dueAtEpochMs = due.dueDateEpochMs,
-        daysUntilDue = due.daysUntilDue,
-        sprayCount = sprayCount,
-        groupName = groupName,
         // Sent back by the desk with an edit, so a change made on the phone while the card was open
         // is refused here rather than written over. See [WebEditorVersion].
         version = WebEditorVersion.of(asset, groupName, paths),
@@ -130,8 +120,8 @@ object WebEditorJson {
      * What a save answers with: the asset as the phone now holds it.
      *
      * The whole record rather than an acknowledgement, so the desk can update its own copy without
-     * fetching the document again - and so the colour a row wears after a save is the phone's new
-     * one rather than the laptop's guess at what its own edit did to the due date.
+     * fetching the document again - and so the version it must quote on the next edit is the phone's
+     * own rather than the laptop's guess at what its edit produced.
      */
     fun saved(record: WebEditorAssetRecord): String =
         json.encodeToString(WebEditorSaved.serializer(), WebEditorSaved(record))
@@ -153,18 +143,6 @@ object WebEditorJson {
      */
     fun removed(message: String): String =
         json.encodeToString(WebEditorRemoved.serializer(), WebEditorRemoved(message))
-
-    /**
-     * What a bulk edit answers with: how many rows were changed, and the phone's sentence about it.
-     *
-     * No records travel with it, and that is deliberate rather than lazy. A bulk edit is the one write
-     * whose answer is *cheaper read again*: six rows is more than a list this size wants to carry, and
-     * the page's own copy of the work is out of date in every one of them - a rename changes the row,
-     * a block change moves it, a kind change re-colours it. So the desk reads the work once instead of
-     * taking six records, which is also what keeps a card that was open on one of them honest.
-     */
-    fun edited(count: Int, message: String): String =
-        json.encodeToString(WebEditorEdited.serializer(), WebEditorEdited(count = count, message = message))
 
     /**
      * What reading a dropped track file answers with: the first track's paths, as the desk draws them.
@@ -236,93 +214,53 @@ object WebEditorJson {
 /** Everything `GET /api/state` answers with. */
 @Serializable
 data class WebEditorDocument(
-    /** The phone's clock, which every due status in this document was worked out against. */
-    val nowEpochMs: Long,
     /** The active assets. An archived one is not on the map the operator works from. */
     val assets: List<WebEditorAssetRecord> = emptyList(),
-    val groups: List<GroupRecord> = emptyList(),
-    /** Read-only on the desk: the catalogue is the phone's business. */
-    val products: List<ProductRecord> = emptyList(),
     /** The box the work is in, so the page can open on the farm rather than on the ocean. */
     val bounds: WebEditorBounds? = null,
     /** The phone's last fix, if it has one. Better than the browser's own: see the plan. */
     val position: WebEditorPosition? = null,
     /**
-     * The phone's own traffic light, one colour per due state, keyed by the state's own name.
-     *
-     * The page's key is the one thing that cannot take its colour from a feature: a state nothing
-     * is in has no feature to be painted by, and a grey dot beside "Overdue 0" would be the page's
-     * own opinion about what overdue looks like - the one thing this arrangement exists to avoid.
-     */
-    val dueColours: Map<String, String> = emptyMap(),
-    /**
      * The words and the choices the phone's own edit form offers.
      *
-     * Carried in the document rather than written into the page, for the same reason the colours and
-     * the dash patterns are: a second copy of the vocabulary is a second copy to keep in step, and
-     * the one that falls behind is the one nobody looks at. A kind renamed on the phone is renamed
-     * on the desk the next time the page is opened.
+     * Carried in the document rather than written into the page, for the same reason the dash patterns
+     * are: a second copy of the vocabulary is a second copy to keep in step, and the one that falls
+     * behind is the one nobody looks at. A kind renamed on the phone is renamed on the desk the next
+     * time the page is opened.
      */
     val choices: WebEditorChoices = WebEditorChoices.ofApp(),
     /**
-     * What an asset somebody draws from scratch starts as.
-     *
-     * The phone's own defaults for a new asset - the same ones `AssetRepository.createAsset` and the
-     * phone's own drawing screen use - so a blank form on a laptop starts where a blank form on the
-     * phone starts. A "120" typed into JavaScript would be a second copy of a default, and the one that
-     * falls behind is the one nobody looks at; this way the interval the desk fills in is the interval
-     * the phone would have filled in.
+     * What an asset somebody draws from scratch starts as: the kind from the phone's own table, so a
+     * blank form on a laptop starts where a blank form on the phone starts. The rest of a new asset's
+     * starting values never leave the phone - see [nz.mckenzie.trailday.web.WebEditorEdits].
      */
     val newAsset: WebEditorNewAsset = WebEditorNewAsset.ofApp(),
     /**
      * What a dropped track file (GPX, KML, KMZ or GeoJSON) has to know: the name it travels under, and the
      * largest file the phone will take. Both the phone's own answers - see [WebEditorGpxRules].
      */
-    val gpx: WebEditorGpxRules = WebEditorGpxRules.ofApp(),
-    /**
-     * What changing several assets at once has to know, so the page does not invent either of them.
-     */
-    val together: WebEditorTogetherRules = WebEditorTogetherRules.ofApp()
+    val gpx: WebEditorGpxRules = WebEditorGpxRules.ofApp()
 )
 
 /**
- * What a new asset is before anybody says otherwise.
+ * What a kind a new asset is drawn as, before anybody says otherwise.
  *
- * Numbers as the field would hold them ("120"), because that is what the form's fields are made of: a
- * page that did its own formatting would be a page that could send "120.0" to a rule expecting a whole
- * number's worth of digits.
+ * Only the kind: the method, the interval and the pass count a new place starts with are the phone's
+ * own defaults and the desk never sends them, so there is nothing for the page to fill in.
  */
 @Serializable
-data class WebEditorNewAsset(
-    val kind: String,
-    val method: String,
-    val intervalDays: String,
-    val passesRequired: Int
-) {
+data class WebEditorNewAsset(val kind: String) {
     companion object {
-        fun ofApp() = WebEditorNewAsset(
-            kind = AssetKind.TRACK.name,
-            method = SprayMethod.UNSET.name,
-            intervalDays = AssetEntity.DEFAULT_INTERVAL_DAYS.toString(),
-            passesRequired = AssetEntity.DEFAULT_PASSES_REQUIRED
-        )
+        fun ofApp() = WebEditorNewAsset(kind = AssetKind.TRACK.name)
     }
 }
 
 /**
- * One asset, with the traffic light the page paints it in.
+ * One asset, with what the page needs of it: the drawing, the version and the delete sentence.
  */
 @Serializable
 data class WebEditorAssetRecord(
     val asset: AssetRecord,
-    /** [nz.mckenzie.trailday.domain.due.DueStatus] name, e.g. `DUE_SOON`. */
-    val dueStatus: String,
-    /** The start of the day it is next due, phone's time zone; null when never sprayed. */
-    val dueAtEpochMs: Long? = null,
-    /** Negative when overdue, null when never sprayed, so the page can word it without arithmetic. */
-    val daysUntilDue: Long? = null,
-    val sprayCount: Int = 0,
-    val groupName: String? = null,
     /**
      * The whole of the asset's drawing: the line first, its side tracks after it.
      *
@@ -406,15 +344,6 @@ data class WebEditorRemoval(val allowed: Boolean, val sentence: String) {
 /** What a delete answers with: the phone's own sentence about what happened. */
 @Serializable
 data class WebEditorRemoved(val message: String)
-
-/**
- * What a bulk edit answers with: how many rows were changed, and the phone's own sentence about it.
- *
- * The count travels beside the sentence rather than inside it so a page can do arithmetic with it
- * without reading prose - and so the sentence stays the phone's to word.
- */
-@Serializable
-data class WebEditorEdited(val count: Int, val message: String)
 
 /**
  * What `POST /api/gpx` answers with: the line and side tracks a dropped file holds.
@@ -575,46 +504,11 @@ data class WebEditorDocImported(
     val message: String = ""
 )
 
-/**
- * The facts a bulk edit needs, carried in the state document rather than written into the page.
- *
- * [maxAssets] is how many rows one request may carry - the phone refuses more, and the page says so
- * before sending rather than passing on a refusal about the size of a request. [different] is the word
- * the page shows for a field the picked assets do not agree on: one word, from the phone, so the desk
- * and any screen the phone grows later say the same thing about the same state.
- */
-@Serializable
-data class WebEditorTogetherRules(
-    val maxAssets: Int = BulkAssetEdits.MAX_ASSETS,
-    val different: String = DIFFERENT
-) {
-    companion object {
-        /**
-         * "More than one", because that is what it means and it is said to the operator rather than
-         * about them: a field showing this is a field the picked rows disagree on.
-         */
-        const val DIFFERENT = "More than one"
-
-        fun ofApp() = WebEditorTogetherRules()
-    }
-}
-
 /** One thing an operator can pick, as the phone stores it and as the phone says it. */
 @Serializable
 data class WebEditorChoice(
     val value: String,
     val label: String,
-    /**
-     * The swath width this choice implies, or null when picking it implies nothing.
-     *
-     * Only the spray methods carry one, and it is [nz.mckenzie.trailday.domain.asset.SprayMethod.defaultSwathM]
-     * - the phone's own table. The desk uses it the way [AssetEdits.swathAfterMethodChange] does: a
-     * width left blank, or still holding the previous method's own default, moves with the choice,
-     * and a width the operator typed does not. Without it, picking "Knapsack" on a laptop would leave
-     * a boom's three metres on a backpack, which is the thing that rule exists to stop.
-     */
-    val swathM: String? = null,
-
     /**
      * The shape this choice makes, or null when picking it makes nothing.
      *
@@ -632,27 +526,13 @@ data class WebEditorChoice(
  * The vocabulary the desk's form offers, taken from the phone's own phrases.
  *
  * Every list here is a list the phone's own edit screen offers, and every label is the string that
- * screen shows - including the three sentences under the fields, which are the phone's and travel
- * with the rules they explain rather than being written again in JavaScript. What the page does with
- * them is draw a `<select>`; what it must not do is decide what the options are.
+ * screen shows. What the page does with them is draw a `<select>`; what it must not do is decide what
+ * the options are. Only the kinds are offered: a place's spray method, interval and pass count are the
+ * phone's business, and the desk neither shows nor sends them.
  */
 @Serializable
 data class WebEditorChoices(
-    val kinds: List<WebEditorChoice>,
-    val methods: List<WebEditorChoice>,
-    /** One pass or two. The value is the number, because that is what the wire carries. */
-    val passes: List<WebEditorChoice>,
-    /** What the field under the typed name says when it is empty. */
-    val blockHint: String,
-    val swathHint: String,
-    val separationHint: String,
-    /**
-     * What a kind that is ground says where a line would have had a swath width and a pass count.
-     *
-     * [AssetEdits.GROUND_HINT], word for word, because the desk's form is the phone's form and a
-     * field that vanishes on a laptop without a word reads as a screen that has lost something.
-     */
-    val groundHint: String
+    val kinds: List<WebEditorChoice>
 ) {
     companion object {
         fun ofApp() = WebEditorChoices(
@@ -660,34 +540,8 @@ data class WebEditorChoices(
             // [WebEditorChoice.shape] - and it is the phone's own answer rather than the page's.
             kinds = AssetPhrase.kinds.map {
                 WebEditorChoice(it.name, AssetPhrase.kind(it), shape = it.shape.name)
-            },
-            methods = MethodPhrase.choices.map {
-                WebEditorChoice(
-                    value = it.name,
-                    label = MethodPhrase.choice(it),
-                    swathM = it.defaultSwathM?.let(::plainNumber)
-                )
-            },
-            passes = PassPhrase.choices.map { WebEditorChoice(it.toString(), PassPhrase.choice(it)) },
-            blockHint = AssetEdits.BLOCK_HINT,
-            swathHint = AssetEdits.SWATH_HINT,
-            separationHint = PassPhrase.SEPARATION_HINT,
-            groundHint = AssetEdits.GROUND_HINT
-        )
-
-        /**
-         * A number as the field would hold it: "3" rather than "3.0".
-         *
-         * `AssetEdits` formats its own defaults the same way, and that formatter is private to the
-         * rules it belongs to. Three metres and one metre are the only two numbers that ever come
-         * through here, so this is a formatting decision rather than a copy of a table.
-         */
-        private fun plainNumber(value: Double): String =
-            if (value == Math.floor(value) && !value.isInfinite()) {
-                value.toInt().toString()
-            } else {
-                value.toString()
             }
+        )
     }
 }
 

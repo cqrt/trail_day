@@ -13,7 +13,7 @@
  * mark is the *shape* of stays the phone's decision.
  *
  * A line gets a **white edge** under it - the colour chosen for it, and the page's own paper: white is the
- * one colour the app's traffic light never uses, so a line goes on saying when it is due while the edge
+ * page's own colour and not one of the kinds', so a line goes on saying what it *is* while the edge
  * round it says only "this is the one in hand". It is the same white the drawing's own handles use, and the
  * argument is the house's own (see `houseImage`): a thing has to be findable over dark winter imagery.
  * A place, whose house is a picture rather than a line, keeps a soft **disc of its own colour** behind it

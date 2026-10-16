@@ -55,15 +55,11 @@
       </div>
 
       <!--
-        The farm at a glance: the phone's own corner box, above the list because it is about the
-        whole farm rather than about whatever the boxes below have narrowed it to. Everything in it
-        is the phone's own - the counts and the figures are the phone's own arithmetic, and the
-        dots are the phone's own traffic light, arrived in the state document - and the page fills
-        it in from that document. Hidden until there is anything on the farm to say.
+        The words typed here and the type beside them narrow what the list shows and what the map
+        draws, together: the two are one answer to one question, and the rule that turns them into
+        rows is `find.mjs`.
       -->
-      <div id="farm" hidden></div>
-
-      <input id="search" type="search" placeholder="Find an asset or block" autocomplete="off">
+      <input id="search" type="search" placeholder="Find a place" autocomplete="off">
 
       <!--
         The type, beside the words: which kind of asset is being looked for. Its options are the
@@ -72,32 +68,7 @@
       -->
       <select id="type" aria-label="Type"></select>
 
-      <!--
-        The words over the list's columns: the tick that picks every row out, the name, how it is sprayed,
-        how many passes that takes, and when it is next due. Here rather than inside the list, because they
-        belong to the list as a whole - they stay put while the work scrolls under them, and a screen reader
-        is told what changed on the farm rather than what the columns are called on every redraw. Hidden
-        while there is nothing to name columns for.
-      -->
-      <div id="list-head" hidden>
-        <span class="tick"><input id="tick-all" type="checkbox" aria-label="Pick every asset the list is showing"></span>
-        <span class="name">Name</span>
-        <span class="method">Spray method</span>
-        <span class="passes">Passes</span>
-        <span class="due">Due</span>
-      </div>
-
       <div id="list" aria-live="polite"></div>
-
-      <!--
-        What is picked out, and the one way on with it. Under the list because it is about the rows above
-        it, and hidden until something is ticked so an untouched desk has nothing here at all.
-      -->
-      <div id="together-bar" hidden>
-        <span class="count" id="together-count"></span>
-        <button id="together-open" type="button">Edit together</button>
-        <button id="together-clear" type="button">Clear</button>
-      </div>
     </aside>
     <div id="map"></div>
     <!--
@@ -203,7 +174,6 @@
   <section id="card" hidden>
     <button id="card-close" type="button" aria-label="Close">&times;</button>
     <h2 id="card-name"></h2>
-    <p id="card-due"></p>
     <dl id="card-facts"></dl>
 
     <!--
@@ -231,10 +201,11 @@
   </section>
 
   <!--
-    The details form: the phone's own edit form, field for field. Its options and the sentences under
-    them arrive in the state document, from the phone's phrase tables, so the desk offers the words
-    the phone offers and cannot offer a choice the phone would refuse. The block field offers the
-    blocks that exist, because typing a block's name again is how a misspelling becomes a new block.
+    The details form: a place's name, what it is, and its notes. What it is comes from the phone's own
+    kind list, in the phone's own words, arrived in the state document, so the desk offers the words the
+    phone offers and cannot offer a choice the phone would refuse. Nothing about spray methods, intervals,
+    blocks or pass counts is asked for here: those are the phone's own fields, the desk neither shows nor
+    sends them, and a save from this form cannot wipe them.
   -->
   <section id="edit" hidden>
     <form id="edit-form">
@@ -244,46 +215,10 @@
       <label for="edit-name">Name</label>
       <input id="edit-name" type="text" autocomplete="off">
 
-      <label for="edit-block">Block or group</label>
-      <input id="edit-block" type="text" autocomplete="off" list="edit-blocks">
-      <datalist id="edit-blocks"></datalist>
-      <p class="hint" id="edit-block-hint"></p>
-
       <span class="label">What it is</span>
       <div class="choices" id="edit-kind" role="radiogroup" aria-label="What it is"></div>
       <!-- No shape to pick: whether it is a line or a place is what the kind means, and two answers
            that can disagree is a picnic table drawn across a paddock. See AssetKind.shape. -->
-
-      <label for="edit-interval">Days between sprays</label>
-      <input id="edit-interval" type="text" inputmode="numeric" autocomplete="off">
-
-      <span class="label">Spray method</span>
-      <div class="choices" id="edit-method" role="radiogroup" aria-label="Spray method"></div>
-
-      <!--
-        The swath width and the passes are a **line's** questions. A kind that is ground answers both of
-        them itself: its area is measured from its own shape rather than estimated from a width somebody
-        typed, and one run round it is the whole job - so the three rows go together and the phone's own
-        sentence takes their place. `showKindRows` in app.js is what shows and hides them.
-      -->
-      <div id="edit-swath-row">
-        <label for="edit-swath">Swath width (m)</label>
-        <input id="edit-swath" type="text" inputmode="decimal" autocomplete="off">
-        <p class="hint" id="edit-swath-hint"></p>
-      </div>
-
-      <div id="edit-passes-row">
-        <span class="label">Passes to finish it</span>
-        <div class="choices" id="edit-passes" role="radiogroup" aria-label="Passes to finish it"></div>
-      </div>
-
-      <p class="hint" id="edit-ground-hint" hidden></p>
-
-      <div id="edit-separation-row" hidden>
-        <label for="edit-separation">Two passes about (m) apart</label>
-        <input id="edit-separation" type="text" inputmode="decimal" autocomplete="off">
-        <p class="hint" id="edit-separation-hint"></p>
-      </div>
 
       <label for="edit-notes">Notes</label>
       <textarea id="edit-notes" rows="3"></textarea>
@@ -292,110 +227,6 @@
       <div id="edit-buttons">
         <button id="edit-save" type="submit">Save to the phone</button>
         <button id="edit-cancel" type="button">Cancel</button>
-      </div>
-    </form>
-  </section>
-
-  <!--
-    Changing several assets at once: the same fields as the details form, one above another, each with a
-    tick in front of it.
-
-    **A tick is what makes a field part of the change.** The fields show what the picked rows hold - and
-    where they do not agree, the word for that, which the phone sends - so the form is both a report of
-    the rows and the way to change them. Nothing is written until Save, and the phone writes all of them
-    or none: a row that has moved on the phone since the list was ticked stops the whole request.
-  -->
-  <section id="together" hidden aria-labelledby="together-title">
-    <form id="together-form">
-      <button id="together-close" type="button" aria-label="Close">&times;</button>
-      <h2 id="together-title">Change them together</h2>
-      <p class="hint" id="together-what"></p>
-
-      <div class="field">
-        <input id="together-tick-name" type="checkbox" aria-label="Change the name">
-        <label class="label" for="together-name">Name</label>
-        <input id="together-name" type="text" autocomplete="off">
-        <span class="note" id="together-tick-name-note"></span>
-      </div>
-
-      <div class="field">
-        <input id="together-tick-block" type="checkbox" aria-label="Change the block">
-        <label class="label" for="together-block">Block or group</label>
-        <input id="together-block" type="text" autocomplete="off" list="together-blocks">
-        <datalist id="together-blocks"></datalist>
-        <span class="note" id="together-tick-block-note"></span>
-      </div>
-      <p class="hint" id="together-block-hint"></p>
-
-      <div class="field stacked">
-        <span class="tick-label">
-          <input id="together-tick-kind" type="checkbox" aria-label="Change what it is">
-          <span class="label">What it is</span>
-          <span class="note" id="together-tick-kind-note"></span>
-        </span>
-        <div class="choices" id="together-kind" role="radiogroup" aria-label="What it is"></div>
-      </div>
-
-      <div class="field">
-        <input id="together-tick-interval" type="checkbox" aria-label="Change the days between sprays">
-        <label class="label" for="together-interval">Days between sprays</label>
-        <input id="together-interval" type="text" inputmode="numeric" autocomplete="off">
-        <span class="note" id="together-tick-interval-note"></span>
-      </div>
-
-      <div class="field stacked">
-        <span class="tick-label">
-          <input id="together-tick-method" type="checkbox" aria-label="Change the spray method">
-          <span class="label">Spray method</span>
-          <span class="note" id="together-tick-method-note"></span>
-        </span>
-        <div class="choices" id="together-method" role="radiogroup" aria-label="Spray method"></div>
-      </div>
-
-      <!--
-        The swath width and the passes are a **line's** questions, as they are on one asset's own form.
-        Nothing here hides them for a kind that is ground: the picked rows may be a mix of shapes, and the
-        phone judges each row against its own kind - a width on a carpark is thrown away there by the same
-        rule that throws one away in the details form.
-      -->
-      <div class="field">
-        <input id="together-tick-swath" type="checkbox" aria-label="Change the swath width">
-        <label class="label" for="together-swath">Swath width (m)</label>
-        <input id="together-swath" type="text" inputmode="decimal" autocomplete="off">
-        <span class="note" id="together-tick-swath-note"></span>
-      </div>
-      <p class="hint" id="together-swath-hint"></p>
-
-      <div class="field stacked">
-        <span class="tick-label">
-          <input id="together-tick-passes" type="checkbox" aria-label="Change the passes to finish it">
-          <span class="label">Passes to finish it</span>
-          <span class="note" id="together-tick-passes-note"></span>
-        </span>
-        <div class="choices" id="together-passes" role="radiogroup" aria-label="Passes to finish it"></div>
-      </div>
-
-      <div class="field">
-        <input id="together-tick-separation" type="checkbox" aria-label="Change how far apart the two passes run">
-        <label class="label" for="together-separation">Two passes about (m) apart</label>
-        <input id="together-separation" type="text" inputmode="decimal" autocomplete="off">
-        <span class="note" id="together-tick-separation-note"></span>
-      </div>
-      <p class="hint" id="together-separation-hint"></p>
-
-      <div class="field stacked">
-        <span class="tick-label">
-          <input id="together-tick-notes" type="checkbox" aria-label="Change the notes">
-          <label class="label" for="together-notes">Notes</label>
-          <span class="note" id="together-tick-notes-note"></span>
-        </span>
-        <textarea id="together-notes" rows="3"></textarea>
-      </div>
-
-      <p id="together-words" hidden></p>
-      <div id="together-buttons">
-        <button id="together-save" type="submit">Save to the phone</button>
-        <button id="together-cancel" type="button">Cancel</button>
       </div>
     </form>
   </section>

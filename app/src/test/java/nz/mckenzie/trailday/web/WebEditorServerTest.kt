@@ -1,11 +1,9 @@
 package nz.mckenzie.trailday.web
 
 import nz.mckenzie.trailday.domain.asset.AssetKind
-import nz.mckenzie.trailday.domain.asset.BulkAssetEdits
 import nz.mckenzie.trailday.domain.backup.AssetRecord
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.track.TrackInterchange
-import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.PlaceIcons
 import nz.mckenzie.trailday.offline.HttpRequest
 import nz.mckenzie.trailday.offline.HttpResponse
@@ -47,7 +45,7 @@ class WebEditorServerTest {
      * no version, because a new asset has nothing to be stale against.
      */
     private val newBody =
-        """{"name":"Gully track","kind":"TRACK","shape":"LINE","method":"UNSET","intervalDays":"120",""" +
+        """{"name":"Gully track","kind":"TRACK","notes":null,""" +
             """"points":[{"lat":-41.5,"lng":173.8},{"lat":-41.6,"lng":173.9}]}"""
 
     private lateinit var server: WebEditorServer
@@ -259,21 +257,6 @@ class WebEditorServerTest {
             }
         }
 
-        /** The body a bulk edit arrived as, and an answer for it - or a refusal, for the same reason. */
-        var lastTogether: String? = null
-
-        override suspend fun editTogether(body: String?): WebEditorWrite {
-            lastTogether = body
-            return if (body.isNullOrBlank()) {
-                WebEditorWrite.Refused(WebEditorRefusal.INVALID, "that request changed nothing")
-            } else {
-                WebEditorWrite.EditedTogether(
-                    count = 3,
-                    message = BulkAssetEdits.editedMessage(3)
-                )
-            }
-        }
-
         /** What a DOC search asked for, and a document for it - or the phone's word for a failure. */
         var lastDocName: String? = null
         var lastDocNear: String? = null
@@ -318,7 +301,6 @@ class WebEditorServerTest {
                 intervalDays = 120,
                 createdAtEpochMs = 1_700_000_000_000L
             ),
-            dueStatus = "DUE_SOON",
             version = "version-$id",
             removal = WebEditorRemoval(
                 allowed = true,
@@ -784,39 +766,6 @@ class WebEditorServerTest {
         // route, which serves no such file, so it is a 404 rather than a file read with no file.
         assertEquals(404, get(WebEditorServer.GPX_PATH).code)
         assertNull(data.lastGpx)
-    }
-
-    @Test
-    fun `changing several assets together is one request, answered with the count`() {
-        start()
-
-        val body = """{"assets":[{"id":1,"version":"v1"},{"id":2,"version":"v2"}],"fields":{"name":"x"}}"""
-        val response = send(WebEditorServer.TOGETHER_PATH, "POST", body)
-
-        assertEquals(200, response.code)
-        assertEquals("application/json; charset=utf-8", response.contentType)
-        assertEquals("the body arrived whole", body, data.lastTogether)
-        assertEquals(
-            """{"count":3,"message":"Changed all 3 assets together."}""",
-            response.body
-        )
-    }
-
-    @Test
-    fun `a together path is not an asset, and needs the token as surely as a write does`() {
-        start()
-
-        // `/api/assets/together` is judged before the route that reads an id out of the path, so it is
-        // never asset `together` and never a 404 - and what it does reach is behind the same door.
-        assertEquals(403, send(WebEditorServer.TOGETHER_PATH, "POST", """{"assets":[]}""", withToken = false).code)
-        assertNull("a refused request never reached the data", data.lastTogether)
-
-        val refused = send(WebEditorServer.TOGETHER_PATH, "POST", "")
-        assertEquals(400, refused.code)
-        assertEquals(
-            """{"reason":"invalid","message":"that request changed nothing"}""",
-            refused.body
-        )
     }
 
     @Test
