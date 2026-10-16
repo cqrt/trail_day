@@ -55,14 +55,23 @@ class OfflineViewModel(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
-    /** How many DOC tracks are kept for offline use, live from the database. */
-    val docTrackCount: StateFlow<Int> = docStore.observeCount()
+    /** How many things from DOC are kept for offline use, live from the database. All four services. */
+    val docDataCount: StateFlow<Int> = docStore.observeCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
 
     private val _docBounds = MutableStateFlow<LatLngBounds?>(null)
 
-    /** The ground the downloaded DOC tracks cover, for the tab's map. Null when none is downloaded. */
+    /** The ground the downloaded DOC data covers, for the tab's map. Null when nothing is downloaded. */
     val docBounds: StateFlow<LatLngBounds?> = _docBounds
+
+    private val _docCounts = MutableStateFlow<Map<DocSource, Int>>(emptyMap())
+
+    /**
+     * How many are held of each of DOC's services, for the tab's own list: "412 tracks, 38 huts" says
+     * what is on the phone in a way "543 things" does not, and it is the shape a walker checks their own
+     * area against.
+     */
+    val docCounts: StateFlow<Map<DocSource, Int>> = _docCounts
 
     init {
         refreshSummary()
@@ -82,14 +91,19 @@ class OfflineViewModel(
             }
         }
 
-        // The DOC cache's own box, worked out from the tracks, refreshed when the count changes rather
-        // than on every frame: it reads and parses every cached track to find the extent.
+        // The DOC cache's own box and breakdown, refreshed when the count changes rather than on every
+        // frame: working out the box reads and parses every cached thing to find the extent.
         viewModelScope.launch {
             docStore.observeCount().collect { count ->
                 _docBounds.value = if (count == 0) {
                     null
                 } else {
-                    runCatching { docStore.bounds(DocSource.TRACKS) }.getOrNull()
+                    runCatching { docStore.bounds() }.getOrNull()
+                }
+                _docCounts.value = if (count == 0) {
+                    emptyMap()
+                } else {
+                    runCatching { docStore.counts() }.getOrDefault(emptyMap())
                 }
             }
         }
@@ -138,8 +152,8 @@ class OfflineViewModel(
         }
     }
 
-    /** Forgets every downloaded DOC track. Costs nothing but the download. */
-    fun clearDocTracks() {
+    /** Forgets everything kept from DOC. Costs nothing but the download. */
+    fun clearDocData() {
         viewModelScope.launch {
             runCatching { docStore.clear() }
         }

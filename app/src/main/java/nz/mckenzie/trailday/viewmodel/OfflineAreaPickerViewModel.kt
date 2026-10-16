@@ -19,9 +19,7 @@ import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.doc.ArcGisDoc
-import nz.mckenzie.trailday.doc.DocDownloadResult
 import nz.mckenzie.trailday.doc.DocDownloader
-import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.DocBounds
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
@@ -120,7 +118,7 @@ class OfflineAreaPickerViewModel(
     val saved: StateFlow<Boolean> = _saved
 
     /** How many DOC tracks are downloaded for offline use, live from the database. */
-    val docTrackCount: StateFlow<Int> = docStore.observeCount()
+    val docDataCount: StateFlow<Int> = docStore.observeCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
 
     private val _docWorking = MutableStateFlow(false)
@@ -175,7 +173,7 @@ class OfflineAreaPickerViewModel(
      * already on disk.
      */
     fun download() {
-        if (mode == OfflinePickerMode.DOC_TRACKS) downloadTracks() else downloadImagery()
+        if (mode == OfflinePickerMode.DOC_DATA) downloadDocData() else downloadImagery()
     }
 
     private fun downloadImagery() {
@@ -226,13 +224,15 @@ class OfflineAreaPickerViewModel(
     private fun defaultName(): String = "Area " + formatShortDate(System.currentTimeMillis())
 
     /**
-     * Downloads every DOC track in the box drawn here, so the browser can import them with no
-     * reception.
+     * Downloads everything DOC publishes in the box drawn here, so the browser and the map's reference
+     * layer work with no reception.
      *
-     * Independent of the imagery: no LINZ key is needed, and nothing is stored but the tracks
-     * themselves - the DOC cache is global, not an area record.
+     * **All four services in one act** - the tracks to walk, the huts and campsites to stop at, the bike
+     * locations to ride - because that is what a walker keeps for an area, and asking for them one at a
+     * time is the walker doing the app's bookkeeping. Independent of the imagery: no LINZ key is needed,
+     * and nothing here is an area record - DOC's cache is the walker's own, held once.
      */
-    private fun downloadTracks() {
+    private fun downloadDocData() {
         if (_docWorking.value) return
         val current = _draft.value
         val plan = current.plan(name = current.name, fallbackName = defaultName())
@@ -245,16 +245,12 @@ class OfflineAreaPickerViewModel(
             _docWorking.value = true
             _docMessage.value = null
             try {
-                when (val result = docStore.download(plan.bounds.toDocBounds(), DocSource.TRACKS)) {
-                    is DocDownloadResult.Done -> {
-                        _docMessage.value = docDownloadedMessage(result.items.size, DocSource.TRACKS)
-                        _saved.value = true
-                    }
-                    // A download that stopped short still kept what arrived, so say both and stay,
-                    // so the walker can see it rather than being sent back with half an answer.
-                    is DocDownloadResult.Failed ->
-                        _docMessage.value = "${result.message} ${docDownloadedMessage(result.items.size, DocSource.TRACKS)}"
-                }
+                val download = docStore.download(plan.bounds.toDocBounds())
+                // One sentence for the whole act: what arrived, and which of the four did not answer. A
+                // download that stopped short still kept what arrived, so the walker stays here and can
+                // read it rather than being sent back with half an answer.
+                _docMessage.value = docDownloadedMessage(download)
+                _saved.value = download.items.isNotEmpty()
             } catch (cancelled: CancellationException) {
                 // Leaving the screen is not a failure; what already arrived is kept.
                 throw cancelled

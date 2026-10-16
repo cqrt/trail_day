@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
@@ -37,14 +38,16 @@ import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.offline.OfflineArea
+import nz.mckenzie.trailday.offline.docHeldWords
 import nz.mckenzie.trailday.viewmodel.OfflineViewModel
 
 /**
- * What is downloaded for offline use, in two tabs: basemap imagery, and DOC's tracks.
+ * What is downloaded for offline use, in two tabs: basemap imagery, and what DOC publishes.
  *
- * The two are **independent caches** - imagery makes the map work with no reception, DOC's tracks
- * make the DOC tracks browser work with no reception - so they are chosen, counted and cleared
- * separately, and neither can fill the other's tab. Choosing an area is the map picker either way.
+ * The two are **independent caches** - imagery makes the map work with no reception, DOC's material
+ * makes the map's reference layer and the browser work with no reception - so they are chosen, counted
+ * and cleared separately, and neither can fill the other's tab. Choosing an area is the map picker
+ * either way; the DOC one keeps all four of DOC's services in one act.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,12 +62,13 @@ fun OfflineScreen(
     val working by viewModel.working.collectAsStateWithLifecycle()
     val summary by viewModel.summary.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
-    val docTrackCount by viewModel.docTrackCount.collectAsStateWithLifecycle()
+    val docDataCount by viewModel.docDataCount.collectAsStateWithLifecycle()
     val docBounds by viewModel.docBounds.collectAsStateWithLifecycle()
+    val docCounts by viewModel.docCounts.collectAsStateWithLifecycle()
 
     var chosenTab by rememberSaveable { mutableStateOf(0) }
     var confirmingClearImagery by rememberSaveable { mutableStateOf(false) }
-    var confirmingClearDoc by rememberSaveable { mutableStateOf(false) }
+    var confirmingClearDocData by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Offline areas") }) },
@@ -80,7 +84,7 @@ fun OfflineScreen(
                 Tab(
                     selected = chosenTab == 1,
                     onClick = { chosenTab = 1 },
-                    text = { Text("DOC tracks") }
+                    text = { Text("DOC data") }
                 )
             }
 
@@ -105,12 +109,13 @@ fun OfflineScreen(
                         onClear = { confirmingClearImagery = true }
                     )
                 } else {
-                    DocTracksTab(
+                    DocDataTab(
                         apiKey = apiKey,
-                        count = docTrackCount,
+                        count = docDataCount,
+                        counts = docCounts,
                         bounds = docBounds,
                         onChooseArea = onChooseDocArea,
-                        onClear = { confirmingClearDoc = true }
+                        onClear = { confirmingClearDocData = true }
                     )
                 }
             }
@@ -143,28 +148,28 @@ fun OfflineScreen(
         )
     }
 
-    if (confirmingClearDoc) {
+    if (confirmingClearDocData) {
         AlertDialog(
-            onDismissRequest = { confirmingClearDoc = false },
-            title = { Text("Delete downloaded DOC tracks?") },
+            onDismissRequest = { confirmingClearDocData = false },
+            title = { Text("Delete downloaded DOC data?") },
             text = {
                 Text(
-                    "This removes the $docTrackCount DOC ${if (docTrackCount == 1) "track" else "tracks"} " +
-                        "kept for offline use. The DOC tracks browser will need reception until an " +
-                        "area is downloaded again. Nothing already imported is touched."
+                    "This removes the ${docHeldWords(docCounts)} kept for offline use. The map's DOC " +
+                        "layer and the DOC browser will need reception until an area is downloaded " +
+                        "again. Nothing of your own is touched."
                 )
             },
             confirmButton = {
                 DestructiveTextButton(
                     text = "Delete",
                     onClick = {
-                        confirmingClearDoc = false
-                        viewModel.clearDocTracks()
+                        confirmingClearDocData = false
+                        viewModel.clearDocData()
                     }
                 )
             },
             dismissButton = {
-                TextButton(onClick = { confirmingClearDoc = false }) { Text("Cancel") }
+                TextButton(onClick = { confirmingClearDocData = false }) { Text("Cancel") }
             }
         )
     }
@@ -257,20 +262,27 @@ private fun ImageryTab(
     }
 }
 
-/** DOC's tracks: drawn on the map as its own layer, and kept here for the hills. */
+/**
+ * What DOC publishes: drawn on the map as DOC's own layer, and kept here for the hills.
+ *
+ * One entry for four services, because a walker keeps an area rather than a kind of thing: the same
+ * download, the same count, the same clearing. What arrived is listed by service, because "412 tracks,
+ * 38 huts" is the shape a walker checks their area against.
+ */
 @Composable
-private fun DocTracksTab(
+private fun DocDataTab(
     apiKey: String,
     count: Int,
+    counts: Map<DocSource, Int>,
     bounds: LatLngBounds?,
     onChooseArea: () -> Unit,
     onClear: () -> Unit
 ) {
     Text(
-        text = "The Department of Conservation's tracks, drawn on the map as DOC's own layer. " +
-            "Downloading an area keeps every track inside it on the phone, so the layer draws and the " +
-            "DOC tracks browser works with no reception; none of it is yours to change, and none of it " +
-            "needs a LINZ key.",
+        text = "What the Department of Conservation publishes - its tracks, huts, campsites and bike " +
+            "locations - drawn on the map as DOC's own layer. Downloading an area keeps everything " +
+            "inside it on the phone, so the layer draws and the DOC browser works with no reception; " +
+            "none of it is yours to change, and none of it needs a LINZ key.",
         style = MaterialTheme.typography.bodySmall
     )
 
@@ -281,17 +293,17 @@ private fun DocTracksTab(
     if (count == 0) {
         EmptyState(
             glyph = IconGlyph.MAP,
-            title = "No DOC tracks downloaded",
-            body = "Choose an area and every DOC track inside it is downloaded, drawn on the map, and " +
-                "available to the DOC tracks browser with no reception.",
+            title = "Nothing from DOC downloaded",
+            body = "Choose an area and everything DOC publishes inside it is downloaded, drawn on the " +
+                "map, and available to the DOC browser with no reception.",
             actionLabel = "Choose an area",
             onAction = onChooseArea
         )
     } else {
         Card(modifier = Modifier.fillMaxWidth()) {
             Column {
-                // The ground the cached tracks cover: a cache of tracks has no box of its own, so
-                // this is the extent of the tracks themselves.
+                // The ground the cached material covers: a cache has no box of its own, so this is the
+                // extent of the things themselves.
                 bounds?.let { CachedAreaMap(bounds = it, apiKey = apiKey) }
                 Column(
                     modifier = Modifier
@@ -300,17 +312,17 @@ private fun DocTracksTab(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
-                        text = "$count DOC ${if (count == 1) "track" else "tracks"} downloaded",
+                        text = "${docHeldWords(counts)} kept",
                         style = MaterialTheme.typography.titleSmall
                     )
                     Text(
-                        text = "Available to the DOC tracks browser with no reception.",
+                        text = "Available to the map and the DOC browser with no reception.",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
         }
-        DestructiveTextButton(text = "Clear downloaded DOC tracks", onClick = onClear)
+        DestructiveTextButton(text = "Clear downloaded DOC data", onClick = onClear)
     }
 }
 

@@ -86,4 +86,54 @@ class DocDownloaderTest {
         assertEquals("the first page is kept", DocDownloader.PAGE, failed.items.size)
         assertTrue("and the reason is the service's", failed.message.contains("Unable to resolve host"))
     }
+
+    /** A reader that answers each of DOC's services with one thing of its own, or fails for the named. */
+    private class BySource(private val fail: Set<DocSource> = emptySet()) : DocReader {
+        val asked = mutableListOf<DocSource>()
+
+        override suspend fun search(query: DocQuery): DocReadResult {
+            asked += query.source
+            if (query.source in fail) {
+                return DocReadResult.Failed("the ${query.source.displayName.lowercase()} are down")
+            }
+            return DocReadResult.Found(
+                listOf(
+                    DocItem(
+                        source = query.source,
+                        objectId = query.source.ordinal.toLong(),
+                        name = "One ${query.source.singular}",
+                        paths = listOf(listOf(GeoPoint(-46.6, 168.3), GeoPoint(-46.61, 168.31)))
+                    )
+                )
+            )
+        }
+    }
+
+    @Test
+    fun `an area is read from all four of DOC's services in one act`() {
+        val source = BySource()
+
+        val download = runBlocking { DocDownloader(source).downloadArea(box) }
+
+        assertEquals("every service DOC publishes was asked", DocSource.entries, source.asked)
+        assertEquals("and each one's answer is here", 4, download.items.size)
+        assertEquals(
+            "counted service by service, so the phone can say what arrived",
+            DocSource.entries.associateWith { 1 },
+            download.counts
+        )
+        assertTrue("with nothing left unread", download.failed.isEmpty())
+    }
+
+    @Test
+    fun `one service failing does not stop the others, and is named`() {
+        val source = BySource(fail = setOf(DocSource.HUTS))
+
+        val download = runBlocking { DocDownloader(source).downloadArea(box) }
+
+        assertEquals("the other three still arrived", 3, download.items.size)
+        assertEquals("and the huts are the ones named as unread", setOf(DocSource.HUTS), download.failed.keys)
+        assertEquals("with no huts counted, because none arrived", 0, download.counts[DocSource.HUTS])
+        assertEquals("while the three that answered are counted", 1, download.counts[DocSource.TRACKS])
+    }
 }

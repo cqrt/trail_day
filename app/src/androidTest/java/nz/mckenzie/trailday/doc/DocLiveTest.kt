@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.doc
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.runBlocking
+import nz.mckenzie.trailday.domain.doc.DocBounds
 import nz.mckenzie.trailday.domain.doc.DocQuery
 import nz.mckenzie.trailday.domain.doc.DocShape
 import nz.mckenzie.trailday.domain.doc.DocSource
@@ -107,6 +108,34 @@ class DocLiveTest {
         assertTrue(
             "and keeps how hard DOC says it is and how long it takes: ${bike.facts}",
             bike.difficulty != null || bike.bikingTime != null
+        )
+    }
+
+    @Test
+    fun anAreaIsReadFromAllOfDocsServicesInOneAct() = runBlocking {
+        // Nelson Lakes: DOC has tracks, huts and campsites in this box, and the fourth service is
+        // asked for as surely as the other three.
+        val box = DocBounds(minLat = -41.75, minLng = 172.55, maxLat = -41.50, maxLng = 172.85)
+
+        val download = DocDownloader(reader, pageSize = 100).downloadArea(box)
+
+        assumeTrue(
+            "DOC could not be reached for any of the four: ${download.failed}",
+            download.failed.keys.size < DocSource.entries.size
+        )
+        val answered = download.counts.filterValues { it > 0 }.keys
+        assertTrue(
+            "more than one of the four answered in one act: ${download.counts}",
+            answered.size >= 2
+        )
+        assertEquals(
+            "and the counts add up to everything that is here",
+            download.items.size,
+            download.counts.values.sum()
+        )
+        assertTrue(
+            "each thing says which service it came from, so the map draws it as what it is",
+            download.items.all { it.source in DocSource.entries }
         )
     }
 }

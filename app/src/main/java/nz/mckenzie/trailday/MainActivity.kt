@@ -303,7 +303,7 @@ class MainActivity : ComponentActivity() {
                         val pickerViewModel: OfflineAreaPickerViewModel = viewModel(
                             factory = OfflineAreaPickerViewModel.factory(
                                 applicationContext,
-                                OfflinePickerMode.DOC_TRACKS
+                                OfflinePickerMode.DOC_DATA
                             )
                         )
                         OfflineAreaPickerScreen(

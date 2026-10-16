@@ -3,6 +3,7 @@ package nz.mckenzie.trailday.offline
 import kotlinx.coroutines.flow.Flow
 import nz.mckenzie.trailday.data.db.OfflineDocItemDao
 import nz.mckenzie.trailday.data.db.OfflineDocItemEntity
+import nz.mckenzie.trailday.doc.DocAreaDownload
 import nz.mckenzie.trailday.doc.DocDownloadResult
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.domain.doc.DocBounds
@@ -48,27 +49,28 @@ class OfflineDocStore(
     /** A live count, for the offline screen to say what is stored, and for the map to redraw on. */
     override fun observeCount(): Flow<Int> = dao.observeCount()
 
+    /** How many are held of each service, for the offline screen to say what is on the phone. */
+    suspend fun counts(): Map<DocSource, Int> = dao.counts().mapNotNull { row ->
+        DocSource.known(row.source)?.let { source -> source to row.count }
+    }.toMap()
+
     /**
      * The ground the held material covers, for the offline screen's map, or null when there is nothing
      * held. Worked out from the vertices, because a cache has no box of its own the way an imagery area
      * does.
      */
-    suspend fun bounds(source: DocSource): LatLngBounds? = cached(source).bounds()
+    suspend fun bounds(): LatLngBounds? = DocSource.entries.flatMap { cached(it) }.bounds()
 
     /**
-     * Downloads everything [source] has in [bounds] and stores it, however the read went.
+     * Downloads everything DOC publishes for [bounds] and stores it, however the reads went.
      *
-     * A download that stopped short stores the pages that arrived: the next attempt asks the service
-     * again rather than starting from a blank cache, and what did arrive is already usable offline.
+     * All four services in one act, because that is what a walker keeps for an area. A download that
+     * stopped short stores what arrived: the next attempt asks again rather than starting from a blank
+     * cache, and what did arrive is already usable offline.
      */
-    suspend fun download(bounds: DocBounds, source: DocSource): DocDownloadResult {
-        val result = downloader.download(bounds, source)
-        store(
-            when (result) {
-                is DocDownloadResult.Done -> result.items
-                is DocDownloadResult.Failed -> result.items
-            }
-        )
+    suspend fun download(bounds: DocBounds): DocAreaDownload {
+        val result = downloader.downloadArea(bounds)
+        store(result.items)
         return result
     }
 }
@@ -103,12 +105,43 @@ private fun DocItem.toEntity(at: Long) = OfflineDocItemEntity(
     downloadedAtEpochMs = at
 )
 
-/** The sentence a download's count earns, in the walker's own terms. */
-fun docDownloadedMessage(count: Int, source: DocSource): String {
-    val what = source.displayName.lowercase()
-    return when (count) {
-        0 -> "No DOC $what were in that area."
-        1 -> "Downloaded 1 DOC ${source.singular.lowercase()}."
-        else -> "Downloaded $count DOC $what."
+/**
+ * The sentence an area's DOC download earns, in the walker's own terms: what arrived, and which of the
+ * four services did not answer.
+ *
+ * **Both halves matter.** "Kept 412 tracks, 38 huts, 6 campsites, 93 bike locations" is what was asked
+ * for and can be checked at a glance; "The campsites could not be read" is the part that would otherwise
+ * be found out on the hill, where nothing can be fetched.
+ */
+fun docDownloadedMessage(download: DocAreaDownload): String {
+    val kept = DocSource.entries.mapNotNull { source ->
+        val count = download.counts[source] ?: return@mapNotNull null
+        if (count == 0) null else "$count ${whatFromDoc(source, count)}"
     }
+    val said = if (kept.isEmpty()) {
+        "Nothing from DOC was in that area."
+    } else {
+        "Kept " + kept.joinToString(", ") + "."
+    }
+    if (download.failed.isEmpty()) return said
+
+    val missing = download.failed.keys.map { source -> source.displayName.lowercase() }
+    return "$said The ${missing.joinToString(" and ")} could not be read."
 }
+
+/** "1 hut", "2 huts": one of DOC's services, counted, in the words the walker reads. */
+fun whatFromDoc(source: DocSource, count: Int): String =
+    if (count == 1) source.singular.lowercase() else source.displayName.lowercase()
+
+/**
+ * What is held from DOC, in the walker's own terms: "412 tracks, 38 huts, 6 campsites, 93 bike
+ * locations", and empty when nothing is held.
+ *
+ * The same words a download's own sentence is built from, and in DOC's own order, so the tab and the
+ * download cannot come to name the same thing differently or list the four in different orders.
+ */
+fun docHeldWords(counts: Map<DocSource, Int>): String =
+    DocSource.entries.mapNotNull { source ->
+        val count = counts[source] ?: return@mapNotNull null
+        if (count == 0) null else "$count ${whatFromDoc(source, count)}"
+    }.joinToString(", ")

@@ -81,7 +81,7 @@ fun OfflineAreaPickerScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (imagery) "Choose an offline area" else "Choose a DOC tracks area") },
+                title = { Text(if (imagery) "Choose an offline area" else "Choose a DOC area") },
                 navigationIcon = { IconButton(onClick = onBack) { AppIcon(IconGlyph.BACK, contentDescription = "Back") } }
             )
         }
@@ -198,9 +198,9 @@ fun OfflineAreaPickerScreen(
                         }
                     } else {
                         Text(
-                            text = "Every DOC track inside the box is downloaded and drawn on the map " +
-                                "as DOC's own layer. Nothing else is fetched, and no LINZ key is " +
-                                "needed.",
+                            text = "Everything DOC publishes inside the box is downloaded and drawn on " +
+                                "the map as DOC's own layer. Nothing else is fetched, and no LINZ key " +
+                                "is needed.",
                             style = MaterialTheme.typography.bodySmall
                         )
                         docMessage?.let {
@@ -223,8 +223,8 @@ fun OfflineAreaPickerScreen(
                         ) {
                             Text(
                                 when {
-                                    !imagery && docWorking -> "Downloading DOC tracks…"
-                                    !imagery -> "Download DOC tracks"
+                                    !imagery && docWorking -> "Downloading DOC data…"
+                                    !imagery -> "Download DOC data"
                                     else -> "Download area"
                                 }
                             )
