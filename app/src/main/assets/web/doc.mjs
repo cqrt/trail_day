@@ -2,7 +2,7 @@
  * The desk's half of the DOC Tracks browser: the request that searches DOC through the phone, and
  * the body that imports the ticked tracks.
  *
- * Pure, and separate from `app.js` for the same reason `wire.mjs` is: node can run it without a
+ * Pure, and separate from `app.js` for the same reason `find.mjs` is: node can run it without a
  * browser (`app/src/test/js/doc.test.mjs`, which CI runs), so what a search asks for and what an
  * import carries are pinned by a test rather than reviewed by eye.
  *

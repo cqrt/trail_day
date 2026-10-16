@@ -7,6 +7,14 @@ and a keyboard, because drawing them by tapping a phone is the hardest part of o
 decisions below move into the README as a `## Drawing from a computer` section and this file goes
 away.
 
+**The drawing has since gone, and the title with it.** The desk no longer draws a line or changes one:
+a line is DOC's, or a file's, or a walk's, and the phone is the only thing that keeps one. `edit.js`
+and `wire.mjs` are deleted, the drawing arithmetic in `geometry.mjs` went with them, and importing a
+file now writes the place straight away instead of handing the line to an editor to be tidied and
+named. Everything below about drawing, tidying, side tracks and the undo stack is therefore the record
+of how that was built rather than a description of the page; `trail-day-plan.md` is what the desk is
+for now.
+
 ## Where this stands
 
 - **Phase 1 is built and shipped: the phone serves it, and the page exists.** `app/src/main/assets/web/`

@@ -1,7 +1,7 @@
 /*
  * A track file dropped on the desk, from the desk's side of it.
  *
- * Pure, and separate from `app.js` for the same reason `wire.mjs` is: node can run it without a
+ * Pure, and separate from `app.js` for the same reason `find.mjs` is: node can run it without a
  * browser (`app/src/test/js/track.test.mjs`, which CI runs), so what the page will and will not take
  * is pinned by a test rather than reviewed by eye.
  *
@@ -94,12 +94,11 @@ export function base64Of(bytes) {
 }
 
 /**
- * What to say about a file the phone has read, in the phone's own numbers.
+ * What to say about a file the phone has read and kept, in the phone's own numbers.
  *
- * [read] is what `POST /api/gpx` answered with. A file whose paths did not meet was joined up into
- * one line, and that is worth saying out loud: a track with a jump in it is a track somebody should
- * look at before it is saved. The count is every vertex of every path, which is the same count the
- * drawing's own box shows a moment later.
+ * [read] is what `POST /api/gpx` answered with. A file whose paths did not meet was joined up into one
+ * line, and that is worth saying out loud: a track with a jump in it is a track somebody should look
+ * at. The count is every vertex of every path.
  */
 export function importedNote(fileName, read) {
   const paths = (read && read.paths) || [];
@@ -123,7 +122,7 @@ export function importedNote(fileName, read) {
     : ` This file holds ${others} more ${others === 1 ? 'track' : 'tracks'} - ` +
       'import it on the phone to bring them all in.';
 
-  return `${fileName}: ${said}. Give it a name, then save it to the phone.${rest}`;
+  return `${fileName}: ${said}. Kept on the phone.${rest}`;
 }
 
 /** A size in words a walker reads at a glance: megabytes once there is one to speak of, whole

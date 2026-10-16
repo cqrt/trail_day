@@ -1,15 +1,14 @@
 /*
- * The desk: the phone's own work, drawn and changed on a computer.
+ * The desk: the phone's own work, read and changed on a computer.
  *
- * It draws, and it writes four things: the details of a place - its name, its kind and its notes - the
- * line a track follows, a track that did not exist until somebody drew it, and - when there is nothing
- * recorded against it - its removal. What a write may hold and what a refusal says are decided on the
- * phone, in Kotlin, by the same rules the app's own screens use. This page fills a form in, draws a
- * line, and sends them.
+ * It writes three things: the details of a place - its name, its kind and its notes - a track brought
+ * in from a file, and - when there is nothing recorded against it - its removal. What a write may hold
+ * and what a refusal says are decided on the phone, in Kotlin, by the same rules the app's own screens
+ * use. This page fills a form in, hands a file over, and sends them.
  *
- * The drawing itself - the handles, the drags, the undo stack - is `edit.js`, with the arithmetic in
- * `geometry.mjs` so it can be tested without a browser. What is here is the page: the list, the card,
- * the form, and the four bodies a write can carry.
+ * A line is never drawn here. What the page shows of a line is what the phone holds: the file it was
+ * brought in from, or the walk it was recorded on. What is here is the page: the list, the card, the
+ * form, and the three bodies a write can carry.
  *
  * Everything it shows comes from the phone on the same Wi-Fi, and it shows it without deciding anything
  * itself: the style is the one the phone builds (the same layer ids, the same dashes, the same houses),
@@ -27,15 +26,6 @@ const params = new URLSearchParams(location.search);
 const TOKEN = params.get('k') || '';
 
 /**
- * The one piece of the page's own logic that decides anything about a write: which of the two drawing
- * shapes a save carries. Imported with the token on the URL, because a browser asks for a module with
- * no query unless it is told otherwise and the phone's gate answers nothing without one.
- */
-const { drawingBody } = await import(
-  TOKEN ? `./wire.mjs?k=${encodeURIComponent(TOKEN)}` : './wire.mjs'
-);
-
-/**
  * The glow under the picked-out track, and the one decision in the page's own drawing furniture that is
  * worth pinning: the halo takes the *phone's* layer's shape - its filter, its width, its dashes - so a
  * dotted line's glow is dotted. Imported the same way, for the same reason.
@@ -47,7 +37,7 @@ const { NO_ASSET, haloId, haloLayer, pickOut, wantsHalo } = await import(
 /**
  * Where the desk was looking the last time it was open.
  *
- * A refresh, and a basemap switch on the phone - which builds the editor's run again - both throw this page
+ * A refresh, and a basemap switch on the phone - which builds the page's run again - both throw this page
  * away and build it again, and neither of them is a different desk: a walker working one corner of the
  * country would otherwise lose it and have to find it again on every basemap. The camera is kept in the
  * browser's own store rather than on the phone, because where a particular desk is looking is the desk's
@@ -340,29 +330,6 @@ let rememberedCamera = null;
 /** The map's own source for the work, found from the phone's own layer names - see `assetsSourceId`. */
 let workSource = null;
 
-/** The page's own drawing: the handles, the drags, the keys. Null until the map has its style. */
-let editor = null;
-
-/**
- * The line drawn for a track that does not exist yet, and null when nothing is waiting.
- *
- * A new track is drawn first and described afterwards - lay the line, then say what it is - so the line
- * has to be held somewhere while the form is open, and the form's Cancel comes back to the drawing with
- * it intact: a line that took twenty clicks to lay is not something a change of mind about a name ought
- * to cost.
- */
-let draftPaths = null;
-
-/**
- * The kind that drawing was being made as: the box's own answer, kept while the form is open.
- *
- * Held beside the line because the form's Cancel has to come back to the *same* drawing - a boundary
- * being drawn must not return as a line of the same shape, which is what the box would
- * say about it and what the phone would store. The form's kind picker is a draft of it, and a change
- * of kind there is the phone's to judge when the save is made.
- */
-let draftKind = null;
-
 let workFeatures = null;
 
 /** The rows the desk is showing, which are also the assets the map draws. See `paintWork`. */
@@ -459,39 +426,9 @@ async function boot() {
     });
 
     map.on('load', () => onStyleLoaded(style));
-
-    // The drawing module: the page's own code, asked for with the token on its URL for the reason the
-    // stylesheet is - a browser requests a module with no query unless it is told otherwise, and every
-    // request the phone answers needs the token. Asked for here rather than at the top of the file
-    // because it is handed the map, which did not exist until a moment ago.
-    const { createEditor } = await import(withToken('./edit.js'));
-    editor = createEditor({
-      map,
-      neighboursOf: featuresExcept,
-      onChange: showDrawing,
-      onFinish: finishDrawing,
-      onCancel: abandonDrawing,
-      // The drawing is on the map but not in the hand while a form is open over it: the form is what
-      // the walker is working on, and a click behind it must not put a vertex on the line.
-      locked: () => formIsOpen()
-    });
-    // The way into a drawing is opened by `onStyleLoaded`, not here: asking for the module is a round
-    // trip to the phone and the style usually wins that race, but when it does not, a button that says
-    // it is ready and cannot draw is exactly the press that does nothing.
   } catch (error) {
     showNotice(error.message);
   }
-}
-
-/**
- * The phone's own features for every asset but one: what a drawing snaps onto.
- *
- * The features themselves rather than their vertices, because reading `[lng, lat]` into `{lat, lng}` is
- * the drawing module's business and is tested there without a browser - and turning coordinates round
- * twice is how a track drawn at the estuary ends up in the Southern Alps.
- */
-function featuresExcept(exceptId) {
-  return [...featuresById.values()].filter((feature) => feature.properties.id !== exceptId);
 }
 
 function onStyleLoaded(style) {
@@ -516,32 +453,19 @@ function onStyleLoaded(style) {
   addGlowLayers(style);
   glowSelected();
 
-  // A click on any of the work's own layers opens that asset, whichever layer drew it. While a line is
-  // being drawn a click belongs to the drawing instead - to a handle, to a segment, or to the paddock
-  // at the end of a new line - so the drawing gets it first.
+  // A click on any of the work's own layers opens that asset, whichever layer drew it.
   for (const layer of (style.layers || []).map((l) => l.id)) {
     if (!layer.startsWith('trailday-assets-')) continue;
     map.on('click', layer, (event) => {
-      if (editor && editor.isActive()) return;
       selectAsset(event.features[0].properties.id);
     });
     map.on('mouseenter', layer, () => {
-      if (editor && editor.isActive()) return;
       map.getCanvas().style.cursor = 'pointer';
     });
     map.on('mouseleave', layer, () => {
-      if (editor && editor.isActive()) return;
       map.getCanvas().style.cursor = '';
     });
   }
-
-  // The way into a drawing is opened **here**, where the style actually is, rather than where the
-  // drawing module was asked for: the button says a drawing can be made, and a drawing needs a map with
-  // a style to put its line in. Asking for the module is a round trip to the phone and the style usually
-  // wins that race - but when it does not, the button that was already open is a press that does nothing
-  // and looks like a broken button. `edit.js` refuses such a drawing as well, so this is the second of
-  // two answers to the same question.
-  field('draw').disabled = false;
 
   // Open on the work rather than on an ocean, and **as the map's own first act rather than as the page's
   // next one**: see `fitTheWorkOnFirstDraw` below for why the two are not the same moment.
@@ -699,9 +623,6 @@ function renderList() {
   document.getElementById('search').addEventListener('input', drawList);
   fillTypeChoices();
   document.getElementById('type').addEventListener('change', drawList);
-  // The same list, in the box in the map's corner: which kind a drawing is being made as. Filled here
-  // because this is where the state document first has answers to give.
-  fillDrawingKinds();
   drawList();
 }
 
@@ -863,10 +784,6 @@ function showCard(item) {
   // The ways in from the card. Assigned rather than added, because the card is redrawn on every save and
   // a listener added again on each one would save the asset twice.
   document.getElementById('card-edit').onclick = () => openEdit(item);
-  // What the second button is about to change. Every place the app keeps is a line or a single spot,
-  // and the line is the one there is a shape to change - see AssetPhrase.changeLabel.
-  document.getElementById('card-shape').textContent = 'Change the line';
-  document.getElementById('card-shape').onclick = () => startShape(item);
 
   // Deleting: the phone's own sentence about what is on the track, and its own answer about whether the
   // desk may take it away at all. A track with a recording on it is not something this page can offer to
@@ -909,170 +826,17 @@ function drawCardElevation(paths) {
 const CARD_ELEVATION_WIDTH = 100;
 const CARD_ELEVATION_HEIGHT = 30;
 
-/**
- * Tidying a track: its own line and side tracks become the desk's drawing.
- *
- * The **paths** the phone handed over are what is opened, not the feature the map is drawing: a feature
- * is one path per asset, and a line that is changed from here has to hand every path back - a spur is not
- * put back by a page that never held it. The shape travels with them, so a place that is a single
- * spot is opened as one rather than as a line.
- */
-function startShape(item) {
-  if (!editor) return;
-  closeForms();
-  editor.startOn(item.asset.id, item.paths ?? [], item.asset.shape);
-}
-
-/* ---- Drawing a track, saving a line, taking one away -------------------------------- */
-
-/**
- * What the box in the map's corner says while a line is being drawn.
- *
- * The page's own words, because none of this is a rule - it is how the map is worked. What the phone
- * will or will not take is the phone's to say, and it says it when the drawing is saved.
- *
- * Three things, in the order they are read: what the job is (the phone's own title for the same job on
- * the same line), what there is so far (the phone's own counts), one short line about whatever the
- * drawing is in the middle of, and then the keys as **pairs** - a key and three or four words - rather
- * than the run of sentences this used to be. A box in the corner of a map is read at a glance; a bar
- * across the top of a page is read once and then in the way.
- *
- * The two side-track buttons are shown by the drawing's own state rather than by a mode of their own:
- * *Side track* is offered while the line has two vertices to hang one off and none is being drawn, and
- * *Back to the track* and *Remove this side track* while one is. That is the same shape the phone's own
- * screen has, so the same gesture means the same thing in both places.
- */
-function showDrawing({
-  mode,
-  paths,
-  sideTracks,
-  sideTrackInHand,
-  lengthM,
-  junction,
-  canUndo,
-  tracing
-}) {
-  const box = field('drawing');
-  // The box and a form are never on the map together. The box is about a line still in hand, and
-  // while the details are being typed the drawing it describes is finished - so a file imported and
-  // named, or a line finished and named, is read without it. Cancel brings both back together: the
-  // form closes and the drawing it was about is put back in hand.
-  if (mode === 'off' || formIsOpen()) {
-    box.hidden = true;
-    return;
-  }
-
-  // Every drawing on this page is a line: what is drawn here is a track, and a spot is placed with a
-  // tap rather than drawn.
-  field('drawing-title').textContent = mode === 'new' ? 'Draw a line' : 'Change the line';
-
-  const count = paths.reduce((total, path) => total + path.length, 0);
-  // The counts in the phone's own words, and the length only once there is a line to measure: one point
-  // is not a line, and "not measured" is the card's word for a place, not this.
-  const parts = [`${count} point${count === 1 ? '' : 's'}`];
-  if (count > 1) {
-    parts.push(metresText(lengthM));
-  }
-  if (sideTracks > 0) {
-    parts.push(`${sideTracks} side track${sideTracks === 1 ? '' : 's'}`);
-  }
-  field('drawing-info').textContent = parts.join(' · ');
-
-  // Which kind the new drawing is being made as. The box asks because the kind decides the shape, and
-  // the shape changes what the drawing does - so it is asked *while* drawing, as the phone's own screen
-  // does, rather than afterwards in the form. A track the phone already has is not asked: it is what its
-  // kind says it is, and changing that is the form's business.
-  field('drawing-kind-row').hidden = mode !== 'new';
-
-  // One line, and only when there is one worth saying. Following the pointer comes first because it is
-  // what the hand is doing at that moment: the whole fence lands at once, so letting go is not a
-  // commitment to twenty vertices. Then which path the handles belong to, which is what decides what a
-  // drag and Del do, and where a side track would leave from - a picked point is easy to miss on a map
-  // full of fences, and it is the one thing that decides where the spur starts.
-  const state = tracing
-    ? 'Following the pointer - let go to put it down'
-    : sideTrackInHand
-      ? 'Working on the side track'
-      : junction
-        ? 'A side track will leave the line here'
-        : (sideTracks > 0 ? 'Click a side track to work on it' : '');
-  const words = field('drawing-state');
-  words.textContent = state;
-  words.hidden = !state;
-
-  // A new line is finished by naming it; a line the phone already has is saved as it stands.
-  field('drawing-enter').textContent = mode === 'new'
-    ? 'finish (or double click)'
-    : 'save (or double click)';
-  field('drawing-keys').classList.toggle('no-undo', !canUndo);
-
-  // The side-track furniture, in the same states the drawing is in. *Remove this side track* is offered for
-  // any side track in hand, finished or not, because that is the other half of being able to edit one.
-  const line = paths[0] ?? [];
-  field('drawing-side-track').hidden = sideTrackInHand || line.length < 2;
-  field('drawing-back').hidden = !sideTrackInHand;
-  field('drawing-drop').hidden = !sideTrackInHand;
-  box.hidden = false;
-}
-
-/**
- * A finished drawing: a track the phone already has is saved; a new one is described first.
- *
- * Both end with the drawing inside a write, but only one of them can be written straight away. An asset
- * already on the phone has a name and a kind and only its paths have moved, while a new line is
- * nothing but its shape - so the form comes first and the drawing waits in `draftPaths`.
- */
-async function finishDrawing(paths, wasEditing) {
-  if (wasEditing !== null) {
-    await savePath(wasEditing, paths);
-    return;
-  }
-  draftPaths = paths;
-  // The kind the box was set to becomes the form's answer, so a boundary drawn as one kind opens a
-  // form that says that kind rather than making the walker say it a second time.
-  draftKind = field('drawing-kind').value;
-  openDraft();
-}
-
-/**
- * The walker has given up on a line.
- *
- * Nothing has to be put back, which is the whole reason this is cheap: the phone was never asked to
- * change anything, so for an asset it already has the provisional line is simply hidden, and for a new
- * track the draft goes with it.
- */
-function abandonDrawing() {
-  draftPaths = null;
-  draftKind = null;
-}
-
 /* ---- A file somebody drew somewhere else ------------------------------------------- */
 
 /**
- * Why the map cannot take a file yet, or null when it can.
- *
- * A file becomes a drawing, and a drawing needs a map with the phone's style in it - the line has nowhere
- * to go until then. This is asked in one place so the two ways in cannot answer it differently: the
- * button, which says so in words rather than being greyed out, and the drop on the map, which a browser
- * allows at any moment. **A control that cannot be pressed and does not say why is worse than one that
- * answers**, which is what a greyed-out Import button turned out to be - see `index.html`.
- */
-function mapIsNotReady() {
-  return editor
-    ? null
-    : 'The map is still opening. Try that again in a moment.';
-}
-
-/**
- * A track file, read by the phone and turned into the drawing: button, picker and drop, one way in.
+ * A track file, read by the phone and kept there: button, picker and drop, one way in.
  *
  * **What the file means is the phone's answer**, not the page's: `POST /api/gpx` reads it with the
  * same rule the phone's own list screen imports a file with - a line and its side tracks, or a file
- * whose paths never met joined into one line - and answers with the paths. The page draws them as
- * the drawing it would have made by hand, which is the whole point: once the line is on the map it
- * can be traced onto, extended, have a side track hung off it, be given a kind and a name, and be
- * saved by the one path every drawn track takes. Nothing is written until the walker says so, so a
- * file dropped by mistake costs a reload and nothing else.
+ * whose paths never met joined into one line - and answers with the paths. The page hands those
+ * straight back to be written, so the track that lands on the phone is the file's own line and not a
+ * copy of it traced onto a map here. The name is the file's own, which is what the phone's own
+ * importer calls it; what kind of thing it is, and anything else about it, is the card's to change.
  *
  * The file travels as base64 of its own bytes, because a KMZ is a zip and not text: the page cannot
  * turn it into characters, and the phone would rather have the bytes it would have read off disk.
@@ -1081,11 +845,6 @@ async function importGpxFile(file) {
   const problem = importProblem(file, state.gpx.maxBytes);
   if (problem) {
     showNotice(problem);
-    return;
-  }
-  const early = mapIsNotReady();
-  if (early) {
-    showNotice(early);
     return;
   }
 
@@ -1103,17 +862,23 @@ async function importGpxFile(file) {
       return;
     }
 
+    const name = trackName(file);
+    const { status: made, answer: written } = await sendJson('/api/assets', 'POST', {
+      name,
+      kind: state.newAsset.kind,
+      notes: '',
+      paths: answer.paths
+    });
+    if (made !== 201) {
+      showNotice(written.message || 'The phone would not keep that file.');
+      return;
+    }
+
     closeForms();
-    // The kind a file is, and the line it holds: a track file is a track on the ground, which is what
-    // the phone makes of one. Both go to the drawing rather than straight to the form, so the line is
-    // on the map while the walker reads the form - a file with a jump in it or a spur in the wrong
-    // place is a thing to be seen before it is named, not after - and so a form given up on comes back
-    // to the drawing, where it can be traced onto, extended and saved by the same Enter every other
-    // drawing is saved by.
-    draftKind = state.newAsset.kind;
-    draftPaths = answer.paths;
-    editor.startNew(answer.paths, shapeOfKind(draftKind));
-    openDraft(trackName(file));
+    replaceAsset(written.asset);
+    await reloadFeatures();
+    drawList();
+    showCard(written.asset);
     showNotice(importedNote(file.name, answer));
   } catch (error) {
     showNotice(error.message);
@@ -1380,35 +1145,6 @@ async function importDocTracks() {
 }
 
 /**
- * Saves a line the walker has finished drawing.
- *
- * The body is the row the card is showing with the new line in it, which is what the phone wants: one
- * write judged as a whole, so a moved vertex and the rest of the row cannot land without each other.
- * The card's own version travels with it, so a track that has been drawn again on the phone is refused
- * rather than overwritten - the phone's line wins and the page reloads to show it.
- */
-async function savePath(assetId, paths) {
-  const item = state.assets.find((one) => one.asset.id === assetId);
-  if (!item) return;
-
-  try {
-    const { status, answer } = await sendJson(`/api/assets/${assetId}`, 'PUT', recordBody(item, paths));
-    if (status !== 200) {
-      showNotice(answer.message || 'The phone would not save that line.');
-      if (status === 409 && answer.reason === 'stale') await reloadWork();
-      return;
-    }
-    replaceAsset(answer.asset);
-    await reloadFeatures();
-    drawList();
-    showCard(answer.asset);
-    showNotice('Saved. The phone has it.');
-  } catch (error) {
-    showNotice(error.message);
-  }
-}
-
-/**
  * Takes a track away, when there is nothing recorded against it.
  *
  * The phone decides that and not this page: the sentence on the card is the phone's, the button is off
@@ -1442,42 +1178,17 @@ async function deleteAsset(item) {
 }
 
 /**
- * The body the form sends: what the walker typed, and the version the card was handed.
+ * The body the details form sends: what the walker typed, and the version the card was handed.
  *
- * `version` and `points` are left out entirely when they do not apply, rather than sent empty: a body
- * that says nothing about the line leaves the line alone, which is what the details form means - and a
- * new track has no version to quote, because there is no row for one to describe.
+ * It says nothing about the line, which is what makes a save from this form a save of the words alone:
+ * a track's own line is the phone's, and this page has no way to change one.
  */
-function formBody({ version = null, points = null, paths = null } = {}) {
-  const body = {
+function detailsBody(version) {
+  return {
     name: textOf('edit-name'),
     kind: selectedValue('edit-kind'),
-    notes: textOf('edit-notes')
-  };
-  if (version !== null) body.version = version;
-  if (points !== null) body.points = points;
-  if (paths !== null) body.paths = paths;
-  return body;
-}
-
-/**
- * The body a line's save sends: the row the card is showing, with the drawn line in it.
- *
- * Built from the record rather than from the form's fields, because the form is not open - and the record
- * is the row the phone last handed over, so what goes back is what the walker is looking at. Only the
- * name, the kind and the notes travel: everything else is the phone's own
- * and the phone writes its own values back for it.
- *
- * Which of the two drawing shapes it carries - one path, or the line with the track's side tracks - is
- * `wire.mjs`'s decision, so that it can be tested without a browser.
- */
-function recordBody(item, paths) {
-  return {
-    name: item.asset.name,
-    kind: item.asset.kind,
-    notes: item.asset.notes || '',
-    version: item.version,
-    ...drawingBody(paths)
+    notes: textOf('edit-notes'),
+    version
   };
 }
 
@@ -1494,15 +1205,6 @@ function closeCard() {
 
 /** The asset the form is open on, or null when it is shut. */
 let editingId = null;
-
-/**
- * Whether the form is describing a track that does not exist yet.
- *
- * A new track and an edit are the same form and two different writes - a POST to the collection with the
- * drawn line, or a PUT of one asset with a version quoted back - so the flag is what tells them apart at
- * the moment of the save, which is the only place they differ.
- */
-let drafting = false;
 
 const field = (id) => document.getElementById(id);
 const textOf = (id) => field(id).value.trim();
@@ -1534,41 +1236,9 @@ function fillChoices(id, choices, chosen) {
   }
 }
 
-/**
- * The shape a kind makes, from the phone's own answer.
- *
- * Each kind in the state document carries the shape the phone reads off it (`AssetKind.shape` - the same
- * word the record stores), so the desk draws a spot as a spot without a list of kind names of its own. A
- * kind that is not in the document - a page from an older build, or a kind this phone has never heard of -
- * is drawn as a line, which is what every drawing here was before there was any other shape.
- */
-function shapeOfKind(kind) {
-  const choice = state.choices.kinds.find((one) => one.value === kind);
-  return (choice && choice.shape) || 'LINE';
-}
-
-/**
- * The kinds a new drawing can be made as: the phone's list, in the phone's words.
- *
- * Filled once the state document has arrived, and the same ten answers the phone's own drawing screen
- * offers - a kind the phone learns appears here already named, with its shape, and nothing here needs
- * changing for it.
- */
-function fillDrawingKinds() {
-  const select = field('drawing-kind');
-  select.textContent = '';
-  for (const choice of state.choices.kinds) {
-    const option = document.createElement('option');
-    option.value = choice.value;
-    option.textContent = choice.label;
-    select.append(option);
-  }
-}
-
 /** Opens the form on an asset, filled with what the phone says it holds. */
 function openEdit(item) {
   editingId = item.asset.id;
-  drafting = false;
 
   field('edit-title').textContent = `Edit ${item.asset.name}`;
   field('edit-name').value = item.asset.name;
@@ -1578,13 +1248,12 @@ function openEdit(item) {
 
   field('edit-words').hidden = true;
   field('edit').hidden = false;
-  field('drawing').hidden = true;
   field('card').hidden = true;
   field('edit-name').focus();
 }
 
 /**
- * Every form shut, and every drawing with it.
+ * Every form shut.
  *
  * They are all about different things and all sit over the same corner of the map, so opening one is
  * closing the rest - said once here rather than at each of the ways in, because the way in that forgot
@@ -1595,74 +1264,23 @@ function closeForms() {
 }
 
 /**
- * The details form shut. The card, the drawing and the drawing's own words are not this function's
- * business: they belong to what the walker was doing before the form opened.
+ * The details form shut. The card is not this function's business: it belongs to what the walker was
+ * doing before the form opened.
  */
 function closeEdit() {
   editingId = null;
-  drafting = false;
   field('edit').hidden = true;
   field('edit-words').hidden = true;
 }
 
 /**
- * Whether the details form is open.
- *
- * The form and the drawing's own box are about different things, so no two of them are on the map at
- * once: a form is opened by hiding the box (see `showDrawing`), and the box comes back when the form's
- * Cancel puts the drawing in hand again.
- */
-function formIsOpen() {
-  return !field('edit').hidden;
-}
-
-/**
- * The form for a new track, opened over the line just drawn.
- *
- * Prefilled with the phone's own starting point for an asset - a track, drawn as the kind the box was
- * set to - because that is the answer the phone would fill in for itself. Everything else here is the
- * same form the card opens: the same fields, the same choices, the same rules underneath, and the same
- * sentences when the phone refuses something.
- *
- * [name] is for a track that came out of a track file, which has a name to start with - the file's own,
- * which the phone's own importer uses too. A line drawn here starts with the field empty, because
- * nothing has said what it is called yet and the phone will not keep an asset that has no name.
- */
-function openDraft(name = '') {
-  editingId = null;
-  drafting = true;
-
-  field('edit-title').textContent = 'New place';
-  field('edit-name').value = name;
-  field('edit-notes').value = '';
-
-  fillChoices('edit-kind', state.choices.kinds, draftKind || state.newAsset.kind);
-
-  field('edit-words').hidden = true;
-  field('edit').hidden = false;
-  field('drawing').hidden = true;
-  field('card').hidden = true;
-  field('edit-name').focus();
-}
-
-/**
  * Backing out of the form.
  *
- * For a new track that means back to the drawing rather than back to nothing: the drawing is the
- * walker's work, and a change of mind about the name is not a reason to lose it. The paths go back to
- * the map, so finishing again is one key away - and giving up altogether is the Escape that follows.
- * The kind it was drawn as goes back with them: a boundary drawn as one kind returns as one, rather
- * than as a line that happens to have the same shape.
+ * The details are the form's and nothing else is: the walker's work is the line on the map, and the
+ * phone holds that, so giving up on a name costs a name and nothing more.
  */
 function cancelForm() {
-  const paths = drafting ? draftPaths : null;
-  const kind = draftKind;
   closeEdit();
-  if (paths && editor) {
-    draftPaths = null;
-    draftKind = null;
-    editor.startNew(paths, shapeOfKind(kind));
-  }
 }
 
 /** The phone's own words about what it refused, where the walker is looking when it happens. */
@@ -1704,34 +1322,29 @@ async function reloadWork() {
 }
 
 /**
- * Saves the form to the phone: the details of a track, or a track that did not exist until now.
+ * Saves the details of a place to the phone.
  *
- * The phone judges every field - the blank-means-unknown rules and the drawn line as well - and its
- * words are what the walker is shown, because they are the words the phone's own screen would use.
- * What this function decides is only what to do with the answer: a save closes the form and redraws the
- * work from what came back, a refusal the walker can fix leaves the form open with the phone's
- * sentence under it, and a refusal because the asset moved under the page closes the form and reloads
- * the lot, because the page's copy is the thing that is wrong.
- *
- * The two writes it can make are one line apart: a new track is a POST to the collection with the line
- * that was drawn, and everything else is a PUT of one asset with the version its card was handed.
+ * The phone judges every field - the blank-means-unknown rules and the rest - and its words are what the
+ * walker is shown, because they are the words the phone's own screen would use. What this function
+ * decides is only what to do with the answer: a save closes the form and redraws the work from what came
+ * back, a refusal the walker can fix leaves the form open with the phone's sentence under it, and a
+ * refusal because the asset moved under the page closes the form and reloads the lot, because the page's
+ * copy is the thing that is wrong.
  */
 async function saveEdit(event) {
   event.preventDefault();
 
-  const item = drafting ? null : state.assets.find((one) => one.asset.id === editingId);
-  if (!drafting && !item) return;
+  const item = state.assets.find((one) => one.asset.id === editingId);
+  if (!item) return;
 
-  const body = drafting ? formBody({ paths: draftPaths }) : formBody({ version: item.version });
-  const path = drafting ? '/api/assets' : `/api/assets/${editingId}`;
+  const body = detailsBody(item.version);
 
   const save = field('edit-save');
   save.disabled = true;
   try {
-    const { status, answer } = await sendJson(path, drafting ? 'POST' : 'PUT', body);
+    const { status, answer } = await sendJson(`/api/assets/${editingId}`, 'PUT', body);
 
-    // 201 for a new track and 200 for a changed one: both are the phone saying it has it.
-    if (status !== 200 && status !== 201) {
+    if (status !== 200) {
       showEditProblem(answer.message || 'The phone would not save that.');
       if (status === 409) {
         closeEdit();
@@ -1741,11 +1354,6 @@ async function saveEdit(event) {
       return;
     }
 
-    // The line is the phone's now, so nothing is waiting on it any more. An imported line was still in
-    // hand while it was being named, so the drawing ends here - and the box that was about it goes with
-    // it rather than being left over the card the save is about to show.
-    draftPaths = null;
-    if (editor) editor.stop();
     replaceAsset(answer.asset);
     closeEdit();
     await reloadFeatures();
@@ -1765,25 +1373,7 @@ document.getElementById('edit-cancel').addEventListener('click', cancelForm);
 document.getElementById('edit-form').addEventListener('submit', saveEdit);
 
 /**
- * The way into drawing a track: an empty line, with nothing on the map to take hold of yet.
- *
- * The box opens on the phone's own starting point for an asset - a track - and the kind picked there is
- * what the drawing is made as, so the shape, the words and the closing side are settled before the first
- * click rather than explained afterwards.
- */
-document.getElementById('draw').addEventListener('click', () => {
-  if (!editor || editor.isActive()) return;
-  closeForms();
-  draftPaths = null;
-  draftKind = null;
-  // The phone's own default, not one remembered from last time: a desk that kept the last pick would be
-  // a second default nobody can see, and the phone's is the one the app's own drawing screen opens on.
-  field('drawing-kind').value = state.newAsset.kind;
-  editor.startNew([], shapeOfKind(state.newAsset.kind));
-});
-
-/**
- * The same errand, out of a file: the button opens the browser's own picker, and what comes back goes
+ * The way into bringing a track in: the button opens the browser's own picker, and what comes back goes
  * the same way a dropped file does. One function for both, so a file read from the picker and a file
  * dropped on the map cannot become two slightly different imports.
  */
@@ -1875,25 +1465,6 @@ window.addEventListener('drop', (event) => {
   if (carryingAFile(event)) event.preventDefault();
 });
 
-// What the drawing is being made as. Nothing here talks to the phone: the shape only changes what the
-// page draws and counts, and what it counts is the phone's own arithmetic on the phone's own shape.
-document.getElementById('drawing-kind').addEventListener('change', () => {
-  if (editor) editor.setShape(shapeOfKind(field('drawing-kind').value));
-});
-
-// The side-track furniture on the drawing bar. Each of these is a move the drawing makes on itself -
-// nothing here talks to the phone - so the page's buttons and the editor's own keys lead to the same
-// place, which is why neither is wired to the other.
-document.getElementById('drawing-side-track').addEventListener('click', () => {
-  if (editor) editor.startSideTrack();
-});
-document.getElementById('drawing-back').addEventListener('click', () => {
-  if (editor) editor.backToLine();
-});
-document.getElementById('drawing-drop').addEventListener('click', () => {
-  if (editor) editor.dropSideTrack();
-});
-
 window.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
   // The DOC dialog is the topmost thing when it is open, so its Escape goes first - a dialog closes
@@ -1902,15 +1473,8 @@ window.addEventListener('keydown', (event) => {
     closeDoc();
     return;
   }
-  // Escape backs out of the form first: it is on top, and it is the one with unsaved typing in it.
-  // While a line is being drawn the drawing has the key itself (see `edit.js`), so this only runs when
-  // the form is open, which is what makes two Escapes in a row mean "back to the drawing, then give it
-  // up".
+  // Escape backs out of the form next: it is on top, and it is the one with unsaved typing in it.
   if (!field('edit').hidden) {
-    if (drafting) {
-      cancelForm();
-      return;
-    }
     const item = state.assets.find((one) => one.asset.id === selectedId);
     closeEdit();
     if (item) showCard(item);

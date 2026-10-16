@@ -84,31 +84,46 @@ class WebEditorSaveTest {
      *
      * Written by hand on purpose: a test that built its body from the class would keep passing after
      * somebody renamed a field, which is precisely the failure a page would see as "nothing saved". It
-     * carries only what the desk shows - a name, a kind, the notes and, when it is about the drawing,
-     * the line - because that is all a save from the desk sends.
+     * carries only what the desk shows: a name, a kind and the notes, because that is all a save from
+     * the desk sends.
      */
     private fun editBody(
         version: String,
         name: String = "Estuary road",
-        notes: String = "Both edges",
-        points: List<GeoPoint>? = null,
-        paths: List<List<GeoPoint>>? = null
+        notes: String = "Both edges"
     ): String =
         """{"name":"$name","kind":"BIKE_TRACK","notes":"$notes",""" +
-            (if (points == null) "" else """"points":${pointsJson(points)},""") +
-            (if (paths == null) "" else """"paths":[${paths.joinToString(",") { pointsJson(it) }}],""") +
             """"version":"$version"}"""
 
     /**
-     * The body a drawing mode sends for a new asset: the details from the form and the line from the
-     * map, with no version, because a new asset has nothing to be stale against.
+     * A page from before the desk stopped drawing: the details, and a line it means to move.
+     *
+     * Nothing sends this any more. It is here because a laptop with the page already open - a tab from
+     * before the phone was updated - sends exactly this, and the phone has to answer it rather than read
+     * it as an edit of the words.
      */
-    private fun newAssetBody(
+    private fun editBodyWithLine(version: String, paths: List<List<GeoPoint>>): String =
+        """{"name":"Estuary road","kind":"BIKE_TRACK","notes":"Both edges",""" +
+            """"paths":[${paths.joinToString(",") { pointsJson(it) }}],""" +
+            """"version":"$version"}"""
+
+    /**
+     * The body the desk sends when it hands a track file over: the name to keep it under, and the line
+     * the phone read out of the file, with no version, because a new place has nothing to be stale
+     * against.
+     */
+    private fun fileBody(
         name: String = "Gully track",
-        points: List<GeoPoint> = line
-    ): String =
-        """{"name":"$name","kind":"TRACK","notes":null,""" +
-            """"points":${pointsJson(points)}}"""
+        paths: List<List<GeoPoint>>? = listOf(line)
+    ): String {
+        val parts = mutableListOf(
+            """"name":"$name"""",
+            """"kind":"TRACK"""",
+            """"notes":null"""
+        )
+        paths?.let { all -> parts += """"paths":[${all.joinToString(",") { pointsJson(it) }}]""" }
+        return "{" + parts.joinToString(",") + "}"
+    }
 
     private fun pointsJson(points: List<GeoPoint>): String =
         points.joinToString(prefix = "[", postfix = "]") { """{"lat":${it.lat},"lng":${it.lng}}""" }
@@ -210,45 +225,38 @@ class WebEditorSaveTest {
     }
 
     @Test
-    fun aLineMovedOnTheDeskIsStoredWholeAndMeasuredAgain() = runBlocking {
+    fun aLineWriteFromTheDeskIsRefusedAndThePhoneLineIsKept() = runBlocking {
         val id = assets.createAsset(name = "Estuary road", geometry = line)
         val version = stateRecord(id).version
         val longer = listOf(GeoPoint(0.0, 0.0), GeoPoint(0.0, 0.001), GeoPoint(0.0, 0.002))
 
-        val answer = saved(documents.save(id, editBody(version, points = longer)))
+        val answer = refused(
+            documents.save(id, editBodyWithLine(version, listOf(longer))),
+            WebEditorRefusal.INVALID
+        )
 
-        assertEquals(
-            "the line the desk drew is the line on the phone, vertex for vertex",
-            longer,
-            assets.getAssetGeometry(id).line
-        )
-        assertEquals(
-            "and the cached length moved with it, which is what the lists read",
-            222.39,
-            assets.getAsset(id)!!.lengthM,
-            0.5
-        )
-        assertNotEquals("the card's version is not the version any more", version, answer.record.version)
-        assertEquals("the answer carries the new one", answer.record.version, stateRecord(id).version)
+        assertTrue("says what happened: ${answer.message}", answer.message.contains("does not do"))
+        assertEquals("and the phone's line is untouched", line, assets.getAssetGeometry(id).line)
+        assertEquals("with its length, which nobody measured again", 111.19, assets.getAsset(id)!!.lengthM, 0.5)
     }
 
     @Test
-    fun aLineMovedOnThePhoneRefusesACardThatDidNotSeeIt() = runBlocking {
+    fun aCardFromBeforeAChangeOnThePhoneIsRefused() = runBlocking {
         val id = assets.createAsset(name = "Estuary road", geometry = line)
         val version = stateRecord(id).version
-        // The phone is where a track gets drawn by hand, so this is the ordinary way a card goes stale
-        // about geometry rather than an exotic one: somebody walked the line again on the phone.
-        val drawnOnThePhone = listOf(GeoPoint(0.0, 0.0), GeoPoint(0.0, 0.005))
-        assets.replaceGeometry(id, AssetGeometry.of(drawnOnThePhone))
+        // The phone is where a track's line is changed now, so this is the ordinary way a card goes
+        // stale about geometry rather than an exotic one: somebody tidied the line on the phone.
+        val tidiedOnThePhone = listOf(GeoPoint(0.0, 0.0), GeoPoint(0.0, 0.005))
+        assets.replaceGeometry(id, AssetGeometry.of(tidiedOnThePhone))
 
-        refused(documents.save(id, editBody(version, points = line)), WebEditorRefusal.STALE)
+        refused(documents.save(id, editBody(version, name = "Estuary road, lower")), WebEditorRefusal.STALE)
 
-        assertEquals("the phone's line is the one that survives", drawnOnThePhone, assets.getAssetGeometry(id).line)
+        assertEquals("the phone's line is the one that survives", tidiedOnThePhone, assets.getAssetGeometry(id).line)
     }
 
     @Test
-    fun aNewTrackFromTheDeskIsStoredLikeAnyOther() = runBlocking {
-        val answer = created(documents.create(newAssetBody()))
+    fun aTrackFileImportedOnTheDeskIsStoredLikeAnyOther() = runBlocking {
+        val answer = created(documents.create(fileBody()))
 
         val id = answer.record.asset.id
         assertTrue("the answer is about a row that exists", id > 0)
@@ -268,143 +276,13 @@ class WebEditorSaveTest {
 
     @Test
     fun aNewTrackWithNothingDrawnIsRefusedAndNothingIsStored() = runBlocking {
-        val answer = refused(documents.create(newAssetBody(points = emptyList())), WebEditorRefusal.INVALID)
+        val answer = refused(documents.create(fileBody(paths = emptyList())), WebEditorRefusal.INVALID)
 
         assertEquals("A line needs at least two points", answer.message)
         assertTrue(
             "nothing was created by a drawing with no line",
             assets.observeActiveAssets().first().isEmpty()
         )
-    }
-
-    /**
-     * A desk's line write against a track that has a side track.
-     *
-     * The wire has no field for side tracks yet, so a write carrying a line would drop every spur on
-     * the track - the one thing the desk must never do quietly. The details half of a card still saves,
-     * so this is a refusal about the drawing rather than about the card.
-     */
-    @Test
-    fun aLineWriteToATrackWithASideTrackIsRefusedRatherThanDroppingIt() = runBlocking {
-        val junction = GeoPoint(0.0, 0.0005)
-        val spur = listOf(junction, GeoPoint(0.001, 0.0005))
-        val id = assets.createAsset(
-            name = "Gully track",
-            geometry = AssetGeometry.of(listOf(line.first(), junction, line.last()), listOf(spur))
-        )
-        val version = stateRecord(id).version
-
-        val refusal = refused(
-            documents.save(id, editBody(version, points = line)),
-            WebEditorRefusal.INVALID
-        )
-
-        assertTrue(
-            "says what is missing: ${refusal.message}",
-            refusal.message.contains("side tracks")
-        )
-        assertTrue(
-            "and what to do about it: ${refusal.message}",
-            refusal.message.contains("Reload the page")
-        )
-        assertEquals(
-            "the side track is still there, which is what the refusal is for",
-            1,
-            assets.getAssetGeometry(id).sideTracks.size
-        )
-        assertEquals("and the line the desk tried to write was not written", 3, assets.getAssetGeometry(id).line.size)
-    }
-
-    /**
-     * The other half of that rule: a page that **has** been handed the side tracks can change the line.
-     *
-     * This is the write v0.6.27 had to refuse outright, and the two writes together are the whole
-     * contract: the paths travel back with the line as the page's own record holds them, and the phone
-     * writes what it is given - the side track untouched, the line as the walker tidied it, and the
-     * length worked out from both.
-     */
-    @Test
-    fun aLineWriteThatCarriesTheSideTracksChangesTheLineAndKeepsThem() = runBlocking {
-        val junction = GeoPoint(0.0, 0.0005)
-        val spur = listOf(junction, GeoPoint(0.001, 0.0005))
-        val id = assets.createAsset(
-            name = "Gully track",
-            geometry = AssetGeometry.of(listOf(line.first(), junction, line.last()), listOf(spur))
-        )
-        val version = stateRecord(id).version
-        // What the card was handed, and therefore what it sends back: the line as the phone holds it,
-        // then the untouched spur.
-        val asThePageHoldsIt = stateRecord(id).paths.map { it.map { point -> GeoPoint(point.lat, point.lng) } }
-        assertEquals("the record carries both paths, line first", 2, asThePageHoldsIt.size)
-        val tidied = listOf(line.first(), junction, GeoPoint(0.0, 0.0015))
-
-        val answer = saved(
-            documents.save(id, editBody(version, paths = listOf(tidied, asThePageHoldsIt[1])))
-        )
-
-        val stored = assets.getAssetGeometry(id)
-        assertEquals("the line as the desk drew it", tidied, stored.line)
-        assertEquals("and the side track, untouched", listOf(spur), stored.sideTracks)
-        assertEquals(
-            "with the length worked out from both, each path counted once",
-            277.9,
-            answer.record.asset.lengthM,
-            1.0
-        )
-        assertEquals("and the version the desk is told is a new one", true, answer.record.version != version)
-    }
-
-    @Test
-    fun aSideTrackDrawnOnTheDeskIsStoredWithTheLine() = runBlocking {
-        val junction = GeoPoint(0.0, 0.0005)
-        val asThePhoneHoldsIt = listOf(line.first(), junction, line.last())
-        val id = assets.createAsset(
-            name = "Gully track",
-            geometry = AssetGeometry.of(asThePhoneHoldsIt)
-        )
-        val version = stateRecord(id).version
-        val spur = listOf(junction, GeoPoint(0.001, 0.0005))
-
-        // The desk drawing a side track where the line ends: the junction is the line's own vertex, every
-        // path is whole, and the rules take it - so this is a write like any other, not something the phone
-        // has to do for the desk.
-        val answer = saved(
-            documents.save(id, editBody(version, paths = listOf(asThePhoneHoldsIt, spur)))
-        )
-
-        val stored = assets.getAssetGeometry(id)
-        assertEquals("the line, as the desk had it", asThePhoneHoldsIt, stored.line)
-        assertEquals("and the side track it drew", listOf(spur), stored.sideTracks)
-        assertEquals(
-            "with the length worked out from both, each path counted once",
-            222.6,
-            answer.record.asset.lengthM,
-            1.0
-        )
-        assertEquals("and a new version, so the desk can save again", true, answer.record.version != version)
-    }
-
-    @Test
-    fun aSideTrackTakenOffOnTheDeskComesOffThePhoneToo() = runBlocking {
-        val junction = GeoPoint(0.0, 0.0005)
-        val spur = listOf(junction, GeoPoint(0.001, 0.0005))
-        val id = assets.createAsset(
-            name = "Gully track",
-            geometry = AssetGeometry.of(listOf(line.first(), junction, line.last()), listOf(spur))
-        )
-        val version = stateRecord(id).version
-        val asThePageHoldsIt = stateRecord(id).paths.map { it.map { point -> GeoPoint(point.lat, point.lng) } }
-
-        // The desk tidying a spur away: a body carrying `paths` is a page that read this track's own
-        // paths, so fewer of them is a decision rather than an out of date page.
-        saved(documents.save(id, editBody(version, paths = listOf(asThePageHoldsIt[0]))))
-
-        assertEquals(
-            "the side track is off the phone, because the desk said so",
-            0,
-            assets.getAssetGeometry(id).sideTracks.size
-        )
-        assertEquals("and the line is what it was", 3, assets.getAssetGeometry(id).line.size)
     }
 
     @Test
@@ -496,18 +374,17 @@ class WebEditorSaveTest {
         val pages = listOf(
             "index.html" to "text/html; charset=utf-8",
             "app.js" to "text/javascript; charset=utf-8",
-            "edit.js" to "text/javascript; charset=utf-8",
-            // `.mjs` is the one worth pinning: the desk's drawing code is the same file node imports to
-            // test its undo stack without a browser, and a browser refuses a module whose type it does
+            // `.mjs` is the one worth pinning: the desk's own pure modules are the same files node
+            // imports to test them without a browser, and a browser refuses a module whose type it does
             // not read as JavaScript - which on a desk looks like a map that will not draw, with the
             // reason only in a console nobody opens.
             "geometry.mjs" to "text/javascript; charset=utf-8",
-            // The other three pure modules the page runs: what a save carries, what the glow under the
-            // picked-out track is made of, and where the desk was looking when it was last open. All are
-            // imported the same way, so a type a browser will not read as JavaScript is the same blank desk.
+            // The other pure modules the page runs: what the glow under the picked-out track is made of,
+            // where the desk was looking when it was last open, and the phone's own words for a figure.
+            // All are imported the same way, so a type a browser will not read as JavaScript is the same
+            // blank desk.
             "camera.mjs" to "text/javascript; charset=utf-8",
             "glow.mjs" to "text/javascript; charset=utf-8",
-            "wire.mjs" to "text/javascript; charset=utf-8",
             "style.css" to "text/css; charset=utf-8",
             "vendor/maplibre-gl.js" to "text/javascript; charset=utf-8"
         )

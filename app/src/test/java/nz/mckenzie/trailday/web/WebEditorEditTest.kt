@@ -49,29 +49,30 @@ class WebEditorEditTest {
     /**
      * The body a page sends back after opening this asset and changing one or two things.
      *
-     * Only what the desk shows: a name, a kind, the notes and, when it is about the drawing, the line.
-     * Nothing else about the asset travels - the phone keeps its own -
-     * so a body here does not carry them either, which is the whole point of the rule
-     * `a field the desk never sent survives the edit` holds.
+     * Only what the desk shows: a name, a kind and the notes. Nothing else about the asset travels - the
+     * phone keeps its own - so a body here does not carry them either, which is the whole point of the
+     * rule `a field the desk never sent survives the edit` holds.
      *
-     * [points] is whatever the desk has drawn, as JSON written by hand rather than built from
-     * [WebEditorPoint]: a test that built its body from the class would keep passing after somebody
-     * renamed a field, which is exactly the failure a page would see as "nothing saved".
+     * Written by hand as JSON rather than built from [WebEditorEdit]: a test that built its body from the
+     * class would keep passing after somebody renamed a field, which is exactly the failure a page would
+     * see as "nothing saved".
      */
     private fun body(
         version: String = WebEditorVersion.of(asset, listOf(path)),
         name: String = asset.name,
         kind: String = asset.kind,
         notes: String? = asset.notes,
-        points: List<GeoPoint>? = null,
-        paths: List<List<GeoPoint>>? = null
+        extra: String = ""
     ): String = buildString {
         append("""{"name":"$name","kind":"$kind",""")
         append(""""notes":${if (notes == null) "null" else "\"$notes\""},""")
-        if (points != null) append(""""points":${pointJson(points)},""")
-        if (paths != null) append(""""paths":[${paths.joinToString(",") { pointJson(it) }}],""")
+        if (extra.isNotEmpty()) append("""$extra,""")
         append(""""version":"$version"}""")
     }
+
+    /** The `paths` a body carries, as JSON, written the way a page writes them. */
+    private fun linesJson(paths: List<List<GeoPoint>>): String =
+        """"paths":[${paths.joinToString(",") { pointJson(it) }}]"""
 
     private fun ok(editBody: String?): WebEditorEditResult.Ok {
         val result = WebEditorEdits.apply(asset, listOf(path), editBody)
@@ -85,14 +86,14 @@ class WebEditorEditTest {
         return result as WebEditorEditResult.Refused
     }
 
-    /** A new asset, as the desk's drawing mode sends one: no version, because there is no row yet. */
-    private fun draftBody(
+    /** A new asset, as the desk's file import sends one: a name, and the line the phone read out of it. */
+    private fun fileBody(
         name: String = "New track",
         kind: String = "TRACK",
-        points: List<GeoPoint>? = path
+        paths: List<List<GeoPoint>>? = listOf(path)
     ): String = buildString {
         append("""{"name":"$name","kind":"$kind","notes":null""")
-        if (points != null) append(""","points":${pointJson(points)}""")
+        if (paths != null) append(""","paths":[${paths.joinToString(",") { pointJson(it) }}]""")
         append("}")
     }
 
@@ -201,44 +202,20 @@ class WebEditorEditTest {
     }
 
     @Test
-    fun `a path the desk drew is taken, and comes back as the paths to store`() {
-        val drawn = listOf(GeoPoint(-41.5, 173.8), GeoPoint(-41.55, 173.85), GeoPoint(-41.6, 173.9))
+    fun `a write that carries a line is refused, because the desk does not draw one`() {
+        // The desk used to be able to move a vertex. It cannot now, and a page that still tries is a page
+        // from before the change: refused rather than quietly ignored, because ignoring it would leave
+        // the page believing it had moved a track it had not.
+        val refused = refused(body(extra = linesJson(listOf(path))))
 
-        val result = ok(body(points = drawn))
-
-        assertEquals("the line is stored with the row", listOf(drawn), result.paths)
-        assertEquals("and the row's own name is still there beside it", asset.name, result.asset.name)
+        assertTrue("says so: ${refused.message}", refused.message.contains("does not do"))
+        assertTrue("and what to do: ${refused.message}", refused.message.contains("Reload the page"))
     }
 
     @Test
     fun `a body that says nothing about the drawing leaves the line exactly as it is`() {
-        // Which is what the details form sends: the same body, one key shorter. Null rather than an
-        // empty list, so the difference between "nothing has moved" and "nothing is drawn" survives
-        // all the way to the repository.
+        // Which is what the details form sends: the words, and nothing about the ground.
         assertNull(ok(body()).paths)
-    }
-
-    @Test
-    fun `a place drawn as a path is refused in the path rules' words`() {
-        val place = asset.copy(kind = "WAYPOINT", shape = "POINT")
-
-        val result = WebEditorEdits.apply(
-            current = place,
-            paths = listOf(path),
-            // The version the place's own card would carry: a place and a line with the same fields
-            // hash differently, which is the point of the shape being in the hash at all.
-            body = body(
-                version = WebEditorVersion.of(place, listOf(path)),
-                kind = "WAYPOINT",
-                points = path
-            )
-        )
-
-        assertTrue("expected a refusal: $result", result is WebEditorEditResult.Refused)
-        assertTrue(
-            "counts the points it was sent: ${(result as WebEditorEditResult.Refused).message}",
-            result.message.contains("2 points")
-        )
     }
 
     @Test
@@ -294,7 +271,7 @@ class WebEditorEditTest {
 
     @Test
     fun `a new track comes back as a row the database will number, with its line`() {
-        val draft = drafted(draftBody(name = "Gully track"))
+        val draft = drafted(fileBody(name = "Gully track"))
 
         assertEquals("Gully track", draft.asset.name)
         assertEquals("TRACK", draft.asset.kind)
@@ -309,35 +286,37 @@ class WebEditorEditTest {
     }
 
     @Test
-    fun `a new place is one point, because its kind says it is a place`() {
-        val draft = drafted(
-            draftBody(name = "Water source", kind = "WAYPOINT", points = listOf(path.first()))
-        )
+    fun `a file's line cannot be kept as a place, in the path rules' own words`() {
+        // A file is a line. A page that asked for it to be kept as a waypoint - or a hut, or a campsite -
+        // is asking for a place with two points on it, which `AssetPathEdits` refuses for every kind.
+        val refused = createRefused(fileBody(name = "Water source", kind = "WAYPOINT"))
 
-        assertEquals("POINT", draft.asset.shape)
-        assertEquals(1, draft.geometry.pointCount)
+        assertTrue(
+            "counts the points it was sent: ${refused.message}",
+            refused.message.contains("2 points")
+        )
     }
 
     @Test
-    fun `a new asset with no drawing is refused, because there is nowhere for it to be`() {
+    fun `a file with no line in it is refused, because there is nothing to keep`() {
         assertTrue(
-            "a path that was never drawn: ${createRefused(draftBody(points = null)).message}",
-            createRefused(draftBody(points = null)).message.contains("draw it on the map")
+            "a file the phone read as no paths at all: ${createRefused(fileBody(paths = null)).message}",
+            createRefused(fileBody(paths = null)).message.contains("no line in that file")
         )
         assertTrue(
             "an empty path is the same thing said a different way: " +
-                createRefused(draftBody(points = emptyList())).message,
-            createRefused(draftBody(points = emptyList())).message.contains("A line needs at least two points")
+                createRefused(fileBody(paths = emptyList())).message,
+            createRefused(fileBody(paths = emptyList())).message.contains("A line needs at least two points")
         )
     }
 
     @Test
     fun `a new asset is judged by the same rules, so an unnamed one is refused in the app's words`() {
-        assertEquals("Give it a name so it can be found later", createRefused(draftBody(name = "  ")).message)
+        assertEquals("Give it a name so it can be found later", createRefused(fileBody(name = "  ")).message)
         assertTrue(
             "and a kind this build does not know is still a refusal: " +
-                createRefused("""{"name":"X","kind":"PADDOCK","points":[]}""").message,
-            createRefused("""{"name":"X","kind":"PADDOCK","points":[]}""")
+                createRefused("""{"name":"X","kind":"PADDOCK","paths":[]}""").message,
+            createRefused("""{"name":"X","kind":"PADDOCK","paths":[]}""")
                 .message.contains("PADDOCK")
         )
     }
@@ -347,31 +326,24 @@ class WebEditorEditTest {
         // The page builds both bodies with one function, so a create arrives carrying the version of
         // whatever card the walker had been looking at. There is no row to compare it with: the
         // only thing that version could refuse is the making of a new track, which is nobody's intent.
-        val withVersion = draftBody().dropLast(1) + ""","version":"a-card-from-before"}"""
+        val withVersion = fileBody().dropLast(1) + ""","version":"a-card-from-before"}"""
 
         assertEquals(path, drafted(withVersion).geometry.line)
     }
 
     @Test
-    fun `a drawing's heights are read back, and a height that moved is a different version`() {
-        // The desk hands the whole line back, and the heights a file gave it travel with it, so a desk
-        // edit does not flatten a line that came off a ride.
+    fun `a file's heights are kept, and a height that moved is a different version`() {
+        // The heights a file gave a line travel with it, so keeping the file does not flatten a line that
+        // came off a ride. The desk hands a line back exactly once - when it hands the file over - and
+        // this is that write.
         val climbed = listOf(
             GeoPoint(-41.5, 173.8, altitudeM = 553.6),
             GeoPoint(-41.6, 173.9, altitudeM = 663.6)
         )
-        val result = WebEditorEdits.apply(
-            asset,
-            listOf(climbed),
-            body(paths = listOf(climbed), version = WebEditorVersion.of(asset, listOf(climbed)))
-        )
 
-        assertTrue("the line with its heights is taken: $result", result is WebEditorEditResult.Ok)
-        assertEquals(
-            553.6,
-            (result as WebEditorEditResult.Ok).paths!!.first()[0].altitudeM!!,
-            1e-9
-        )
+        val draft = drafted(fileBody(paths = listOf(climbed)))
+
+        assertEquals("the height on the line is the file's own", 553.6, draft.geometry.line.first().altitudeM!!, 1e-9)
 
         // A vertex that moved only in height is a vertex that moved: a card that never saw it is stale.
         assertNotEquals(
@@ -380,57 +352,27 @@ class WebEditorEditTest {
         )
     }
 
-    /* ---- A drawing that carries side tracks -------------------------------------------- */
+    /* ---- A file that carries side tracks ------------------------------------------------ */
 
     /** A side track off the far end of the line, which is where one leaves a track. */
     private val spur = listOf(path.last(), GeoPoint(-41.55, 173.85))
 
     @Test
-    fun `a body carrying paths is taken with every path in it`() {
-        val taken = ok(body(paths = listOf(path, spur)))
+    fun `a file with a side track keeps every path in it`() {
+        val draft = drafted(fileBody(paths = listOf(path, spur)))
 
-        assertEquals("the line and its side track", 2, taken.paths!!.size)
-        assertEquals(path, taken.paths!![0])
-        assertEquals("the side track goes back exactly as it came", spur, taken.paths!![1])
+        assertEquals("the line and its side track", 2, draft.geometry.paths.size)
+        assertEquals(path, draft.geometry.paths[0])
+        assertEquals("the side track goes back exactly as it came", spur, draft.geometry.paths[1])
     }
 
     @Test
-    fun `a side track that does not start on the line is refused in the app's own words`() {
-        val refused = refused(
-            body(paths = listOf(path, listOf(GeoPoint(-41.2, 173.2), GeoPoint(-41.3, 173.3))))
+    fun `a file's side track that does not start on the line is refused in the app's own words`() {
+        val refused = createRefused(
+            fileBody(paths = listOf(path, listOf(GeoPoint(-41.2, 173.2), GeoPoint(-41.3, 173.3))))
         )
 
         assertTrue("says what to do: ${refused.message}", refused.message.contains("start on the track"))
-    }
-
-    @Test
-    fun `a body carrying two drawings is refused rather than read one way or the other`() {
-        val refused = refused(body(points = path, paths = listOf(path, spur)))
-
-        assertTrue(
-            "says the page is confused: ${refused.message}",
-            refused.message.contains("two drawings")
-        )
-        assertTrue(
-            "and what to do about it: ${refused.message}",
-            refused.message.contains("Reload the page")
-        )
-    }
-
-    @Test
-    fun `a body carrying paths puts them on the version too, so a spur added since is stale`() {
-        // The version is built from the paths the phone holds, so a card that never saw the spur is
-        // refused by the same arithmetic as one that never saw a rename: this is that arithmetic, from
-        // the desk's side - the body's own paths are what a fresh card would quote.
-        val quoted = WebEditorVersion.of(asset, listOf(path))
-        val fresh = WebEditorVersion.of(asset, listOf(path, spur))
-
-        assertNotEquals(quoted, fresh)
-        assertEquals(
-            "and a body carrying the paths is taken against the version it quoted",
-            path,
-            ok(body(version = quoted, paths = listOf(path))).paths!!.first()
-        )
     }
 
     /* ---- A track file dropped on the desk ----------------------------------------------- */

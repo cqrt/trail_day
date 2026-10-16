@@ -152,31 +152,11 @@ class WebEditorDocuments(
         return when (val result = WebEditorEdits.apply(before, geometry.paths, body)) {
             is WebEditorEditResult.Refused -> WebEditorWrite.Refused(result.refusal, result.message)
             is WebEditorEditResult.Ok -> {
-                // A drawing that does not carry the track's side tracks cannot be written: the write
-                // would drop every spur on it, which is the one thing a desk must never do quietly.
-                //
-                // Only one shape of that is left, now that the desk draws side tracks itself: a body of
-                // a single `points` for a track that has side tracks. That page never read this track's
-                // `paths` - every page since the desk was taught to carry them sends `paths` for a track
-                // that has more than one - so it is out of date, and a reload is what fixes it.
-                //
-                // A body that carries `paths` may carry a different number of them: adding a side track
-                // and taking one off are things the desk can do now, and the rules above have already
-                // judged the shape it sent - every path whole, every side track starting on the line.
-                val drawn = result.paths
-                if (drawn != null && !result.carriedPaths && drawn.size != geometry.paths.size) {
-                    return refused(
-                        WebEditorRefusal.INVALID,
-                        "That write did not carry all of this track's side tracks, so nothing was " +
-                            "saved. Reload the page and try again."
-                    )
-                }
-                // The row and, when the write carried one, the drawing - in one transaction, with the
-                // length the paths add up to.
-                assets.saveAssetEdits(
-                    result.asset,
-                    drawn?.let { paths -> AssetGeometry(paths) }
-                )
+                // The words, and nothing about the line: a save from the desk cannot move a vertex,
+                // because the desk has no way to draw one. The geometry is left exactly as it is -
+                // `saveAssetEdits` is handed no geometry at all - so a track the walker tidied on the
+                // phone keeps the line they tidied it into.
+                assets.saveAssetEdits(result.asset, null)
                 // The second read is the answer, so what the desk is told is what the phone holds.
                 val after = activeAssets().firstOrNull { it.id == id }
                     ?: return missing("That track is not on the phone any more.")
@@ -186,12 +166,12 @@ class WebEditorDocuments(
     }
 
     /**
-     * `POST /api/assets`: a track or a place drawn on a computer.
+     * `POST /api/assets`: a track brought in from a file on the desk.
      *
      * The new row is written where the app writes its own - `insertAsset`, which issues the id and
      * stores the geometry and its length in one transaction - and the answer is the row as
-     * the phone holds it afterwards, read back the same way a save's is. So a desk's new track is
-     * indistinguishable, from that moment on, from one drawn by tapping on the phone: same table, same
+     * the phone holds it afterwards, read back the same way a save's is. So a file imported on the desk
+     * is indistinguishable, from that moment on, from one imported on the phone: same table, same
      * points, same rules on the next page load.
      */
     override suspend fun create(body: String?): WebEditorWrite {

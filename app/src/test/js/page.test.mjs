@@ -28,7 +28,6 @@ const pageCode = readFileSync(new URL('../../main/assets/web/app.js', import.met
  * good intentions.
  */
 const STARTS_DISABLED = {
-  draw: "field('draw').disabled = false",
   'doc-import': "field('doc-import').disabled = count === 0"
 };
 
@@ -58,17 +57,14 @@ test('every control that starts disabled is one the page turns on, and says so',
   }
 });
 
-test('the Import a track file button is not one of them', () => {
-  // The fault this file was written for, pinned on its own: a file becomes a drawing, a drawing needs a
-  // map with a style - and that is a question for the press to answer, not a reason to grey the button
-  // out. The page says so in words instead: `mapIsNotReady`.
+test('the Import a track file button is never off', () => {
+  // The fault this file was written for, pinned on its own: the Import button was greyed out because a
+  // file used to become a drawing and a drawing needed a map with a style. Nothing about importing
+  // needs the map at all now - the phone reads the file and keeps the place - so the button is simply
+  // never off, and this says so.
   const button = html.match(/<button id="import"[^>]*>/)[0];
 
   assert.ok(!/\bdisabled\b/.test(button), `the import button starts disabled again: ${button}`);
-  assert.ok(
-    pageCode.includes('function mapIsNotReady()'),
-    'and the page no longer has the guard that says why a file cannot be taken yet'
-  );
 });
 
 test('every control the page reaches for is in the markup', () => {

@@ -1,7 +1,7 @@
 /*
  * Where the desk was looking.
  *
- * Pure, and separate from `app.js` for the same reason `glow.mjs` and `wire.mjs` are: node can run it
+ * Pure, and separate from `app.js` for the same reason `glow.mjs` and `find.mjs` are: node can run it
  * without a browser (`app/src/test/js/camera.test.mjs`, which CI runs), so what the memory will keep and
  * what it will refuse are pinned by a test rather than reviewed by eye.
  *

@@ -1,7 +1,7 @@
 /*
  * The page's word for a phone code.
  *
- * Pure, and separate from `app.js` for the same reason `geometry.mjs` is separate from `edit.js`: node
+ * Pure, and separate from `app.js` for the same reason `find.mjs` is separate from `app.js`: node
  * can run it without a browser (`app/src/test/js/words.test.mjs`, which CI runs), so what the desk says
  * a hut is - and what it says for a kind it has not been told about - is pinned by a test rather than
  * reviewed by eye.

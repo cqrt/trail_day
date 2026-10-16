@@ -1,7 +1,7 @@
 /*
  * What is drawn under the asset that is picked out.
  *
- * Pure, and separate from `app.js` for the same reason `wire.mjs` is: node can run it without a browser
+ * Pure, and separate from `app.js` for the same reason `find.mjs` is: node can run it without a browser
  * (`app/src/test/js/glow.test.mjs`, which CI runs), so what the mark is made of is pinned by a test rather
  * than reviewed by eye.
  *

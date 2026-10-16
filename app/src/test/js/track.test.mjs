@@ -113,7 +113,7 @@ test('a file read as one line says how many points it has', () => {
 
   assert.match(note, /gully track\.gpx/);
   assert.match(note, /one line of 2 points/);
-  assert.match(note, /Give it a name/, 'and says what the walker does next');
+  assert.match(note, /Kept on the phone/, 'and says where the file has gone');
 });
 
 test('a file with side tracks says how many, in the drawing\'s own words', () => {

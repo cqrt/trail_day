@@ -29,7 +29,7 @@ import java.util.Base64
  * last-walked date or an archived flag it never heard of.
  *
  * **And the fields the desk no longer shows are the row's own.** Only a name, a kind, the notes
- * and the drawing ever come from the body.
+ * and - on the one write that brings a file in - the line ever come from the body.
  *
  * **Why a fingerprint and not a version column.** The desk has to be able to say "I am changing the
  * place I read" and the phone has to be able to answer "that is not the place you read any more".
@@ -39,11 +39,10 @@ import java.util.Base64
  * hands it out, and the edit sends it back. It moves exactly when something the desk could
  * overwrite moves, and it costs the database nothing at all.
  *
- * **The path travels in the same body as the words.** Moving a vertex is not a second kind of write
- * with its own rules and its own staleness: the desk sends the details it is looking at *and* the line
- * it has drawn, judged by [AssetPathEdits] and written by the repository in one transaction. So a
- * drawing mode on the desk never holds a half-filled form: the row it sends is the row it read, with
- * one thing moved.
+ * **The line arrives with the words, and only when a file is brought in.** A file is one write: the
+ * paths the phone read out of it and the name it is kept under, judged by [AssetPathEdits] and written
+ * by the repository in one transaction. Everything else the desk writes is about the words, and a save
+ * that moves no ground cannot drop a vertex a walker tidied on the phone.
  *
  * **Deleting is judged when it happens**, not from what a card said a minute ago: see
  * [WebEditorRemoval] and [nz.mckenzie.trailday.domain.asset.AssetRemovalRules] for the rule and for
@@ -56,8 +55,8 @@ import java.util.Base64
  * Every number arrives as the text the field held, for the reason [AssetEdits] exists: what a
  * blank, a comma or a stray space means is decided in one place, and it is not decided here.
  *
- * Only what the desk actually shows is here. The desk edits a name, a kind, the notes and the
- * drawing, and nothing else.
+ * Only what the desk actually shows is here. The desk edits a name, a kind and the notes, and brings a
+ * file in with its line.
  */
 @Serializable
 data class WebEditorEdit(
@@ -65,23 +64,11 @@ data class WebEditorEdit(
     val kind: String,
     val notes: String? = null,
     /**
-     * The line the desk has drawn, when this write is about where the asset goes.
+     * The whole of a track's drawing, on the one write that carries one: bringing a file in.
      *
-     * Absent means "nothing about the drawing has changed", which is what the details form sends -
-     * the same body either way, so a page has one shape of write to get right. Present means every
-     * vertex, in order, as the map holds them: the desk sends the whole line rather than what
-     * changed, which is what makes Ctrl+Z on a laptop cost the phone nothing.
-     */
-    val points: List<WebEditorPoint>? = null,
-    /**
-     * The whole of a track's drawing, when the write carries more than one path: the line first and its
-     * side tracks after it.
-     *
-     * This is the line-write that can carry side tracks, and it exists because [points] is one path: a
-     * page that could only ever send one path could not change the line of a track that has a spur
-     * without dropping it, so that write was refused outright. A body carries **one or the other**,
-     * never both - two drawings in one write is a page that is confused, and the phone says so rather
-     * than guessing which one was meant.
+     * The line first and the side tracks after it, as the phone's own geometry holds them. Absent means
+     * "nothing about the line", which is what every other write says - the details form sends the same
+     * body shape either way, so a page has one kind of write to get right.
      */
     val paths: List<List<WebEditorPoint>>? = null,
     /**
@@ -145,42 +132,30 @@ sealed interface WebEditorEditResult {
      * The row to store.
      *
      * [paths] is the line to store with the row, or null when this write said nothing about the
-     * drawing and the geometry stays exactly as it is.
+     * drawing - which every write does now except the one that brings a file in.
      */
     data class Ok(
         val asset: AssetEntity,
         /**
-         * The drawing to store, when the write was about where the asset goes: the line first and its
-         * side tracks after it, already judged. Null when the write said nothing about the drawing,
-         * which is what the details form sends.
+         * The drawing to store, on the write that carried one: the line first and its side tracks after
+         * it, already judged. Null for a write about the words alone.
          */
-        val paths: List<List<GeoPoint>>? = null,
-        /**
-         * Whether the body carried the drawing as `paths` rather than as a single `points`.
-         *
-         * The two are told apart by the caller because they mean different things when the count
-         * changes: a page that sends `paths` read this track's own paths and may hand back a different
-         * number of them - the desk draws and tidies side tracks now - while a page that sends `points`
-         * never saw the paths at all, so a body of one path for a track with side tracks is an out of
-         * date page rather than an edit.
-         */
-        val carriedPaths: Boolean = false
+        val paths: List<List<GeoPoint>>? = null
     ) : WebEditorEditResult
 
     data class Refused(val refusal: WebEditorRefusal, val message: String) : WebEditorEditResult
 }
 
-/** A new asset, as a desk's drawing and the form beside it describe one. */
+/** A new asset: a file the desk handed over, and the line the phone read out of it. */
 data class WebEditorDraft(
     val asset: AssetEntity,
     /**
-     * The geometry to store with it, and never empty: an asset with nothing drawn is not something
-     * the desk can make, and [AssetPathEdits] refuses that for both shapes - so this type says what is
+     * The geometry to store with it, and never empty: a file with no line in it is refused by
+     * [AssetPathEdits] rather than kept as a place with nothing on the ground, so this type says what is
      * true rather than leaving every caller to check it.
      *
      * A [nz.mckenzie.trailday.domain.geo.AssetGeometry] rather than a list of points, because that is
-     * what the repository writes: a track made here has one line and no side tracks, and saying so in
-     * the type is how the writing code holds no opinion about it.
+     * what the repository writes.
      */
     val geometry: AssetGeometry
 )
@@ -341,6 +316,16 @@ object WebEditorEdits {
     ): WebEditorEditResult {
         val edit = parse(body) ?: return Refused(UNREADABLE)
 
+        // A write that carries a line is a page trying to change one, and the desk cannot: a line here
+        // is DOC's, a file's or a walk's, and none of them is a laptop's to redraw. Refused rather than
+        // ignored, because ignoring it would be the page believing it had moved a track it had not.
+        if (edit.paths != null) {
+            return Refused(
+                "That page tried to change the line, which the desk does not do. Reload the page and " +
+                    "change the details instead."
+            )
+        }
+
         // The version first. When a field has moved, "somebody changed this on the phone" is the
         // useful thing to say, and arguing with a stale edit about whether its own fields are in
         // range would be an answer about an asset that is no longer there. A body that did not say
@@ -375,7 +360,7 @@ object WebEditorEdits {
 
             is WebEditorEditResult.Ok -> {
                 val paths = judged.paths
-                    ?: return CreateRefused("A new track needs somewhere to go: draw it on the map.")
+                    ?: return CreateRefused("There was no line in that file to save.")
                 WebEditorCreateResult.Ok(
                     WebEditorDraft(
                         asset = judged.asset,
@@ -426,8 +411,7 @@ object WebEditorEdits {
                     is AssetPathResult.Invalid -> Refused(drawn.message)
                     is AssetPathResult.Ok -> WebEditorEditResult.Ok(
                         asset = result.asset,
-                        paths = drawn.paths,
-                        carriedPaths = edit.paths != null
+                        paths = drawn.paths
                     )
                 }
             }
@@ -437,22 +421,13 @@ object WebEditorEdits {
     /**
      * The drawing a body carried, judged for the shape the row has.
      *
-     * Null when the body said nothing about the drawing. A body that says nothing and a body that
-     * sends an empty list are told apart deliberately: the first leaves the line exactly as it is,
-     * and the second is a page saying it has drawn nothing - which for either shape is a refusal
-     * rather than a way to empty a track.
-     *
-     * `points` is one path and `paths` is however many the desk has, and a body carrying both is
-     * refused rather than read one way or the other: two drawings in one write is a page that has got
-     * its own state wrong, and the only honest answer to that is to say so.
+     * Null when the body said nothing about the line, which is every write but the one that brings a
+     * file in. A body that says nothing and a body that sends an empty list are told apart deliberately:
+     * the first leaves the line exactly as it is, and the second is a page saying it has no line -
+     * which for either shape is a refusal rather than a way to empty a track.
      */
     private fun drawingOf(shape: AssetShape, edit: WebEditorEdit): AssetPathResult? {
-        if (edit.points != null && edit.paths != null) {
-            return AssetPathResult.Invalid(
-                "That write carried two drawings, so nothing was saved. Reload the page and try again."
-            )
-        }
-        val paths = edit.paths ?: edit.points?.let { listOf(it) } ?: return null
+        val paths = edit.paths ?: return null
         return AssetPathEdits.applyPaths(
             shape,
             paths.map { path ->
