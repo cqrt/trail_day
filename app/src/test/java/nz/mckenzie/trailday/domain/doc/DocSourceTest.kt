@@ -142,6 +142,49 @@ class DocSourceTest {
     }
 
     @Test
+    fun `each service says which of its own facts are worth narrowing by`() {
+        // The vocabulary the browser's Filter is built from, and the reason it is per source: a hut has
+        // no "how it is walked" and a track has nobody to book with, so one service's filter would offer
+        // the other three a chip that can never match.
+        assertEquals(
+            listOf(
+                DocFilter("SubObjectType", "What it is"),
+                DocFilter(DocSource.TRACK_TYPE_CHARACTERISTIC, "How it is walked")
+            ),
+            DocSource.TRACKS.filters
+        )
+        assertEquals(
+            listOf(DocFilter("bookable", "Bookable"), DocFilter("region", "Region")),
+            DocSource.HUTS.filters
+        )
+        assertEquals(
+            listOf(
+                DocFilter("campsiteCategory", "What it is"),
+                DocFilter("bookable", "Bookable"),
+                DocFilter("region", "Region")
+            ),
+            DocSource.CAMPSITES.filters
+        )
+        assertEquals(listOf(DocFilter("difficulty", "Difficulty")), DocSource.BIKES.filters)
+    }
+
+    @Test
+    fun `a filter is on a fact the service publishes, and its label is words`() {
+        DocSource.entries.forEach { source ->
+            source.filters.forEach { filter ->
+                assertTrue(
+                    "$source filters on ${filter.field}, which it does not publish",
+                    filter.field == DocSource.TRACK_TYPE_CHARACTERISTIC || filter.field in source.fields
+                )
+                assertTrue(
+                    "a label is read by a walker: \"${filter.label}\"",
+                    filter.label.isNotBlank() && filter.label.none { it == '_' }
+                )
+            }
+        }
+    }
+
+    @Test
     fun `each source has an id of its own, which is what a cache row is keyed by`() {
         val ids = DocSource.entries.map { it.id }
         assertEquals(ids.size, ids.toSet().size)

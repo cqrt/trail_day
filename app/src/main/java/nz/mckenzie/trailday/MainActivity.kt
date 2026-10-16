@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.first
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.ui.screens.AddSpotScreen
-import nz.mckenzie.trailday.ui.screens.DocTracksScreen
+import nz.mckenzie.trailday.ui.screens.DocBrowserScreen
 import nz.mckenzie.trailday.ui.screens.MapScreen
 import nz.mckenzie.trailday.ui.screens.OfflineAreaPickerScreen
 import nz.mckenzie.trailday.ui.screens.OfflineScreen
@@ -35,7 +35,7 @@ import nz.mckenzie.trailday.ui.screens.AssetEditScreen
 import nz.mckenzie.trailday.ui.screens.AssetListScreen
 import nz.mckenzie.trailday.ui.theme.TrailDayTheme
 import nz.mckenzie.trailday.viewmodel.AddSpotViewModel
-import nz.mckenzie.trailday.viewmodel.DocTracksViewModel
+import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
 import nz.mckenzie.trailday.viewmodel.MapViewModel
 import nz.mckenzie.trailday.viewmodel.OfflineAreaPickerViewModel
 import nz.mckenzie.trailday.viewmodel.OfflineViewModel
@@ -51,7 +51,7 @@ import nz.mckenzie.trailday.web.WebEditorService
 import nz.mckenzie.trailday.web.WebEditorState
 
 /** Destinations for now; swap for a NavHost when routes need arguments. */
-private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC_TRACKS }
+private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC }
 
 class MainActivity : ComponentActivity() {
 
@@ -153,16 +153,16 @@ class MainActivity : ComponentActivity() {
                                 addSpotVisit++
                                 destination = Destination.ADD_SPOT
                             },
-                            onImportDocTracks = { destination = Destination.DOC_TRACKS },
+                            onOpenDoc = { destination = Destination.DOC },
                             onOpenSettings = { destination = Destination.SETTINGS }
                         )
                     }
 
-                    Destination.DOC_TRACKS -> {
-                        val docViewModel: DocTracksViewModel = viewModel(
-                            factory = DocTracksViewModel.factory(applicationContext)
+                    Destination.DOC -> {
+                        val docViewModel: DocBrowserViewModel = viewModel(
+                            factory = DocBrowserViewModel.factory(applicationContext)
                         )
-                        DocTracksScreen(
+                        DocBrowserScreen(
                             viewModel = docViewModel,
                             onBack = { destination = Destination.ASSETS }
                         )

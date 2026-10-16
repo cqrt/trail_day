@@ -33,6 +33,15 @@ fun List<DocItem>.kindsPresent(): List<String> = mapNotNull { it.kind }.distinct
 fun List<DocItem>.typesPresent(): List<String> = mapNotNull { it.trackType }.distinct().sorted()
 
 /**
+ * The values these rows carry for a filter's field, each once, sorted, blanks left out.
+ *
+ * Read from the page the search actually brought back, so every chip a filter offers is a fact about
+ * something on the screen: a chip that matches nothing is a filter nobody can use.
+ */
+fun List<DocItem>.valuesPresent(field: String): List<String> =
+    mapNotNull { item -> item.filterValue(field) }.distinct().sorted()
+
+/**
  * Only what is within [radiusM] of [from], and everything when there is no fix to measure from.
  *
  * The service is asked about a **box** around the walker - a rectangle is what a spatial query takes -
@@ -62,13 +71,13 @@ enum class DocSort {
  * list of nearest would be answering the question with a shrug.
  */
 fun List<DocItem>.showing(
-    kinds: Set<String> = emptySet(),
-    types: Set<String> = emptySet(),
+    filters: Map<String, Set<String>> = emptyMap(),
     sort: DocSort = DocSort.NAME,
     from: GeoPoint? = null
 ): List<DocItem> {
     val filtered = filter { item ->
-        (kinds.isEmpty() || item.kind in kinds) && (types.isEmpty() || item.trackType in types)
+        // Every filter must agree with the row, and a filter with nothing ticked agrees with everything.
+        filters.all { (field, chosen) -> chosen.isEmpty() || item.filterValue(field) in chosen }
     }
     return when (sort) {
         DocSort.NEAREST -> filtered.sortedWith(

@@ -104,6 +104,14 @@ data class DocItem(
     /** Whether a campsite is free, in DOC's own word. Null when DOC did not say. */
     val free: String? get() = fact("free")
 
+    /**
+     * Whether a hut or campsite has to be booked, read out of DOC's own word.
+     *
+     * Null when DOC said nothing, because "no" and "nobody said" are different answers and no row should
+     * collapse them into one. DOC writes "Yes" or "No" as text; anything else is not a yes.
+     */
+    val isBookable: Boolean? get() = bookable?.let { it.equals("yes", ignoreCase = true) }
+
     /** What is there: water, toilets, a fire pit. DOC's words, with the links taken out. */
     val facilities: String? get() = DocText.plain(fact("facilities"))
 
@@ -145,6 +153,18 @@ data class DocItem(
 
     /** One fact, trimmed, or null when DOC sent nothing or nothing but spaces. */
     private fun fact(field: String): String? = facts[field]?.trim()?.takeIf { it.isNotEmpty() }
+
+    /**
+     * What this row's answer is to a filter's question, or null when DOC said nothing.
+     *
+     * **One rule for every filter.** The browser's chips are built through this and its rows are matched
+     * through this, so a chip can never offer a value that its own rows would not match - which is the
+     * whole reason the filters are the source's own facts rather than a fixed list. The track type is
+     * the one fact that is not a field of its own: it lives in one of the service's name-and-value
+     * slots, and [trackType] is what finds it there.
+     */
+    fun filterValue(field: String): String? =
+        if (field == DocSource.TRACK_TYPE_CHARACTERISTIC) trackType else fact(field)
 }
 
 /**

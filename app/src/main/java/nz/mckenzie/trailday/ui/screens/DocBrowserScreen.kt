@@ -1,6 +1,5 @@
 package nz.mckenzie.trailday.ui.screens
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,29 +39,31 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import nz.mckenzie.trailday.domain.doc.DocPlaces
+import nz.mckenzie.trailday.domain.doc.DocFilter
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSort
+import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.distanceM
 import nz.mckenzie.trailday.ui.formatDistance
-import nz.mckenzie.trailday.viewmodel.DocTracksViewModel
+import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
 
 /**
- * The DOC Tracks browser: DOC's track network searched at the source, and the ones you work imported.
+ * Reading what DOC publishes: its tracks, huts, campsites and bike locations.
  *
- * DOC publishes its tracks as a hosted service rather than a file, so this screen asks that service
- * for a page of tracks - by name, by where the phone is, or both - and imports the ticked ones as
- * ordinary places. It is a deliberate detour from the fence line, which is why it is a screen of its
- * own and not part of the map: you come here to bring tracks in, then go back to the work.
+ * DOC publishes these as hosted services rather than files - thousands of them, four services carrying
+ * four different sets of facts - so this screen asks one of them for a page, by name, by where the phone
+ * is, or both. **It reads and nothing more.** A DOC thing is not one of the walker's places and does not
+ * become one here: what is out there is drawn on the map as DOC's own layer, and this screen is how the
+ * walker finds out what it is, what DOC says about it, and how far away it is before going.
  *
- * The chrome is deliberately thin - two rows of search, a Filter and a Sort - because the list is what
- * the walker is here for, and it takes the rest of the screen. The filters are labelled menus rather
- * than a row of sliding chips, which said nothing about what they filtered and scrolled the list away.
+ * The chrome is deliberately thin - a search, a place, the four sources, a Filter and a Sort - because
+ * the list is what the walker is here for and it takes the rest of the screen. The filters are labelled
+ * menus rather than rows of chips, which said nothing about what they filtered and scrolled the list away.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DocTracksScreen(
-    viewModel: DocTracksViewModel,
+fun DocBrowserScreen(
+    viewModel: DocBrowserViewModel,
     onBack: () -> Unit
 ) {
     val name by viewModel.name.collectAsStateWithLifecycle()
@@ -72,21 +73,20 @@ fun DocTracksScreen(
     val message by viewModel.message.collectAsStateWithLifecycle()
     val results by viewModel.results.collectAsStateWithLifecycle()
     val visible by viewModel.visible.collectAsStateWithLifecycle()
-    val kindChoices by viewModel.kindChoices.collectAsStateWithLifecycle()
-    val kinds by viewModel.kinds.collectAsStateWithLifecycle()
-    val typeChoices by viewModel.typeChoices.collectAsStateWithLifecycle()
-    val types by viewModel.types.collectAsStateWithLifecycle()
+    val source by viewModel.source.collectAsStateWithLifecycle()
+    val filterChoices by viewModel.filterChoices.collectAsStateWithLifecycle()
+    val filters by viewModel.filters.collectAsStateWithLifecycle()
     val sort by viewModel.sort.collectAsStateWithLifecycle()
     val phoneFix by viewModel.phoneFix.collectAsStateWithLifecycle()
-    val selected by viewModel.selected.collectAsStateWithLifecycle()
     val searched by viewModel.searched.collectAsStateWithLifecycle()
-    val imported by viewModel.imported.collectAsStateWithLifecycle()
     val focus = LocalFocusManager.current
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("DOC tracks") },
+                // Which of DOC's four services this page is about, in the phone's own words for it: the
+                // answer changes as the source does, so the title has to.
+                title = { Text("DOC ${source.displayName.lowercase()}") },
                 navigationIcon = {
                     IconButton(onClick = onBack) { AppIcon(IconGlyph.BACK, contentDescription = "Back") }
                 }
@@ -108,7 +108,7 @@ fun DocTracksScreen(
                 OutlinedTextField(
                     value = name,
                     onValueChange = viewModel::onNameChange,
-                    label = { Text("Track name contains") },
+                    label = { Text("Name contains") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = {
@@ -152,53 +152,47 @@ fun DocTracksScreen(
                 }
             }
 
+            // Which of DOC's services is being read. Asked here rather than with the search, because it
+            // is not part of the question - it is which of four datasets the question is put to.
+            ChoiceRow(
+                label = "What DOC publishes",
+                choices = DocSource.entries,
+                selected = source,
+                onChoose = viewModel::chooseSource,
+                text = { it.displayName }
+            )
+
             if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
 
             message?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
 
-            // What a search found, narrowed and ordered here rather than by asking DOC again: the
-            // filters are the ones actually on the page, and the nearest order re-runs as the phone moves.
+            // What a search found, narrowed and ordered here rather than by asking DOC again: the filters
+            // are the ones actually on the page, and the nearest order re-runs as the phone moves.
             if (results.isNotEmpty()) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     FilterMenu(
-                        kindChoices = kindChoices,
-                        kinds = kinds,
-                        typeChoices = typeChoices,
-                        types = types,
-                        onToggleKind = viewModel::toggleKind,
-                        onToggleType = viewModel::toggleType,
-                        onClear = {
-                            viewModel.clearKinds()
-                            viewModel.clearTypes()
-                        }
+                        choices = filterChoices,
+                        filters = filters,
+                        onToggle = viewModel::toggleFilter,
+                        onClear = viewModel::clearFilters
                     )
                     SortMenu(sort = sort, onSort = viewModel::setSort)
-                }
-            }
-
-            if (selected.isNotEmpty()) {
-                Button(
-                    onClick = viewModel::importSelected,
-                    enabled = !busy,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Import ${selected.size} selected")
                 }
             }
 
             when {
                 results.isEmpty() && searched && message == null && !busy -> EmptyState(
                     glyph = IconGlyph.ASSETS,
-                    title = "No tracks matched",
-                    body = "Try part of a track's name, or turn on Near me and search again.",
+                    title = "No ${source.displayName.lowercase()} matched",
+                    body = "Try part of a name, or turn on Near me and search again.",
                     actionLabel = "Search again",
                     onAction = { viewModel.search() }
                 )
 
-                // A filter that hides every row is not "no tracks matched": the way out is to clear a
+                // A filter that hides every row is not "nothing matched": the way out is to clear a
                 // filter, so say that rather than showing the empty state again.
                 results.isNotEmpty() && visible.isEmpty() -> Text(
                     text = "Nothing matches those filters. Clear one to see the rest.",
@@ -206,14 +200,11 @@ fun DocTracksScreen(
                 )
 
                 else -> LazyColumn(modifier = Modifier.weight(1f)) {
-                    itemsIndexed(visible, key = { _, track -> track.objectId }) { index, track ->
+                    itemsIndexed(visible, key = { _, item -> item.objectId }) { index, item ->
                         if (index > 0) HorizontalDivider()
                         DocItemRow(
-                            track = track,
-                            checked = track.objectId in selected,
-                            imported = track.sourceRef in imported,
-                            distanceM = phoneFix?.let { position -> track.distanceM(position) },
-                            onToggle = { viewModel.toggle(track) }
+                            item = item,
+                            distanceM = phoneFix?.let { position -> item.distanceM(position) }
                         )
                     }
                 }
@@ -223,41 +214,38 @@ fun DocTracksScreen(
 }
 
 /**
- * The **Filter** control: a labelled menu of the kinds and track types the search returned, each one
+ * The **Filter** control: a labelled menu of what this service's page can be narrowed by, each value
  * ticked or not.
  *
- * A menu rather than a row of chips, because the chips scrolled sideways and said nothing about what
- * they filtered - and they were as tall as the list they were filtering. The count on the button is
- * how many filters are on, so a list that looks short says why.
+ * A menu rather than a row of chips, because the chips scrolled sideways and said nothing about what they
+ * filtered - and they were as tall as the list they were filtering. Which groups it has is the source's
+ * own answer (see [DocFilter]), so a hut is offered "Bookable" and a track is not. The count on the
+ * button is how many filters are on, so a list that looks short says why.
  */
 @Composable
 private fun FilterMenu(
-    kindChoices: List<String>,
-    kinds: Set<String>,
-    typeChoices: List<String>,
-    types: Set<String>,
-    onToggleKind: (String) -> Unit,
-    onToggleType: (String) -> Unit,
+    choices: List<Pair<DocFilter, List<String>>>,
+    filters: Map<String, Set<String>>,
+    onToggle: (DocFilter, String) -> Unit,
     onClear: () -> Unit
 ) {
     var open by remember { mutableStateOf(false) }
-    val count = kinds.size + types.size
+    val count = filters.values.sumOf { it.size }
+    // A filter with nothing to offer is not offered: a group whose values DOC did not publish for
+    // anything on this page would be a heading over nothing.
+    val offerable = choices.filter { (_, values) -> values.isNotEmpty() }
 
     Box {
-        OutlinedButton(onClick = { open = true }) {
+        OutlinedButton(onClick = { open = true }, enabled = offerable.isNotEmpty()) {
             Text(if (count == 0) "Filter" else "Filter ($count)")
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            if (kindChoices.isNotEmpty()) {
-                MenuHeading("Kind")
-                kindChoices.forEach { kind ->
-                    MenuChoice(kind, kind in kinds) { onToggleKind(kind) }
-                }
-            }
-            if (typeChoices.isNotEmpty()) {
-                MenuHeading("Track type")
-                typeChoices.forEach { type ->
-                    MenuChoice(type, type in types) { onToggleType(type) }
+            offerable.forEach { (filter, values) ->
+                MenuHeading(filter.label)
+                values.forEach { value ->
+                    MenuChoice(value, value in filters[filter.field].orEmpty()) {
+                        onToggle(filter, value)
+                    }
                 }
             }
             if (count > 0) {
@@ -312,7 +300,8 @@ private fun MenuHeading(text: String) {
  * One choice in a menu: its label, and a tick when it is on.
  *
  * The menu stays open when it is pressed, because filtering is a thing done twice - a kind and then a
- * type - and a menu that closed on the first pick would make the second one a second press of Filter.
+ * difficulty - and a menu that closed on the first pick would make the second one a second press of
+ * Filter.
  */
 @Composable
 private fun MenuChoice(label: String, chosen: Boolean, onChoose: () -> Unit) {
@@ -328,42 +317,62 @@ private fun MenuChoice(label: String, chosen: Boolean, onChoose: () -> Unit) {
 }
 
 @Composable
-private fun DocItemRow(
-    track: DocItem,
-    checked: Boolean,
-    imported: Boolean,
-    distanceM: Double?,
-    onToggle: () -> Unit
-) {
+private fun DocItemRow(item: DocItem, distanceM: Double?) {
     ListItem(
-        // A track already on the phone is not something to tick: the box and the row are both off, and
-        // the line says why rather than leaving the walker to wonder.
-        modifier = Modifier.clickable(enabled = !imported, onClick = onToggle),
-        leadingContent = {
-            Checkbox(checked = checked, onCheckedChange = { onToggle() }, enabled = !imported)
-        },
-        headlineContent = {
-            // The name the import will give it - the place, then DOC's own name - so a site the app
-            // names wrongly is seen here, at a glance, rather than after the track has landed.
-            Text(
-                DocPlaces.assetName(track.name, track.flocId),
-                style = MaterialTheme.typography.titleSmall
-            )
-        },
-        supportingContent = {
-            Text(
-                listOfNotNull(
-                    track.kind,
-                    // How the track is walked, in place of a vertex count: "584 points" says nothing
-                    // a walker uses, where one-way tells them what they are taking on.
-                    track.trackType,
-                    formatDistance(track.lengthM),
-                    // How far away it is, from the phone's own fix - so "Near me" can be seen to be
-                    // the radius it says it is.
-                    distanceM?.let { distance -> "${formatDistance(distance)} away" },
-                    if (imported) "already imported" else null
-                ).joinToString(" \u00b7 ")
-            )
-        }
+        headlineContent = { Text(item.name, style = MaterialTheme.typography.titleSmall) },
+        supportingContent = { Text(docRowDetail(item, distanceM)) }
     )
+}
+
+/**
+ * What a row says under the name, in the app's own words and DOC's own values.
+ *
+ * **One rule for four services, and it is here** rather than in the domain because how far away
+ * something is and how long a line is are written in the walker's own metres, which is the screen's
+ * business. Which parts a summary has is the *source's* answer, so a row cannot say about a hut what
+ * only makes sense about a track; a part DOC said nothing about is left out rather than shown blank,
+ * because "no facilities line" and "nothing worth saying" are not the same thing to read.
+ */
+internal fun docRowDetail(item: DocItem, distanceM: Double?): String {
+    val parts: List<String?> = when (item.source) {
+        DocSource.TRACKS -> listOf(
+            item.kind,
+            // How the track is walked, which tells a walker what they are taking on where a vertex
+            // count would tell them nothing.
+            item.trackType,
+            item.lengthM.takeIf { it > 0.0 }?.let { formatDistance(it) }
+        )
+
+        DocSource.HUTS -> listOf(
+            item.place,
+            item.region,
+            "Bookable".takeIf { item.isBookable == true }
+        )
+
+        DocSource.CAMPSITES -> listOf(
+            item.place,
+            item.region,
+            item.kind,
+            campsiteSites(item),
+            "Bookable".takeIf { item.isBookable == true }
+        )
+
+        // DOC publishes the bike layer as places: how hard the riding is and how long it takes are the
+        // two things worth reading on the row, and there is no line to measure.
+        DocSource.BIKES -> listOf(item.difficulty, item.bikingTime)
+    }
+
+    return (parts + distanceM?.let { "${formatDistance(it)} away" }).filterNotNull().joinToString(" \u00b7 ")
+}
+
+/** How many sites a campsite has, in the walker's terms, or null when DOC said nothing. */
+private fun campsiteSites(item: DocItem): String? {
+    val unpowered = item.unpoweredSites ?: return null
+    val powered = item.poweredSites ?: 0
+    val total = unpowered + powered
+    return when {
+        total == 0 -> null
+        powered > 0 -> "$total sites, $powered powered"
+        else -> "$total sites"
+    }
 }

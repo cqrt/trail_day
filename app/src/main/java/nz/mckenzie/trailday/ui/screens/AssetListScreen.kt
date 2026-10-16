@@ -41,8 +41,9 @@ import nz.mckenzie.trailday.viewmodel.AssetListViewModel
 /**
  * The place library: what places you keep, and how long the lines among them are.
  *
- * A place arrives one of three ways - a spot dropped on the map, a file brought in, or a search of
- * DOC - and all three are offered above the list.
+ * A place arrives one of two ways - a spot dropped on the map, or a file brought in - and both are
+ * offered above the list. [onOpenDoc] is not a third: what DOC publishes is read here rather than kept,
+ * because it is not the walker's to change.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -51,7 +52,7 @@ fun AssetListScreen(
     onOpenTab: (Tab) -> Unit = {},
     onOpenAsset: (Long) -> Unit,
     onAddSpot: () -> Unit,
-    onImportDocTracks: () -> Unit,
+    onOpenDoc: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
     val assets by viewModel.assets.collectAsStateWithLifecycle()
@@ -84,10 +85,10 @@ fun AssetListScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Three ways to make a place, and only three: recording, the recordings list and
-            // settings used to be buttons here, and are now the tabs in the bar below and
-            // the icon in the bar above. Dropping a spot gets the filled treatment because it is
-            // what happens standing on the track, which is the commoner case.
+            // Two ways to make a place, and only two: recording, the recordings list and settings used
+            // to be buttons here, and are now the tabs in the bar below and the icon in the bar above.
+            // Dropping a spot gets the filled treatment because it is what happens standing on the
+            // track, which is the commoner case.
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -100,9 +101,16 @@ fun AssetListScreen(
                 ) {
                     Text("Import GPX, KML, KMZ or GeoJSON")
                 }
-                OutlinedButton(onClick = onImportDocTracks) {
-                    Text("DOC tracks")
-                }
+            }
+
+            // And one thing to *read* rather than to make: what DOC publishes, which is the map's own
+            // layer rather than a place of the walker's. Its own row, because it is not a way to add
+            // anything - see the plan.
+            OutlinedButton(
+                onClick = onOpenDoc,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("From DOC")
             }
 
             // What the list is showing. One line that scrolls sideways rather than a block of

@@ -9,6 +9,14 @@ package nz.mckenzie.trailday.domain.doc
 enum class DocShape { LINE, POINT }
 
 /**
+ * A fact worth narrowing a page of DOC's material by, and what to call it.
+ *
+ * The label is the app's own words, because DOC's field names are not: "SubObjectType" is not something
+ * to show anybody. [field] is the name the fact arrives under, which is what a row is matched on.
+ */
+data class DocFilter(val field: String, val label: String)
+
+/**
  * How many free name-and-value slots the tracks service publishes.
  *
  * Eleven, and it is DOC's number rather than the app's: the service keeps whatever characteristics
@@ -59,7 +67,17 @@ enum class DocSource(
      * The values are DOC's own field names, and they arrive as text: a fact this build does not have a
      * word for is still kept, so a later build can read one without asking DOC again.
      */
-    val fields: List<String>
+    val fields: List<String>,
+    /**
+     * What a page of this material is worth narrowing by, in the app's own words.
+     *
+     * **Different services answer different questions.** A hut has no "how it is walked" and a track has
+     * nobody to book with, so a filter row drawn from one service's facts would offer the other three a
+     * filter that can never match. Each source therefore says which of its own facts are worth one - and
+     * a source with nothing worth narrowing by says nothing, rather than a row of chips that filter
+     * nothing.
+     */
+    val filters: List<DocFilter>
 ) {
 
     /**
@@ -78,7 +96,13 @@ enum class DocSource(
         service = "DOC_Tracks_EAM",
         shape = DocShape.LINE,
         nameField = "TechObjectName",
-        fields = listOf("SubObjectType", "FlocID") + characteristicSlots(CHARACTERISTIC_SLOT_COUNT)
+        fields = listOf("SubObjectType", "FlocID") + characteristicSlots(CHARACTERISTIC_SLOT_COUNT),
+        filters = listOf(
+            DocFilter("SubObjectType", "What it is"),
+            // The top-level constant rather than the companion's, because the table is built before the
+            // companion exists - the same reason the slots are named that way above.
+            DocFilter(TRACK_TYPE_SLOT_NAME, "How it is walked")
+        )
     ),
 
     /**
@@ -99,6 +123,12 @@ enum class DocSource(
         fields = listOf(
             "place", "region", "bookable", "facilities", "hasAlerts",
             "introductionThumbnail", "staticLink", "locationString"
+        ),
+        // A hut has no kind of its own and nothing about walking it: what a walker narrows by is whether
+        // it has to be booked, and where in the country it is.
+        filters = listOf(
+            DocFilter("bookable", "Bookable"),
+            DocFilter("region", "Region")
         )
     ),
 
@@ -120,6 +150,11 @@ enum class DocSource(
             "place", "region", "introduction", "campsiteCategory", "numberOfPoweredSites",
             "numberOfUnpoweredSites", "bookable", "free", "facilities", "activities", "dogsAllowed",
             "landscape", "access", "hasAlerts", "introductionThumbnail", "staticLink", "locationString"
+        ),
+        filters = listOf(
+            DocFilter("campsiteCategory", "What it is"),
+            DocFilter("bookable", "Bookable"),
+            DocFilter("region", "Region")
         )
     ),
 
@@ -140,7 +175,9 @@ enum class DocSource(
         fields = listOf(
             "introduction", "difficulty", "bikingTime", "hasAlerts", "introductionThumbnail",
             "mountainBikingTrackWebPage"
-        )
+        ),
+        // How hard the riding is: the one fact a rider narrows this layer by.
+        filters = listOf(DocFilter("difficulty", "Difficulty"))
     );
 
     /** Whether this source publishes lines rather than places. */

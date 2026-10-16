@@ -8,9 +8,11 @@ import org.junit.Test
 /**
  * Narrowing and ordering what a DOC search found.
  *
- * The two rules worth holding still are that "nearest" means nearest *vertex* - a long line passing
- * beside the phone is near the phone, where its middle would not be - and that a nearest sort with
- * nothing to be near to is no order at all, so it falls back to by name rather than inventing one.
+ * Three rules worth holding still. "Nearest" means nearest *vertex* - a long line passing beside the
+ * phone is near the phone, where its middle would not be - and a nearest sort with nothing to be near to
+ * is no order at all, so it falls back to by name rather than inventing one. And **the facts a filter
+ * offers are the ones the rows actually carry**: a hut has no difficulty and a track has nobody to book
+ * with, so a value a row does not have cannot be offered as a chip.
  */
 class DocListTest {
 
@@ -33,10 +35,21 @@ class DocListTest {
         }
     )
 
+    private fun hut(id: Long, name: String, bookable: String?, region: String?) = DocItem(
+        source = DocSource.HUTS,
+        objectId = id,
+        name = name,
+        paths = listOf(listOf(GeoPoint(-41.62, 172.65))),
+        facts = buildMap {
+            bookable?.let { put("bookable", it) }
+            region?.let { put("region", it) }
+        }
+    )
+
     private val invercargill = GeoPoint(-46.4132, 168.3538)
 
     @Test
-    fun `the kinds present are each once, sorted, and blanks are left out`() {
+    fun `a filter offers the values the rows carry, each once, sorted, blanks left out`() {
         val tracks = listOf(
             track(1, "A", "Tramping Track", invercargill),
             track(2, "B", "Short Walk", invercargill),
@@ -45,20 +58,40 @@ class DocListTest {
             track(5, "E", "  ", invercargill)
         )
 
-        assertEquals(listOf("Short Walk", "Tramping Track"), tracks.kindsPresent())
+        assertEquals(listOf("Short Walk", "Tramping Track"), tracks.valuesPresent("SubObjectType"))
     }
 
     @Test
-    fun `the types present are each once, sorted, and blanks are left out`() {
+    fun `a track's type is offered from the slot DOC keeps it in`() {
         val tracks = listOf(
             track(1, "A", "Walking Track", invercargill, type = "One way"),
             track(2, "B", "Walking Track", invercargill, type = "Loop"),
-            track(3, "C", "Walking Track", invercargill, type = "One way"),
-            track(4, "D", "Walking Track", invercargill),
-            track(5, "E", "Walking Track", invercargill, type = "  ")
+            track(3, "C", "Walking Track", invercargill, type = "  ")
         )
 
-        assertEquals(listOf("Loop", "One way"), tracks.typesPresent())
+        assertEquals(
+            listOf("Loop", "One way"),
+            tracks.valuesPresent(DocSource.TRACK_TYPE_CHARACTERISTIC)
+        )
+    }
+
+    @Test
+    fun `a hut is narrowed by the facts a hut has, and not by the ones it does not`() {
+        val huts = listOf(
+            hut(1, "Angelus Hut", "Yes", "Nelson/Marlborough"),
+            hut(2, "Liverpool Hut", "No", "Nelson/Marlborough"),
+            hut(3, "Cupola Hut", null, null)
+        )
+
+        assertEquals(listOf("No", "Yes"), huts.valuesPresent("bookable"))
+        assertEquals(listOf("Nelson/Marlborough"), huts.valuesPresent("region"))
+        // The one that matters: a hut has no difficulty, so a difficulty filter would be a chip that
+        // matches nothing - which is exactly what the per-source vocabulary exists to prevent.
+        assertTrue(huts.valuesPresent("difficulty").isEmpty())
+        assertEquals(
+            listOf(huts[0]),
+            huts.showing(mapOf("bookable" to setOf("Yes")), DocSort.NAME, from = null)
+        )
     }
 
     @Test
@@ -72,8 +105,7 @@ class DocListTest {
             "the type alone keeps every kind of it (ordered by name, as asked)",
             listOf(loopTramp, loopWalk),
             tracks.showing(
-                kinds = emptySet(),
-                types = setOf("Loop"),
+                filters = mapOf(DocSource.TRACK_TYPE_CHARACTERISTIC to setOf("Loop")),
                 sort = DocSort.NAME,
                 from = invercargill
             )
@@ -82,8 +114,10 @@ class DocListTest {
             "and both together keep only what is both",
             listOf(loopTramp),
             tracks.showing(
-                kinds = setOf("Tramping Track"),
-                types = setOf("Loop"),
+                filters = mapOf(
+                    "SubObjectType" to setOf("Tramping Track"),
+                    DocSource.TRACK_TYPE_CHARACTERISTIC to setOf("Loop")
+                ),
                 sort = DocSort.NAME,
                 from = invercargill
             )
@@ -92,8 +126,8 @@ class DocListTest {
 
     @Test
     fun `nearest is measured to the closest vertex, not the middle of the line`() {
-        // The second path starts exactly at the fix, so the track is nought metres away even though
-        // its other end is a kilometre off.
+        // The second path starts exactly at the fix, so the track is nought metres away even though its
+        // other end is a kilometre off.
         val track = track(1, "A", "Walking Track", invercargill)
 
         assertEquals(0.0, track.distanceM(invercargill)!!, 0.5)
@@ -104,12 +138,7 @@ class DocListTest {
         val near = track(1, "Near", "Walking Track", GeoPoint(-46.4130, 168.3538))
         val far = track(2, "Far", "Walking Track", GeoPoint(-46.30, 168.20))
 
-        val shown = listOf(far, near).showing(
-            kinds = emptySet(),
-            types = emptySet(),
-            sort = DocSort.NEAREST,
-            from = invercargill
-        )
+        val shown = listOf(far, near).showing(emptyMap(), DocSort.NEAREST, from = invercargill)
 
         assertEquals(listOf(near, far), shown)
     }
@@ -119,34 +148,35 @@ class DocListTest {
         val b = track(1, "B", "Walking Track", invercargill)
         val a = track(2, "A", "Walking Track", invercargill)
 
-        val shown = listOf(b, a).showing(
-            kinds = emptySet(),
-            types = emptySet(),
-            sort = DocSort.NEAREST,
-            from = null
-        )
+        val shown = listOf(b, a).showing(emptyMap(), DocSort.NEAREST, from = null)
 
         assertEquals(listOf(a, b), shown)
     }
 
     @Test
-    fun `picking kinds keeps only those`() {
+    fun `picking a value keeps only the rows that carry it`() {
         val walk = track(1, "Walk", "Walking Track", invercargill)
         val tramp = track(2, "Tramp", "Tramping Track", invercargill)
 
-        val shown = listOf(walk, tramp).showing(setOf("Tramping Track"), emptySet(), DocSort.NAME, invercargill)
+        val shown = listOf(walk, tramp)
+            .showing(mapOf("SubObjectType" to setOf("Tramping Track")), DocSort.NAME, invercargill)
 
         assertEquals(listOf(tramp), shown)
     }
 
     @Test
-    fun `no kinds picked leaves an empty filter, not an empty list`() {
+    fun `a filter with nothing ticked is no filter, not an empty list`() {
         val walk = track(1, "Walk", "Walking Track", invercargill)
         val tramp = track(2, "Tramp", "Tramping Track", invercargill)
+        // By name, which is the order a filter asks for unless the walker says nearest.
+        val both = listOf(tramp, walk)
 
-        val shown = listOf(walk, tramp).showing(emptySet(), emptySet(), DocSort.NAME, invercargill)
-
-        assertTrue(shown.containsAll(listOf(walk, tramp)))
+        assertEquals(both, listOf(walk, tramp).showing(emptyMap(), DocSort.NAME, invercargill))
+        assertEquals(
+            "and a field with nothing chosen is the same as no filter at all",
+            both,
+            listOf(walk, tramp).showing(mapOf("SubObjectType" to emptySet()), DocSort.NAME, invercargill)
+        )
     }
 
     @Test
