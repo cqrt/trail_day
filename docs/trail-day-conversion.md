@@ -329,9 +329,14 @@ Done:
 - **The first release** - the signing secrets copied onto the new repositories, and `v0.1.0` tagged,
   built and published with one signed APK per architecture and the bundle.
 
-Still to do, exactly as the plan has it:
+What is left of this plan is now planned in [the plan from here](trail-day-plan.md), because thinking
+it through changed two of this one's assumptions:
 
-- **Huts, campsites and bike tracks read from DOC** the way its tracks are. Until then they are kinds
-  you keep yourself: drawn on the map or brought in from a file.
-- **The trip** - the recorder and the recordings screen reframed as a walk or a ride.
-- **Waypoints** saved from the map, and **"download along this track"**.
+- **DOC's material becomes a read-only reference layer**, rather than being imported into your places
+  where it could then be renamed, redrawn and deleted like something you made yourself.
+- **Drawing lines by hand goes**, on the phone and on the laptop page. A line is now DOC's, brought in
+  from a file, or walked.
+
+That plan also carries the reframing of the recorder and the trips, the waypoints saved from the map,
+**"download along this track"**, and the work of making the app look like the mock screens in
+`mockups/` rather than like a spray app with the spraying taken out.
