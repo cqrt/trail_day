@@ -67,9 +67,19 @@ class DevicePositionTest {
         DevicePosition.useForTest(CountingFixes(listOf(fix(173.95), fix(173.96))))
         val scope = scope()
         try {
-            val newest = withTimeout(5_000) { DevicePosition.updates(scope).first { it != null } }!!
+            // Waited for **by value**, not for "the first one that is not null": the stream holds
+            // every fix as it arrives, so a map may be handed the older one first, and on a busy
+            // machine it is. What the app promises is where the dot ends up - the newest fix - and
+            // that is what this waits for.
+            val fixes = DevicePosition.updates(scope)
+            val newest = withTimeout(5_000) { fixes.first { it?.lng == 173.96 } }!!
 
             assertEquals("the latest fix is the one the map draws", 173.96, newest.lng, 1e-9)
+            assertEquals(
+                "and the state holds it, not the fix that came before it",
+                173.96,
+                fixes.value?.lng
+            )
             assertTrue(
                 "and it is the dot, ringed by the accuracy the fix was good to",
                 PositionGeoJson.build(newest).contains("\"part\":\"${PositionGeoJson.PART_DOT}\"")
