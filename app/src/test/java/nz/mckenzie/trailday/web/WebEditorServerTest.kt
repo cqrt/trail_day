@@ -440,7 +440,7 @@ class WebEditorServerTest {
             if (name.startsWith("trailday-place-")) "the picture's own bytes".toByteArray() else null
         })
 
-        val name = PlaceIcons.imageName(AssetKind.SIGN, AssetColors.RED)
+        val name = PlaceIcons.imageName(AssetKind.SIGN)
         val served = get("/api/markers/$name.png?px=44&k=$token", withToken = false)
 
         assertEquals(200, served.code)

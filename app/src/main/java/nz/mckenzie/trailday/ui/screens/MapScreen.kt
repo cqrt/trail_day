@@ -303,10 +303,6 @@ private fun LayersSheet(
 private fun DueLegend(tracks: List<AssetWithDue>, modifier: Modifier = Modifier) {
     if (tracks.isEmpty()) return
 
-    val counts = tracks.groupingBy { it.due.status }.eachCount()
-    val overdue = (counts[DueStatus.OVERDUE] ?: 0) + (counts[DueStatus.NEVER_SPRAYED] ?: 0)
-    val dueSoon = counts[DueStatus.DUE_SOON] ?: 0
-    val notDue = counts[DueStatus.NOT_DUE] ?: 0
     // How big the work is, by the same arithmetic a block's tile uses: the box and the tiles are two
     // answers to one question, and this is what keeps them the same answer.
     val stats = farmStatsLines(AssetGrouping.totals(tracks.map { it.asGroupable() }))
@@ -331,9 +327,6 @@ private fun DueLegend(tracks: List<AssetWithDue>, modifier: Modifier = Modifier)
                 text = "${tracks.size} asset${if (tracks.size == 1) "" else "s"}",
                 style = MaterialTheme.typography.titleSmall
             )
-            LegendRow(AssetColors.RED, "Overdue", overdue)
-            LegendRow(AssetColors.YELLOW, "Due soon", dueSoon)
-            LegendRow(AssetColors.GREEN, "Not due", notDue)
             if (stats.isNotEmpty()) {
                 // The rule is what says the lines under it are figures about the farm rather than more
                 // counts, so it keeps its place; the gaps either side of it are the rows' own now.
@@ -343,21 +336,6 @@ private fun DueLegend(tracks: List<AssetWithDue>, modifier: Modifier = Modifier)
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun LegendRow(colorHex: String, label: String, count: Int) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(12.dp)
-                .background(parseHexColor(colorHex), CircleShape)
-        )
-        Text(text = "$label  $count", style = MaterialTheme.typography.bodySmall)
     }
 }
 

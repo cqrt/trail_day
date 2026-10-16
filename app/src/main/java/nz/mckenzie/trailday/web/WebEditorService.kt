@@ -253,12 +253,12 @@ class WebEditorService : Service() {
      * rather than a smaller marker with a fat ring around it.
      */
     private fun renderMarker(name: String, px: Int): ByteArray? {
-        val (kind, colorHex) = PlaceIcons.ofImageName(name) ?: return null
+        val kind = PlaceIcons.ofImageName(name) ?: return null
         val size = px.coerceAtLeast(1)
 
         val bitmap = MarkerIcons.bitmap(
             kind = kind,
-            colorHex = colorHex,
+            colorHex = PlaceIcons.colorOf(kind),
             sizePx = size,
             outlinePx = size * (PlaceIcons.MARKER_OUTLINE_DP / PlaceIcons.MARKER_DP)
         )

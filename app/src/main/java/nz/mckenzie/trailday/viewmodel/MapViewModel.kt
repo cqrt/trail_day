@@ -192,12 +192,11 @@ class MapViewModel(
                 AssetLine(
                     assetId = item.asset.id,
                     name = item.asset.name,
-                    colorHex = AssetColors.forStatus(item.due.status),
+                    colorHex = AssetColors.forKind(AssetKind.fromStorage(item.asset.kind, shape)),
                     points = assetGeometry.line,
                     sideTracks = assetGeometry.sideTracks,
                     kind = AssetKind.fromStorage(item.asset.kind, shape),
-                    shape = shape,
-                    stretches = stretchesFor(item, assetGeometry.paths, coverage[item.asset.id], shape, now)
+                    shape = shape
                 )
             }
         )
@@ -206,37 +205,6 @@ class MapViewModel(
         SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
         AssetGeoJson.build(emptyList())
     )
-
-    /**
-     * The stretches a track is drawn as, or nothing at all when it is all in one state.
-     *
-     * Nothing at all is the common case and it costs nothing to detect: an asset with no
-     * recent spray has no part worth walking, and the whole line is coloured by its traffic
-     * light as it always was. A place has no length to cut up, and a path needs two points
-     * before there is anything to walk along.
-     */
-    private fun stretchesFor(
-        item: AssetWithDue,
-        paths: List<List<GeoPoint>>,
-        coverage: AssetSprayCoverage?,
-        shape: AssetShape,
-        nowEpochMs: Long
-    ): List<AssetStretch> {
-        if (shape != AssetShape.LINE || paths.none { it.size >= 2 }) return emptyList()
-        if (coverage == null) return emptyList()
-        if (coverage.passes.isEmpty() && coverage.lastWithoutRecordingAtEpochMs == null) return emptyList()
-
-        return AssetCoverageStretches.of(
-            planned = paths,
-            passes = coverage.passes,
-            lastWithoutRecordingAtEpochMs = coverage.lastWithoutRecordingAtEpochMs,
-            intervalDays = item.asset.intervalDays,
-            leadDays = AssetEntity.DEFAULT_LEAD_DAYS,
-            nowEpochMs = nowEpochMs,
-            passesRequired = item.asset.passesRequired,
-            separationM = item.asset.passSeparationM
-        )
-    }
 
     init {
         viewModelScope.launch {

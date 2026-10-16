@@ -2,7 +2,6 @@ package nz.mckenzie.trailday.map
 
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
-import nz.mckenzie.trailday.domain.due.DueStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -12,22 +11,19 @@ import org.junit.Test
 /**
  * Which picture a place is drawn with.
  *
- * What matters is not the drawing - that is a bitmap, and it is looked at - but that the map
- * can always put something on a place, in the colour the place's own traffic light is showing.
- * A place drawn in the wrong colour is a wrong answer, and a place drawn as nothing at all
- * looks like an asset somebody has deleted.
+ * What matters is not the drawing - that is a bitmap, and it is looked at - but that the map can
+ * always put something on a place, in the kind's own colour. A place drawn as nothing at all looks
+ * like an asset somebody has deleted.
  */
 class PlaceIconsTest {
 
     @Test
-    fun `every colour a traffic light can show has a picture for every kind of place`() {
-        DueStatus.entries.map { AssetColors.forStatus(it) }.forEach { colorHex ->
-            PlaceIcons.KINDS.forEach { kind ->
-                assertTrue(
-                    "a ${kind.name} wearing $colorHex would have no picture to ask for",
-                    PlaceIcons.IMAGE_NAMES.contains(PlaceIcons.imageName(kind, colorHex))
-                )
-            }
+    fun `every kind of place has a picture to ask for`() {
+        PlaceIcons.KINDS.forEach { kind ->
+            assertTrue(
+                "a ${kind.name} would have no picture to ask for",
+                PlaceIcons.IMAGE_NAMES.contains(PlaceIcons.imageName(kind))
+            )
         }
     }
 
@@ -42,72 +38,58 @@ class PlaceIconsTest {
     }
 
     @Test
-    fun `a picture is named after the kind and the colour, so the three cannot drift apart`() {
-        assertEquals(
-            "trailday-place-building-2e7d32",
-            PlaceIcons.imageName(AssetKind.BUILDING, AssetColors.GREEN)
-        )
-        assertEquals(
-            "trailday-place-sign-f9a825",
-            PlaceIcons.imageName(AssetKind.SIGN, AssetColors.YELLOW)
-        )
-        assertEquals(
-            "trailday-place-bench-c62828",
-            PlaceIcons.imageName(AssetKind.BENCH, AssetColors.RED)
-        )
+    fun `a picture is named after the kind, so the two cannot drift apart`() {
+        assertEquals("trailday-place-building", PlaceIcons.imageName(AssetKind.BUILDING))
+        assertEquals("trailday-place-sign", PlaceIcons.imageName(AssetKind.SIGN))
+        assertEquals("trailday-place-bench", PlaceIcons.imageName(AssetKind.BENCH))
         assertEquals(
             "a kind with two words in it is one word in a name",
-            "trailday-place-other-place-757575",
-            PlaceIcons.imageName(AssetKind.OTHER_PLACE, AssetColors.UNKNOWN)
+            "trailday-place-other-place",
+            PlaceIcons.imageName(AssetKind.OTHER_PLACE)
         )
         assertFalse(
             "a hash in an image name is a URL fragment, not part of a picture",
-            PlaceIcons.imageName(AssetKind.BUILDING, AssetColors.GREEN).contains("#")
+            PlaceIcons.imageName(AssetKind.BUILDING).contains("#")
         )
     }
 
     @Test
     fun `no two pictures share a name`() {
-        assertEquals("a picture per kind, per colour", 24, PlaceIcons.IMAGE_NAMES.size)
-        assertTrue(
+        assertEquals("a picture per kind", PlaceIcons.KINDS.size, PlaceIcons.IMAGE_NAMES.size)
+        assertEquals(
             "two of them sharing a name would make one of them a lie: ${PlaceIcons.IMAGE_NAMES}",
-            PlaceIcons.IMAGE_NAMES.toSet().size == PlaceIcons.KINDS.size * PlaceIcons.COLORS.size
+            PlaceIcons.KINDS.size,
+            PlaceIcons.IMAGE_NAMES.toSet().size
         )
     }
 
     @Test
-    fun `a colour nothing was drawn for is grey, and a kind that is not a place is the grey ring`() {
-        val oddColour = PlaceIcons.imageName(AssetKind.TABLE, "#123456")
-        val lineKind = PlaceIcons.imageName(AssetKind.TRACK, AssetColors.RED)
-
+    fun `a kind that is not a place wears the grey ring`() {
         assertEquals(
-            "a colour the app does not draw still says what the thing is: a grey table, not a grey blob",
-            PlaceIcons.imageName(AssetKind.TABLE, AssetColors.UNKNOWN),
-            oddColour
+            "a line kind has no marker at all",
+            PlaceIcons.FALLBACK_IMAGE_NAME,
+            PlaceIcons.imageName(AssetKind.TRACK)
         )
-        assertEquals("a line kind has no marker at all", PlaceIcons.FALLBACK_IMAGE_NAME, lineKind)
+        assertEquals(
+            "and neither does ground with an edge: a shape is drawn, not stuck on the map",
+            PlaceIcons.FALLBACK_IMAGE_NAME,
+            PlaceIcons.imageName(AssetKind.CARPARK)
+        )
         assertTrue(
-            "and the fallback has to be a picture the style was given",
+            "the fallback has to be a picture the style was given",
             PlaceIcons.IMAGE_NAMES.contains(PlaceIcons.FALLBACK_IMAGE_NAME)
         )
     }
 
     @Test
-    fun `a carpark asks for no picture at all, because it is drawn as a shape`() {
-        // Its own layer draws the boundary round the ground, so there is no marker and no image name:
-        // a shape on a map is drawn, not stuck on top of it.
-        assertEquals(
-            PlaceIcons.FALLBACK_IMAGE_NAME,
-            PlaceIcons.imageName(AssetKind.CARPARK, AssetColors.RED)
-        )
-    }
-
-    @Test
-    fun `the same colour in either case asks for the same picture`() {
-        assertEquals(
-            PlaceIcons.imageName(AssetKind.BUILDING, AssetColors.RED),
-            PlaceIcons.imageName(AssetKind.BUILDING, AssetColors.RED.lowercase())
-        )
+    fun `a place is drawn in its own kind's colour`() {
+        PlaceIcons.KINDS.forEach { kind ->
+            assertEquals(
+                "a ${kind.name} is drawn in the colour the kind says",
+                AssetColors.forKind(kind),
+                PlaceIcons.colorOf(kind)
+            )
+        }
     }
 
     @Test
@@ -126,19 +108,17 @@ class PlaceIconsTest {
     }
 
     @Test
-    fun `a name reads back as the kind and the colour it was made from`() {
+    fun `a name reads back as the kind it was made from`() {
         PlaceIcons.KINDS.forEach { kind ->
-            PlaceIcons.COLORS.forEach { colour ->
-                assertEquals(
-                    "the desk asks for a picture by name, so a name has to mean one kind in one colour",
-                    kind to colour,
-                    PlaceIcons.ofImageName(PlaceIcons.imageName(kind, colour))
-                )
-            }
+            assertEquals(
+                "the desk asks for a picture by name, so a name has to mean one kind",
+                kind,
+                PlaceIcons.ofImageName(PlaceIcons.imageName(kind))
+            )
         }
         assertNull(
             "a name that is no picture reads back as nothing",
-            PlaceIcons.ofImageName("trailday-place-nonsense-c62828")
+            PlaceIcons.ofImageName("trailday-place-nonsense")
         )
     }
 

@@ -591,19 +591,17 @@ private fun addPlaceMarkerImages(style: Style, density: Float) {
     val outlinePx = PlaceIcons.MARKER_OUTLINE_DP * density
     val missing = HashMap<String, Bitmap>(PlaceIcons.IMAGE_NAMES.size)
     PlaceIcons.KINDS.forEach { kind ->
-        PlaceIcons.COLORS.forEach { colorHex ->
-            val name = PlaceIcons.imageName(kind, colorHex)
-            // An image belongs to the style it was added to, and a style can be loaded again -
-            // the same basemap with a key that has just been entered, say. Adding one twice is
-            // not wrong so much as unnecessary work on the main thread.
-            if (style.getImage(name) == null) {
-                missing[name] = MarkerIcons.bitmap(
-                    kind = kind,
-                    colorHex = colorHex,
-                    sizePx = sizePx,
-                    outlinePx = outlinePx
-                )
-            }
+        val name = PlaceIcons.imageName(kind)
+        // An image belongs to the style it was added to, and a style can be loaded again -
+        // the same basemap with a key that has just been entered, say. Adding one twice is
+        // not wrong so much as unnecessary work on the main thread.
+        if (style.getImage(name) == null) {
+            missing[name] = MarkerIcons.bitmap(
+                kind = kind,
+                colorHex = PlaceIcons.colorOf(kind),
+                sizePx = sizePx,
+                outlinePx = outlinePx
+            )
         }
     }
     if (missing.isNotEmpty()) style.addImages(missing)
@@ -614,8 +612,8 @@ private fun addPlaceMarkerImages(style: Style, density: Float) {
  *
  * **One layer per kind, each filtering to its own**, which is what lets a kind be hidden on its own:
  * one layer for every place could only be shown or hidden whole. Which picture a place wears is still
- * the feature's own business - see [AssetGeoJson.ICON_PROPERTY] - because two places of the same kind
- * differ in colour, and that colour is when each is next due.
+ * the feature's own business - see [AssetGeoJson.ICON_PROPERTY] - and that picture is the kind's own
+ * glyph in the kind's own colour.
  */
 private fun addPlaceLayer(style: Style, kind: AssetKind) {
     val id = AssetLayerIds.pointOf(kind)
