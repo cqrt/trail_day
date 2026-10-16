@@ -227,3 +227,22 @@ of this plan.
 Built, unit-tested, linted, looked at on the emulator, and put through the device tests before it is
 committed. One step, one commit, in plain-English words. The screenshots and the notes for each step
 are kept as its evidence, the same as the conversion's steps were.
+
+## Where this has got to
+
+**Step 1 is done.** The drawing is gone from the phone and from the laptop page: a place is dropped
+with one tap on the phone, and a track file is kept straight from the desk.
+
+It landed as **three commits rather than one**, because a new capability (dropping a spot) and two
+removals (the phone's drawing, the desk's) are three subjects. The phone's came first, because without
+the one-tap spot the app could not make a place at all.
+
+Two things came out of it that this plan did not foresee:
+
+- **The desk's file import was built on the drawing** - a dropped file became the editor's line - so
+  removing the editor meant rebuilding the import: the phone reads the file and the place is written
+  from what it answers with.
+- **A page from before the change still tries to move a line.** That write is refused rather than
+  ignored, because ignoring it would leave the page believing it had moved a track it had not.
+
+Steps 2 to 11 are as written above.
