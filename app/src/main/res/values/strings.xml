@@ -19,9 +19,6 @@
     <string name="web_editor_channel_description">Shown while the phone is serving the track editor to a computer on the same Wi-Fi</string>
     <string name="web_editor_notification_title">Drawing from a computer</string>
     <string name="web_editor_notification_text">Open %1$s on a computer on the same Wi-Fi</string>
-    <!-- Due reminders -->
-    <string name="due_channel_name">Spray reminders</string>
-    <string name="due_channel_description">Tells you when planned tracks are due for spraying</string>
     <!-- App updates -->
     <string name="update_channel_name">App updates</string>
     <string name="update_channel_description">Tells you when a newer version of Trail Day has been released</string>

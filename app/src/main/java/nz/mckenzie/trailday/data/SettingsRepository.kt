@@ -55,7 +55,6 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
      */
     private val webEditorEnabledPref = booleanPreferencesKey("web_editor_enabled")
     private val webEditorKeepAwakePref = booleanPreferencesKey("web_editor_keep_awake")
-    private val remindersPref = booleanPreferencesKey("reminders_enabled")
     private val updateChecksPref = booleanPreferencesKey("update_checks_enabled")
     private val lastNotifiedUpdatePref = stringPreferencesKey("last_notified_update")
     private val backupDestinationPref = stringPreferencesKey("backup_destination")
@@ -226,20 +225,6 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     }
 
     /**
-     * Whether the app should tell the operator when tracks come due.
-     *
-     * On by default, because that is the point of a spray calendar - but nothing is
-     * posted until Android has been asked for permission, which is its own consent step.
-     */
-    val remindersEnabled: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
-        prefs[remindersPref] ?: true
-    }
-
-    suspend fun setRemindersEnabled(enabled: Boolean) {
-        context.settingsDataStore.edit { prefs -> prefs[remindersPref] = enabled }
-    }
-
-    /**
      * Whether the app should look for a newer version of itself.
      *
      * On by default. This app is not installed from a store, so nothing else will ever
@@ -374,7 +359,6 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
      * finds it.
      */
     override suspend fun read(): BackupSettingsRecord = BackupSettingsRecord(
-        remindersEnabled = remindersEnabled.first(),
         updateChecksEnabled = updateChecksEnabled.first(),
         backUpAutomatically = backUpAutomatically.first(),
         destination = backupDestination.first().name
@@ -388,7 +372,6 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
      * given its own token, and there is no honest way around that.
      */
     override suspend fun apply(record: BackupSettingsRecord) {
-        setRemindersEnabled(record.remindersEnabled)
         setUpdateChecksEnabled(record.updateChecksEnabled)
         setBackUpAutomatically(record.backUpAutomatically)
         record.destination?.let { setBackupDestination(BackupDestination.fromName(it)) }

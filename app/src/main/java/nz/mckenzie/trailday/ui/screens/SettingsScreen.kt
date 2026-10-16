@@ -91,9 +91,6 @@ fun SettingsScreen(
     val check by viewModel.check.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val storedTiles by viewModel.storedTiles.collectAsStateWithLifecycle()
-    val remindersEnabled by viewModel.remindersEnabled.collectAsStateWithLifecycle()
-    val reminderOutcome by viewModel.reminderOutcome.collectAsStateWithLifecycle()
-    val checkingReminders by viewModel.checkingReminders.collectAsStateWithLifecycle()
     val dataMessage by viewModel.dataMessage.collectAsStateWithLifecycle()
     val dataBusy by viewModel.dataBusy.collectAsStateWithLifecycle()
     val pendingRestore by viewModel.pendingRestore.collectAsStateWithLifecycle()
@@ -124,10 +121,6 @@ fun SettingsScreen(
     val restoreLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri -> uri?.let(viewModel::chooseBackupToRestore) }
-
-    val handoverLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/csv")
-    ) { uri -> uri?.let(viewModel::exportHandoverTo) }
 
     val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
@@ -454,67 +447,6 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Reminders", style = MaterialTheme.typography.titleMedium)
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Switch(
-                            checked = remindersEnabled,
-                            onCheckedChange = viewModel::setRemindersEnabled
-                        )
-                        Text(
-                            text = "Tell me when assets are due",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-
-                    Text(
-                        text = "Assets are checked twice a day. You are told when one first " +
-                            "becomes due, again if it goes from due soon to overdue, and after " +
-                            "that at most once a week while it stays due.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-
-                    if (!notificationsAllowed) {
-                        Text(
-                            text = "Android needs permission before any reminder can appear, " +
-                                "so nothing will be posted until this is allowed.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }
-                            ) {
-                                Text("Allow notifications")
-                            }
-                            TextButton(onClick = { openNotificationSettings(context) }) {
-                                Text("Notification settings")
-                            }
-                        }
-                    }
-
-                    reminderOutcome?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
-
-                    OutlinedButton(
-                        onClick = viewModel::checkRemindersNow,
-                        enabled = !checkingReminders
-                    ) {
-                        Text(if (checkingReminders) "Checking…" else "Check now")
-                    }
-                }
-            }
-
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
                     Text("Updates", style = MaterialTheme.typography.titleMedium)
                     Text(
                         text = "This is version ${updateViewModel.currentLabel}. Trail Day is not " +
@@ -652,23 +584,11 @@ fun SettingsScreen(
                         ) {
                             Text("Restore from a backup")
                         }
-                        OutlinedButton(
-                            onClick = { handoverLauncher.launch(viewModel.handoverFileName()) },
-                            enabled = !dataBusy
-                        ) {
-                            Text("Handover record (CSV)")
-                        }
                     }
                     dataMessage?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
                     Text(
                         text = "Downloaded offline imagery is not in the backup: it describes " +
                             "tiles on this phone and can be downloaded again.",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Text(
-                        text = "The handover record is one row per product per spray: what " +
-                            "went where, when, and which recording proves it. It opens in a " +
-                            "spreadsheet \u2014 for a client, an auditor, or whoever takes over.",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }

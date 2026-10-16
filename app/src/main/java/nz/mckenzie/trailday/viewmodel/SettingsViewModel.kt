@@ -20,11 +20,8 @@ import nz.mckenzie.trailday.backup.BackupTargets
 import nz.mckenzie.trailday.backup.FileBackupTarget
 import nz.mckenzie.trailday.data.BackupController
 import nz.mckenzie.trailday.data.BackupRepository
-import nz.mckenzie.trailday.data.HandoverController
-import nz.mckenzie.trailday.data.HandoverRepository
 import nz.mckenzie.trailday.data.OffsiteBackup
 import nz.mckenzie.trailday.data.OffsiteResult
-import nz.mckenzie.trailday.data.ReminderStateStore
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
@@ -39,9 +36,6 @@ import nz.mckenzie.trailday.offline.OfflineTileStore
 import nz.mckenzie.trailday.offline.TileServerHolder
 import nz.mckenzie.trailday.offline.TileStoreSummary
 import nz.mckenzie.trailday.offline.maskKey
-import nz.mckenzie.trailday.reminders.DueReminderCheck
-import nz.mckenzie.trailday.reminders.ReminderNotifier
-import nz.mckenzie.trailday.reminders.ReminderOutcome
 import nz.mckenzie.trailday.web.WebEditorService
 import nz.mckenzie.trailday.web.WebEditorState
 
@@ -102,15 +96,8 @@ class SettingsViewModel(
     private val probe: LinzKeyProbe = LinzKeyProbe(),
     /** Injected so tests never reach LINZ. */
     private val checkKey: suspend (String) -> KeyCheck = { probe.check(it) },
-    /**
-     * Runs one due-reminder check. Built by the factory rather than here, so this view
-     * model needs no database and a test can answer without one.
-     */
-    private val runReminderCheck: (suspend () -> ReminderOutcome)? = null,
     /** Backup files: chosen by the operator, read and written by the app. */
     private val backup: BackupController? = null,
-    /** The season as a handover record. */
-    private val handover: HandoverController? = null,
     /**
      * The off-site copy, built fresh from the settings each time it is used so that a
      * destination changed on this screen takes effect at once. Null in a test that has no
@@ -261,24 +248,7 @@ class SettingsViewModel(
     private val _storedTiles = MutableStateFlow(TileStoreSummary(0, 0))
     val storedTiles: StateFlow<TileStoreSummary> = _storedTiles
 
-    /**
-     * Whether the app tells the operator when tracks come due.
-     *
-     * Turning it on or off only writes the setting: the application watches it and
-     * enqueues or cancels the background work, so there is one place that keeps the
-     * schedule honest.
-     */
-    val remindersEnabled: StateFlow<Boolean> = settings.remindersEnabled
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), true)
-
-    /** What the last Check now said, in the operator's words. */
-    private val _reminderOutcome = MutableStateFlow<String?>(null)
-    val reminderOutcome: StateFlow<String?> = _reminderOutcome
-
-    private val _checkingReminders = MutableStateFlow(false)
-    val checkingReminders: StateFlow<Boolean> = _checkingReminders
-
-    /** What the last backup, restore or handover said. One line, because it is one card. */
+    /** What the last backup or restore said. One line, because it is one card. */
     private val _dataMessage = MutableStateFlow<String?>(null)
     val dataMessage: StateFlow<String?> = _dataMessage
 
@@ -381,33 +351,6 @@ class SettingsViewModel(
         }
     }
 
-    /** Turns the twice-daily check on or off. The application keeps the work in step. */
-    fun setRemindersEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            settings.setRemindersEnabled(enabled)
-            _reminderOutcome.value = if (enabled) {
-                "Reminders on: tracks are checked twice a day."
-            } else {
-                "Reminders off. Nothing will be posted in the background."
-            }
-        }
-    }
-
-    /**
-     * Runs the check straight away and reports what it did, rather than making the
-     * operator wait half a day to find out whether reminders work.
-     */
-    fun checkRemindersNow() {
-        val check = runReminderCheck ?: return
-        viewModelScope.launch {
-            _checkingReminders.value = true
-            _reminderOutcome.value = runCatching { check() }
-                .map { it.message }
-                .getOrElse { it.message ?: "The reminder check could not run" }
-            _checkingReminders.value = false
-        }
-    }
-
     /** "trail-day-backup-2026-09-14.json" - offered as the file name in the picker. */
     fun backupFileName(): String = backup?.suggestedFileName() ?: "trail-day-backup.json"
 
@@ -418,27 +361,6 @@ class SettingsViewModel(
             _dataBusy.value = true
             _dataMessage.value = runCatching { controller.exportTo(uri) }
                 .map { summary -> "Backed up ${summary.describe()}." }
-                .getOrElse { "Nothing was written: ${it.message}" }
-            _dataBusy.value = false
-        }
-    }
-
-    /** "trail-day-sprays-2026-09-14.csv" - the season as a spreadsheet for somebody else. */
-    fun handoverFileName(): String = handover?.suggestedFileName() ?: "trail-day-sprays.csv"
-
-    /** Writes every spray of every track as a handover record. */
-    fun exportHandoverTo(uri: Uri) {
-        val controller = handover ?: return
-        viewModelScope.launch {
-            _dataBusy.value = true
-            _dataMessage.value = runCatching { controller.exportTo(uri) }
-                .map { sprays ->
-                    if (sprays == 0) {
-                        "Nothing has been sprayed yet, so the file has only column names."
-                    } else {
-                        "Handed over $sprays spray${if (sprays == 1) "" else "s"}."
-                    }
-                }
                 .getOrElse { "Nothing was written: ${it.message}" }
             _dataBusy.value = false
         }
@@ -867,21 +789,10 @@ class SettingsViewModel(
                                 WebEditorService.refresh(appContext)
                             }
                         },
-                        runReminderCheck = {
-                            DueReminderCheck(
-                                assetRepository = AssetRepository(TrailDayDatabase.get(appContext)),
-                                store = ReminderStateStore(appContext),
-                                notifier = ReminderNotifier(appContext)
-                            ).run()
-                        },
                         backup = BackupController(
                             repository = backupRepository(),
                             context = appContext,
                             switches = settings
-                        ),
-                        handover = HandoverController(
-                            repository = HandoverRepository(TrailDayDatabase.get(appContext)),
-                            context = appContext
                         ),
                         // Built per use rather than held, so changing the destination on
                         // this screen takes effect on the next press of a button.

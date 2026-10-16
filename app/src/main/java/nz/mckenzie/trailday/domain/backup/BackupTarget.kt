@@ -59,7 +59,6 @@ data class StoredBackup(
  */
 @Serializable
 data class BackupSettingsRecord(
-    val remindersEnabled: Boolean = true,
     val updateChecksEnabled: Boolean = true,
     val backUpAutomatically: Boolean = false,
     /** The destination's name, so a new phone can be pointed the same way. */

@@ -9,7 +9,6 @@ import nz.mckenzie.trailday.backup.BackupScheduler
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.offline.TileServerHolder
 import nz.mckenzie.trailday.tracking.DevicePosition
-import nz.mckenzie.trailday.reminders.DueReminderScheduler
 import nz.mckenzie.trailday.update.UpdateCheckScheduler
 import org.maplibre.android.MapLibre
 
@@ -37,14 +36,9 @@ class TrailDayApplication : Application() {
         // collection starts and stops with whichever map is on screen.
         DevicePosition.start(this)
 
-        // Keep the reminder schedule in step with the setting, whatever changes it -
-        // the settings switch, or a restore putting the setting back.
+        // The switches below have to actually stop the job they name, or the setting is a lie.
+        // (The reminder schedule this used to keep in step went with the spraying.)
         val settings = SettingsRepository(this)
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            settings.remindersEnabled.collect { enabled ->
-                DueReminderScheduler.sync(this@TrailDayApplication, enabled)
-            }
-        }
 
         // The same for the update check: the switch that turns it off has to actually
         // stop the job that does it, or the setting is a lie.

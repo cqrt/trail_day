@@ -26,7 +26,6 @@ class BackupSettingsRecordTest {
     @Test
     fun `the switches come back out of a file as they went in`() {
         val record = BackupSettingsRecord(
-            remindersEnabled = false,
             updateChecksEnabled = true,
             backUpAutomatically = true,
             destination = "GITHUB"

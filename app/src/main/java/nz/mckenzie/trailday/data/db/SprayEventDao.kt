@@ -4,7 +4,6 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
-import nz.mckenzie.trailday.domain.handover.HandoverRow
 
 /**
  * Rolled-up spray history per asset, used by the due-status engine to colour
@@ -132,35 +131,4 @@ abstract class SprayEventDao {
 
     @Query("DELETE FROM asset_product_defaults WHERE assetId = :assetId AND productId = :productId")
     abstract suspend fun deleteDefault(assetId: Long, productId: Long)
-
-    /**
-     * Every spray of every asset as one row per product, oldest first - the shape a
-     * handover record is read in. Joined rather than assembled in Kotlin so the record
-     * cannot disagree with the database it describes.
-     */
-    @Query(
-        """
-        SELECT e.sprayedAtEpochMs AS sprayedAtEpochMs,
-               a.name AS assetName,
-               g.name AS groupName,
-               a.method AS method,
-               p.name AS productName,
-               ep.quantityMl AS amount,
-               p.unit AS unit,
-               e.waterLitres AS waterLitres,
-               e.distanceM AS distanceM,
-               e.areaSqm AS areaSqm,
-               e.operatorName AS operatorName,
-               e.notes AS notes,
-               r.name AS recordingName
-        FROM spray_event_products ep
-        JOIN spray_events e ON e.id = ep.sprayEventId
-        JOIN assets a ON a.id = e.assetId
-        JOIN products p ON p.id = ep.productId
-        LEFT JOIN groups g ON g.id = a.groupId
-        LEFT JOIN recorded_sessions r ON r.id = e.recordedSessionId
-        ORDER BY e.sprayedAtEpochMs, ep.id
-        """
-    )
-    abstract suspend fun handoverRows(): List<HandoverRow>
 }
