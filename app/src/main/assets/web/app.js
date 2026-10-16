@@ -486,7 +486,7 @@ async function boot() {
     // hoped over. A colour no place has worn yet, and the first frame of a map that has just opened,
     // both arrive here.
     map.on('styleimagemissing', (event) => {
-      if (!event.id.startsWith('sprayday-place-')) return;
+      if (!event.id.startsWith('trailday-place-')) return;
       addPlaceIcon(map, event.id, style.markerDp);
     });
 
@@ -552,7 +552,7 @@ function onStyleLoaded(style) {
   // being drawn a click belongs to the drawing instead - to a handle, to a segment, or to the paddock
   // at the end of a new line - so the drawing gets it first.
   for (const layer of (style.layers || []).map((l) => l.id)) {
-    if (!layer.startsWith('sprayday-assets-')) continue;
+    if (!layer.startsWith('trailday-assets-')) continue;
     map.on('click', layer, (event) => {
       if (editor && editor.isActive()) return;
       selectAsset(event.features[0].properties.id);
@@ -645,11 +645,11 @@ function keepCameraNow() {
  * The map's own source for the work.
  *
  * Found from the phone's own layer names rather than written down here: the phone names every layer
- * of its work `sprayday-assets-...` (`AssetLayerIds`), each of those layers says which source it
+ * of its work `trailday-assets-...` (`AssetLayerIds`), each of those layers says which source it
  * draws, and that is the source a save hands the phone's new features to.
  */
 function assetsSourceId(style) {
-  const layer = (style.layers || []).find((one) => one.id.startsWith('sprayday-assets-'));
+  const layer = (style.layers || []).find((one) => one.id.startsWith('trailday-assets-'));
   return layer ? layer.source : null;
 }
 
@@ -681,7 +681,7 @@ let glowFilters = new Map();
  */
 function addGlowLayers(style) {
   const phoneLayers = (style.layers || []).filter(
-    (one) => one.id.startsWith('sprayday-assets-') && wantsHalo(one)
+    (one) => one.id.startsWith('trailday-assets-') && wantsHalo(one)
   );
   if (!phoneLayers.length) return;
 

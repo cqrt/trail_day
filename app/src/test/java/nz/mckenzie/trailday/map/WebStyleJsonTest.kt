@@ -1,0 +1,515 @@
+package nz.mckenzie.trailday.map
+
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import nz.mckenzie.trailday.domain.asset.AssetKind
+import nz.mckenzie.trailday.domain.asset.AssetShape
+import nz.mckenzie.trailday.domain.tiles.Basemap
+import nz.mckenzie.trailday.domain.tiles.PlaceLabels
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * What the page is told to draw.
+ *
+ * These are the claims that decide whether the desk and the phone show the same farm: the same layer
+ * ids, the same dash patterns, the same pictures, and the tiles coming from the phone rather than
+ * from LINZ with a key in them. Every one of them is a copy of a decision made elsewhere, so every
+ * one of them is a chance to drift - which is what this file is for.
+ */
+class WebStyleJsonTest {
+
+    private val tiles = "http://192.168.1.23:8799/tiles/linz-aerial/{z}/{x}/{y}.webp?k=7f3a"
+    private val assets = "http://192.168.1.23:8799/api/assets.geojson?k=7f3a"
+
+    private val style: JsonObject =
+        Json.parseToJsonElement(WebStyleJson.build(Basemap.LINZ_AERIAL, tiles, assets)).jsonObject
+
+    private val namesUrl = "http://192.168.1.23:8799/tiles/${PlaceLabels.ID}/{z}/{x}/{y}.pbf?k=7f3a"
+
+    private val styleWithNames: JsonObject =
+        Json.parseToJsonElement(WebStyleJson.build(Basemap.LINZ_AERIAL, tiles, assets, namesUrl))
+            .jsonObject
+
+    private fun layerIds(): List<String> =
+        style["layers"]!!.jsonArray.map { it.jsonObject["id"]!!.jsonPrimitive.content }
+
+    private fun layerIdsOf(style: JsonObject): List<String> =
+        style["layers"]!!.jsonArray.map { it.jsonObject["id"]!!.jsonPrimitive.content }
+
+    private fun layer(id: String): JsonObject =
+        style["layers"]!!.jsonArray.first { it.jsonObject["id"]!!.jsonPrimitive.content == id }.jsonObject
+
+    private fun paint(id: String): JsonObject = layer(id)["paint"]!!.jsonObject
+
+    @Test
+    fun `the work is drawn in the app's own layers, in the app's own order`() {
+        assertEquals(
+            listOf("background", Basemap.LINZ_AERIAL.id) + AssetLayerIds.ALL,
+            layerIds()
+        )
+    }
+
+    @Test
+    fun `the tiles and the credit come from the phone`() {
+        val source = style["sources"]!!.jsonObject[Basemap.LINZ_AERIAL.id]!!.jsonObject
+
+        assertEquals(
+            listOf(tiles),
+            source["tiles"]!!.jsonArray.map { it.jsonPrimitive.content }
+        )
+        assertEquals(
+            Basemap.LINZ_AERIAL.attributionHtml(),
+            source["attribution"]!!.jsonPrimitive.content
+        )
+        assertEquals(
+            assets,
+            style["sources"]!!.jsonObject[ASSETS_SOURCE]!!.jsonObject["data"]!!.jsonPrimitive.content
+        )
+    }
+
+    @Test
+    fun `a road is dashed exactly as the app dashes it, and a track is not dashed at all`() {
+        val roads = paint(AssetLayerIds.ROADS)["line-dasharray"]!!.jsonArray
+            .map { it.jsonPrimitive.content.toDouble() }
+        val fencelines = paint(AssetLayerIds.FENCELINES)["line-dasharray"]!!.jsonArray
+            .map { it.jsonPrimitive.content.toDouble() }
+
+        AssetLineStyles.ROAD.zip(roads).forEach { (expected, actual) ->
+            assertEquals(expected.toDouble(), actual, 1e-6)
+        }
+        AssetLineStyles.FENCELINE.zip(fencelines).forEach { (expected, actual) ->
+            assertEquals(expected.toDouble(), actual, 1e-6)
+        }
+        // Solid means no dash array at all, rather than a dash of zero.
+        assertTrue(
+            "a solid track must carry no dash array",
+            paint(AssetLayerIds.TRACKS)["line-dasharray"] == null
+        )
+    }
+
+    @Test
+    fun `a line's colour is the feature's own, so a half-sprayed track is one layer in two colours`() {
+        assertEquals(
+            """["get","stroke"]""",
+            paint(AssetLayerIds.TRACKS)["line-color"].toString()
+        )
+    }
+
+    @Test
+    fun `each line layer keeps its own kind apart, and leaves the name's own stretch alone`() {
+        assertEquals(
+            """["all",["==",["get","kind"],"TRACK"],["==",["get","shape"],"LINE"],""" +
+                """["!=",["get","carriesName"],true]]""",
+            layer(AssetLayerIds.TRACKS)["filter"].toString()
+        )
+        assertEquals(
+            """["all",["==",["get","kind"],"ROAD"],["==",["get","shape"],"LINE"],""" +
+                """["!=",["get","carriesName"],true]]""",
+            layer(AssetLayerIds.ROADS)["filter"].toString()
+        )
+        assertEquals(
+            """["all",["==",["get","kind"],"FENCELINE"],["==",["get","shape"],"LINE"],""" +
+                """["!=",["get","carriesName"],true]]""",
+            layer(AssetLayerIds.FENCELINES)["filter"].toString()
+        )
+    }
+
+    @Test
+    fun `the letters for a name come from the phone, on the address its tiles come from`() {
+        assertEquals(
+            "http://192.168.1.23:8799/fonts/{fontstack}/{range}.pbf",
+            style["glyphs"]!!.jsonPrimitive.content
+        )
+    }
+
+    @Test
+    fun `one name per track, drawn with the phone's own numbers, on the stretch that carries it`() {
+        val names = layer(AssetLayerIds.TRACK_NAMES)
+        val layout = names["layout"]!!.jsonObject
+
+        assertEquals("symbol", names["type"]!!.jsonPrimitive.content)
+        assertEquals(
+            "a name waits until the map is close in, exactly as the phone's own map does",
+            TrackNames.MIN_ZOOM,
+            names["minzoom"]!!.jsonPrimitive.content.toFloat(),
+            1e-6f
+        )
+        assertEquals(
+            "the name layer draws the one stretch the app marked, and nothing else",
+            """["all",["==",["get","kind"],"TRACK"],["==",["get","shape"],"LINE"],""" +
+                """["==",["get","carriesName"],true]]""",
+            names["filter"].toString()
+        )
+        assertEquals("line-center", layout["symbol-placement"]!!.jsonPrimitive.content)
+        assertEquals("""["get","name"]""", layout["text-field"].toString())
+        assertEquals(
+            "the letters the app ships, by the name a style asks for them with",
+            listOf(GlyphFonts.STACK),
+            layout["text-font"]!!.jsonArray.map { it.jsonPrimitive.content }
+        )
+        assertEquals(TrackNames.SIZE, layout["text-size"]!!.jsonPrimitive.content.toFloat(), 1e-6f)
+        assertEquals(
+            TrackNames.MAX_ANGLE,
+            layout["text-max-angle"]!!.jsonPrimitive.content.toFloat(),
+            1e-6f
+        )
+        assertEquals(
+            "beside the line rather than on it",
+            TrackNames.OFFSET,
+            layout["text-offset"]!!.jsonArray[1].jsonPrimitive.content.toFloat(),
+            1e-6f
+        )
+        assertEquals("map", layout["text-rotation-alignment"]!!.jsonPrimitive.content)
+        assertEquals("true", layout["text-keep-upright"]!!.jsonPrimitive.content)
+        assertEquals("true", layout["text-allow-overlap"]!!.jsonPrimitive.content)
+        assertEquals("true", layout["text-ignore-placement"]!!.jsonPrimitive.content)
+
+        val paint = paint(AssetLayerIds.TRACK_NAMES)
+        assertEquals(TrackNames.COLOUR, paint["text-color"]!!.jsonPrimitive.content)
+        assertEquals(TrackNames.HALO_COLOUR, paint["text-halo-color"]!!.jsonPrimitive.content)
+        assertEquals(
+            TrackNames.HALO_WIDTH,
+            paint["text-halo-width"]!!.jsonPrimitive.content.toFloat(),
+            1e-6f
+        )
+    }
+
+    @Test
+    fun `the desk draws no place names until the phone's switch is on`() {
+        assertNull(
+            "nothing is fetched for a switch nobody has thrown",
+            style["sources"]!!.jsonObject[PlaceLabels.ID]
+        )
+        assertTrue(layerIds().none { it.startsWith("linz-place") })
+    }
+
+    @Test
+    fun `the place names come from the phone, over the imagery and under the work`() {
+        val source = styleWithNames["sources"]!!.jsonObject[PlaceLabels.ID]!!.jsonObject
+
+        assertEquals("vector", source["type"]!!.jsonPrimitive.content)
+        assertEquals(
+            "the phone's own server, so the page never reaches LINZ",
+            listOf(namesUrl),
+            source["tiles"]!!.jsonArray.map { it.jsonPrimitive.content }
+        )
+        assertEquals(PlaceLabels.MAX_ZOOM, source["maxzoom"]!!.jsonPrimitive.int)
+
+        val ids = layerIdsOf(styleWithNames)
+        val imagery = ids.indexOf(Basemap.LINZ_AERIAL.id)
+        val work = ids.indexOf(AssetLayerIds.ALL.first())
+        PlaceLabels.BANDS.forEach { band ->
+            assertTrue("${band.id} is drawn over the imagery", ids.indexOf(band.id) > imagery)
+            assertTrue("and under the work", ids.indexOf(band.id) < work)
+        }
+        assertEquals(
+            "in the app's own order, and nothing else in between",
+            PlaceLabels.BANDS.map { it.id },
+            ids.filter { id -> PlaceLabels.BANDS.any { it.id == id } }
+        )
+    }
+
+    @Test
+    fun `a place name is written with the phone's own numbers`() {
+        val layer = styleWithNames["layers"]!!.jsonArray
+            .map { it.jsonObject }
+            .first { it["id"]!!.jsonPrimitive.content == PlaceLabels.TOWNS.id }
+        val layout = layer["layout"]!!.jsonObject
+        val paint = layer["paint"]!!.jsonObject
+
+        assertEquals(PlaceLabels.ID, layer["source"]!!.jsonPrimitive.content)
+        assertEquals(PlaceLabels.SOURCE_LAYER, layer["source-layer"]!!.jsonPrimitive.content)
+        assertEquals(
+            PlaceLabels.TOWNS.minZoom,
+            layer["minzoom"]!!.jsonPrimitive.content.toFloat(),
+            1e-6f
+        )
+        assertEquals(
+            "the name is a property of the feature, and LINZ's own name for it",
+            """["get","${PlaceLabels.NAME_PROPERTY}"]""",
+            layout["text-field"].toString()
+        )
+        assertEquals(
+            "the letters the app ships, by the name a style asks for them with",
+            listOf(GlyphFonts.STACK),
+            layout["text-font"]!!.jsonArray.map { it.jsonPrimitive.content }
+        )
+        val filter = layer["filter"]!!.jsonArray
+        assertEquals("in", filter[0].jsonPrimitive.content)
+        assertEquals(
+            "the property a place's kind is in",
+            """["get","${PlaceLabels.TOWNS.property}"]""",
+            filter[1].toString()
+        )
+        assertEquals("literal", filter[2].jsonArray[0].jsonPrimitive.content)
+        assertEquals(
+            "the kinds are one argument - the array - rather than one argument each, which is the " +
+                "shape v0.6.97 shipped and MapLibre refused outright",
+            PlaceLabels.TOWNS.kinds,
+            filter[2].jsonArray[1].jsonArray.map { it.jsonPrimitive.content }
+        )
+        assertEquals(
+            "a name that will not fit is dropped rather than drawn over: place names are furniture",
+            "false",
+            layout["text-allow-overlap"]!!.jsonPrimitive.content
+        )
+        assertEquals(PlaceLabels.COLOUR, paint["text-color"]!!.jsonPrimitive.content)
+        assertEquals(PlaceLabels.HALO_COLOUR, paint["text-halo-color"]!!.jsonPrimitive.content)
+        assertEquals(
+            PlaceLabels.HALO_WIDTH,
+            paint["text-halo-width"]!!.jsonPrimitive.content.toFloat(),
+            1e-6f
+        )
+    }
+
+    @Test
+    fun `a river's name runs along the river, and every other name sits at its point`() {
+        val river = styleWithNames["layers"]!!.jsonArray
+            .map { it.jsonObject }
+            .first { it["id"]!!.jsonPrimitive.content == PlaceLabels.RIVERS.id }
+        val layout = river["layout"]!!.jsonObject
+
+        assertEquals(
+            "a river is a line in LINZ's tiles, not a point",
+            PlaceLabels.WATER_LINES_LAYER,
+            river["source-layer"]!!.jsonPrimitive.content
+        )
+        assertEquals("line", layout["symbol-placement"]!!.jsonPrimitive.content)
+        assertEquals(
+            "and the letters may bend with it, or a river with a bend loses its name",
+            PlaceLabels.LINE_MAX_ANGLE,
+            layout["text-max-angle"]!!.jsonPrimitive.content.toFloat(),
+            1e-6f
+        )
+        assertEquals(
+            "from zoom twelve: the densest band of the lot",
+            PlaceLabels.RIVERS.minZoom,
+            river["minzoom"]!!.jsonPrimitive.content.toFloat(),
+            1e-6f
+        )
+        assertEquals(
+            "everything that flows is filed as a river",
+            """["in",["get","kind"],["literal",["river"]]]""",
+            river["filter"].toString()
+        )
+        assertEquals(
+            "and a river's name is in `name`, not in the place labels' `label` - asking for the " +
+                "wrong one draws nothing and says nothing",
+            """["get","${PlaceLabels.WATER_LINES_NAME_PROPERTY}"]""",
+            layout["text-field"].toString()
+        )
+        assertEquals(
+            "while every other band's name is where the place labels keep theirs",
+            """["get","${PlaceLabels.NAME_PROPERTY}"]""",
+            styleWithNames["layers"]!!.jsonArray
+                .map { it.jsonObject }
+                .first { it["id"]!!.jsonPrimitive.content == PlaceLabels.BAYS.id }["layout"]!!
+                .jsonObject["text-field"].toString()
+        )
+
+        // And nothing else is drawn along a line: a name that ran along a town would be a mistake.
+        styleWithNames["layers"]!!.jsonArray.map { it.jsonObject }.forEach { layer ->
+            val id = layer["id"]!!.jsonPrimitive.content
+            if (!id.startsWith("linz-place") || id == PlaceLabels.RIVERS.id) return@forEach
+            assertNull("$id must be placed at its point", layer["layout"]!!.jsonObject["symbol-placement"])
+        }
+    }
+
+    @Test
+    fun `a name waits for a close view, and the line it belongs to does not`() {
+        // What the zoom floor is for: a name read on a wide view is a muddle, a track seen on a wide view
+        // is a track. A floor on the lines as well would hide the work itself from the operator until they
+        // zoomed in, which is the opposite of what a map is for.
+        listOf(AssetLayerIds.TRACKS, AssetLayerIds.ROADS, AssetLayerIds.FENCELINES).forEach { id ->
+            assertNull("$id is drawn at every zoom", layer(id)["minzoom"])
+        }
+    }
+
+    @Test
+    fun `the line caps and joins are where a browser will accept them`() {
+        val lines = listOf(AssetLayerIds.TRACKS, AssetLayerIds.ROADS, AssetLayerIds.FENCELINES)
+
+        lines.forEach { id ->
+            val layout = layer(id)["layout"]!!.jsonObject
+            assertEquals("round", layout["line-cap"]!!.jsonPrimitive.content)
+            assertEquals("round", layout["line-join"]!!.jsonPrimitive.content)
+
+            // A paint property the spec does not know is not a warning to MapLibre GL JS: it refuses
+            // the style, and the desk shows a blank rectangle where the farm should be. The app's own
+            // map is an Android SDK, which is how this went unnoticed until a browser saw it.
+            assertTrue("$id must not carry line-cap in paint", paint(id)["line-cap"] == null)
+            assertTrue("$id must not carry line-join in paint", paint(id)["line-join"] == null)
+        }
+    }
+
+    @Test
+    fun `a place asks for the marker the feature names, and falls back to the grey ring`() {
+        val places = layer(AssetLayerIds.pointOf(AssetKind.OTHER_PLACE))
+
+        assertEquals(
+            """["all",["==",["get","kind"],"OTHER_PLACE"],["==",["get","shape"],"POINT"]]""",
+            places["filter"].toString()
+        )
+        assertEquals(
+            """["coalesce",["get","icon"],"${PlaceIcons.FALLBACK_IMAGE_NAME}"]""",
+            places["layout"]!!.jsonObject["icon-image"].toString()
+        )
+    }
+
+    @Test
+    fun `every kind of place has a marker layer of its own, filtered to that kind`() {
+        PlaceIcons.KINDS.forEach { kind ->
+            val filter = layer(AssetLayerIds.pointOf(kind))["filter"].toString()
+
+            assertTrue(
+                "a ${kind.name} with no layer of its own could not be hidden on its own: $filter",
+                filter.contains("\"${kind.name}\"")
+            )
+        }
+    }
+
+    @Test
+    fun `the page is told which pictures to fetch, and how big to draw them`() {
+        assertEquals(
+            PlaceIcons.IMAGE_NAMES,
+            style["placeIcons"]!!.jsonArray.map { it.jsonPrimitive.content }
+        )
+        assertEquals(
+            "the size the markers are drawn at, which is the phone's own marker size",
+            PlaceIcons.MARKER_DP,
+            style["markerDp"]!!.jsonPrimitive.content.toFloat(),
+            1e-6f
+        )
+    }
+
+    @Test
+    fun `with nothing drawn yet, the page opens where the phone's map opens`() {
+        assertEquals(
+            "[${DEFAULT_CAMERA_TARGET.longitude},${DEFAULT_CAMERA_TARGET.latitude}]",
+            style["center"].toString()
+        )
+        assertEquals(
+            DEFAULT_CAMERA_ZOOM,
+            style["zoom"]!!.jsonPrimitive.content.toDouble(),
+            1e-6
+        )
+    }
+
+    @Test
+    fun `a carpark is ground - a surface under the lines, in the feature's own colour`() {
+        val fill = layer(AssetLayerIds.CARPARKS_FILL)
+
+        assertEquals("fill", fill["type"]!!.jsonPrimitive.content)
+        assertEquals(
+            """["all",["==",["get","kind"],"CARPARK"],["==",["get","shape"],"AREA"],["==",["geometry-type"],"Polygon"]]""",
+            fill["filter"].toString()
+        )
+        assertEquals(
+            "the carpark's own traffic light, read off the feature, so the fill and the edge cannot disagree",
+            """["get","stroke"]""",
+            paint(AssetLayerIds.CARPARKS_FILL)["fill-color"].toString()
+        )
+        assertEquals(
+            "the same strength the app's own map draws it at",
+            0.25,
+            paint(AssetLayerIds.CARPARKS_FILL)["fill-opacity"]!!.jsonPrimitive.content.toDouble(),
+            1e-9
+        )
+
+        val ids = layerIds()
+        assertTrue(
+            "a surface is drawn under everything that is drawn on it: $ids",
+            ids.indexOf(AssetLayerIds.CARPARKS_FILL) < ids.indexOf(AssetLayerIds.TRACKS)
+        )
+        assertTrue(
+            "and the boundary is drawn after the fill: $ids",
+            ids.indexOf(AssetLayerIds.CARPARKS_FILL) < ids.indexOf(AssetLayerIds.CARPARKS)
+        )
+    }
+
+    @Test
+    fun `the ground wears a white rim outside its boundary, drawn under it`() {
+        val casing = layer(AssetLayerIds.CARPARKS_CASING)
+        val boundary = layer(AssetLayerIds.CARPARKS)
+
+        assertEquals("line", casing["type"]!!.jsonPrimitive.content)
+        assertEquals(
+            "round exactly the ground the boundary closes, in the boundary's own words",
+            boundary["filter"].toString(),
+            casing["filter"].toString()
+        )
+        assertEquals(
+            "white: the one colour the app's traffic light never uses, so a rim can never say due",
+            "\"#FFFFFF\"",
+            paint(AssetLayerIds.CARPARKS_CASING)["line-color"].toString()
+        )
+        assertEquals(
+            "a pixel wider than the boundary on each side, which is what leaves a pixel of white outside the ring",
+            paint(AssetLayerIds.CARPARKS)["line-width"]!!.jsonPrimitive.content.toDouble() + 2,
+            paint(AssetLayerIds.CARPARKS_CASING)["line-width"]!!.jsonPrimitive.content.toDouble(),
+            1e-9
+        )
+
+        val ids = layerIds()
+        assertTrue(
+            "the boundary is drawn after the rim, or the rim would be a second edge to read: $ids",
+            ids.indexOf(AssetLayerIds.CARPARKS_CASING) < ids.indexOf(AssetLayerIds.CARPARKS)
+        )
+        assertTrue(
+            "and the rim is drawn after the ground it rims: $ids",
+            ids.indexOf(AssetLayerIds.CARPARKS_FILL) < ids.indexOf(AssetLayerIds.CARPARKS_CASING)
+        )
+    }
+
+    @Test
+    fun `the other basemap is a different style, with that basemap's tiles and credit`() {
+        val osm = Json.parseToJsonElement(
+            WebStyleJson.build(Basemap.OPENSTREETMAP, "http://192.168.1.23:8799/tiles/osm/{z}/{x}/{y}.png", assets)
+        ).jsonObject
+
+        val source = osm["sources"]!!.jsonObject[Basemap.OPENSTREETMAP.id]!!.jsonObject
+
+        assertEquals(
+            Basemap.OPENSTREETMAP.attributionHtml(),
+            source["attribution"]!!.jsonPrimitive.content
+        )
+        assertEquals(
+            listOf("background", Basemap.OPENSTREETMAP.id) + AssetLayerIds.ALL,
+            osm["layers"]!!.jsonArray.map { it.jsonObject["id"]!!.jsonPrimitive.content }
+        )
+    }
+
+    /**
+     * The whole document, against the rules MapLibre judges an expression by.
+     *
+     * **This is the test v0.6.97 needed and did not have.** The builder wrote
+     * `["literal", "city", "town"]`, and a `literal` takes one argument - the array - so MapLibre
+     * refused the style outright: the desk drew a blank rectangle where the farm should be, and said
+     * so in words the operator could do nothing with ("'literal' expression requires exactly one
+     * argument, but found 3 instead"). Every test in this file passed, because they checked the
+     * values inside the expressions and the values were right.
+     *
+     * Both styles are checked, names on and names off: the expressions only appear when the operator
+     * has asked for them, which is exactly when they are not being looked at in a test run.
+     */
+    @Test
+    fun `the desk's style is built from expressions MapLibre will accept`() {
+        assertEquals(
+            "the style with the work on it",
+            emptyList<String>(),
+            StyleExpressions.problems(style.toString())
+        )
+        assertEquals(
+            "and the style with the place names on it",
+            emptyList<String>(),
+            StyleExpressions.problems(styleWithNames.toString())
+        )
+    }
+}

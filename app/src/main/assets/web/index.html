@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Spray Day - the work</title>
+  <title>Trail Day - the work</title>
   <!--
     The page's own files are loaded by the script at the end of the body, not by tags written here,
     because every request the phone answers needs the token and the token is in the address the
@@ -19,7 +19,7 @@
 </head>
 <body>
   <header id="bar">
-    <span id="title">Spray Day - the work</span>
+    <span id="title">Trail Day - the work</span>
     <span id="subtitle">Served by the phone. The details you save here are saved on the phone.</span>
     <button id="theme" type="button" aria-pressed="false">Dark mode</button>
   </header>
@@ -409,7 +409,7 @@
       // `app.js` keeps the choice; the words here are the ones `theme.mjs` uses, said literally because
       // that module has not loaded yet.
       try {
-        if (localStorage.getItem('sprayday-desk-theme') === 'dark') {
+        if (localStorage.getItem('trailday-desk-theme') === 'dark') {
           document.documentElement.setAttribute('data-theme', 'dark');
         }
       } catch (error) {

@@ -49,7 +49,7 @@ const DEFAULT_WIDTH = 4;
 
 /** The page's own name for the halo under a layer of the phone's work. */
 export function haloId(phoneLayerId) {
-  return `sprayday-desk-glow-${phoneLayerId}`;
+  return `trailday-desk-glow-${phoneLayerId}`;
 }
 
 /**
@@ -79,7 +79,7 @@ export function pickOut(phoneFilter, id) {
  * symbol layer is a place's only when it is named for a place: the phone names a place's layer for its
  * kind under one prefix, and a place's house has to wear no halo at all rather than borrow the names'.
  */
-const POINT_PREFIX = 'sprayday-assets-point-';
+const POINT_PREFIX = 'trailday-assets-point-';
 
 export function wantsHalo(phoneLayer) {
   if (phoneLayer.type === 'line') return true;

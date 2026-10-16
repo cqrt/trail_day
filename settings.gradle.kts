@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "SprayDay"
+rootProject.name = "TrailDay"
 include(":app")

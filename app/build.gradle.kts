@@ -44,11 +44,11 @@ val releaseKeyPassword: String? = signingValue("KEY_PASSWORD", "keyPassword")
 val hasReleaseKeystore: Boolean = releaseStoreFile != null && file(releaseStoreFile).exists()
 
 android {
-    namespace = "nz.mckenzie.sprayday"
+    namespace = "nz.mckenzie.trailday"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "nz.mckenzie.sprayday"
+        applicationId = "nz.mckenzie.trailday"
         minSdk = 26
         targetSdk = 36
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

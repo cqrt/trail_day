@@ -1,7 +1,7 @@
 # Drawing tracks from a computer
 
 A web interface for drawing and editing assets — tracks, roads, fencelines, places — with a mouse
-and a keyboard, because drawing them by tapping a phone is the hardest part of operating Spray Day.
+and a keyboard, because drawing them by tapping a phone is the hardest part of operating Trail Day.
 
 **This file is a plan and a handover, not a record of work done.** When the feature ships, the
 decisions below move into the README as a `## Drawing from a computer` section and this file goes
@@ -73,7 +73,7 @@ later: the same editor would sit behind a second storage adapter.
 ## The facts that shape it
 
 1. **The backup file cannot be the wire.** `GitHubBackupTarget.save` reads the current sha and then
-   PUTs the **whole document** under `spray-day-<model>.json`. Anything a second writer put in that
+   PUTs the **whole document** under `trail-day-<model>.json`. Anything a second writer put in that
    file is destroyed by the phone's next backup, with no error anywhere.
 2. **A delete cascades into spray history.** `SprayEventEntity` has
    `ForeignKey(AssetEntity, onDelete = CASCADE)`; recordings survive, because
@@ -483,7 +483,7 @@ change re-colours it, so the desk reads the work once instead of taking six reco
    in the APK, in exchange for a page that works with no internet and no third-party script running
    inside it.
 2. **Fixed port 8799** with a fallback, so the address is bookmarkable. Optional `NsdManager`
-   registration so `sprayday.local:8799` may also work (no dependency; `NsdManager` is in the SDK).
+   registration so `trailday.local:8799` may also work (no dependency; `NsdManager` is in the SDK).
 3. **Delete rule** as written under phase 2: archive-only once a spray or a recording is attached.
 4. The web may **not** touch sprays, recordings, products or anything to do with due dates. It draws
    and edits assets. It is not a management application.
@@ -520,7 +520,7 @@ phone at all.
 ## How to verify
 
 1. Install the debug build over a seeded database (`build/verify/db/seed*.py`, pushed with
-   `adb push` + `run-as nz.mckenzie.sprayday`); flip the switch on. **On API 36 that push has to go
+   `adb push` + `run-as nz.mckenzie.trailday`); flip the switch on. **On API 36 that push has to go
    through `/data/local/tmp` with `chmod 644` first — `run-as` cannot read `/sdcard` at all. The
    exact commands are in `build/verify/web-editor.txt`.**
 2. `adb forward tcp:8799 tcp:8799` puts the phone's endpoint on this machine, so the real page can
@@ -530,8 +530,8 @@ phone at all.
 4. Switch off → the port is closed, and `netstat` shows the loopback listener and the LAN listener
    as two separate sockets, proving the loopback promise is intact.
 5. Screen off for ten minutes → the page still loads (foreground service, Doze), and
-   `adb shell dumpsys power | grep SprayDay` shows the run holding the phone awake —
-   `SprayDay:webEditor`, and `SprayDay:webEditor:wifi` too on a phone before API 34. Browsing onto
+   `adb shell dumpsys power | grep TrailDay` shows the run holding the phone awake —
+   `TrailDay:webEditor`, and `TrailDay:webEditor:wifi` too on a phone before API 34. Browsing onto
    ground nobody has looked at yet draws imagery with the screen off, which is what the locks are for;
    switching the editor off takes both away again. **With "Keep this phone awake" on**, the entry is a
    `SCREEN_DIM_WAKE_LOCK` and the screen stays lit, which is the answer on a phone whose radio sleeps
@@ -540,7 +540,7 @@ phone at all.
    offline download's job.
 6. Re-run the step-0 proof: the app's own map still draws its tiles.
 7. A write is checked in the **database**, not in the page. Force-stop the app first so nothing is
-   writing, then pull `databases/spray_day.db` *and* its `-wal` (`adb exec-out run-as … cat` into a
+   writing, then pull `databases/trail_day.db` *and* its `-wal` (`adb exec-out run-as … cat` into a
    file — Room's writes live in the WAL until something checkpoints it, and a copy without it reads as
    the state *before* the save), and read them with `build/verify/db/webcheck.py`. The claim is not
    "the name changed": it is "the name changed and **nothing else did**", which is why `webcheck.py`
@@ -897,7 +897,7 @@ style's background colour and the work draws on top of it.
       (zoom 15.246 → **17.955**, 349,437 px of change) and then rebuilt is **pixel for pixel** where it
       was left, while a second browser differs from it by 349,507 px, so it is the memory holding the desk
       and not something else; and the phone's basemap was switched to OpenStreetMap (`/api/style`
-      answering `osm,sprayday-assets`, the page fetching `/tiles/osm/19/…`) and back to aerial, with the
+      answering `osm,trailday-assets`, the page fetching `/tiles/osm/19/…`) and back to aerial, with the
       desk's picture **pixel for pixel** where it was left. **The rounding the pixels threw out**: the
       first version stored the camera tidied to a centimetre, and two runs that differed only by a reload
       came back to the same place and drew a *different picture* — 485 px of difference along the tracks —
@@ -1190,7 +1190,7 @@ style's background colour and the work draws on top of it.
       failed tile is an `error` carrying `sourceId`, `tile` and the 502, a loaded one is a `data`
       carrying `tile`, and a failing tile fires no `data` at all — and the Wi-Fi lock's version rule
       by `EditorAwakeTest`. **Not proven here:** that the phone really holds itself awake, which needs
-      a phone — `adb shell dumpsys power | grep SprayDay` is the check, and it is written into the
+      a phone — `adb shell dumpsys power | grep TrailDay` is the check, and it is written into the
       list above. Doze is not fixed and cannot be, which is what the offline download is for. Unit
       suite, JS tests, lint and assemble are green.
 - [x] **The phone can be kept awake while it is serving, as the operator's own switch. v0.6.96** — the

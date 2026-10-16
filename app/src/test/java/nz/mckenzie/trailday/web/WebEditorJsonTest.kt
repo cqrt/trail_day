@@ -1,0 +1,631 @@
+package nz.mckenzie.trailday.web
+
+import kotlinx.serialization.json.Json
+import nz.mckenzie.trailday.data.db.AssetEntity
+import nz.mckenzie.trailday.domain.asset.AssetKind
+import nz.mckenzie.trailday.domain.asset.AssetPhrase
+import nz.mckenzie.trailday.domain.asset.AssetShape
+import nz.mckenzie.trailday.domain.asset.MethodPhrase
+import nz.mckenzie.trailday.domain.asset.PassPhrase
+import nz.mckenzie.trailday.domain.asset.SprayMethod
+import nz.mckenzie.trailday.domain.backup.GroupRecord
+import nz.mckenzie.trailday.domain.backup.ProductRecord
+import nz.mckenzie.trailday.domain.due.DueCalculator
+import nz.mckenzie.trailday.domain.due.DueStatus
+import nz.mckenzie.trailday.domain.doc.DocTrack
+import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.track.TrackInterchange
+import nz.mckenzie.trailday.domain.tiles.LatLngBounds
+import nz.mckenzie.trailday.map.AssetColors
+import nz.mckenzie.trailday.ui.AssetEdits
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.time.ZoneId
+
+/**
+ * The document the page is handed.
+ *
+ * Two things are being held here. One is that the desk is told enough to draw and to answer a
+ * question: the traffic light, the day it is due, the block, the catalogue, the box the work is in
+ * and where the phone is. The other is that nothing the operator typed on the phone is quietly
+ * dropped on the way out - the mapping into the backup vocabulary is written out in
+ * [WebEditorJson], and a column forgotten there is a column the desk never sees.
+ */
+class WebEditorJsonTest {
+
+    private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
+    private val zone = ZoneId.of("Pacific/Auckland")
+    private val now = 1_758_000_000_000L
+
+    /** An asset with every field a value of its own, so a dropped column cannot hide. */
+    private val everyField = AssetEntity(
+        id = 7L,
+        name = "Estuary road",
+        kind = "ROAD",
+        shape = "LINE",
+        method = "BOOM",
+        groupId = 3L,
+        notes = "Both edges, twice a year",
+        intervalDays = 120,
+        swathWidthM = 12.5,
+        passesRequired = 2,
+        passSeparationM = 3.0,
+        active = true,
+        createdAtEpochMs = 1_700_000_000_000L,
+        lastSprayedAtEpochMs = 1_750_000_000_000L,
+        lengthM = 3300.0
+    )
+
+    private fun dueOf(asset: AssetEntity) = DueCalculator.calculate(
+        lastSprayedAtEpochMs = asset.lastSprayedAtEpochMs,
+        intervalDays = asset.intervalDays,
+        leadDays = AssetEntity.DEFAULT_LEAD_DAYS,
+        nowEpochMs = now,
+        zoneId = zone
+    )
+
+    private fun roundTrip(document: WebEditorDocument): WebEditorDocument =
+        json.decodeFromString(WebEditorDocument.serializer(), WebEditorJson.build(document))
+
+    /** The line the phone holds for this asset, which the version the desk quotes is hashed over. */
+    private val path = listOf(GeoPoint(-41.5, 173.8), GeoPoint(-41.6, 173.9))
+
+    private fun documentWith(
+        asset: AssetEntity,
+        groupName: String? = "Estuary",
+        recordings: Int = 0,
+        sprays: Int = 4
+    ) = WebEditorDocument(
+        nowEpochMs = now,
+        assets = listOf(
+            WebEditorJson.record(
+                asset = asset,
+                due = dueOf(asset),
+                sprayCount = sprays,
+                groupName = groupName,
+                paths = listOf(path),
+                recordingCount = recordings
+            )
+        )
+    )
+
+    @Test
+    fun `a track drawn before the kinds existed reaches the desk as what it is`() {
+        // Stored as INFRASTRUCTURE by every build before v0.6.40. The phone reads it back by its
+        // shape, here, once - so the page is handed a kind it can compare with the kinds in its own
+        // filter list, and holds no copy of the old-kind rule itself.
+        val oldLine = everyField.copy(kind = "INFRASTRUCTURE", shape = "LINE")
+        val oldSpot = everyField.copy(kind = "INFRASTRUCTURE", shape = "POINT")
+
+        assertEquals(
+            "a line is a fenceline or stopbank",
+            AssetKind.FENCELINE.name,
+            roundTrip(documentWith(oldLine)).assets.single().asset.kind
+        )
+        assertEquals(
+            "and a spot is some other place",
+            AssetKind.OTHER_PLACE.name,
+            roundTrip(documentWith(oldSpot)).assets.single().asset.kind
+        )
+        assertEquals(
+            "the shape it was stored with still travels, because the card draws a length from it",
+            "LINE",
+            roundTrip(documentWith(oldLine)).assets.single().asset.shape
+        )
+    }
+
+    @Test
+    fun `every column of an asset survives the trip to the desk`() {
+        val restored = roundTrip(documentWith(everyField)).assets.single().asset
+
+        assertEquals(everyField.id, restored.id)
+        assertEquals(everyField.name, restored.name)
+        assertEquals(everyField.kind, restored.kind)
+        assertEquals(everyField.shape, restored.shape)
+        assertEquals(everyField.method, restored.method)
+        assertEquals(everyField.groupId, restored.groupId)
+        assertEquals(everyField.notes, restored.notes)
+        assertEquals(everyField.intervalDays, restored.intervalDays)
+        assertEquals(everyField.swathWidthM!!, restored.swathWidthM!!, 0.0)
+        assertEquals(everyField.passesRequired, restored.passesRequired)
+        assertEquals(everyField.passSeparationM!!, restored.passSeparationM!!, 0.0)
+        assertEquals(everyField.active, restored.active)
+        assertEquals(everyField.createdAtEpochMs, restored.createdAtEpochMs)
+        assertEquals(everyField.lastSprayedAtEpochMs, restored.lastSprayedAtEpochMs)
+        assertEquals(everyField.lengthM, restored.lengthM, 0.0)
+    }
+
+    @Test
+    fun `the asset the desk is handed carries the paths a write has to bring back`() {
+        // The geometry a page draws comes from the GeoJSON, but a line write has to carry every path -
+        // so the paths are in the record beside the version, and a page that ignores them still works:
+        // its writes carry one path, and the phone refuses those for a track that has side tracks
+        // rather than dropping them.
+        val spur = listOf(path.last(), GeoPoint(-41.55, 173.85))
+        val record = WebEditorDocument(
+            nowEpochMs = now,
+            assets = listOf(
+                WebEditorJson.record(
+                    asset = everyField,
+                    due = dueOf(everyField),
+                    sprayCount = 4,
+                    groupName = "Estuary",
+                    paths = listOf(path, spur),
+                    recordingCount = 0
+                )
+            )
+        ).let { roundTrip(it) }.assets.single()
+
+        assertEquals("the line first, then its side tracks", 2, record.paths.size)
+        assertEquals(path, record.paths[0].map { GeoPoint(it.lat, it.lng) })
+        assertEquals(spur, record.paths[1].map { GeoPoint(it.lat, it.lng) })
+    }
+
+    @Test
+    fun `an asset with nothing drawn carries no paths at all`() {
+        val record = WebEditorDocument(
+            nowEpochMs = now,
+            assets = listOf(
+                WebEditorJson.record(
+                    asset = everyField,
+                    due = dueOf(everyField),
+                    sprayCount = 4,
+                    groupName = "Estuary",
+                    paths = emptyList(),
+                    recordingCount = 0
+                )
+            )
+        ).let { roundTrip(it) }.assets.single()
+
+        assertTrue("the desk sees an empty list rather than a guess", record.paths.isEmpty())
+    }
+
+    @Test
+    fun `the asset carries the traffic light and the day it is next due`() {
+        val due = dueOf(everyField)
+        val record = roundTrip(documentWith(everyField)).assets.single()
+
+        assertEquals(due.status.name, record.dueStatus)
+        assertEquals(due.dueDateEpochMs, record.dueAtEpochMs)
+        assertEquals(due.daysUntilDue, record.daysUntilDue)
+        assertEquals(4, record.sprayCount)
+        assertEquals("Estuary", record.groupName)
+    }
+
+    @Test
+    fun `an asset never sprayed says so, and has no due day to show`() {
+        val never = everyField.copy(lastSprayedAtEpochMs = null)
+
+        val record = roundTrip(documentWith(never)).assets.single()
+
+        assertEquals(DueStatus.NEVER_SPRAYED.name, record.dueStatus)
+        assertNull(record.dueAtEpochMs)
+        assertNull(record.daysUntilDue)
+    }
+
+    @Test
+    fun `the geometry is left out of the state, because the geojson carries it once`() {
+        val text = WebEditorJson.build(documentWith(everyField))
+
+        assertTrue(roundTrip(documentWith(everyField)).assets.single().asset.points.isEmpty())
+        assertTrue("the length still says how long it is: $text", text.contains("\"lengthM\":3300"))
+        assertTrue("said empty rather than left to guess: $text", text.contains("\"points\":[]"))
+    }
+
+    @Test
+    fun `the two figures a card is read for travel with the record`() {
+        // A carpark's card says the metres round it and the ground inside it, and both are the phone's own
+        // numbers: the cached length, and the measurement the kind exists for. Worked out again on the
+        // desk from the corners it can see, either would be a second answer to a question the phone has
+        // already answered - and the area is the one figure in this app that is not an estimate, so a page
+        // quietly showing zero for it is the worst version of that mistake.
+        val carpark = everyField.copy(
+            kind = AssetKind.CARPARK.name,
+            shape = AssetKind.CARPARK.shape.name,
+            swathWidthM = null,
+            passesRequired = 1,
+            passSeparationM = null,
+            lengthM = 855.0,
+            areaM2 = 45_000.0
+        )
+        val text = WebEditorJson.build(documentWith(carpark))
+
+        val record = roundTrip(documentWith(carpark)).assets.single()
+        assertEquals(855.0, record.asset.lengthM, 1e-9)
+        assertEquals(45_000.0, record.asset.areaM2, 1e-9)
+        assertTrue("and the page is handed it: $text", text.contains("\"areaM2\":45000"))
+    }
+
+    @Test
+    fun `the heights a file gave a line reach the desk, and a line with none says nothing`() {
+        val climbed = listOf(
+            GeoPoint(-45.35, 168.12, altitudeM = 553.6),
+            GeoPoint(-45.36, 168.13, altitudeM = 663.6)
+        )
+        val withHeights = WebEditorJson.record(
+            asset = everyField,
+            due = dueOf(everyField),
+            sprayCount = 0,
+            groupName = null,
+            paths = listOf(climbed),
+            recordingCount = 0
+        )
+
+        assertEquals(553.6, withHeights.paths[0][0].altitudeM!!, 1e-9)
+        assertEquals(663.6, withHeights.paths[0][1].altitudeM!!, 1e-9)
+        // The range is the phone's own figures, worked out once, so the two cards cannot disagree.
+        assertEquals(553.6, withHeights.elevation!!.lowestM, 1e-9)
+        assertEquals(663.6, withHeights.elevation!!.highestM, 1e-9)
+        assertEquals(110.0, withHeights.elevation!!.climbM, 1e-9)
+
+        // A line drawn on a map has no heights, and the document says nothing about a height rather than
+        // a null on every point.
+        val flat = documentWith(everyField)
+        val text = WebEditorJson.build(flat)
+        assertTrue("no height on the wire: $text", !text.contains("altitudeM"))
+        assertTrue("and no range: $text", !text.contains("elevation"))
+        assertNull(flat.assets.single().elevation)
+    }
+
+    @Test
+    fun `blocks and products travel in the backup's own vocabulary`() {
+        val document = WebEditorDocument(
+            nowEpochMs = now,
+            groups = listOf(GroupRecord(id = 3L, name = "Estuary", notes = "The lower block")),
+            products = listOf(
+                ProductRecord(id = 1L, name = "Roundup", unit = "mL", rateText = "10 mL/L"),
+                ProductRecord(id = 2L, name = "Spray oil", archived = true)
+            )
+        )
+
+        val restored = roundTrip(document)
+
+        assertEquals(document.groups, restored.groups)
+        assertEquals(document.products, restored.products)
+    }
+
+    @Test
+    fun `the box the work is in and the phone's fix are both offered`() {
+        val document = WebEditorDocument(
+            nowEpochMs = now,
+            bounds = WebEditorBounds.of(
+                LatLngBounds(minLat = -41.6, minLng = 173.8, maxLat = -41.4, maxLng = 174.1)
+            ),
+            position = WebEditorPosition(lat = -41.5, lng = 173.9)
+        )
+
+        val restored = roundTrip(document)
+
+        assertEquals(WebEditorBounds(-41.6, 173.8, -41.4, 174.1), restored.bounds)
+        assertEquals(WebEditorPosition(-41.5, 173.9), restored.position)
+    }
+
+    @Test
+    fun `the record carries the version an edit has to quote back`() {
+        val record = roundTrip(documentWith(everyField)).assets.single()
+
+        // Worked out here from the row, the block and the line, exactly as the phone will work it out
+        // again when the edit comes back: a desk quoting this cannot have been reading another version
+        // of the asset, and the version survives the trip to the page as the rest of the record does.
+        assertEquals(WebEditorVersion.of(everyField, "Estuary", listOf(path)), record.version)
+    }
+
+    @Test
+    fun `the record carries what deleting it would take, in the phone's own words`() {
+        // A track nothing has ever been recorded against, which is the only kind the desk may delete.
+        val clean = roundTrip(documentWith(everyField, sprays = 0)).assets.single()
+
+        assertTrue("a track nothing is recorded against may be deleted", clean.removal.allowed)
+        assertTrue(
+            "and the sentence says so: ${clean.removal.sentence}",
+            clean.removal.sentence.contains("nothing else with it")
+        )
+
+        // The four sprays the record already carries are counted by the same rule the delete uses, so a
+        // card cannot say "4 sprays recorded" and offer to delete the track in the same breath. The
+        // recording is in there too: a recording outlives its asset, and this is the sentence that has
+        // to say so before anything goes.
+        val sprayed = roundTrip(documentWith(everyField, recordings = 1)).assets.single()
+        assertFalse(sprayed.removal.allowed)
+        assertTrue(
+            "counts both: ${sprayed.removal.sentence}",
+            sprayed.removal.sentence.contains("4 sprays and 1 recording")
+        )
+        assertTrue(
+            "and sends the operator to the phone: ${sprayed.removal.sentence}",
+            sprayed.removal.sentence.contains("Delete it on the phone")
+        )
+    }
+
+    @Test
+    fun `the desk's form is offered the phone's own words`() {
+        val choices = roundTrip(documentWith(everyField)).choices
+
+        // Not a second copy of the vocabulary: the phone's own phrase tables, value and label, so a
+        // kind added on the phone appears on the desk with nothing to remember here.
+        assertEquals(
+            AssetPhrase.kinds.map { it.name to AssetPhrase.kind(it) },
+            choices.kinds.map { it.value to it.label }
+        )
+        assertEquals(
+            MethodPhrase.choices.map { it.name to MethodPhrase.choice(it) },
+            choices.methods.map { it.value to it.label }
+        )
+        assertEquals(
+            PassPhrase.choices.map { it.toString() to PassPhrase.choice(it) },
+            choices.passes.map { it.value to it.label }
+        )
+        // And the sentences under the fields, which are the phone's own - including the one a kind
+        // that is ground gets *instead* of a swath field, exactly as the phone's own screen shows it.
+        assertEquals(PassPhrase.SEPARATION_HINT, choices.separationHint)
+        assertEquals(AssetEdits.SWATH_HINT, choices.swathHint)
+        assertEquals(AssetEdits.BLOCK_HINT, choices.blockHint)
+        assertEquals(AssetEdits.GROUND_HINT, choices.groundHint)
+        // There is no shape list to offer: whether a thing is a line or a place is what its kind
+        // means (`AssetKind.shape`), so the desk is offered the phone's kinds and no second question.
+    }
+
+    @Test
+    fun `a kind carries the shape it makes, so the desk draws ground as ground`() {
+        val kinds = WebEditorChoices.ofApp().kinds.associateBy { it.value }
+
+        // The phone's own answer, not a list of kind names kept in JavaScript: the desk draws the
+        // closing side of a ring, counts its ground and offers it no side tracks, and a page that
+        // decided which kinds those are from their names would drift the day a second one ships.
+        assertEquals(AssetKind.CARPARK.shape.name, kinds.getValue(AssetKind.CARPARK.name).shape)
+        assertEquals("AREA", kinds.getValue(AssetKind.CARPARK.name).shape)
+        assertEquals("LINE", kinds.getValue(AssetKind.TRACK.name).shape)
+        assertEquals("POINT", kinds.getValue(AssetKind.OTHER_PLACE.name).shape)
+        // Nothing else carries one: picking a method or a pass count makes no shape at all.
+        assertNull(WebEditorChoices.ofApp().methods.first().shape)
+        assertNull(WebEditorChoices.ofApp().passes.first().shape)
+    }
+
+    @Test
+    fun `a new asset is offered the phone's own starting point`() {
+        val fresh = roundTrip(documentWith(everyField)).newAsset
+
+        // What a track somebody draws from scratch starts as, taken from the phone's own table rather
+        // than written into the page: a default copied into JavaScript is a default that drifts, and the
+        // one that drifts is the interval.
+        assertEquals(AssetKind.TRACK.name, fresh.kind)
+        assertEquals(SprayMethod.UNSET.name, fresh.method)
+        assertEquals("120", fresh.intervalDays)
+        assertEquals(AssetEntity.DEFAULT_PASSES_REQUIRED, fresh.passesRequired)
+        assertEquals(
+            "and it is the same default `createAsset` fills in",
+            AssetEntity.DEFAULT_INTERVAL_DAYS.toString(),
+            fresh.intervalDays
+        )
+    }
+
+    @Test
+    fun `a spray method carries the swath width picking it implies`() {
+        val methods = WebEditorChoices.ofApp().methods.associateBy { it.value }
+
+        // The phone's own table, so the desk can move the field the way the phone's form does when a
+        // boom becomes a knapsack.
+        assertEquals("3", methods.getValue(SprayMethod.BOOM.name).swathM)
+        assertEquals("1", methods.getValue(SprayMethod.KNAPSACK.name).swathM)
+        assertNull("a method nobody has recorded implies no width", methods.getValue(SprayMethod.UNSET.name).swathM)
+        // Nothing else carries one: picking a kind does not imply a width.
+        assertNull(WebEditorChoices.ofApp().kinds.first().swathM)
+    }
+
+    @Test
+    fun `the traffic light's colours travel under the names the page looks them up by`() {
+        val restored = roundTrip(
+            WebEditorDocument(
+                nowEpochMs = now,
+                dueColours = DueStatus.entries.associate { it.name to AssetColors.forStatus(it) }
+            )
+        )
+
+        // The phone's own red, amber and green - the ones its map paints lines with - so the page's
+        // key is the phone's, and a state nothing is in still has its colour rather than a grey dot.
+        assertEquals(AssetColors.RED, restored.dueColours.getValue(DueStatus.OVERDUE.name))
+        assertEquals(AssetColors.RED, restored.dueColours.getValue(DueStatus.NEVER_SPRAYED.name))
+        assertEquals(AssetColors.YELLOW, restored.dueColours.getValue(DueStatus.DUE_SOON.name))
+        assertEquals(AssetColors.GREEN, restored.dueColours.getValue(DueStatus.NOT_DUE.name))
+    }
+
+    @Test
+    fun `an empty farm is a document with no assets, not a missing document`() {
+        val text = WebEditorJson.build(WebEditorDocument(nowEpochMs = now))
+
+        val restored = json.decodeFromString(WebEditorDocument.serializer(), text)
+
+        assertTrue(restored.assets.isEmpty())
+        assertEquals(now, restored.nowEpochMs)
+        // The page is handed every key every time, so nothing it reads is ever ambiguous.
+        assertTrue(text.contains("\"bounds\":null"))
+        assertTrue(text.contains("\"position\":null"))
+        assertTrue(text.contains("\"assets\":[]"))
+    }
+
+    @Test
+    fun `the page is told what a dropped GPX file is called and how big one may be`() {
+        val gpx = roundTrip(documentWith(everyField)).gpx
+
+        // The name a file travels under, and the size the socket will read. Both the phone's answers:
+        // a page that guessed the name would send a file the phone read as absent, which looks exactly
+        // like a GPX file with nothing in it, and one that guessed the size would pass on a refusal
+        // about a request that never arrived.
+        assertEquals(WebEditorServer.GPX_FIELD, gpx.field)
+        assertEquals(WebEditorServer.MAX_GPX_BYTES, gpx.maxBytes)
+        assertEquals(2 * 1024 * 1024, gpx.maxBytes)
+    }
+
+    @Test
+    fun `a reading answers with the paths, the line first, and what became of the segments`() {
+        val line = listOf(GeoPoint(-41.5, 173.8), GeoPoint(-41.6, 173.9))
+        val sideTrack = listOf(GeoPoint(-41.6, 173.9), GeoPoint(-41.7, 173.9))
+
+        val text = WebEditorJson.gpx(
+            track = TrackInterchange.Track(
+                name = null,
+                reading = TrackInterchange.Reading(
+                    paths = listOf(line, sideTrack),
+                    sideTracks = 1,
+                    segmentsDidNotMeet = false
+                )
+            ),
+            otherTracks = 0
+        )
+        val read = json.decodeFromString(WebEditorGpx.serializer(), text)
+
+        // The vertices in the same shape the write that follows carries them back in, so a drawing read
+        // out of a file is the same kind of thing as one traced over the imagery - which is what lets
+        // the desk tidy it and save it by the one path every drawing takes.
+        assertEquals(2, read.paths.size)
+        assertEquals(WebEditorPoint(lat = -41.5, lng = 173.8), read.paths[0].first())
+        assertEquals("the line is first, and the side track hangs off its own last vertex",
+            read.paths[0].last(), read.paths[1].first())
+        assertEquals(1, read.sideTracks)
+        assertEquals(false, read.segmentsDidNotMeet)
+    }
+
+    @Test
+    fun `a file whose segments did not meet says so, rather than being left to be worked out`() {
+        val text = WebEditorJson.gpx(
+            track = TrackInterchange.Track(
+                name = null,
+                reading = TrackInterchange.Reading(
+                    paths = listOf(listOf(GeoPoint(-41.5, 173.8), GeoPoint(-42.0, 174.0))),
+                    sideTracks = 0,
+                    segmentsDidNotMeet = true
+                )
+            ),
+            otherTracks = 0
+        )
+
+        // The page cannot see this from a count of paths: a file with one segment and a file whose
+        // segments could not be joined are both one line, and only the second is worth saying out loud.
+        assertTrue("the page is told: $text", text.contains("\"segmentsDidNotMeet\":true"))
+    }
+
+    @Test
+    fun `a file of several tracks tells the page how many more there were`() {
+        val text = WebEditorJson.gpx(
+            track = TrackInterchange.Track(
+                name = "Boundary Fence/Ocean Beach Tk",
+                reading = TrackInterchange.Reading(
+                    paths = listOf(listOf(GeoPoint(-41.5, 173.8), GeoPoint(-41.6, 173.9))),
+                    sideTracks = 0,
+                    segmentsDidNotMeet = false
+                )
+            ),
+            otherTracks = 3
+        )
+
+        // The desk draws the first; the page has to know the file held three more so it can say so
+        // rather than let them vanish without a word.
+        assertTrue("the page is told: $text", text.contains("\"otherTracks\":3"))
+    }
+
+    @Test
+    fun `a DOC search carries each track with its geometry, kind and the phone's own figures`() {
+        val text = WebEditorJson.docSearch(
+            tracks = listOf(
+                DocTrack(
+                    objectId = 42,
+                    name = "Glory Tk",
+                    kind = "Walking Track",
+                    trackType = "One way",
+                    flocId = "BLUFFHIL-TK02",
+                    reading = TrackInterchange.Reading(
+                        paths = listOf(listOf(GeoPoint(-46.6, 168.3), GeoPoint(-46.61, 168.31))),
+                        sideTracks = 0,
+                        segmentsDidNotMeet = false
+                    )
+                )
+            ),
+            importedRefs = setOf("doc:99"),
+            from = GeoPoint(-46.62, 168.32),
+            message = null,
+            capped = false
+        )
+        val read = json.decodeFromString(WebEditorDocSearch.serializer(), text)
+
+        // The geometry travels to the desk because these tracks are not on the phone yet - the desk
+        // draws them, and ticking one has to be able to make it without asking DOC again.
+        assertEquals(1, read.tracks.size)
+        assertEquals(42L, read.tracks[0].id)
+        assertEquals("Glory Tk", read.tracks[0].name)
+        assertEquals(
+            "the name the import will give it travels too, so a wrong place is seen before it lands",
+            "Bluff Hill Glory Tk",
+            read.tracks[0].assetName
+        )
+        assertEquals("Walking Track", read.tracks[0].kind)
+        assertEquals("how the track is walked travels so the desk can show and filter it", "One way", read.tracks[0].trackType)
+        assertEquals("the site travels so the phone can prefix the place", "BLUFFHIL-TK02", read.tracks[0].flocId)
+        assertEquals(2, read.tracks[0].points)
+        assertEquals(1, read.tracks[0].paths.size)
+        assertEquals(2, read.tracks[0].paths[0].size)
+        assertEquals(WebEditorPoint(lat = -46.6, lng = 168.3), read.tracks[0].paths[0].first())
+        assertEquals("a track the phone does not have is not marked imported", false, read.tracks[0].imported)
+        assertTrue("and its distance to the phone travels so the desk can order by it",
+            (read.tracks[0].distanceM ?: 0.0) > 0.0)
+    }
+
+    @Test
+    fun `with no fix the distance is left out, and the desk falls back to by name`() {
+        val track = DocTrack(
+            objectId = 42,
+            name = "Glory Tk",
+            kind = "Walking Track",
+            reading = TrackInterchange.Reading(
+                paths = listOf(listOf(GeoPoint(-46.6, 168.3), GeoPoint(-46.61, 168.31))),
+                sideTracks = 0,
+                segmentsDidNotMeet = false
+            )
+        )
+
+        val text = WebEditorJson.docSearch(
+            tracks = listOf(track),
+            importedRefs = emptySet(),
+            from = null,
+            message = null,
+            capped = false
+        )
+        val read = json.decodeFromString(WebEditorDocSearch.serializer(), text)
+
+        assertTrue("no fix means no distance", read.tracks[0].distanceM == null)
+    }
+
+    @Test
+    fun `a DOC track the phone already has is marked imported, so the desk will not import it twice`() {
+        val track = DocTrack(
+            objectId = 42,
+            name = "Glory Tk",
+            kind = "Walking Track",
+            reading = TrackInterchange.Reading(
+                paths = listOf(listOf(GeoPoint(-46.6, 168.3), GeoPoint(-46.61, 168.31))),
+                sideTracks = 0,
+                segmentsDidNotMeet = false
+            )
+        )
+
+        val text = WebEditorJson.docSearch(
+            tracks = listOf(track),
+            importedRefs = setOf(track.sourceRef),
+            from = null,
+            message = null,
+            capped = false
+        )
+
+        assertTrue("the page is told: $text", text.contains("\"imported\":true"))
+    }
+
+    @Test
+    fun `a DOC import answers with the count and the phone's sentence`() {
+        val text = WebEditorJson.docImported(count = 3, message = "Imported 3 DOC tracks.")
+
+        assertTrue("the page is told: $text", text.contains("\"imported\":3"))
+        assertTrue("and the phone's words: $text", text.contains("Imported 3 DOC tracks."))
+    }
+}

@@ -115,7 +115,7 @@ the line, and not at the end. Three new instrumented tests (192 in all) and four
 between them pin the insert, the paddock tap that still draws, and the Undo fallback.
 
 **Pulling the database needs the `-wal` file as well as the `.db`** - Room runs in WAL mode, so after a
-force-stop the main file is a 4 KB header and the track is in `spray_day.db-wal`. Pulling all three parts
+force-stop the main file is a 4 KB header and the track is in `trail_day.db-wal`. Pulling all three parts
 into one folder and opening the `.db` is what makes it readable; this cost a detour and is worth knowing.
 
 ## Shipped: v0.6.33 - a side track can be worked on like the line

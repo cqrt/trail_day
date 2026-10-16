@@ -1,0 +1,169 @@
+package nz.mckenzie.trailday.viewmodel
+
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import nz.mckenzie.trailday.data.AssetRepository
+import nz.mckenzie.trailday.data.AssetWithDue
+import nz.mckenzie.trailday.data.db.TrailDayDatabase
+import nz.mckenzie.trailday.domain.asset.AssetKind
+import nz.mckenzie.trailday.domain.asset.AssetKindFilter
+
+/**
+ * The asset library: every planned asset with its due status, folded into the blocks it is
+ * worked with, plus GPX import.
+ */
+class AssetListViewModel(
+    private val assetRepository: AssetRepository,
+    private val context: Context
+) : ViewModel() {
+
+    val assetsWithDue: StateFlow<List<AssetWithDue>> = assetRepository.observeAssetsWithDue()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
+    /**
+     * What the list is showing: everything, or the one kind the chips are asking about.
+     *
+     * Held here rather than in the screen so it survives the list being rebuilt and a turned phone,
+     * and not in a preference because it is a question being asked now rather than a way of working
+     * - see [AssetKindFilter]. Nothing is stored, so an install that never taps a chip is unchanged.
+     */
+    private val _filter = MutableStateFlow(AssetKindFilter.All)
+    val filter: StateFlow<AssetKindFilter> = _filter
+
+    /**
+     * The rows the list is built from: the whole work, or one kind of it.
+     *
+     * Filtered here rather than in the screen so the block tiles, the rows and the "nothing of that
+     * kind" line are all reading the same list - and so the rule can be tested without a screen.
+     */
+    val shown: StateFlow<List<AssetWithDue>> = combine(assetsWithDue, _filter) { all, filter ->
+        all.filter { item -> filter.keeps(item.asset.kind, item.asset.shape) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
+    /**
+     * Taps a kind chip, or the *All* chip when [kind] is null.
+     *
+     * Tapping the chip already showing goes back to everything: the chips are the only way into this
+     * and so one of them has to be the way out.
+     */
+    fun showOnly(kind: AssetKind?) {
+        _filter.update { showing -> AssetKindFilter.afterTapping(kind, showing) }
+    }
+
+    /**
+     * Which blocks are open, by name.
+     *
+     * Held here rather than in the screen so it survives the list being rebuilt - and closed
+     * to begin with, because a block's tile is meant to answer the question on its own; the
+     * rows are what you open it for.
+     */
+    private val _expandedBlocks = MutableStateFlow<Set<String>>(emptySet())
+    val expandedBlocks: StateFlow<Set<String>> = _expandedBlocks
+
+    /** Opens a closed block, or closes an open one. */
+    fun toggleBlock(name: String) {
+        _expandedBlocks.update { open -> if (name in open) open - name else open + name }
+    }
+
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message
+
+    private val _busy = MutableStateFlow(false)
+    val busy: StateFlow<Boolean> = _busy
+
+    fun clearMessage() {
+        _message.value = null
+    }
+
+    fun delete(assetId: Long) {
+        viewModelScope.launch {
+            runCatching { assetRepository.deleteAsset(assetId) }
+                .onFailure { _message.value = it.message ?: "Could not delete the track" }
+        }
+    }
+
+    /**
+     * Imports a GPX, KML, KMZ or GeoJSON file chosen through the system file picker.
+     *
+     * Failures are surfaced as messages rather than crashes: a malformed or
+     * empty track file is a normal thing for an operator to pick by mistake.
+     */
+    fun importTrackFile(uri: Uri) {
+        viewModelScope.launch {
+            _busy.value = true
+            try {
+                val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+                    input.readBytes()
+                } ?: throw IllegalStateException("Could not open the selected file")
+
+                val name = displayName(uri)
+                    ?.substringBeforeLast('.')
+                    ?.takeIf { it.isNotBlank() }
+                    ?: "Imported track"
+
+                val imported = assetRepository.importAssetTracks(fileName = name, file = bytes)
+                // The points are the reading's own, so the sentence counts what the file held rather
+                // than asking the database again for a number the import has just been handed.
+                _message.value = if (imported.size == 1) {
+                    val track = imported.single()
+                    val points = track.reading.paths.sumOf { it.size }
+                    when {
+                        track.reading.segmentsDidNotMeet ->
+                            "Imported \"${track.name}\" with $points points as one line: the file's " +
+                                "own track segments do not meet, so they were joined up."
+                        track.reading.sideTracks == 1 ->
+                            "Imported \"${track.name}\" with $points points: the line and 1 side track."
+                        track.reading.sideTracks > 1 ->
+                            "Imported \"${track.name}\" with $points points: the line and " +
+                                "${track.reading.sideTracks} side tracks."
+                        else -> "Imported \"${track.name}\" with $points points"
+                    }
+                } else {
+                    // A file of named tracks - a GeoJSON collection - arrives as that many assets, so
+                    // the sentence says how many rather than pretending there was only ever one.
+                    val points = imported.sumOf { track -> track.reading.paths.sumOf { it.size } }
+                    "Imported ${imported.size} tracks, $points points between them"
+                }
+            } catch (failure: Throwable) {
+                _message.value = failure.message ?: "Import failed"
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
+
+    private fun displayName(uri: Uri): String? = runCatching {
+        context.contentResolver
+            .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+    }.getOrNull()
+
+    companion object {
+        private const val STOP_TIMEOUT_MS = 5_000L
+
+        fun factory(context: Context): ViewModelProvider.Factory {
+            val appContext = context.applicationContext
+            return viewModelFactory {
+                initializer {
+                    AssetListViewModel(
+                        assetRepository = AssetRepository(TrailDayDatabase.get(appContext)),
+                        context = appContext
+                    )
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,436 @@
+package nz.mckenzie.trailday
+
+import android.content.Intent
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.first
+import nz.mckenzie.trailday.data.SettingsRepository
+import nz.mckenzie.trailday.ui.screens.DrawAssetScreen
+import nz.mckenzie.trailday.ui.screens.DocTracksScreen
+import nz.mckenzie.trailday.ui.screens.MapScreen
+import nz.mckenzie.trailday.ui.screens.OfflineAreaPickerScreen
+import nz.mckenzie.trailday.ui.screens.OfflineScreen
+import nz.mckenzie.trailday.ui.screens.RecordScreen
+import nz.mckenzie.trailday.ui.screens.RecordingDetailScreen
+import nz.mckenzie.trailday.ui.screens.RecordingsScreen
+import nz.mckenzie.trailday.ui.screens.SettingsScreen
+import nz.mckenzie.trailday.ui.screens.SprayEntryScreen
+import nz.mckenzie.trailday.ui.screens.Tab
+import nz.mckenzie.trailday.ui.screens.AssetDetailScreen
+import nz.mckenzie.trailday.ui.screens.AssetEditScreen
+import nz.mckenzie.trailday.ui.screens.AssetListScreen
+import nz.mckenzie.trailday.ui.screens.BlockEditScreen
+import nz.mckenzie.trailday.ui.screens.BlocksScreen
+import nz.mckenzie.trailday.ui.theme.TrailDayTheme
+import nz.mckenzie.trailday.viewmodel.DrawAssetViewModel
+import nz.mckenzie.trailday.viewmodel.DocTracksViewModel
+import nz.mckenzie.trailday.viewmodel.MapViewModel
+import nz.mckenzie.trailday.viewmodel.OfflineAreaPickerViewModel
+import nz.mckenzie.trailday.viewmodel.OfflineViewModel
+import nz.mckenzie.trailday.viewmodel.RecordingDetailViewModel
+import nz.mckenzie.trailday.viewmodel.RecordingsViewModel
+import nz.mckenzie.trailday.viewmodel.RecordingViewModel
+import nz.mckenzie.trailday.viewmodel.SettingsViewModel
+import nz.mckenzie.trailday.viewmodel.SprayEntryViewModel
+import nz.mckenzie.trailday.viewmodel.UpdateViewModel
+import nz.mckenzie.trailday.viewmodel.AssetDetailViewModel
+import nz.mckenzie.trailday.viewmodel.AssetListViewModel
+import nz.mckenzie.trailday.viewmodel.BlockEditViewModel
+import nz.mckenzie.trailday.viewmodel.BlocksViewModel
+import nz.mckenzie.trailday.offline.OfflinePickerMode
+import nz.mckenzie.trailday.web.WebEditorService
+import nz.mckenzie.trailday.web.WebEditorState
+
+/** Destinations for now; swap for a NavHost when routes need arguments. */
+private enum class Destination { MAP, ASSETS, DRAW, CHANGE_LINE, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, ASSET_DETAIL, ASSET_EDIT, BLOCKS, BLOCK_EDIT, SPRAY_ENTRY, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC_TRACKS }
+
+class MainActivity : ComponentActivity() {
+
+    /**
+     * A screen asked for by whatever started the activity - today, a tap on a due
+     * reminder. Held outside the composition so `onNewIntent` can set it too.
+     */
+    private val requestedDestination = mutableStateOf<Destination?>(null)
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        requestedDestination.value = destinationFrom(intent)
+        setContent {
+            TrailDayTheme {
+                var destination by rememberSaveable { mutableStateOf(Destination.MAP) }
+                var selectedAssetId by rememberSaveable { mutableStateOf<Long?>(null) }
+                var selectedBlockId by rememberSaveable { mutableStateOf<Long?>(null) }
+                var selectedSessionId by rememberSaveable { mutableStateOf<Long?>(null) }
+
+                /**
+                 * The recording a spray is being logged from, when the operator started
+                 * at a recording rather than at a track. Cleared whenever a spray is
+                 * started from the track screen, so a spray is only ever linked to the
+                 * recording it was actually logged from.
+                 */
+                var spraySessionId by rememberSaveable { mutableStateOf<Long?>(null) }
+
+                // Bumped on every visit to the draw screen so it gets its own view
+                // model: a shared one would carry the previous visit's draft (and
+                // its "just saved" signal) into the next drawing session.
+                var drawVisit by rememberSaveable { mutableStateOf(0) }
+
+                // System back always returns to the map rather than leaving the app.
+                BackHandler(enabled = destination != Destination.MAP) {
+                    destination = Destination.MAP
+                }
+
+                // A reminder tap asks for the track list. Done here rather than in the
+                // initial value so it also works when the app was already open.
+                LaunchedEffect(requestedDestination.value) {
+                    requestedDestination.value?.let { wanted ->
+                        destination = wanted
+                        requestedDestination.value = null
+                    }
+                }
+
+                // The editor serves itself from the moment the app is opened, unless the operator
+                // has turned it off - which is what "on by default" has to mean for a service that
+                // Android only lets an app on screen start. Read here rather than in the
+                // application, where the same code would run for a scheduled job that started the
+                // process with no screen behind it and no right to start a service at all. Left
+                // alone when a run is already going, because starting again would build a new run
+                // and hand the operator a new address under a page they are already reading.
+                LaunchedEffect(Unit) {
+                    val settings = SettingsRepository(applicationContext)
+                    if (settings.webEditorEnabled.first() && !WebEditorState.isOn) {
+                        WebEditorService.start(applicationContext)
+                    }
+                }
+
+                when (destination) {
+                    Destination.MAP -> {
+                        val mapViewModel: MapViewModel = viewModel(
+                            factory = MapViewModel.factory(applicationContext)
+                        )
+                        MapScreen(
+                            viewModel = mapViewModel,
+                            onOpenTab = { destination = destinationOf(it) },
+                            onOpenSettings = { destination = Destination.SETTINGS },
+                            onOpenAsset = { assetId ->
+                                selectedAssetId = assetId
+                                destination = Destination.ASSET_DETAIL
+                            }
+                        )
+                    }
+
+                    Destination.ASSETS -> {
+                        val assetViewModel: AssetListViewModel = viewModel(
+                            factory = AssetListViewModel.factory(applicationContext)
+                        )
+                        AssetListScreen(
+                            viewModel = assetViewModel,
+                            onOpenTab = { destination = destinationOf(it) },
+                            onOpenAsset = { assetId ->
+                                selectedAssetId = assetId
+                                destination = Destination.ASSET_DETAIL
+                            },
+                            onDrawAsset = {
+                                drawVisit++
+                                destination = Destination.DRAW
+                            },
+                            onImportDocTracks = { destination = Destination.DOC_TRACKS },
+                            onOpenBlocks = { destination = Destination.BLOCKS },
+                            onOpenSettings = { destination = Destination.SETTINGS }
+                        )
+                    }
+
+                    Destination.DOC_TRACKS -> {
+                        val docViewModel: DocTracksViewModel = viewModel(
+                            factory = DocTracksViewModel.factory(applicationContext)
+                        )
+                        DocTracksScreen(
+                            viewModel = docViewModel,
+                            onBack = { destination = Destination.ASSETS }
+                        )
+                    }
+
+                    Destination.ASSET_DETAIL -> {
+                        val assetId = selectedAssetId
+                        if (assetId == null) {
+                            destination = Destination.ASSETS
+                        } else {
+                            val detailViewModel: AssetDetailViewModel = viewModel(
+                                key = "detail-$assetId",
+                                factory = AssetDetailViewModel.factory(applicationContext, assetId)
+                            )
+                            AssetDetailScreen(
+                                viewModel = detailViewModel,
+                                onBack = { destination = Destination.ASSETS },
+                                onRecordSpray = {
+                                    spraySessionId = null
+                                    destination = Destination.SPRAY_ENTRY
+                                },
+                                onEdit = { destination = Destination.ASSET_EDIT },
+                                onChangeLine = {
+                                    drawVisit++
+                                    destination = Destination.CHANGE_LINE
+                                },
+                                onOpenRecording = { sessionId ->
+                                    selectedSessionId = sessionId
+                                    destination = Destination.RECORDING_DETAIL
+                                }
+                            )
+                        }
+                    }
+
+                    // Editing is a screen rather than a dialog, and it asks for the same view
+                    // model the screen behind it uses: that one is keyed by asset id, so the
+                    // form opens on the asset that was just on screen, and saving updates it.
+                    Destination.ASSET_EDIT -> {
+                        val assetId = selectedAssetId
+                        if (assetId == null) {
+                            destination = Destination.ASSETS
+                        } else {
+                            val editViewModel: AssetDetailViewModel = viewModel(
+                                key = "detail-$assetId",
+                                factory = AssetDetailViewModel.factory(applicationContext, assetId)
+                            )
+                            AssetEditScreen(
+                                viewModel = editViewModel,
+                                onDone = { destination = Destination.ASSET_DETAIL }
+                            )
+                        }
+                    }
+
+                    Destination.BLOCKS -> {
+                        val blocksViewModel: BlocksViewModel = viewModel(
+                            factory = BlocksViewModel.factory(applicationContext)
+                        )
+                        BlocksScreen(
+                            viewModel = blocksViewModel,
+                            onBack = { destination = Destination.ASSETS },
+                            onOpenBlock = { blockId ->
+                                selectedBlockId = blockId
+                                destination = Destination.BLOCK_EDIT
+                            }
+                        )
+                    }
+
+                    // The block form asks for the same view model the list behind it uses,
+                    // keyed by block id, so saving or deleting lands back on the list that
+                    // has already been watching the row.
+                    Destination.BLOCK_EDIT -> {
+                        val blockId = selectedBlockId
+                        if (blockId == null) {
+                            destination = Destination.BLOCKS
+                        } else {
+                            val blockViewModel: BlockEditViewModel = viewModel(
+                                key = "block-$blockId",
+                                factory = BlockEditViewModel.factory(applicationContext, blockId)
+                            )
+                            BlockEditScreen(
+                                viewModel = blockViewModel,
+                                onDone = { destination = Destination.BLOCKS }
+                            )
+                        }
+                    }
+
+                    Destination.SPRAY_ENTRY -> {
+                        val assetId = selectedAssetId
+                        val linkedSessionId = spraySessionId
+                        if (assetId == null) {
+                            destination = Destination.ASSETS
+                        } else {
+                            val sprayViewModel: SprayEntryViewModel = viewModel(
+                                key = "spray-$assetId-$linkedSessionId",
+                                factory = SprayEntryViewModel.factory(
+                                    applicationContext,
+                                    assetId,
+                                    linkedSessionId
+                                )
+                            )
+                            // Logging a spray from a recording returns to that recording,
+                            // so the operator can see the link they just made.
+                            val onDone = {
+                                destination = if (linkedSessionId != null) {
+                                    Destination.RECORDING_DETAIL
+                                } else {
+                                    Destination.ASSET_DETAIL
+                                }
+                            }
+                            SprayEntryScreen(
+                                viewModel = sprayViewModel,
+                                onBack = onDone,
+                                onSaved = onDone
+                            )
+                        }
+                    }
+
+                    Destination.RECORD -> {
+                        val recordingViewModel: RecordingViewModel = viewModel(
+                            factory = RecordingViewModel.factory(applicationContext)
+                        )
+                        RecordScreen(
+                            viewModel = recordingViewModel,
+                            onOpenTab = { destination = destinationOf(it) }
+                        )
+                    }
+
+                    Destination.DRAW -> {
+                        val drawViewModel: DrawAssetViewModel = viewModel(
+                            key = "draw-$drawVisit",
+                            factory = DrawAssetViewModel.factory(applicationContext)
+                        )
+                        DrawAssetScreen(
+                            viewModel = drawViewModel,
+                            onBack = { destination = Destination.ASSETS }
+                        )
+                    }
+
+                    // The same screen, opened on a track that exists: its geometry is what the taps
+                    // start from, and Save replaces it rather than making a new row. Back without
+                    // saving leaves the track exactly as it was, because nothing is written until then.
+                    Destination.CHANGE_LINE -> {
+                        val assetId = selectedAssetId
+                        if (assetId == null) {
+                            destination = Destination.ASSETS
+                        } else {
+                            val changeViewModel: DrawAssetViewModel = viewModel(
+                                key = "change-$assetId-$drawVisit",
+                                factory = DrawAssetViewModel.factory(applicationContext, assetId)
+                            )
+                            DrawAssetScreen(
+                                viewModel = changeViewModel,
+                                onBack = { destination = Destination.ASSET_DETAIL }
+                            )
+                        }
+                    }
+
+                    Destination.RECORDINGS -> {
+                        val recordingsViewModel: RecordingsViewModel = viewModel(
+                            factory = RecordingsViewModel.factory(applicationContext)
+                        )
+                        RecordingsScreen(
+                            viewModel = recordingsViewModel,
+                            onOpenTab = { destination = destinationOf(it) },
+                            onOpenRecording = { sessionId ->
+                                selectedSessionId = sessionId
+                                destination = Destination.RECORDING_DETAIL
+                            }
+                        )
+                    }
+
+                    Destination.RECORDING_DETAIL -> {
+                        val sessionId = selectedSessionId
+                        if (sessionId == null) {
+                            destination = Destination.RECORDINGS
+                        } else {
+                            val detailViewModel: RecordingDetailViewModel = viewModel(
+                                key = "recording-$sessionId",
+                                factory = RecordingDetailViewModel.factory(applicationContext, sessionId)
+                            )
+                            RecordingDetailScreen(
+                                viewModel = detailViewModel,
+                                onBack = { destination = Destination.RECORDINGS },
+                                onLogSpray = { assetId ->
+                                    selectedAssetId = assetId
+                                    // Carried through so the spray that gets saved points
+                                    // back at the recording it was logged from.
+                                    spraySessionId = selectedSessionId
+                                    destination = Destination.SPRAY_ENTRY
+                                }
+                            )
+                        }
+                    }
+
+                    Destination.SETTINGS -> {
+                        val settingsViewModel: SettingsViewModel = viewModel(
+                            factory = SettingsViewModel.factory(applicationContext)
+                        )
+                        val updateViewModel: UpdateViewModel = viewModel(
+                            factory = UpdateViewModel.factory(applicationContext)
+                        )
+                        SettingsScreen(
+                            viewModel = settingsViewModel,
+                            updateViewModel = updateViewModel,
+                            onBack = { destination = Destination.MAP }
+                        )
+                    }
+
+                    Destination.OFFLINE -> {
+                        val offlineViewModel: OfflineViewModel = viewModel(
+                            factory = OfflineViewModel.factory(applicationContext)
+                        )
+                        OfflineScreen(
+                            viewModel = offlineViewModel,
+                            onOpenTab = { destination = destinationOf(it) },
+                            onChooseArea = { destination = Destination.OFFLINE_PICKER },
+                            onChooseDocArea = { destination = Destination.OFFLINE_DOC_PICKER }
+                        )
+                    }
+
+                    Destination.OFFLINE_PICKER -> {
+                        val pickerViewModel: OfflineAreaPickerViewModel = viewModel(
+                            factory = OfflineAreaPickerViewModel.factory(
+                                applicationContext,
+                                OfflinePickerMode.IMAGERY
+                            )
+                        )
+                        OfflineAreaPickerScreen(
+                            viewModel = pickerViewModel,
+                            onBack = { destination = Destination.OFFLINE },
+                            onSaved = { destination = Destination.OFFLINE }
+                        )
+                    }
+
+                    Destination.OFFLINE_DOC_PICKER -> {
+                        val pickerViewModel: OfflineAreaPickerViewModel = viewModel(
+                            factory = OfflineAreaPickerViewModel.factory(
+                                applicationContext,
+                                OfflinePickerMode.DOC_TRACKS
+                            )
+                        )
+                        OfflineAreaPickerScreen(
+                            viewModel = pickerViewModel,
+                            onBack = { destination = Destination.OFFLINE },
+                            onSaved = { destination = Destination.OFFLINE }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /** The app was already open when the reminder was tapped. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        requestedDestination.value = destinationFrom(intent)
+    }
+
+    companion object {
+        /** The screen an intent would like opened, e.g. from a due reminder. */
+        const val EXTRA_DESTINATION = "nz.mckenzie.trailday.extra.DESTINATION"
+        const val DESTINATION_ASSETS = "tracks"
+        const val DESTINATION_SETTINGS = "settings"
+
+        private fun destinationFrom(intent: Intent?): Destination? =
+            when (intent?.getStringExtra(EXTRA_DESTINATION)) {
+                DESTINATION_ASSETS -> Destination.ASSETS
+                DESTINATION_SETTINGS -> Destination.SETTINGS
+                else -> null
+            }
+
+        /** A tab is named after the destination it opens, so a tap maps across by name. */
+        private fun destinationOf(tab: Tab): Destination = Destination.valueOf(tab.name)
+    }
+}
+
+
+

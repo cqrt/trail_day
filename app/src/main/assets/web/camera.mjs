@@ -26,7 +26,7 @@
  * A store belongs to one *address* - scheme, host and port - so this names the view one desk has of one
  * phone's work, and a second phone is a second address with a memory of its own.
  */
-export const CAMERA_KEY = 'sprayday-desk-camera';
+export const CAMERA_KEY = 'trailday-desk-camera';
 
 /**
  * How far out the memory will be believed.

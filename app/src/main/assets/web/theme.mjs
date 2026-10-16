@@ -16,7 +16,7 @@
  */
 
 /** What the desk calls this in the browser's store. */
-export const THEME_KEY = 'sprayday-desk-theme';
+export const THEME_KEY = 'trailday-desk-theme';
 
 export const LIGHT = 'light';
 export const DARK = 'dark';

@@ -124,24 +124,24 @@ jobs:
             name="$(basename "${apk}")"
             variant="${name#app-}"
             variant="${variant%-release.apk}"
-            cp "${apk}" "${APK_DIR}/spray-day-${VERSION}-${variant}.apk"
+            cp "${apk}" "${APK_DIR}/trail-day-${VERSION}-${variant}.apk"
           done
-          cp "${BUNDLE_DIR}/app-release.aab" "${BUNDLE_DIR}/spray-day-${VERSION}.aab"
+          cp "${BUNDLE_DIR}/app-release.aab" "${BUNDLE_DIR}/trail-day-${VERSION}.aab"
           ls -la "${APK_DIR}" "${BUNDLE_DIR}"
 
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: Spray Day ${{ steps.version.outputs.name }}
+          name: Trail Day ${{ steps.version.outputs.name }}
           generate_release_notes: true
           body: |
-            **Which file to install:** `spray-day-${{ steps.version.outputs.name }}-arm64-v8a.apk`
+            **Which file to install:** `trail-day-${{ steps.version.outputs.name }}-arm64-v8a.apk`
             for any phone from the last few years. The `universal` APK runs anywhere but is
             four times the size; `x86_64` is only for emulators.
 
             Signed with the same key as previous releases, so it installs straight over
             an existing install.
           files: |
-            app/build/outputs/apk/release/spray-day-*.apk
-            app/build/outputs/bundle/release/spray-day-*.aab
+            app/build/outputs/apk/release/trail-day-*.apk
+            app/build/outputs/bundle/release/trail-day-*.aab

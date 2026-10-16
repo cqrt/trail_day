@@ -1,4 +1,10 @@
-# Spray Day
+# Trail Day
+
+> **This app is being converted.** It was Spray Day, a spray-recording tool, and it is becoming
+> Trail Day — a companion for walking and riding DOC tracks and huts. This build is the first step:
+> the name, the app id and the package are the new ones, and everything below still describes what
+> the app does today, because the spraying is still here. The plan for the rest is in
+> [docs/trail-day-conversion.md](docs/trail-day-conversion.md).
 
 GPS track planning and spray records for set spray tracks — built for the way
 rural tracks actually get sprayed: the same lines, roughly three times a year.
@@ -269,7 +275,7 @@ term rather than a preference, and three parts of it shaped the code:
   same policy requires.
 - **A `User-Agent` naming the application.** The map never talks to `tile.openstreetmap.org`:
   their tiles are fetched by the app's own tile server, and `OsmTileFetcher` sends
-  `SprayDay/<version> (+https://github.com/cqrt/spray_day)`. A library's default user agent is
+  `TrailDay/<version> (+https://github.com/cqrt/trail_day)`. A library's default user agent is
   exactly what their policy names as not enough.
 - **Attribution that is visible.** `© OpenStreetMap contributors` links to
   [openstreetmap.org/copyright](https://www.openstreetmap.org/copyright), in the same
@@ -293,7 +299,7 @@ in the path is what keeps two licences, two suffixes and two caches apart:
 Everything that differs between basemaps — the tile URL, the suffix on disk, the content type,
 the zoom the source publishes to, whether a key is needed, whether it may be fetched ahead of
 time, and the credit its licence requires — is one entry in
-[`domain/tiles/Basemap.kt`](app/src/main/java/nz/mckenzie/sprayday/domain/tiles/Basemap.kt).
+[`domain/tiles/Basemap.kt`](app/src/main/java/nz/mckenzie/trailday/domain/tiles/Basemap.kt).
 Adding a basemap is that entry, a store decision in `TileServerHolder`, and a fetcher if the
 source is not one of the two already there.
 
@@ -724,7 +730,7 @@ rather than factory-fresh — reminders, the update check, and where the off-sit
 but the LINZ key and the GitHub token do not, because both are credentials rather than
 records, and a backup file may be read by whoever finds it.
 
-Files are versioned (`"format": "spray-day-backup"`, `"version": 2`). An older file
+Files are versioned (`"format": "trail-day-backup"`, `"version": 2`). An older file
 restores into a newer build, since missing fields fall back to defaults; a file from a
 newer build is refused with an explanation rather than half-read. The switches arrived
 without a version bump for the same reason: a file written before they existed simply has
@@ -741,7 +747,7 @@ written somewhere else as well, down the same seam: a `BackupTarget`, which is a
 **Where the copy goes** chooses between nowhere, a file, and a repository. The repository
 is the one that keeps history without being asked: every backup is a commit, so the copy
 from before a mistake is still there. Each phone writes its own file
-(`spray-day-<model>.json`), so two phones pointed at one repository cannot overwrite each
+(`trail-day-<model>.json`), so two phones pointed at one repository cannot overwrite each
 other's copy, and a copy says which phone it came from.
 
 The token is a fine-grained GitHub token with **Contents: read and write** on that one
@@ -885,7 +891,7 @@ the size you get.
 Three things the platform decides rather than this app:
 
 - Android asks you to confirm every install, and needs **install unknown apps** allowed for
-  Spray Day before it will even offer to. Settings says when that is missing, and has the
+  Trail Day before it will even offer to. Settings says when that is missing, and has the
   button that goes to the screen where it is granted.
 - Play Protect may scan a sideloaded APK before it installs, because it has not seen it
   before. That is Google's check, not this app's, and it happens after the download.

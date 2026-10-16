@@ -31,8 +31,8 @@ git tag -a v0.X.Y -m "..." && git push origin v0.X.Y           # ships the relea
 
 ## How verification is done here — use these, don't invent new ones
 
-- Emulator `Medium_Phone_API_36.0` (1080x2400, `emulator-5554`); app id `nz.mckenzie.sprayday`;
-  database `databases/spray_day.db`.
+- Emulator `Medium_Phone_API_36.0` (1080x2400, `emulator-5554`); app id `nz.mckenzie.trailday`;
+  database `databases/trail_day.db`.
 - Scratch scripts under `build/verify` (gitignored, and never to be listed wholesale):
   - `ui.ps1 -Action texts | tap -Text <regex> | tapxy -Text "x,y" | type | clearfield | scroll |
     shot | size` — drive the app through its own UI tree.
@@ -41,8 +41,8 @@ git tag -a v0.X.Y -m "..." && git push origin v0.X.Y           # ships the relea
     the thing it should have".
   - `db/linepix.ps1`, `db/placepix.ps1`, `db/redcount.ps1`, `db/measure-shot.ps1` — counts within
     a band or a box, for colours, icon sizes and dashes.
-  - `db/seed*.py` — build a seeded `spray_day.db` from one pulled off the emulator. Push it back
-    with `adb push` + `run-as nz.mckenzie.sprayday`; that only works on a debuggable build, so a
+  - `db/seed*.py` — build a seeded `trail_day.db` from one pulled off the emulator. Push it back
+    with `adb push` + `run-as nz.mckenzie.trailday`; that only works on a debuggable build, so a
     released APK's database cannot be pulled.
   - Notes for finished work go in `build/verify/<feature>.txt`: plain-English prose, with `----`
     underlined section headings. Commit messages are drafted in `build/verify/commit-*.txt` first.

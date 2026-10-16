@@ -25,7 +25,7 @@ const DUE_COLOURS = ['#2E7D32', '#F9A825', '#C62828'];
 
 /** A track's own layer, as `WebStyleJson` builds it: solid, 5 px, the feature's own colour. */
 const track = {
-  id: 'sprayday-assets-line-track',
+  id: 'trailday-assets-line-track',
   type: 'line',
   source: 'assets',
   filter: ['all', ['==', ['get', 'kind'], 'TRACK'], ['==', ['get', 'shape'], 'LINE']],
@@ -33,18 +33,18 @@ const track = {
 };
 
 /** A road's: dashed, in the dashes the phone keeps for a road. */
-const roadLayer = { ...track, id: 'sprayday-assets-line-road', paint: { ...track.paint, 'line-dasharray': [2, 1.6] } };
+const roadLayer = { ...track, id: 'trailday-assets-line-road', paint: { ...track.paint, 'line-dasharray': [2, 1.6] } };
 
 /** A fenceline's: dotted, which is a very short dash with a round cap rather than a dot. */
 const fenceline = {
   ...track,
-  id: 'sprayday-assets-line-infrastructure',
+  id: 'trailday-assets-line-infrastructure',
   paint: { ...track.paint, 'line-dasharray': [0.05, 1.7] }
 };
 
 /** A place's: a picture, so no width and no paint block at all - and named for its kind, as the phone names it. */
 const place = {
-  id: 'sprayday-assets-point-other-place',
+  id: 'trailday-assets-point-other-place',
   type: 'symbol',
   source: 'assets',
   filter: ['==', ['get', 'shape'], 'POINT']
@@ -168,7 +168,7 @@ test('a line layer that says nothing about its width still gets a halo with one'
 });
 
 test('the halo is named after the layer it belongs under, once', () => {
-  assert.equal(haloId(track.id), 'sprayday-desk-glow-sprayday-assets-line-track');
+  assert.equal(haloId(track.id), 'trailday-desk-glow-trailday-assets-line-track');
   assert.equal(haloLayer(track, 7).id, haloId(track.id));
 });
 
@@ -176,7 +176,7 @@ test('ground gets no halo of its own: its edge is a line like any other', () => 
   // The carpark's fill, as `WebStyleJson` builds it. A halo for it would have to be a circle layer -
   // `haloLayer` has only two shapes - and a circle draws one disc per corner of the ring.
   const ground = {
-    id: 'sprayday-assets-area-carpark-fill',
+    id: 'trailday-assets-area-carpark-fill',
     type: 'fill',
     source: 'assets',
     filter: ['all', ['==', ['get', 'kind'], 'CARPARK'], ['==', ['get', 'shape'], 'AREA']],
@@ -199,7 +199,7 @@ test('the names beside tracks get no halo: a disc there sits on every corner of 
   // stretch, in the track's own due colour. That was the red glow an operator reported on a picked-out
   // track. A symbol layer is a place's only when it is named for a place.
   const names = {
-    id: 'sprayday-assets-line-track-names',
+    id: 'trailday-assets-line-track-names',
     type: 'symbol',
     source: 'assets',
     minzoom: 16,
@@ -214,7 +214,7 @@ test('the names beside tracks get no halo: a disc there sits on every corner of 
   assert.equal(wantsHalo(names), false, 'a layer about the work is not a layer of it');
   assert.equal(wantsHalo(place), true, 'and a place, named for its kind, still gets its disc');
   assert.equal(
-    wantsHalo({ ...names, id: 'sprayday-assets-line-road' }),
+    wantsHalo({ ...names, id: 'trailday-assets-line-road' }),
     false,
     'a symbol that is not a place is passed over whatever the line its name came from'
   );

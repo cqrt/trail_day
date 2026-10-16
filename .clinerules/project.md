@@ -1,8 +1,8 @@
-# Spray Day — project rules
+# Trail Day — project rules
 
 An Android app for planning spray tracks and keeping spray records: Kotlin + Jetpack Compose,
 Room, DataStore, WorkManager, MapLibre Android, kotlinx-serialization. Public repository
-`cqrt/spray_day`. The off-site backups live in the private `cqrt/spray-day-backups`.
+`cqrt/trail_day`. The off-site backups live in the private `cqrt/trail-day-backups`.
 
 Rules are split by what they govern: this file is the project itself, and
 `release-and-verification.md` is how a change gets out the door. Both are always active.
@@ -49,7 +49,7 @@ The operator reads the summary to decide what happens next, not to review the wo
 ## Invariants not to break
 
 - **The backup file has one writer.** `GitHubBackupTarget.save` PUTs the whole document under
-  `spray-day-<model>.json`, so anything a second writer put in that file is destroyed by the next
+  `trail-day-<model>.json`, so anything a second writer put in that file is destroyed by the next
   backup, silently.
 - **Deleting an asset cascades into its sprays** (`SprayEventEntity`, `onDelete = CASCADE`);
   recordings survive (`RecordedSessionEntity.assetId` has no foreign key). Never make that easy by

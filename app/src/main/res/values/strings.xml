@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Spray Day</string>
+    <string name="app_name">Trail Day</string>
 
     <string name="build_title">Build</string>
     <string name="linz_key_title">LINZ Basemaps key</string>
@@ -10,7 +10,7 @@
 
     <!-- Recording notification -->
     <string name="recording_channel_name">Track recording</string>
-    <string name="recording_channel_description">Shown while Spray Day is recording a GPS track</string>
+    <string name="recording_channel_description">Shown while Trail Day is recording a GPS track</string>
     <string name="recording_notification_title">Recording spray track</string>
     <string name="recording_notification_text">%1$s \u00b7 %2$d points</string>
     <string name="recording_paused_text">Paused</string>
@@ -24,7 +24,7 @@
     <string name="due_channel_description">Tells you when planned tracks are due for spraying</string>
     <!-- App updates -->
     <string name="update_channel_name">App updates</string>
-    <string name="update_channel_description">Tells you when a newer version of Spray Day has been released</string>
+    <string name="update_channel_description">Tells you when a newer version of Trail Day has been released</string>
     <string name="backup_channel_name">Off-site backup</string>
     <string name="backup_channel_description">Tells you when the copy of your season kept off the phone did not get written</string>
 </resources>

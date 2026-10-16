@@ -146,7 +146,7 @@ recording has had them all along.
 | File | What it is here |
 | --- | --- |
 | `data/db/AssetPointEntity.kt` | The asset's points: gains a nullable `altitudeM`. |
-| `data/db/Migrations.kt`, `SprayDayDatabase.kt` | `MIGRATION_11_12` (an `ALTER TABLE asset_points ADD COLUMN altitudeM REAL`), schema v12, `12.json` written out. |
+| `data/db/Migrations.kt`, `TrailDayDatabase.kt` | `MIGRATION_11_12` (an `ALTER TABLE asset_points ADD COLUMN altitudeM REAL`), schema v12, `12.json` written out. |
 | `data/AssetRepository.kt` | Writes the height with each point and reads it back, so `GeoPoint.altitudeM` survives a save and a load. |
 | `domain/backup/BackupDocument.kt`, `data/BackupRepository.kt` | `LinePointRecord` gains `altitudeM`, and the backup carries it out and in. |
 | `domain/geo/ElevationProfile.kt` (new) | The arithmetic: lowest, highest, climb, descent, and a series to draw. Pure, tested. |

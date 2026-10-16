@@ -73,10 +73,10 @@ const {
 const INK = '#212121';
 const PAPER = '#ffffff';
 
-const SOURCE_ID = 'sprayday-desk-drawing';
-const LINE_LAYER = 'sprayday-desk-drawing-line';
-const HANDLE_LAYER = 'sprayday-desk-drawing-handles';
-const JUNCTION_LAYER = 'sprayday-desk-drawing-junction';
+const SOURCE_ID = 'trailday-desk-drawing';
+const LINE_LAYER = 'trailday-desk-drawing-line';
+const HANDLE_LAYER = 'trailday-desk-drawing-handles';
+const JUNCTION_LAYER = 'trailday-desk-drawing-junction';
 
 /**
  * The drawing, as a thing the page can start and stop.
