@@ -282,8 +282,8 @@ Signing comes from repository secrets:
 | `KEY_PASSWORD` | key password |
 | `LINZ_API_KEY` | baked into the release build as the default key |
 
-Each release carries one APK per architecture plus a universal one, so a phone downloads ~15 MB
-(arm64) rather than ~50 MB of native libraries for four architectures it will never use.
+Each release carries one APK per architecture plus a universal one, so a phone downloads ~17 MB
+(arm64) rather than ~53 MB of native libraries for four architectures it will never use.
 
 Pushing a tag like `v0.1.0` stamps `versionName 0.1.0` and `versionCode 100` (major × 10000 + minor ×
 100 + patch). **The tag is what ships**: a code change is committed, pushed and tagged as its own
