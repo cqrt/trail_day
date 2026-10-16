@@ -20,7 +20,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.flow.first
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.domain.settings.ThemeChoice
-import nz.mckenzie.trailday.ui.screens.DrawAssetScreen
+import nz.mckenzie.trailday.ui.screens.AddSpotScreen
 import nz.mckenzie.trailday.ui.screens.DocTracksScreen
 import nz.mckenzie.trailday.ui.screens.MapScreen
 import nz.mckenzie.trailday.ui.screens.OfflineAreaPickerScreen
@@ -34,7 +34,7 @@ import nz.mckenzie.trailday.ui.screens.AssetDetailScreen
 import nz.mckenzie.trailday.ui.screens.AssetEditScreen
 import nz.mckenzie.trailday.ui.screens.AssetListScreen
 import nz.mckenzie.trailday.ui.theme.TrailDayTheme
-import nz.mckenzie.trailday.viewmodel.DrawAssetViewModel
+import nz.mckenzie.trailday.viewmodel.AddSpotViewModel
 import nz.mckenzie.trailday.viewmodel.DocTracksViewModel
 import nz.mckenzie.trailday.viewmodel.MapViewModel
 import nz.mckenzie.trailday.viewmodel.OfflineAreaPickerViewModel
@@ -51,7 +51,7 @@ import nz.mckenzie.trailday.web.WebEditorService
 import nz.mckenzie.trailday.web.WebEditorState
 
 /** Destinations for now; swap for a NavHost when routes need arguments. */
-private enum class Destination { MAP, ASSETS, DRAW, CHANGE_LINE, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC_TRACKS }
+private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC_TRACKS }
 
 class MainActivity : ComponentActivity() {
 
@@ -90,10 +90,10 @@ class MainActivity : ComponentActivity() {
                 var selectedAssetId by rememberSaveable { mutableStateOf<Long?>(null) }
                 var selectedSessionId by rememberSaveable { mutableStateOf<Long?>(null) }
 
-                // Bumped on every visit to the draw screen so it gets its own view
+                // Bumped on every visit to the add-a-spot screen so it gets its own view
                 // model: a shared one would carry the previous visit's draft (and
-                // its "just saved" signal) into the next drawing session.
-                var drawVisit by rememberSaveable { mutableStateOf(0) }
+                // its "just saved" signal) into the next one.
+                var addSpotVisit by rememberSaveable { mutableStateOf(0) }
 
                 // System back always returns to the map rather than leaving the app.
                 BackHandler(enabled = destination != Destination.MAP) {
@@ -149,9 +149,9 @@ class MainActivity : ComponentActivity() {
                                 selectedAssetId = assetId
                                 destination = Destination.ASSET_DETAIL
                             },
-                            onDrawAsset = {
-                                drawVisit++
-                                destination = Destination.DRAW
+                            onAddSpot = {
+                                addSpotVisit++
+                                destination = Destination.ADD_SPOT
                             },
                             onImportDocTracks = { destination = Destination.DOC_TRACKS },
                             onOpenSettings = { destination = Destination.SETTINGS }
@@ -181,10 +181,6 @@ class MainActivity : ComponentActivity() {
                                 viewModel = detailViewModel,
                                 onBack = { destination = Destination.ASSETS },
                                 onEdit = { destination = Destination.ASSET_EDIT },
-                                onChangeLine = {
-                                    drawVisit++
-                                    destination = Destination.CHANGE_LINE
-                                },
                                 onOpenRecording = { sessionId ->
                                     selectedSessionId = sessionId
                                     destination = Destination.RECORDING_DETAIL
@@ -222,34 +218,15 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    Destination.DRAW -> {
-                        val drawViewModel: DrawAssetViewModel = viewModel(
-                            key = "draw-$drawVisit",
-                            factory = DrawAssetViewModel.factory(applicationContext)
+                    Destination.ADD_SPOT -> {
+                        val spotViewModel: AddSpotViewModel = viewModel(
+                            key = "add-spot-$addSpotVisit",
+                            factory = AddSpotViewModel.factory(applicationContext)
                         )
-                        DrawAssetScreen(
-                            viewModel = drawViewModel,
+                        AddSpotScreen(
+                            viewModel = spotViewModel,
                             onBack = { destination = Destination.ASSETS }
                         )
-                    }
-
-                    // The same screen, opened on a track that exists: its geometry is what the taps
-                    // start from, and Save replaces it rather than making a new row. Back without
-                    // saving leaves the track exactly as it was, because nothing is written until then.
-                    Destination.CHANGE_LINE -> {
-                        val assetId = selectedAssetId
-                        if (assetId == null) {
-                            destination = Destination.ASSETS
-                        } else {
-                            val changeViewModel: DrawAssetViewModel = viewModel(
-                                key = "change-$assetId-$drawVisit",
-                                factory = DrawAssetViewModel.factory(applicationContext, assetId)
-                            )
-                            DrawAssetScreen(
-                                viewModel = changeViewModel,
-                                onBack = { destination = Destination.ASSET_DETAIL }
-                            )
-                        }
                     }
 
                     Destination.RECORDINGS -> {

@@ -1,5 +1,6 @@
 package nz.mckenzie.trailday.ui
 
+import nz.mckenzie.trailday.domain.asset.AssetShape
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -13,6 +14,19 @@ class FormattingTest {
         assertEquals("1.00 km", formatDistance(1000.0))
         assertEquals("2.35 km", formatDistance(2345.0))
         assertEquals("-", formatDistance(-1.0))
+    }
+
+    @Test
+    fun `a place with no length says nothing rather than nought metres`() {
+        // A spot is somewhere you stop, and a line nothing has been drawn along is not a line yet:
+        // in both cases there is no measurement to give, so none is given - on a list row and on a
+        // place's own page alike, which is why the rule is one function rather than two.
+        assertEquals("", formatLengthOf(AssetShape.POINT, 0.0))
+        assertEquals("", formatLengthOf(AssetShape.POINT, 1200.0))
+        assertEquals("", formatLengthOf(AssetShape.LINE, 0.0))
+
+        assertEquals("1.40 km", formatLengthOf(AssetShape.LINE, 1400.0))
+        assertEquals("850 m", formatLengthOf(AssetShape.LINE, 850.0))
     }
 
     @Test

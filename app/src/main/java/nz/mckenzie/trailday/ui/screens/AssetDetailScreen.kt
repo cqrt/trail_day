@@ -44,6 +44,7 @@ import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.ui.formatDate
 import nz.mckenzie.trailday.ui.formatDistance
+import nz.mckenzie.trailday.ui.formatLengthOf
 import nz.mckenzie.trailday.viewmodel.AssetDetailViewModel
 
 /**
@@ -56,10 +57,6 @@ fun AssetDetailScreen(
     onBack: () -> Unit,
     // Editing happens on a screen of its own, so this screen only has to say where to go.
     onEdit: () -> Unit,
-    // Changing the geometry is the same screen again, opened on this track rather than on nothing:
-    // the phone had no way to change a line that was already drawn, which is what a side track off a
-    // track drawn months ago needs.
-    onChangeLine: () -> Unit,
     onOpenRecording: (Long) -> Unit = {}
 ) {
     val track by viewModel.track.collectAsStateWithLifecycle()
@@ -157,13 +154,15 @@ fun AssetDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(AssetPhrase.kind(kind), style = MaterialTheme.typography.titleMedium)
-                    // How long the line is: the one figure every kind has, and the one the list
-                    // already shows beside its name.
-                    Text(
-                        text = AssetPhrase.lengthLabel() + " " +
-                            formatDistance(track?.lengthM ?: 0.0),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    // How long the line is, and nothing at all when there is no line: a spot is
+                    // somewhere you stop, and "Length 0 m" is a measurement nobody took. The list's
+                    // rows say it the same way, through the same one rule.
+                    formatLengthOf(shape, track?.lengthM ?: 0.0).takeIf { it.isNotEmpty() }?.let { length ->
+                        Text(
+                            text = AssetPhrase.lengthLabel() + " " + length,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                     // How high the line goes, when the file it came from said. One line, in the
                     // words the domain gives; a track drawn here has no heights and says nothing.
                     ElevationPhrase.range(elevation)?.let { range ->
@@ -258,22 +257,19 @@ fun AssetDetailScreen(
                 ListItem(
                     modifier = Modifier.clickable {
                         actionsOpen = false
-                        onChangeLine()
-                    },
-                    headlineContent = { Text(AssetPhrase.changeLabel()) },
-                    supportingContent = {
-                        Text("Move it, redraw it, or add a side track off it")
-                    },
-                    leadingContent = { AppIcon(IconGlyph.EDIT) }
-                )
-                ListItem(
-                    modifier = Modifier.clickable {
-                        actionsOpen = false
                         exportLauncher.launch("${track?.name ?: "place"}.gpx")
                     },
                     headlineContent = { Text("Export GPX") },
                     supportingContent = {
-                        Text("The line and its side tracks, for another device")
+                        // What goes in the file depends on what the place is: a line and the side
+                        // tracks off it, or the one coordinate a place has.
+                        Text(
+                            if (shape == AssetShape.LINE) {
+                                "The line and its side tracks, for another device"
+                            } else {
+                                "Where it is, for another device"
+                            }
+                        )
                     },
                     leadingContent = { AppIcon(IconGlyph.EXPORT) }
                 )

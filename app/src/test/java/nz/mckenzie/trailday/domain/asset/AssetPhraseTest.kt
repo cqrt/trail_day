@@ -46,9 +46,34 @@ class AssetPhraseTest {
     }
 
     @Test
-    fun `a line is asked for its length, and changing a drawing is changing a line`() {
+    fun `a line is asked for its length`() {
         assertEquals("Length", AssetPhrase.lengthLabel())
-        assertEquals("Change the line", AssetPhrase.changeLabel())
+    }
+
+    @Test
+    fun `a picker offers only the kinds that agree with the shape already there`() {
+        // A place's shape was decided by how it came to exist, and no form asks about it again:
+        // offering a track for a spot is offering a line with one coordinate on it.
+        assertEquals(
+            listOf(AssetKind.TRACK, AssetKind.BIKE_TRACK),
+            AssetPhrase.kindsFor(AssetShape.LINE)
+        )
+        assertEquals(
+            listOf(AssetKind.HUT, AssetKind.CAMPSITE, AssetKind.WAYPOINT),
+            AssetPhrase.kindsFor(AssetShape.POINT)
+        )
+
+        // Every kind belongs to exactly one shape, so nothing is offered twice and nothing is lost.
+        assertEquals(
+            AssetPhrase.kinds.toSet(),
+            AssetShape.entries.flatMap { AssetPhrase.kindsFor(it) }.toSet()
+        )
+        AssetShape.entries.forEach { shape ->
+            assertTrue(
+                "$shape offers a kind of another shape",
+                AssetPhrase.kindsFor(shape).all { it.shape == shape }
+            )
+        }
     }
 
     @Test

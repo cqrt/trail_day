@@ -26,6 +26,16 @@ object AssetPhrase {
     val kinds: List<AssetKind> = AssetKind.entries.toList()
 
     /**
+     * The kinds a place of this shape may be, in that same order.
+     *
+     * Which shape a place is was decided by how it came to exist - a spot dropped on the map, or a
+     * line from DOC, from a file or from a walk - and it is never asked about again. A form that
+     * could answer otherwise is the waypoint drawn as a line across a valley that the five kinds
+     * exist to prevent, so the picker offers only the kinds that agree with the place already there.
+     */
+    fun kindsFor(shape: AssetShape): List<AssetKind> = kinds.filter { it.shape == shape }
+
+    /**
      * What the metres of a place are called.
      *
      * A line has a length and a place has none - and every kind that has metres is a line - so the
@@ -34,12 +44,4 @@ object AssetPhrase {
      * the same statement about the same number.
      */
     fun lengthLabel(): String = "Length"
-
-    /**
-     * What changing a place's drawing is called.
-     *
-     * The card's own action and the drawing screen's title are the same errand and so the same
-     * words.
-     */
-    fun changeLabel(): String = "Change the line"
 }

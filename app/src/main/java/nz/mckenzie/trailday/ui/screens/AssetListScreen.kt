@@ -35,12 +35,14 @@ import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetPhrase
 import nz.mckenzie.trailday.domain.asset.AssetShape
-import nz.mckenzie.trailday.ui.formatDistance
+import nz.mckenzie.trailday.ui.formatLengthOf
 import nz.mckenzie.trailday.viewmodel.AssetListViewModel
 
 /**
- * The place library: what places exist and how long they are. Tracks can be
- * imported from GPX or drawn on the map.
+ * The place library: what places you keep, and how long the lines among them are.
+ *
+ * A place arrives one of three ways - a spot dropped on the map, a file brought in, or a search of
+ * DOC - and all three are offered above the list.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -48,7 +50,7 @@ fun AssetListScreen(
     viewModel: AssetListViewModel,
     onOpenTab: (Tab) -> Unit = {},
     onOpenAsset: (Long) -> Unit,
-    onDrawAsset: () -> Unit,
+    onAddSpot: () -> Unit,
     onImportDocTracks: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
@@ -82,16 +84,16 @@ fun AssetListScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Two ways to make a place, and only two: recording, the recordings list and
+            // Three ways to make a place, and only three: recording, the recordings list and
             // settings used to be buttons here, and are now the tabs in the bar below and
-            // the icon in the bar above. Drawing gets the filled treatment because it is
-            // what happens standing in the paddock, which is the commoner case.
+            // the icon in the bar above. Dropping a spot gets the filled treatment because it is
+            // what happens standing on the track, which is the commoner case.
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(onClick = onDrawAsset) { Text("Draw") }
+                Button(onClick = onAddSpot) { Text("Add a spot") }
                 OutlinedButton(
                     onClick = { importLauncher.launch(TRACK_MIME_TYPES) },
                     enabled = !busy
@@ -134,9 +136,9 @@ fun AssetListScreen(
                 EmptyState(
                     glyph = IconGlyph.ASSETS,
                     title = "No places yet",
-                    body = "Import a GPX, KML, KMZ or GeoJSON file, or draw one on the map.",
-                    actionLabel = "Draw one",
-                    onAction = onDrawAsset
+                    body = "Drop a spot on the map, or bring in a GPX, KML, KMZ or GeoJSON file.",
+                    actionLabel = "Add a spot",
+                    onAction = onAddSpot
                 )
             } else if (shown.isEmpty()) {
                 // Nothing of the kind asked about is worth one line rather than an empty list: the
@@ -199,13 +201,8 @@ private fun AssetRow(
 }
 
 /**
- * What the row says under a place's name.
- *
- * A spot has no length, and a line that has not been drawn on yet has none either, so in both
- * cases the length is left out rather than printed as "0 m".
+ * What the row says under a place's name: how long the line is, and nothing at all for a place
+ * that has no length. See [formatLengthOf].
  */
-internal fun assetRowDetail(item: AssetEntity): String {
-    val length = item.lengthM
-    val drawnLine = AssetShape.fromStorage(item.shape) == AssetShape.LINE && length > 0.0
-    return if (drawnLine) formatDistance(length) else ""
-}
+internal fun assetRowDetail(item: AssetEntity): String =
+    formatLengthOf(AssetShape.fromStorage(item.shape), item.lengthM)

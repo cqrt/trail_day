@@ -195,7 +195,7 @@ fun BasemapView(
      * than some screens talking to a provider directly and some not.
      */
     tileUrlTemplate: String? = TileServerHolder.templateUrl(basemap),
-    onMapClick: ((latitude: Double, longitude: Double, radiusM: Double, onTheLineRadiusM: Double) -> Unit)? = null,
+    onMapClick: ((latitude: Double, longitude: Double, radiusM: Double) -> Unit)? = null,
     initialTarget: LatLng = DEFAULT_CAMERA_TARGET,
     initialZoom: Double = DEFAULT_CAMERA_ZOOM
 ) {
@@ -264,15 +264,14 @@ fun BasemapView(
                         if (handler == null) {
                             false
                         } else {
-                            // Two radii, because a tap answers two questions. The fingertip is which
-                            // line was tapped, out of everything on the map; the line's own width is
-                            // where on it, which is the only thing a tap can mean while drawing.
+                            // The radius is the map's own answer for the zoom the walker is working
+                            // at, so "which place was that tap" means the same thing zoomed out over
+                            // a valley as it does zoomed in on a gate.
                             val zoom = map.cameraPosition.zoom
                             handler(
                                 latLng.latitude,
                                 latLng.longitude,
-                                AssetHitTest.toleranceForZoom(zoom, latLng.latitude),
-                                AssetHitTest.onTheLineToleranceForZoom(zoom, latLng.latitude)
+                                AssetHitTest.toleranceForZoom(zoom, latLng.latitude)
                             )
                             true
                         }

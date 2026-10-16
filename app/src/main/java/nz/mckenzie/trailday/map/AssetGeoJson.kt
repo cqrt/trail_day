@@ -74,14 +74,6 @@ object AssetColors {
     const val RECORDED = "#C62828"
 
     /**
-     * The line being drawn, before it is saved.
-     *
-     * Amber, which reads as "in progress" and is not one of the kind families: a draft is not yet
-     * any kind of place, and it must look like something being made rather than something that is.
-     */
-    const val DRAFT = "#F9A825"
-
-    /**
      * One colour per kind of place, for the icon beside a place in the list and the line it
      * is drawn as.
      *

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetPhrase
+import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.ui.AssetEditFields
 import nz.mckenzie.trailday.ui.AssetEditResult
 import nz.mckenzie.trailday.ui.AssetEdits
@@ -104,7 +105,10 @@ fun AssetEditScreen(
             )
             ChoiceRow(
                 label = "What it is",
-                choices = AssetPhrase.kinds,
+                // Only the kinds that agree with the shape this place already has: how it was made
+                // decided that, and a hut asked to be a track would be a line with one coordinate
+                // on it. See [AssetPhrase.kindsFor].
+                choices = AssetPhrase.kindsFor(AssetShape.fromStorage(current.shape)),
                 selected = kind,
                 // The shape follows the kind and is not asked about: a hut is a point because a hut
                 // is somewhere you stop, and a question that could answer otherwise is a waypoint

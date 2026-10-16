@@ -1,5 +1,6 @@
 package nz.mckenzie.trailday.ui
 
+import nz.mckenzie.trailday.domain.asset.AssetShape
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -13,6 +14,17 @@ fun formatDistance(meters: Double): String = when {
     meters < 1000.0 -> "${meters.roundToInt()} m"
     else -> String.format(Locale.US, "%.2f km", meters / 1000.0)
 }
+
+/**
+ * How long a place is, or empty when there is nothing to say.
+ *
+ * A spot has no length - it is somewhere you stop - and a line nothing has been drawn along has
+ * none either, so both say **nothing** rather than "0 m": a zero is a measurement, and there is no
+ * measurement here. The list's rows and a place's own page both ask this one question, so they
+ * cannot drift into answering it differently.
+ */
+fun formatLengthOf(shape: AssetShape, lengthM: Double): String =
+    if (shape == AssetShape.LINE && lengthM > 0.0) formatDistance(lengthM) else ""
 
 /** "45s" / "12m 30s" / "1h 05m" - elapsed recording time. */
 fun formatDuration(millis: Long): String {
