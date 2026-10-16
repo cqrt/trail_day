@@ -12,6 +12,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import nz.mckenzie.trailday.BuildConfig
 import nz.mckenzie.trailday.data.SettingsRepository
+import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.offline.KeyCheck
 import nz.mckenzie.trailday.offline.LinzKeyProbe
 import nz.mckenzie.trailday.offline.OfflineTileStore
@@ -63,6 +64,9 @@ class SettingsViewModelTest {
         SettingsRepository(context).setWebEditorTokenRequired(false)
         SettingsRepository(context).setWebEditorEnabled(true)
         SettingsRepository(context).setWebEditorKeepAwake(false)
+        // And the light goes back to following the phone, so a test that chose one outright cannot
+        // leave the next one reading somebody else's screen.
+        SettingsRepository(context).setThemeChoice(ThemeChoice.DEFAULT)
         store.deleteAll()
     }
 
@@ -411,6 +415,39 @@ class SettingsViewModelTest {
 
         viewModel.setWebEditor(true)
         awaitValue("the switch written back", true, { settings.webEditorEnabled.first() })
+    }
+
+    /**
+     * The light setting: written down, and published to every screen that draws.
+     *
+     * Stored rather than held in the view model, because it is a property of this phone rather than
+     * of this visit - a phone put away and opened again in the dark has to come back as it was left.
+     *
+     * Collected here as a screen collects it, and that is the point rather than a detail: the
+     * published flow reads the preference **while something is watching** and not otherwise, which
+     * is what keeps a settings screen from holding a preference open when it is not on screen. A
+     * subscription is therefore what makes the flow answer at all, and a test that read it with
+     * nothing watching would be testing its seed value.
+     */
+    @Test
+    fun theLightSettingIsWrittenAndPublishedToTheScreens(): Unit = runBlocking {
+        val settings = SettingsRepository(context)
+        val viewModel = SettingsViewModel(settings, store, checkKey = { KeyCheck.Works })
+        val watching = launch { viewModel.themeChoice.collect { } }
+
+        try {
+            viewModel.setThemeChoice(ThemeChoice.DARK)
+
+            awaitValue("the choice written", ThemeChoice.DARK) { settings.themeChoice.first() }
+            awaitValue("the choice published", ThemeChoice.DARK) { viewModel.themeChoice.value }
+
+            viewModel.setThemeChoice(ThemeChoice.DEFAULT)
+
+            awaitValue("the choice written back", ThemeChoice.DEFAULT) { settings.themeChoice.first() }
+            awaitValue("the choice published back", ThemeChoice.DEFAULT) { viewModel.themeChoice.value }
+        } finally {
+            watching.cancel()
+        }
     }
 
     private companion object {

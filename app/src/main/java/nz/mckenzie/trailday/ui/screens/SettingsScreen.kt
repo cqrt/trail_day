@@ -46,6 +46,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.backup.BackupDestination
+import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.viewmodel.KeyCheckState
 import nz.mckenzie.trailday.viewmodel.KeySource
@@ -85,6 +86,7 @@ fun SettingsScreen(
     }
     val activeKeyLabel by viewModel.activeKeyLabel.collectAsStateWithLifecycle()
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
+    val themeChoice by viewModel.themeChoice.collectAsStateWithLifecycle()
     val webEditorUrl by viewModel.webEditorUrl.collectAsStateWithLifecycle()
     val webEditorTokenRequired by viewModel.webEditorTokenRequired.collectAsStateWithLifecycle()
     val webEditorKeepAwake by viewModel.webEditorKeepAwake.collectAsStateWithLifecycle()
@@ -245,6 +247,29 @@ fun SettingsScreen(
                             Text("Report a map issue to OpenStreetMap")
                         }
                     }
+                }
+            }
+
+            // How the whole app is lit, which is the one setting here that changes the screen it is
+            // set from. The theme around every screen reads this same preference, so a tap lands at
+            // once - and a phone held up in the sun, or a tent at night, is a reason to say outright
+            // rather than leave it to the phone's own idea of the time of day.
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Appearance", style = MaterialTheme.typography.titleMedium)
+
+                    ChoiceRow(
+                        label = "Light or dark",
+                        choices = ThemeChoice.entries,
+                        selected = themeChoice,
+                        onChoose = viewModel::setThemeChoice,
+                        text = { it.displayName }
+                    )
+
+                    Text(themeChoice.summary, style = MaterialTheme.typography.bodySmall)
                 }
             }
 

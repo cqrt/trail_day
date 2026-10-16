@@ -19,6 +19,9 @@ when you want a bigger screen.
   because unknown is not the same as small. A **locate** button puts the camera back on you, and is
   where the map asks for location permission — on a tap, not on the way in. The dot follows you
   while a map is open and stops when you leave it.
+- **Light or dark** — the app follows the phone's own light or dark setting, and **Settings** can say
+  *Light* or *Dark* outright: light is the one to read on a screen in the sun, dark is easier at night
+  and easier on the battery. The bars along the top and the bottom follow the same answer.
 - **Places** — the tracks, huts, campsites and spots you keep, in one list. There are five kinds and
   **the kind decides the shape**: a **track** and a **bike track** are lines you travel along, and a
   **hut**, a **campsite** and a **waypoint** are single spots you stop at. Each row carries a coloured

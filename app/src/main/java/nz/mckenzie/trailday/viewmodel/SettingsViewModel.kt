@@ -29,6 +29,7 @@ import nz.mckenzie.trailday.domain.backup.BackupDestination
 import nz.mckenzie.trailday.domain.backup.BackupSummary
 import nz.mckenzie.trailday.domain.backup.OffsiteBackupRules
 import nz.mckenzie.trailday.domain.backup.StoredBackup
+import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.offline.KeyCheck
 import nz.mckenzie.trailday.offline.LinzKeyProbe
@@ -162,6 +163,25 @@ class SettingsViewModel(
     /** Chooses a basemap. Every map reads the same preference, so this is visible at once. */
     fun setBasemap(value: Basemap) {
         viewModelScope.launch { settings.setBasemap(value) }
+    }
+
+    /**
+     * How the app is lit: light, dark, or whatever this phone is set to.
+     *
+     * Seeded with the default rather than left empty, like the basemap above: DataStore answers in
+     * a frame, and a card briefly showing the wrong choice is better than one briefly showing none.
+     */
+    val themeChoice: StateFlow<ThemeChoice> = settings.themeChoice
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ThemeChoice.DEFAULT)
+
+    /**
+     * Chooses how the app is lit.
+     *
+     * The screens above this one read the same preference, so the change is visible at once -
+     * including on the screen the choice was made on.
+     */
+    fun setThemeChoice(value: ThemeChoice) {
+        viewModelScope.launch { settings.setThemeChoice(value) }
     }
 
     /**

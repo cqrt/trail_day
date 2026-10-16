@@ -1,19 +1,25 @@
 package nz.mckenzie.trailday
 
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.flow.first
 import nz.mckenzie.trailday.data.SettingsRepository
+import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.ui.screens.DrawAssetScreen
 import nz.mckenzie.trailday.ui.screens.DocTracksScreen
 import nz.mckenzie.trailday.ui.screens.MapScreen
@@ -60,7 +66,26 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         requestedDestination.value = destinationFrom(intent)
         setContent {
-            TrailDayTheme {
+            val settings = remember { SettingsRepository(applicationContext) }
+            val themeChoice by settings.themeChoice
+                .collectAsStateWithLifecycle(initialValue = ThemeChoice.DEFAULT)
+            val darkTheme = themeChoice.isDark(isSystemInDarkTheme())
+
+            // The bars at the edges are the app's own background showing through, so the icons over
+            // them have to follow the theme the walker chose rather than the phone's own setting:
+            // choosing Light on a phone set to dark would otherwise leave pale icons on a pale bar.
+            // Asked for again whenever the answer changes, because this is the same call the launch
+            // above makes - with what the setting says rather than with what Android guessed.
+            LaunchedEffect(darkTheme) {
+                val barStyle = if (darkTheme) {
+                    SystemBarStyle.dark(Color.TRANSPARENT)
+                } else {
+                    SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                }
+                enableEdgeToEdge(statusBarStyle = barStyle, navigationBarStyle = barStyle)
+            }
+
+            TrailDayTheme(darkTheme = darkTheme) {
                 var destination by rememberSaveable { mutableStateOf(Destination.MAP) }
                 var selectedAssetId by rememberSaveable { mutableStateOf<Long?>(null) }
                 var selectedSessionId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -92,7 +117,6 @@ class MainActivity : ComponentActivity() {
                 // alone when a run is already going, because starting again would build a new run
                 // and hand the walker a new address under a page they are already reading.
                 LaunchedEffect(Unit) {
-                    val settings = SettingsRepository(applicationContext)
                     if (settings.webEditorEnabled.first() && !WebEditorState.isOn) {
                         WebEditorService.start(applicationContext)
                     }

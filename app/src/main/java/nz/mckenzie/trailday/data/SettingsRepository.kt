@@ -17,6 +17,7 @@ import nz.mckenzie.trailday.domain.asset.AssetLayer
 import nz.mckenzie.trailday.domain.backup.BackupDestination
 import nz.mckenzie.trailday.domain.backup.BackupSettingsRecord
 import nz.mckenzie.trailday.domain.backup.BackupSwitches
+import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.domain.tiles.Basemap
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "trail_day_settings")
@@ -36,6 +37,7 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
 
     private val linzKeyPref = stringPreferencesKey("linz_api_key")
     private val basemapPref = stringPreferencesKey("basemap")
+    private val themeChoicePref = stringPreferencesKey("theme_choice")
     private val hiddenMapLayersPref = stringSetPreferencesKey("hidden_map_layers")
     private val placeNamesPref = booleanPreferencesKey("place_names")
     private val webEditorTokenRequiredPref = booleanPreferencesKey("web_editor_token_required")
@@ -99,6 +101,27 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
 
     suspend fun setBasemap(value: Basemap) {
         context.settingsDataStore.edit { prefs -> prefs[basemapPref] = value.id }
+    }
+
+    /**
+     * How the app is lit: light, dark, or whatever this phone is set to.
+     *
+     * Following the phone when unset, which is what every install has been doing since the theme
+     * could only be the system's - a setting that arrived later must not darken a phone that was
+     * one way yesterday.
+     *
+     * **Not carried in a backup**, and the difference between it and the switches that are is worth
+     * saying: a backup is read on another phone, and the setting in *that* phone's hand, and the
+     * light around it, are not the ones that answered this here. The basemap and the map's layer
+     * switches are left out of a backup for the same reason - they are answers about this device's
+     * screen rather than about the work, and [BackupSettingsRecord] carries the work.
+     */
+    val themeChoice: Flow<ThemeChoice> = context.settingsDataStore.data.map { prefs ->
+        ThemeChoice.fromStorage(prefs[themeChoicePref])
+    }
+
+    suspend fun setThemeChoice(value: ThemeChoice) {
+        context.settingsDataStore.edit { prefs -> prefs[themeChoicePref] = value.id }
     }
 
     /**
