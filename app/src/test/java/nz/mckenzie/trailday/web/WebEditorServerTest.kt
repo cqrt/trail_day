@@ -258,27 +258,23 @@ class WebEditorServerTest {
         }
 
         /** What a DOC search asked for, and a document for it - or the phone's word for a failure. */
+        var lastDocSource: String? = null
         var lastDocName: String? = null
         var lastDocNear: String? = null
         var lastDocBounds: String? = null
 
-        override suspend fun docSearch(name: String, near: String?, radiusKm: Double?, bounds: String?): String {
+        override suspend fun docSearch(
+            source: String,
+            name: String,
+            near: String?,
+            radiusKm: Double?,
+            bounds: String?
+        ): String {
+            lastDocSource = source
             lastDocName = name
             lastDocNear = near
             lastDocBounds = bounds
-            return """{"tracks":[],"message":"no tracks here","capped":false}"""
-        }
-
-        /** The body a DOC import arrived as, and the count it made - or a refusal. */
-        var lastDocImport: String? = null
-
-        override suspend fun docImport(body: String?): WebEditorWrite {
-            lastDocImport = body
-            return if (body.isNullOrBlank()) {
-                WebEditorWrite.Refused(WebEditorRefusal.INVALID, "that request carried no tracks")
-            } else {
-                WebEditorWrite.DocImported(count = 2, message = "Imported 2 DOC tracks.")
-            }
+            return """{"source":"huts","rows":[],"message":"no huts here","capped":false}"""
         }
 
         override fun page(path: String): HttpResponse? =
@@ -768,49 +764,31 @@ class WebEditorServerTest {
     }
 
     @Test
-    fun `DOC's tracks are searched at their own path, with the name and place the page asked for`() {
+    fun `what DOC publishes is searched at its own path, with the service, name and place the page asked for`() {
         start()
 
-        val response = get("${WebEditorServer.DOC_PATH}?name=Glory&near=-46.6,168.35&bounds=-46.7,168.1,-46.5,168.6")
+        val response = get(
+            "${WebEditorServer.DOC_PATH}?source=huts&name=Angelus&near=-41.6,172.6&bounds=-41.7,172.5,-41.5,172.7"
+        )
 
         assertEquals(200, response.code)
         assertEquals("application/json; charset=utf-8", response.contentType)
-        assertEquals("the name reached the phone", "Glory", data.lastDocName)
-        assertEquals("and the place too", "-46.6,168.35", data.lastDocNear)
-        assertEquals("and the map's own view", "-46.7,168.1,-46.5,168.6", data.lastDocBounds)
-        assertEquals("""{"tracks":[],"message":"no tracks here","capped":false}""", response.body)
+        assertEquals("which of DOC's services to read", "huts", data.lastDocSource)
+        assertEquals("the name reached the phone", "Angelus", data.lastDocName)
+        assertEquals("and the place too", "-41.6,172.6", data.lastDocNear)
+        assertEquals("and the map's own view", "-41.7,172.5,-41.5,172.7", data.lastDocBounds)
+        assertEquals("""{"source":"huts","rows":[],"message":"no huts here","capped":false}""", response.body)
     }
 
     @Test
-    fun `importing DOC's tracks is one request, answered with the count and the phone's sentence`() {
-        start()
-
-        val body = """{"tracks":[{"name":"Glory Tk","paths":[[{"lat":-46.6,"lng":168.3}]]}]}"""
-        val response = send(WebEditorServer.DOC_IMPORT_PATH, "POST", body)
-
-        assertEquals(200, response.code)
-        assertEquals("the body arrived whole", body, data.lastDocImport)
-        assertEquals(
-            """{"imported":2,"message":"Imported 2 DOC tracks."}""",
-            response.body
-        )
-    }
-
-    @Test
-    fun `DOC's tracks need the token as surely as a write does, and a GET of the import path is not a route`() {
+    fun `DOC's material needs the token as surely as a write does`() {
         start()
 
         assertEquals(403, get("${WebEditorServer.DOC_PATH}?name=x", withToken = false).code)
         assertNull("a refused search never reached the data", data.lastDocName)
 
-        assertEquals(
-            403,
-            send(WebEditorServer.DOC_IMPORT_PATH, "POST", """{"tracks":[]}""", withToken = false).code
-        )
-        assertNull("a refused import never reached the data", data.lastDocImport)
-
-        // The import path names a thing done, so a GET of it falls through to the page route, which
-        // serves no such file: a 404 rather than an import with no tracks.
-        assertEquals(404, get(WebEditorServer.DOC_IMPORT_PATH).code)
+        // And nothing under the old import path: what DOC publishes is read here, and never written.
+        assertEquals(404, get("${WebEditorServer.DOC_PATH}/import").code)
+        assertEquals(404, send("${WebEditorServer.DOC_PATH}/import", "POST", """{"tracks":[]}""").code)
     }
 }

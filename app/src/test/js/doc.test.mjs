@@ -1,16 +1,27 @@
 /*
- * The desk's half of the DOC Tracks browser, under node.
+ * The desk's half of the DOC browser, under node.
  *
- * `doc.mjs` is pure, so node runs the very file the browser does: what a search asks the phone for,
- * what an import carries back, and how the answer is worded. What is *not* here is the search itself
- * or the import: those are the phone's, reached through `GET /api/doc` and `POST /api/doc/import`,
- * and they are tested there.
+ * `doc.mjs` is pure, so node runs the very file the browser does: what a search asks the phone for, and
+ * how a page of the answer is narrowed and worded. What is *not* here is the reading itself: that is the
+ * phone's, reached through `GET /api/doc`, and it is tested there.
  */
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { docImportBody, docKindsOf, docSearchNote, docSearchPath, docShowing, docTypesOf } from '../../main/assets/web/doc.mjs';
+import { docSearchNote, docSearchPath, docShowing, docValuesOf } from '../../main/assets/web/doc.mjs';
+
+test('a search asks for one of DOC\'s services, by the id the phone gave it', () => {
+  assert.equal(docSearchPath('', null, null, null, 'huts'), '/api/doc?source=huts');
+  assert.equal(
+    docSearchPath('', null, null, null, '  bikes  '),
+    '/api/doc?source=bikes',
+    'and a page that sent it padded still asks for the right one'
+  );
+  // A page from before the sources were asked for sends none, and the phone reads that as its own
+  // default rather than as a service nobody has heard of.
+  assert.equal(docSearchPath('Glory', null), '/api/doc?name=Glory');
+});
 
 test('a search with neither a name nor a place is the plain path', () => {
   assert.equal(docSearchPath('', null), '/api/doc');
@@ -56,39 +67,26 @@ test('a radius goes with the place it belongs to, and nowhere else', () => {
   );
 });
 
-test('and both together narrow each other', () => {
-  const path = docSearchPath('Foveaux', { lat: -46.6, lng: 168.35 });
+test('a service, a name and a place all go together, and each is its own parameter', () => {
+  const path = docSearchPath('Foveaux', { lat: -46.6, lng: 168.35 }, null, null, 'huts');
 
+  assert.match(path, /source=huts/);
   assert.match(path, /name=Foveaux/);
   assert.match(path, /near=-46\.6%2C168\.35/);
 });
 
-test('an import carries each ticked track\'s key, name, site and the geometry it was shown', () => {
-  const sky = [{ lat: -46.6, lng: 168.3 }, { lat: -46.61, lng: 168.31 }];
-
-  assert.deepEqual(
-    docImportBody([{ id: 1, name: 'Glory Tk', flocId: 'BLUFFHIL-TK02', paths: [sky] }]),
-    { tracks: [{ id: 1, name: 'Glory Tk', flocId: 'BLUFFHIL-TK02', paths: [sky] }] }
-  );
-  assert.deepEqual(
-    docImportBody([{ id: 2, name: 'No site', paths: [sky] }]),
-    { tracks: [{ id: 2, name: 'No site', flocId: null, paths: [sky] }] },
-    'a track with no site key carries an explicit null'
-  );
-});
-
 test('the note is the phone\'s word when it has one, and otherwise a count', () => {
-  assert.equal(docSearchNote({ message: 'No DOC tracks matched.', tracks: [] }), 'No DOC tracks matched.');
-  assert.equal(docSearchNote({ tracks: [] }), 'No DOC tracks matched.');
-  assert.equal(docSearchNote({ tracks: [{}] }), '1 track');
-  assert.equal(docSearchNote({ tracks: [{}, {}, {}] }), '3 tracks');
+  assert.equal(docSearchNote({ message: 'No DOC huts matched.', rows: [] }), 'No DOC huts matched.');
+  assert.equal(docSearchNote({ rows: [] }), 'Nothing matched.');
+  assert.equal(docSearchNote({ rows: [{}] }), '1 match');
+  assert.equal(docSearchNote({ rows: [{}, {}, {}] }), '3 matches');
 });
 
 test('a page that was only the first of more says so', () => {
-  const tracks = Array.from({ length: 300 }, () => ({}));
+  const rows = Array.from({ length: 300 }, () => ({}));
 
-  assert.match(docSearchNote({ tracks, capped: true }), /first 300 matches/);
-  assert.equal(docSearchNote({ tracks, capped: false }), '300 tracks');
+  assert.match(docSearchNote({ rows, capped: true }), /first 300 matches/);
+  assert.equal(docSearchNote({ rows, capped: false }), '300 matches');
 });
 
 test('nothing to say is said as nothing, rather than a crash', () => {
@@ -96,80 +94,76 @@ test('nothing to say is said as nothing, rather than a crash', () => {
   assert.equal(docSearchNote(undefined), '');
 });
 
-test('the kinds present are each once, sorted, and blanks are left out', () => {
-  const tracks = [
-    { kind: 'Tramping Track' },
-    { kind: 'Short Walk' },
-    { kind: 'Tramping Track' },
-    { kind: null },
-    { kind: '  ' }
+test('a filter offers the values the rows carry, each once, sorted, blanks left out', () => {
+  const rows = [
+    { values: { bookable: 'Yes' } },
+    { values: { bookable: 'No' } },
+    { values: { bookable: 'Yes' } },
+    { values: {} },
+    { values: { bookable: '  ' } }
   ];
 
-  assert.deepEqual(docKindsOf(tracks), ['Short Walk', 'Tramping Track']);
-  assert.deepEqual(docKindsOf(undefined), []);
-});
-
-test('the types present are each once, sorted, and blanks are left out', () => {
-  const tracks = [
-    { trackType: 'One way' },
-    { trackType: 'Loop' },
-    { trackType: 'One way' },
-    { trackType: null },
-    { trackType: '  ' }
-  ];
-
-  assert.deepEqual(docTypesOf(tracks), ['Loop', 'One way']);
-  assert.deepEqual(docTypesOf(undefined), []);
+  // Read off the rows the phone sent, so a chip is always a fact about something on the page - and a
+  // field no row carries offers nothing at all, which is how a hut is never offered a difficulty.
+  assert.deepEqual(docValuesOf(rows, 'bookable'), ['No', 'Yes']);
+  assert.deepEqual(docValuesOf(rows, 'difficulty'), []);
+  assert.deepEqual(docValuesOf(undefined, 'bookable'), []);
 });
 
 test('nearest orders by the distance the phone sent', () => {
-  const near = { name: 'Near', kind: 'Walking Track', distanceM: 10 };
-  const far = { name: 'Far', kind: 'Walking Track', distanceM: 9000 };
+  const near = { name: 'Near', values: {}, distanceM: 10 };
+  const far = { name: 'Far', values: {}, distanceM: 9000 };
 
-  assert.deepEqual(docShowing([far, near], [], [], 'nearest'), [near, far]);
+  assert.deepEqual(docShowing([far, near], {}, 'nearest'), [near, far]);
 });
 
-test('a track with no distance sorts last, and a tie falls back to the name', () => {
-  const known = { name: 'B', kind: 'Walking Track', distanceM: 5 };
-  const unknown = { name: 'A', kind: 'Walking Track', distanceM: null };
-  const alsoUnknown = { name: 'C', kind: 'Walking Track' };
-
-  const shown = docShowing([unknown, known, alsoUnknown], [], [], 'nearest');
-
-  assert.deepEqual(shown.map((t) => t.name), ['B', 'A', 'C']);
-});
-
-test('picking kinds keeps only those; none picked keeps them all', () => {
-  const walk = { name: 'Walk', kind: 'Walking Track' };
-  const tramp = { name: 'Tramp', kind: 'Tramping Track' };
-
-  assert.deepEqual(docShowing([walk, tramp], ['Tramping Track'], [], 'name'), [tramp]);
-  assert.equal(docShowing([walk, tramp], [], [], 'name').length, 2);
-});
-
-test('a kind and a type together narrow to the tracks that are both', () => {
-  const oneWayWalk = { name: 'One way walk', kind: 'Walking Track', trackType: 'One way' };
-  const loopWalk = { name: 'Loop walk', kind: 'Walking Track', trackType: 'Loop' };
-  const loopTramp = { name: 'Loop tramp', kind: 'Tramping Track', trackType: 'Loop' };
-  const tracks = [oneWayWalk, loopWalk, loopTramp];
+test('a row with no distance sorts last, and a tie falls back to the name', () => {
+  const known = { name: 'B', values: {}, distanceM: 5 };
+  const unknown = { name: 'A', values: {}, distanceM: null };
+  const alsoUnknown = { name: 'C', values: {} };
 
   assert.deepEqual(
-    docShowing(tracks, [], ['Loop'], 'name'),
+    docShowing([unknown, known, alsoUnknown], {}, 'nearest').map((row) => row.name),
+    ['B', 'A', 'C']
+  );
+});
+
+test('picking a value keeps only the rows that carry it; none picked keeps them all', () => {
+  const yes = { name: 'Angelus Hut', values: { bookable: 'Yes' } };
+  const no = { name: 'Liverpool Hut', values: { bookable: 'No' } };
+
+  assert.deepEqual(docShowing([yes, no], { bookable: ['No'] }, 'name'), [no]);
+  assert.equal(docShowing([yes, no], {}, 'name').length, 2);
+  assert.equal(
+    docShowing([yes, no], { bookable: [] }, 'name').length,
+    2,
+    'a field with nothing ticked is no filter, not an empty page'
+  );
+});
+
+test('two filters together narrow to the rows that are both', () => {
+  const oneWay = { name: 'One way walk', values: { SubObjectType: 'Walking Track', WEB_TRACK_TYPE: 'One way' } };
+  const loopWalk = { name: 'Loop walk', values: { SubObjectType: 'Walking Track', WEB_TRACK_TYPE: 'Loop' } };
+  const loopTramp = { name: 'Loop tramp', values: { SubObjectType: 'Tramping Track', WEB_TRACK_TYPE: 'Loop' } };
+  const rows = [oneWay, loopWalk, loopTramp];
+
+  assert.deepEqual(
+    docShowing(rows, { WEB_TRACK_TYPE: ['Loop'] }, 'name'),
     [loopTramp, loopWalk],
     'the type alone keeps every kind of it (ordered by name, as asked)'
   );
   assert.deepEqual(
-    docShowing(tracks, ['Tramping Track'], ['Loop'], 'name'),
+    docShowing(rows, { SubObjectType: ['Tramping Track'], WEB_TRACK_TYPE: ['Loop'] }, 'name'),
     [loopTramp],
     'and both together keep only what is both'
   );
 });
 
 test('by name is A to Z, and the input is not reordered underneath the caller', () => {
-  const b = { name: 'b', kind: 'Walking Track' };
-  const a = { name: 'A', kind: 'Walking Track' };
+  const b = { name: 'b', values: {} };
+  const a = { name: 'A', values: {} };
   const original = [b, a];
 
-  assert.deepEqual(docShowing(original, [], [], 'name').map((t) => t.name), ['A', 'b']);
+  assert.deepEqual(docShowing(original, {}, 'name').map((row) => row.name), ['A', 'b']);
   assert.deepEqual(original, [b, a], 'the page keeps its own array');
 });

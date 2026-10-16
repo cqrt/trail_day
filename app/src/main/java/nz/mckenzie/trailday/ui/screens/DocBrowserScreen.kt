@@ -44,7 +44,7 @@ import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSort
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.distanceM
-import nz.mckenzie.trailday.ui.formatDistance
+import nz.mckenzie.trailday.ui.docRowDetail
 import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
 
 /**
@@ -320,59 +320,7 @@ private fun MenuChoice(label: String, chosen: Boolean, onChoose: () -> Unit) {
 private fun DocItemRow(item: DocItem, distanceM: Double?) {
     ListItem(
         headlineContent = { Text(item.name, style = MaterialTheme.typography.titleSmall) },
+        // What the row says under the name is one rule for both surfaces - see [docRowDetail].
         supportingContent = { Text(docRowDetail(item, distanceM)) }
     )
-}
-
-/**
- * What a row says under the name, in the app's own words and DOC's own values.
- *
- * **One rule for four services, and it is here** rather than in the domain because how far away
- * something is and how long a line is are written in the walker's own metres, which is the screen's
- * business. Which parts a summary has is the *source's* answer, so a row cannot say about a hut what
- * only makes sense about a track; a part DOC said nothing about is left out rather than shown blank,
- * because "no facilities line" and "nothing worth saying" are not the same thing to read.
- */
-internal fun docRowDetail(item: DocItem, distanceM: Double?): String {
-    val parts: List<String?> = when (item.source) {
-        DocSource.TRACKS -> listOf(
-            item.kind,
-            // How the track is walked, which tells a walker what they are taking on where a vertex
-            // count would tell them nothing.
-            item.trackType,
-            item.lengthM.takeIf { it > 0.0 }?.let { formatDistance(it) }
-        )
-
-        DocSource.HUTS -> listOf(
-            item.place,
-            item.region,
-            "Bookable".takeIf { item.isBookable == true }
-        )
-
-        DocSource.CAMPSITES -> listOf(
-            item.place,
-            item.region,
-            item.kind,
-            campsiteSites(item),
-            "Bookable".takeIf { item.isBookable == true }
-        )
-
-        // DOC publishes the bike layer as places: how hard the riding is and how long it takes are the
-        // two things worth reading on the row, and there is no line to measure.
-        DocSource.BIKES -> listOf(item.difficulty, item.bikingTime)
-    }
-
-    return (parts + distanceM?.let { "${formatDistance(it)} away" }).filterNotNull().joinToString(" \u00b7 ")
-}
-
-/** How many sites a campsite has, in the walker's terms, or null when DOC said nothing. */
-private fun campsiteSites(item: DocItem): String? {
-    val unpowered = item.unpoweredSites ?: return null
-    val powered = item.poweredSites ?: 0
-    val total = unpowered + powered
-    return when {
-        total == 0 -> null
-        powered > 0 -> "$total sites, $powered powered"
-        else -> "$total sites"
-    }
 }

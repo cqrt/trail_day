@@ -1,6 +1,8 @@
 package nz.mckenzie.trailday.ui
 
 import nz.mckenzie.trailday.domain.asset.AssetShape
+import nz.mckenzie.trailday.domain.doc.DocItem
+import nz.mckenzie.trailday.domain.doc.DocSource
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -25,6 +27,60 @@ fun formatDistance(meters: Double): String = when {
  */
 fun formatLengthOf(shape: AssetShape, lengthM: Double): String =
     if (shape == AssetShape.LINE && lengthM > 0.0) formatDistance(lengthM) else ""
+
+/**
+ * What a row of DOC's material says under the name, in the app's own words and DOC's own values.
+ *
+ * **One rule for four services, and it is here** rather than on the screen that draws it, because the
+ * phone's browser and the desk's draw the same rows: a rule kept on one of them is a rule the other
+ * would have to copy, and the copy that fell behind is the one nobody looks at. Which parts a summary
+ * has is the *source's* answer, so a row cannot say about a hut what only makes sense about a track -
+ * and a part DOC said nothing about is left out rather than shown blank, because "no facilities line"
+ * and "nothing worth saying" read very differently.
+ */
+fun docRowDetail(item: DocItem, distanceM: Double?): String {
+    val parts: List<String?> = when (item.source) {
+        DocSource.TRACKS -> listOf(
+            item.kind,
+            // How the track is walked, which tells a walker what they are taking on where a vertex
+            // count would tell them nothing.
+            item.trackType,
+            item.lengthM.takeIf { it > 0.0 }?.let { formatDistance(it) }
+        )
+
+        DocSource.HUTS -> listOf(
+            item.place,
+            item.region,
+            "Bookable".takeIf { item.isBookable == true }
+        )
+
+        DocSource.CAMPSITES -> listOf(
+            item.place,
+            item.region,
+            item.kind,
+            campsiteSites(item),
+            "Bookable".takeIf { item.isBookable == true }
+        )
+
+        // DOC publishes the bike layer as places: how hard the riding is and how long it takes are the
+        // two things worth reading on the row, and there is no line to measure.
+        DocSource.BIKES -> listOf(item.difficulty, item.bikingTime)
+    }
+
+    return (parts + distanceM?.let { "${formatDistance(it)} away" }).filterNotNull().joinToString(" \u00b7 ")
+}
+
+/** How many sites a campsite has, in the walker's terms, or null when DOC said nothing. */
+private fun campsiteSites(item: DocItem): String? {
+    val unpowered = item.unpoweredSites ?: return null
+    val powered = item.poweredSites ?: 0
+    val total = unpowered + powered
+    return when {
+        total == 0 -> null
+        powered > 0 -> "$total sites, $powered powered"
+        else -> "$total sites"
+    }
+}
 
 /** "45s" / "12m 30s" / "1h 05m" - elapsed recording time. */
 fun formatDuration(millis: Long): String {

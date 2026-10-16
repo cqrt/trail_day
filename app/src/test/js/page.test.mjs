@@ -23,13 +23,11 @@ const pageCode = readFileSync(new URL('../../main/assets/web/app.js', import.met
 /**
  * The controls that start disabled, and why each one is.
  *
- * Nothing else may start disabled. If a control is added that needs to, it belongs in this table with the
- * sentence saying what turns it on - which is the check on the next line, so the table cannot be a list of
- * good intentions.
+ * Nothing does any more, and that is worth saying: the Import button was the last one, and the DOC
+ * dialog no longer imports anything - it reads. If a control is added that needs to start disabled, it
+ * belongs in this table with the sentence saying what turns it on, which is the check below.
  */
-const STARTS_DISABLED = {
-  'doc-import': "field('doc-import').disabled = count === 0"
-};
+const STARTS_DISABLED = {};
 
 test('every control that starts disabled is one the page turns on, and says so', () => {
   const disabled = [...html.matchAll(/<button id="([^"]+)"[^>]*\bdisabled\b[^>]*>/g)].map((m) => m[1]);

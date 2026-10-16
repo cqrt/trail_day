@@ -10,7 +10,6 @@ import nz.mckenzie.trailday.domain.asset.AssetRemoval
 import nz.mckenzie.trailday.domain.asset.AssetRemovalRules
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.backup.AssetRecord
-import nz.mckenzie.trailday.domain.doc.DocPlaces
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.distanceM
@@ -18,6 +17,7 @@ import nz.mckenzie.trailday.domain.geo.ElevationProfile
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.track.TrackInterchange
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
+import nz.mckenzie.trailday.ui.docRowDetail
 
 /**
  * What the page is told about the work: the document behind `GET /api/state`, and what a write
@@ -145,16 +145,17 @@ object WebEditorJson {
     )
 
     /**
-     * What a DOC Tracks search answers with: the tracks it matched, and the phone's own word for a
-     * search that could not be made at all.
+     * What a DOC search answers with: which service was read, what its rows can be narrowed by, and the
+     * rows themselves.
      *
-     * The geometry travels here rather than being asked for again at import, because a track ticked on
-     * the desk is imported from the very vertices the desk was shown - so a service that changed
-     * between the search and the import cannot put a different line on the map.
+     * **The phone decides, the desk draws.** Which service it is, which facts are worth filtering by, and
+     * what each row says under its name are all the phone's answers - worked out by the same rules its
+     * own browser uses - so a laptop cannot come to show something about a hut that only makes sense
+     * about a track, and the two surfaces cannot drift apart about what DOC said.
      */
     fun docSearch(
-        tracks: List<DocItem>,
-        importedRefs: Set<String>,
+        source: DocSource,
+        items: List<DocItem>,
         from: GeoPoint?,
         message: String?,
         capped: Boolean
@@ -162,35 +163,29 @@ object WebEditorJson {
         json.encodeToString(
             WebEditorDocSearch.serializer(),
             WebEditorDocSearch(
-                tracks = tracks.map { track ->
-                    WebEditorDocItem(
-                        id = track.objectId,
-                        name = track.name,
-                        // The name the import will give it - place first - so the desk shows what the
-                        // asset will be called, and a wrong place is seen before it is imported.
-                        assetName = DocPlaces.assetName(track.name, track.flocId),
-                        kind = track.kind,
-                        trackType = track.trackType,
-                        flocId = track.flocId,
-                        points = track.pointCount,
-                        lengthM = track.lengthM,
-                        paths = track.paths.map { path ->
-                            path.map { WebEditorPoint(lat = it.lat, lng = it.lng, altitudeM = it.altitudeM) }
-                        },
-                        imported = track.sourceRef in importedRefs,
-                        // The phone's own fix, so the desk can order by "nearest to phone" without
-                        // its own distance arithmetic - and cannot disagree with the phone's order.
-                        distanceM = from?.let { track.distanceM(it) }
+                source = source.id,
+                filters = source.filters.map { filter ->
+                    WebEditorDocFilter(field = filter.field, label = filter.label)
+                },
+                rows = items.map { item ->
+                    val distance = from?.let { fix -> item.distanceM(fix) }
+                    WebEditorDocRow(
+                        id = item.objectId,
+                        name = item.name,
+                        detail = docRowDetail(item, distance),
+                        // What this row's answer is to each filter the phone offered, by field: the desk's
+                        // chips are built and matched from these, so they cannot offer a value no row has.
+                        values = source.filters.mapNotNull { filter ->
+                            item.filterValue(filter.field)?.let { value -> filter.field to value }
+                        }.toMap(),
+                        // The phone's own distance, so the desk's "nearest" order is the phone's.
+                        distanceM = distance
                     )
                 },
                 message = message,
                 capped = capped
             )
         )
-
-    /** What importing the ticked tracks answers with: how many were made, and the phone's sentence. */
-    fun docImported(count: Int, message: String): String =
-        json.encodeToString(WebEditorDocImported.serializer(), WebEditorDocImported(imported = count, message = message))
 }
 
 /** Everything `GET /api/state` answers with. */
@@ -221,8 +216,25 @@ data class WebEditorDocument(
      * What a dropped track file (GPX, KML, KMZ or GeoJSON) has to know: the name it travels under, and the
      * largest file the phone will take. Both the phone's own answers - see [WebEditorGpxRules].
      */
-    val gpx: WebEditorGpxRules = WebEditorGpxRules.ofApp()
+    val gpx: WebEditorGpxRules = WebEditorGpxRules.ofApp(),
+    /**
+     * Which of DOC's services the desk's browser can read, in the phone's own words for them.
+     *
+     * Carried here for the same reason the kinds are: the page draws the chips it is handed rather than
+     * keeping its own list of DOC's services, which would be a second copy to keep in step with the
+     * phone's - and the one that fell behind would be the one nobody looks at.
+     */
+    val docSources: List<WebEditorDocSource> = WebEditorDocSource.ofApp()
 )
+
+/** One of DOC's services, as the desk's browser offers it: its id, and the phone's words for it. */
+@Serializable
+data class WebEditorDocSource(val value: String = "", val label: String = "") {
+    companion object {
+        fun ofApp(): List<WebEditorDocSource> =
+            DocSource.entries.map { WebEditorDocSource(value = it.id, label = it.displayName) }
+    }
+}
 
 /**
  * What a kind a new asset is drawn as, before anybody says otherwise.
@@ -422,68 +434,57 @@ data class WebEditorGpxRules(
  * these tracks are not on the phone yet: the desk has to be able to draw them, and ticking one has to
  * be able to make it without a second trip to DOC.
  */
+/** What a page of DOC's material can be narrowed by, as the phone's own browser narrows it. */
 @Serializable
-data class WebEditorDocItem(
+data class WebEditorDocFilter(
+    /** The fact's DOC field name, which is what a row's values are matched on. */
+    val field: String = "",
+    /** The app's own words for it: "What it is", "How it is walked", "Bookable". */
+    val label: String = ""
+)
+
+/**
+ * One thing DOC published, as the desk draws it.
+ *
+ * Carries no geometry and no id to write back: the desk reads DOC's material and keeps none of it - what
+ * is out there reaches the phone as the map's own layer - so a row is a name, what the phone says about
+ * it, and how far away it is.
+ */
+@Serializable
+data class WebEditorDocRow(
     val id: Long = 0,
     val name: String = "",
     /**
-     * The name the import will give the asset, place first (`DocPlaces`): "Catlins Coast Historic House
-     * Walk". The desk shows this as the track's title, so a place the map names wrongly is seen before
-     * it is imported rather than after.
+     * What the row says under the name, in the phone's own words: a hut's place, region and whether it
+     * has to be booked; a track's kind, how it is walked and how long it is.
+     *
+     * Written by the phone's own rule (`docRowDetail`) rather than built again in JavaScript: the two
+     * surfaces showing the same page of DOC's material have to say the same thing about it.
      */
-    val assetName: String = "",
-    val kind: String? = null,
-    /** `WEB_TRACK_TYPE`: how the track is walked - "One way", "Loop" - for the desk to show and filter. */
-    val trackType: String? = null,
-    /** The asset's `FlocID`, carried back with an import so the phone can prefix the place. */
-    val flocId: String? = null,
-    val points: Int = 0,
-    val lengthM: Double = 0.0,
-    val paths: List<List<WebEditorPoint>> = emptyList(),
-    /** True when a track with this source is already on the phone: the desk shows it and will not
-     * import it again. */
-    val imported: Boolean = false,
+    val detail: String = "",
+    /** This row's answer to each filter, by field, for the desk's chips to be built and matched on. */
+    val values: Map<String, String> = emptyMap(),
     /**
-     * The metres from the phone's own fix to the nearest vertex of this track, or null when the phone
-     * has no fix. Worked out on the phone so the desk's "nearest" order is the phone's.
+     * The metres from the phone's own fix to the nearest vertex of this, or null when the phone has no
+     * fix. Worked out on the phone so the desk's "nearest" order is the phone's.
      */
     val distanceM: Double? = null
 )
 
 /**
- * The answer to `GET /api/doc`: the tracks a search matched, and the phone's own word when there is
- * one to say - nothing matched, or the service could not be asked. [capped] is true when the service
- * returned a full page, so the desk can say the search showed the first of more.
+ * The answer to `GET /api/doc`: which of DOC's services was read, what its rows can be narrowed by, the
+ * rows, and the phone's own word when there is one to say - nothing matched, or the service could not be
+ * asked. [capped] is true when the service returned a full page, so the desk can say the search showed
+ * the first of more.
  */
 @Serializable
 data class WebEditorDocSearch(
-    val tracks: List<WebEditorDocItem> = emptyList(),
+    /** The source's own id, so the page can say which of the four it is looking at. */
+    val source: String = "",
+    val filters: List<WebEditorDocFilter> = emptyList(),
+    val rows: List<WebEditorDocRow> = emptyList(),
     val message: String? = null,
     val capped: Boolean = false
-)
-
-/** One track the desk ticked, on its way back to be made into an asset. */
-@Serializable
-data class WebEditorDocItemBody(
-    /** The service's own key, kept so the asset records where it came from. */
-    val id: Long = 0,
-    val name: String = "",
-    /** The `FlocID`, so the phone can prefix the place the site names. */
-    val flocId: String? = null,
-    val paths: List<List<WebEditorPoint>> = emptyList()
-)
-
-/** The body `POST /api/doc/import` carries: the ticked tracks, with the geometry they were shown. */
-@Serializable
-data class WebEditorDocImportBody(
-    val tracks: List<WebEditorDocItemBody> = emptyList()
-)
-
-/** The answer to an import: how many assets were made, and the phone's own sentence about it. */
-@Serializable
-data class WebEditorDocImported(
-    val imported: Int = 0,
-    val message: String = ""
 )
 
 /** One thing a walker can pick, as the phone stores it and as the phone says it. */

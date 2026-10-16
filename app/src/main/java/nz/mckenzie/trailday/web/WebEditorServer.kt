@@ -152,6 +152,7 @@ class WebEditorServer(
             handler = { request ->
                 json(
                     data.docSearch(
+                        source = request.query["source"].orEmpty(),
                         name = request.query["name"].orEmpty(),
                         near = request.query["near"],
                         radiusKm = request.query["radiusKm"]?.toDoubleOrNull(),
@@ -160,12 +161,7 @@ class WebEditorServer(
                 )
             }
         ),
-        HttpRoute(
-            claims = { it.method == POST && it.path == DOC_IMPORT_PATH },
-            // The tracks ticked on the desk, made into assets by the same call every drawn track goes
-            // through, in one request so an import is one act.
-            handler = { request -> write(data.docImport(request.body)) }
-        ),
+
         HttpRoute(
             claims = { it.method == PUT && assetId(it.path) != null },
             // The id is asked for twice, once to decide whether this route answers at all and once
@@ -248,9 +244,6 @@ class WebEditorServer(
         is WebEditorWrite.Removed -> json(WebEditorJson.removed(result.message))
         // A file read, and nothing written: the page is handed the first track and the count of the rest.
         is WebEditorWrite.GpxRead -> json(WebEditorJson.gpx(result.track, result.otherTracks))
-        // Tracks from DOC made into assets: the count and the phone's sentence, and the page reads the
-        // work again rather than being handed each new asset.
-        is WebEditorWrite.DocImported -> json(WebEditorJson.docImported(result.count, result.message))
         is WebEditorWrite.Refused -> HttpResponse.bytes(
             result.refusal.status,
             JSON,
@@ -357,14 +350,6 @@ class WebEditorServer(
          */
         const val DOC_PATH = "/api/doc"
 
-        /**
-         * Where the tracks ticked on the desk are made into assets: `/api/doc/import`.
-         *
-         * A collection of its own rather than a loop of `POST /api/assets`, because importing six
-         * tracks is one act: the geometry the phone already showed is handed straight back, so there
-         * is no half-imported page and no second trip to DOC.
-         */
-        const val DOC_IMPORT_PATH = "/api/doc/import"
 
         /**
          * The longest track file the phone will take, in bytes of the file itself.
@@ -518,22 +503,23 @@ interface WebEditorData {
     suspend fun gpx(body: String?): WebEditorWrite
 
     /**
-     * `GET /api/doc`: DOC's track network searched by the phone for the desk's own browser.
+     * `GET /api/doc`: what DOC publishes, searched by the phone for the desk's own browser.
      *
-     * [name] is part of a track's name, empty for any; [near] is `lat,lng` around which to look, or
+     * [source] is which of DOC's services to read - see [nz.mckenzie.trailday.domain.doc.DocSource] -
+     * and a name this build does not know reads as the tracks. [name] is part of a name, empty for any;
+     * [near] is `lat,lng` around which to look, or
      * null; [radiusKm] is how far around it; [bounds] is the desk's own map view as
      * `minLat,minLng,maxLat,maxLng`, or null. The answer is a document of tracks and the phone's own
      * word when there is one to say.
      */
-    suspend fun docSearch(name: String, near: String?, radiusKm: Double?, bounds: String?): String
+    suspend fun docSearch(
+        source: String,
+        name: String,
+        near: String?,
+        radiusKm: Double?,
+        bounds: String?
+    ): String
 
-    /**
-     * `POST /api/doc/import`: the tracks ticked on the desk, made into assets.
-     *
-     * The body carries each track's name and the geometry the phone already showed, so importing is
-     * the same `createAsset` every drawn track goes through and needs no second trip to DOC.
-     */
-    suspend fun docImport(body: String?): WebEditorWrite
 
     /**
      * The page and the files it asks for, from `app/src/main/assets/web`.

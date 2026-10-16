@@ -194,15 +194,6 @@ sealed interface WebEditorWrite {
      */
     data class GpxRead(val track: TrackInterchange.Track, val otherTracks: Int) : WebEditorWrite
 
-    /**
-     * Tracks from DOC were made into assets on the phone, and how many.
-     *
-     * The desk searched DOC through the phone and the walker ticked rows; making them is the
-     * phone's own write, so what comes back is the count and the phone's sentence, and the page reads
-     * the work again rather than being handed each new asset.
-     */
-    data class DocImported(val count: Int, val message: String) : WebEditorWrite
-
     data class Refused(val refusal: WebEditorRefusal, val message: String) : WebEditorWrite
 }
 
@@ -292,16 +283,6 @@ object WebEditorEdits {
         ?.takeIf { it.isNotBlank() }
         ?.let { runCatching { Base64.getDecoder().decode(it) }.getOrNull() }
         ?.takeIf { it.isNotEmpty() }
-
-    /**
-     * The DOC tracks a page sent to import, or null when the body carried none this build can read.
-     *
-     * Read beside [readTrackFile], with the same `Json` and for the same reason: every body the
-     * editor takes is decoded in one place. The geometry travelled out with the search and back with
-     * the import, so this only has to decode it.
-     */
-    fun readDocImport(body: String?): WebEditorDocImportBody? = body
-        ?.let { runCatching { json.decodeFromString(WebEditorDocImportBody.serializer(), it) }.getOrNull() }
 
     /**
      * An edit to an asset the phone already has.

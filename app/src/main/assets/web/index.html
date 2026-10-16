@@ -43,10 +43,13 @@
         <!-- The picker itself: opened by the button above, and never shown. -->
         <input id="import-file" type="file" accept=".gpx,.kml,.kmz,.geojson,.json,application/gpx+xml,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/geo+json,application/json" hidden>
         <!--
-          DOC's own track network, searched through the phone. A second way in beside a file: DOC
-          publishes its tracks as a web service, and the phone asks it on the desk's behalf.
+          What DOC publishes, read through the phone. A way of *reading* rather than of adding: DOC's
+          material is the map's own layer rather than a place of the walker's, so nothing here is
+          imported and nothing is written. It is a dialog rather than a block in the sidebar because it
+          is read once and closed, and because a list of rows wants the width and the height the 460px
+          sidebar could not give it.
         -->
-        <button id="doc-open" type="button">Import from DOC tracks</button>
+        <button id="doc-open" type="button">From DOC</button>
       </div>
 
       <!--
@@ -86,36 +89,38 @@
   <div id="doc-overlay" hidden>
     <section id="doc" role="dialog" aria-labelledby="doc-title">
       <div class="doc-head">
-        <h2 id="doc-title">DOC tracks</h2>
-        <p class="hint">Search DOC's track network and import the tracks you work. The phone does the searching.</p>
+        <h2 id="doc-title">From DOC</h2>
+        <p class="hint">What the Department of Conservation publishes: its tracks, huts, campsites and bike locations. The phone
+          does the searching, and nothing here is saved to your places.</p>
         <p id="doc-words" hidden></p>
         <button id="doc-close" type="button" aria-label="Close">&times;</button>
       </div>
 
       <div class="doc-body">
         <div class="doc-side">
-          <label for="doc-name">Track name contains</label>
+          <label for="doc-name">Name contains</label>
           <input id="doc-name" type="text" autocomplete="off">
 
           <label class="doc-check"><input id="doc-near" type="checkbox"> Near the phone</label>
           <label class="doc-radius">Within <input id="doc-radius" type="text" inputmode="numeric" value="25"> km</label>
           <label class="doc-check"><input id="doc-view" type="checkbox"> Only what's on the map</label>
 
+          <div class="doc-choices" id="doc-sources" role="radiogroup" aria-label="What DOC publishes"></div>
+
           <div id="doc-buttons">
             <button id="doc-search" type="button">Search</button>
-            <button id="doc-import" type="button" disabled>Import selected</button>
           </div>
 
           <!--
             What the search found, narrowed and ordered. Labelled controls rather than a row of sliding
-            chips: a Filter group of the kinds and track types the search returned, and a Sort group of
-            the two orders. Both are drawn from the answer, so a filter is always a fact about the page.
+            chips: a group per filter **the phone offered** - a hut is narrowed by whether it is bookable,
+            a track by how it is walked - and a group of the two orders. Both are drawn from the answer,
+            so a filter is always a fact about the page.
           -->
           <div id="doc-controls" hidden>
             <div class="doc-control">
               <span class="doc-label" id="doc-filter-label">Filter</span>
-              <div class="doc-choices" id="doc-kinds" role="group" aria-labelledby="doc-filter-label"></div>
-              <div class="doc-choices" id="doc-types" role="group" aria-labelledby="doc-filter-label"></div>
+              <div id="doc-filters"></div>
             </div>
             <div class="doc-control">
               <span class="doc-label" id="doc-sort-label">Sort</span>

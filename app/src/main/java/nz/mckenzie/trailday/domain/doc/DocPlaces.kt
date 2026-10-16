@@ -9,9 +9,9 @@ package nz.mckenzie.trailday.domain.doc
  * place boundaries are far coarser than a site - so the expansion lives here, in one place, and it is
  * the app's own.
  *
- * **This map is the thing to edit.** A prefix with no entry simply gives no place and the asset keeps
- * the name DOC gave it. The seed is the sites seen in the data so far, to be corrected by the walker
- * who knows them.
+ * **This map is the thing to edit.** A prefix with no entry simply gives no place, and a row says
+ * nothing about where it is rather than naming the wrong place. The seed is the sites seen in the data
+ * so far, to be corrected by the walker who knows them.
  */
 object DocPlaces {
 
@@ -31,20 +31,5 @@ object DocPlaces {
             ?.takeIf { it.isNotEmpty() }
             ?: return null
         return PLACES[prefix]
-    }
-
-    /**
-     * The name an imported track's asset is given: the place first, then the track's own name -
-     * "Catlins Coast Historic House Walk" - so the list reads by where the work is.
-     *
-     * A track whose site is unknown keeps the name DOC gave it, which is the honest answer: better the
-     * name alone than the wrong place. A track already named after its place is left alone rather than
-     * named twice.
-     */
-    fun assetName(trackName: String, flocId: String?): String {
-        val place = placeFor(flocId) ?: return trackName
-        val name = trackName.trim()
-        if (name.startsWith(place, ignoreCase = true)) return name
-        return "$place $name"
     }
 }

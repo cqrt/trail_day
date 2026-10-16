@@ -1,9 +1,8 @@
-package nz.mckenzie.trailday.ui.screens
+package nz.mckenzie.trailday.ui
 
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.geo.GeoPoint
-import nz.mckenzie.trailday.ui.formatDistance
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -18,7 +17,7 @@ import org.junit.Test
  * The words are the walker's, not DOC's field names: a length in metres, a distance in metres, and
  * "Bookable" rather than `bookable: "Yes"`.
  */
-class DocBrowserRowTest {
+class DocRowDetailTest {
 
     private fun item(
         source: DocSource,

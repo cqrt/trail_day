@@ -1,27 +1,34 @@
 /*
- * The desk's half of the DOC Tracks browser: the request that searches DOC through the phone, and
- * the body that imports the ticked tracks.
+ * The desk's half of the DOC browser: the request that reads what DOC publishes through the phone.
  *
- * Pure, and separate from `app.js` for the same reason `find.mjs` is: node can run it without a
- * browser (`app/src/test/js/doc.test.mjs`, which CI runs), so what a search asks for and what an
- * import carries are pinned by a test rather than reviewed by eye.
+ * Pure, and separate from `app.js` for the same reason `find.mjs` is: node can run it without a browser
+ * (`app/src/test/js/doc.test.mjs`, which CI runs), so what a search asks for and what a page shows of
+ * the answer are pinned by a test rather than reviewed by eye.
  *
- * **The phone does the asking.** The page never reaches DOC's service itself: it asks the phone, and
- * the phone asks DOC. So the only decisions here are the query's shape and the import's.
+ * **The phone does the asking, and the phone does the saying.** The page never reaches DOC itself: it
+ * asks the phone, and the phone asks DOC. And the words a row carries - what it is, what DOC says about
+ * it, how far away it is - arrive written, because the phone's own browser shows the same page and the
+ * two surfaces have to say the same thing about the same thing.
  */
 
 /**
- * The path `GET /api/doc` is asked at: the name, and where to look - the desk's own map view, or the
- * phone's own place.
+ * The path `GET /api/doc` is asked at: which of DOC's services to read, the name, and where to look -
+ * the desk's own map view, or the phone's own place.
  *
- * The place is the **phone's** fix, from the state document - not the browser's own location. The
- * work is the phone's, the phone is the one that can search DOC, and a laptop on a desk has no
- * business pretending to be the tractor. The view is the desk's, and it is a different question:
- * "the paddock I am looking at", not "where the tractor is". When both are given the view wins, so a
- * page that somehow checks both still sends one filter.
+ * The service is the phone's own id for one of the four it publishes, and it is asked for by id rather
+ * than by name so a service renamed on the phone is not a service the desk has stopped being able to
+ * read.
+ *
+ * The place is the **phone's** fix, from the state document - not the browser's own location. The work
+ * is the phone's, the phone is the one that can search DOC, and a laptop on a desk has no business
+ * pretending to be the tractor. The view is the desk's, and it is a different question: "the paddock I
+ * am looking at", not "where the tractor is". When both are given the view wins, so a page that somehow
+ * checks both still sends one filter.
  */
-export function docSearchPath(name, near, bounds, radiusKm) {
+export function docSearchPath(name, near, bounds, radiusKm, source) {
   const params = new URLSearchParams();
+  const service = String(source || '').trim();
+  if (service) params.set('source', service);
   const trimmed = String(name || '').trim();
   if (trimmed) params.set('name', trimmed);
   if (bounds) {
@@ -36,89 +43,64 @@ export function docSearchPath(name, near, bounds, radiusKm) {
 }
 
 /**
- * The body `POST /api/doc/import` carries: the ticked tracks, each with the geometry the phone
- * already showed. One request for the lot, so an import is one act.
- */
-export function docImportBody(tracks) {
-  return {
-    tracks: tracks.map((track) => ({
-      id: track.id,
-      name: track.name,
-      // The site key, so the phone can prefix the place the FlocID names: "Catlins Coast <track>".
-      flocId: track.flocId ?? null,
-      paths: track.paths
-    }))
-  };
-}
-
-/**
- * The word under the desk's track list: the phone's own sentence when it has one, and otherwise how
- * many tracks there are - saying so when a search showed only the first of more.
+ * The word under the desk's rows: the phone's own sentence when it has one, and otherwise how many rows
+ * there are - saying so when a search showed only the first of more.
+ *
+ * The count is the rows that came back, not the rows being shown: the filters are the page's own, and a
+ * filter that hides everything is not "nothing matched" - the page says that in its own words.
  */
 export function docSearchNote(search) {
   if (!search || typeof search !== 'object') return '';
   if (search.message) return search.message;
 
-  const count = (search.tracks || []).length;
-  if (count === 0) return 'No DOC tracks matched.';
+  const count = (search.rows || []).length;
+  if (count === 0) return 'Nothing matched.';
   if (search.capped) return `Showing the first ${count} matches. Narrow the search to see the rest.`;
-  return count === 1 ? '1 track' : `${count} tracks`;
+  return count === 1 ? '1 match' : `${count} matches`;
 }
 
 /**
- * The kinds present in these tracks, each once, sorted, for a filter row to offer.
+ * The values these rows carry for one filter, each once, sorted, blanks left out.
  *
- * Taken from what a search returned rather than from a list of DOC's taxonomy kept here: the filter
- * offers what is actually on the page, so it cannot offer a kind the service no longer uses or miss
- * one it has learned since.
+ * Taken from what the search returned rather than from a list of DOC's taxonomy kept here: a filter
+ * offers what is actually on the page, so it cannot offer a value that matches nothing - which is the
+ * same rule the phone's own browser keeps, because the two rows are the same rows.
  */
-export function docKindsOf(tracks) {
-  const kinds = [];
-  for (const track of tracks || []) {
-    const kind = track.kind ? String(track.kind).trim() : '';
-    if (kind && !kinds.includes(kind)) kinds.push(kind);
+export function docValuesOf(rows, field) {
+  const values = [];
+  for (const row of rows || []) {
+    const value = row && row.values ? String(row.values[field] || '').trim() : '';
+    if (value && !values.includes(value)) values.push(value);
   }
-  return kinds.sort();
+  return values.sort();
 }
 
 /**
- * The track types present in these tracks - "One way", "Loop" and the like - each once, sorted, for a
- * filter to offer.
+ * The rows to show: those whose every chosen value matches, ordered by `sort`.
  *
- * Like the kinds, taken from what the search returned rather than from a list kept here, so the filter
- * is always a fact about the page.
+ * `chosen` is an object of `field: [values]`, and a field with nothing chosen means every value of it -
+ * the filters the phone offered, and only those. `nearest` uses the `distanceM` the phone sent, so the
+ * desk's order is the phone's, worked out from the phone's own fix. A row with no distance, because the
+ * phone had no fix, sorts last rather than first, and ties fall back to the name.
  */
-export function docTypesOf(tracks) {
-  const types = [];
-  for (const track of tracks || []) {
-    const type = track.trackType ? String(track.trackType).trim() : '';
-    if (type && !types.includes(type)) types.push(type);
-  }
-  return types.sort();
-}
-
-/**
- * The tracks to show: those whose kind and type are both picked (each filter unset meaning every one),
- * ordered by `sort`.
- *
- * The two filters are independent: a kind narrows to Walking Track, a type narrows to One way, and
- * asking for both narrows to the tracks that are both. `nearest` uses the `distanceM` the phone sent -
- * so the desk's order is the phone's, computed from the phone's own fix. A track with no distance,
- * because the phone had no fix, sorts last rather than first, and ties fall back to the name.
- */
-export function docShowing(tracks, kinds, types, sort) {
-  const chosenKinds = kinds || [];
-  const chosenTypes = types || [];
-  const all = tracks || [];
-  const chosen = all.filter(
-    (track) =>
-      (chosenKinds.length === 0 || chosenKinds.includes(track.kind)) &&
-      (chosenTypes.length === 0 || chosenTypes.includes(track.trackType))
-  );
+export function docShowing(rows, chosen, sort) {
+  const filters = chosen || {};
+  const all = rows || [];
+  const chosenValues = (field) => {
+    const values = filters[field];
+    return Array.isArray(values) ? values : [];
+  };
+  const shown = all.filter((row) => {
+    const values = (row && row.values) || {};
+    return Object.keys(filters).every((field) => {
+      const wanted = chosenValues(field);
+      return wanted.length === 0 || wanted.includes(values[field]);
+    });
+  });
   const byName = (a, b) => a.name.localeCompare(b.name);
 
-  if (sort !== 'nearest') return [...chosen].sort(byName);
-  return [...chosen].sort((a, b) => {
+  if (sort !== 'nearest') return [...shown].sort(byName);
+  return [...shown].sort((a, b) => {
     const da = typeof a.distanceM === 'number' ? a.distanceM : Infinity;
     const db = typeof b.distanceM === 'number' ? b.distanceM : Infinity;
     // `da - db` is NaN when both are Infinity; `|| byName` then takes over.

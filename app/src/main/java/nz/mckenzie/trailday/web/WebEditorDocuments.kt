@@ -11,11 +11,9 @@ import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetRemovalRules
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.doc.DocBounds
-import nz.mckenzie.trailday.domain.doc.DocPlaces
 import nz.mckenzie.trailday.domain.doc.DocCache
 import nz.mckenzie.trailday.domain.doc.DocQuery
 import nz.mckenzie.trailday.domain.doc.EmptyDocCache
-import nz.mckenzie.trailday.domain.doc.docSourceRef
 import nz.mckenzie.trailday.domain.doc.matching
 import nz.mckenzie.trailday.domain.doc.within
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
@@ -272,15 +270,25 @@ class WebEditorDocuments(
      * all the phone's, and the page is handed a document it can draw and tick. A search with neither a
      * name nor a place is refused before DOC is asked, because "all 3,255 tracks" is not a search.
      */
-    override suspend fun docSearch(name: String, near: String?, radiusKm: Double?, bounds: String?): String {
+    override suspend fun docSearch(
+        source: String,
+        name: String,
+        near: String?,
+        radiusKm: Double?,
+        bounds: String?
+    ): String {
+        // Which of DOC's four services this page is reading. An id this build does not know - a page from
+        // before a service existed, or a name somebody typed into the address bar - reads as the tracks,
+        // which is the browser's own default rather than a refusal: the desk is asking to read.
+        val wanted = DocSource.known(source) ?: DocSource.TRACKS
         val point = pointOf(near)
         val box = boundsOf(bounds)
         if (name.isBlank() && point == null && box == null) {
             return WebEditorJson.docSearch(
-                tracks = emptyList(),
-                importedRefs = emptySet(),
+                source = wanted,
+                items = emptyList(),
                 from = null,
-                message = "Type part of a track's name, turn on Near the phone, or search the map's view.",
+                message = "Type part of a name, turn on Near the phone, or search the map's view.",
                 capped = false
             )
         }
@@ -288,9 +296,7 @@ class WebEditorDocuments(
         val limit = DocQuery.DEFAULT_LIMIT
         val radius = radiusKm ?: DEFAULT_DOC_RADIUS_KM
         val query = DocQuery(
-            // Which of DOC's services this browser asks. Four are published and four are read; this
-            // screen is the tracks one until the browser itself is generalised.
-            source = DocSource.TRACKS,
+            source = wanted,
             nameContains = name.trim(),
             near = point,
             radiusKm = radius,
@@ -300,36 +306,36 @@ class WebEditorDocuments(
         // The distance the desk is told is measured from the place the desk asked about, else the
         // phone's own fix. Read once, so every row's distance is from the same point.
         val from = point ?: position()
-        // The service filters by a box, whose corners reach about 1.4x the radius and which any long
-        // track clipping it passes through. Keep only what is truly within the radius - and only when
-        // the search was "near", because a map view's own box is the answer.
+        // The service filters by a box, whose corners reach about 1.4x the radius and which anything
+        // clipping it passes through. Keep only what is truly within the radius - and only when the
+        // search was "near", because a map view's own box is the answer.
         val radiusM = radius * 1000.0
         return when (val result = docTracks.search(query)) {
             is DocReadResult.Found -> {
-                // Read once, so every row can be told whether the phone already has it.
-                val imported = assets.existingSourceRefs()
-                val tracks = if (point != null) result.items.within(radiusM, point) else result.items
+                val items = if (point != null) result.items.within(radiusM, point) else result.items
                 WebEditorJson.docSearch(
-                    tracks = tracks,
-                    importedRefs = imported,
+                    source = wanted,
+                    items = items,
                     from = from,
-                    message = if (tracks.isEmpty()) "No DOC tracks matched." else null,
+                    message = if (items.isEmpty()) "No DOC ${wanted.displayName.lowercase()} matched." else null,
                     capped = result.items.size >= limit
                 )
             }
+
             is DocReadResult.Failed -> {
-                // No service: fall back to the tracks downloaded for offline use, so the desk can
-                // still import one. Filtered by name; the download is the place filter.
-                val cached = docCache.cached(DocSource.TRACKS).matching(name)
+                // No service: fall back to what was downloaded for offline use, so what the phone holds
+                // can still be read with no reception. Filtered by name; the download is the place filter.
+                val held = docCache.cached(wanted).matching(name)
                     .let { if (point != null) it.within(radiusM, point) else it }
                 WebEditorJson.docSearch(
-                    tracks = cached,
-                    importedRefs = assets.existingSourceRefs(),
+                    source = wanted,
+                    items = held,
                     from = from,
                     message = when {
-                        cached.isNotEmpty() ->
-                            "Could not reach DOC. Showing ${cached.size} downloaded " +
-                                (if (cached.size == 1) "track" else "tracks") + "."
+                        held.isNotEmpty() ->
+                            "Could not reach DOC. Showing ${held.size} downloaded " +
+                                wanted.displayName.lowercase() + "."
+
                         docCache.count() > 0 -> "Could not reach DOC, and nothing downloaded matches."
                         else -> result.message
                     },
@@ -337,48 +343,6 @@ class WebEditorDocuments(
                 )
             }
         }
-    }
-
-    /**
-     * `POST /api/doc/import`: the tracks ticked on the desk, made into assets.
-     *
-     * The geometry the search returned comes straight back and is created by the same `createAsset`
-     * every drawn track goes through - so a DOC track is an asset like any other the moment it lands,
-     * and there is no second trip to DOC that could put a different line on the map. The whole request
-     * is capped: a page that asked to import a thousand tracks is a page to refuse, not to obey.
-     */
-    override suspend fun docImport(body: String?): WebEditorWrite {
-        val parsed = WebEditorEdits.readDocImport(body) ?: return refused(
-            WebEditorRefusal.INVALID,
-            "That request did not carry any tracks to import."
-        )
-        val tracks = parsed.tracks.take(MAX_DOC_IMPORT)
-        if (tracks.isEmpty()) return refused(
-            WebEditorRefusal.INVALID,
-            "That request did not carry any tracks to import."
-        )
-
-        var imported = 0
-        // A track the phone already has is not imported again, whatever the page sent: the page
-        // disables it, and this is the same promise kept at the door that writes.
-        val already = assets.existingSourceRefs()
-        for (track in tracks) {
-            val paths = track.paths.map { path -> path.map { GeoPoint(lat = it.lat, lng = it.lng) } }
-            if (paths.isEmpty()) continue
-            val sourceRef = if (track.id != 0L) docSourceRef(DocSource.TRACKS, track.id) else null
-            if (sourceRef != null && sourceRef in already) continue
-            val name = DocPlaces.assetName(track.name.trim().ifBlank { "DOC track" }, track.flocId)
-            runCatching {
-                assets.createAsset(name = name, geometry = AssetGeometry(paths), sourceRef = sourceRef)
-            }.onSuccess { imported++ }
-        }
-
-        val message = if (imported == tracks.size) {
-            "Imported $imported DOC ${if (imported == 1) "track" else "tracks"}."
-        } else {
-            "Imported $imported of ${tracks.size} DOC tracks."
-        }
-        return WebEditorWrite.DocImported(count = imported, message = message)
     }
 
     /** A `lat,lng` query value as a point, or null when it is absent or would not read. */
@@ -475,7 +439,6 @@ class WebEditorDocuments(
         private const val DEFAULT_DOC_RADIUS_KM = 25.0
 
         /** The most tracks one import may carry: more than a page of them is a request to refuse. */
-        private const val MAX_DOC_IMPORT = 100
 
         /**
          * The file types the page uses, by extension.

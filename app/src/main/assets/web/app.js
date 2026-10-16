@@ -125,12 +125,13 @@ const { elevationChart, elevationWords } = await import(
 );
 
 /**
- * DOC's track network, browsed through the phone: the query a search is, and the body an import is.
+ * What DOC publishes, browsed through the phone: the query a search is, and the page of rows it answers
+ * with.
  *
- * The phone does the asking - the page never reaches DOC itself - so this module holds only the two
- * small shapes the page and the phone have to agree on. Pure, and tested under node like the rest.
+ * The phone does the asking, and the phone does the saying - the page never reaches DOC itself - so this
+ * module holds only the small shapes the two have to agree on. Pure, and tested under node like the rest.
  */
-const { docImportBody, docKindsOf, docSearchNote, docSearchPath, docShowing, docTypesOf } = await import(
+const { docSearchNote, docSearchPath, docShowing, docValuesOf } = await import(
   TOKEN ? `./doc.mjs?k=${encodeURIComponent(TOKEN)}` : './doc.mjs'
 );
 
@@ -888,20 +889,21 @@ async function importGpxFile(file) {
 }
 
 /**
- * DOC's track network, browsed through the phone: search, tick, import.
+ * What DOC publishes, read through the phone: four services, searched and narrowed.
  *
- * **The phone does the searching** (`GET /api/doc`): the page sends a name and, when Near is on, the
- * phone's own fix from the state document - never the browser's own location, because the work and
- * the service are the phone's - and is handed a page of tracks to draw. Importing sends the ticked
- * tracks' geometry straight back (`POST /api/doc/import`), so the line that lands on the phone is the
- * line the walker was shown, and the whole import is one request rather than a loop.
+ * **The phone does the asking.** The page never reaches DOC itself: it says which of the four services
+ * to read, a name and a place, and the phone asks DOC and hands back a page of rows. And **nothing is
+ * written**: a DOC thing is not one of the walker's places - what is out there reaches the phone as the
+ * map's own layer - so this dialog is a way of reading, not of adding.
+ *
+ * The page decides three things: which service is asked, which rows survive the filters, and the order.
+ * Everything else is the phone's - the words, the facts, the distances and the list of services all
+ * arrive in the answer - so a laptop cannot come to say about a hut what only makes sense about a track.
  */
-let docTracks = [];
-const docSelected = new Set();
-// The kinds and track types ticked in the filter (each empty is all of them), and the order: nearest
-// to the phone first.
-const docKinds = new Set();
-const docTypes = new Set();
+let docRows = [];
+let docSource = '';
+let docFilters = [];
+const docChosen = new Map();
 let docSort = 'nearest';
 
 function openDoc() {
@@ -909,13 +911,42 @@ function openDoc() {
   field('doc-words').hidden = true;
   field('doc-words').textContent = '';
   field('doc-controls').hidden = true;
-  field('doc-import').textContent = 'Import selected';
-  field('doc-import').disabled = true;
+  drawDocSources();
   field('doc-name').focus();
 }
 
 function closeDoc() {
   field('doc-overlay').hidden = true;
+}
+
+/**
+ * The four services, in the phone's own words for them.
+ *
+ * Built from the state document rather than written here, for the reason this page reads every other
+ * vocabulary from the phone: a list kept here is a second copy to keep in step, and which services DOC
+ * publishes is the phone's own business.
+ */
+function drawDocSources() {
+  const sources = state.docSources || [];
+  if (!docSource && sources.length > 0) docSource = sources[0].value;
+  docOrders(
+    field('doc-sources'),
+    'What DOC publishes',
+    sources.map((one) => ({ value: one.value, label: one.label })),
+    docSource,
+    chooseDocSource
+  );
+}
+
+/** Reads another of DOC's services: the last page's rows and filters were about a different thing. */
+function chooseDocSource(value) {
+  docSource = value;
+  docRows = [];
+  docFilters = [];
+  docChosen.clear();
+  field('doc-words').hidden = true;
+  drawDocFilters();
+  drawDocList();
 }
 
 async function searchDoc() {
@@ -932,18 +963,21 @@ async function searchDoc() {
     showNotice('The map is still opening. Try that again in a moment, or search by name.');
     return;
   }
+  if (!near && !bounds && field('doc-name').value.trim() === '') {
+    showNotice('Type part of a name, or turn on Near the phone or the map view.');
+    return;
+  }
 
   const button = field('doc-search');
   button.disabled = true;
   try {
     const answer = await getJson(
-      docSearchPath(field('doc-name').value, near, bounds, field('doc-radius').value)
+      docSearchPath(field('doc-name').value, near, bounds, field('doc-radius').value, docSource)
     );
-    docTracks = answer.tracks || [];
-    docSelected.clear();
+    docRows = answer.rows || [];
+    docFilters = answer.filters || [];
     // A new set of results, so a filter from the last search is not carried onto it.
-    docKinds.clear();
-    docTypes.clear();
+    docChosen.clear();
     drawDocFilters();
     drawDocList();
     const words = docSearchNote(answer);
@@ -969,27 +1003,37 @@ function docMapBounds() {
 }
 
 /**
- * The Filter and Sort controls: a labelled group of the kinds and track types the search returned,
- * each one ticked or not, and the two orders.
+ * The Filter and Sort controls: one labelled group per filter the phone offered, each value ticked or
+ * not, and the two orders.
  *
- * Offered from the results rather than from a list of DOC's taxonomy kept here, so a filter is always
- * a fact about the page. Tick or untick one and the list is redrawn and DOC is asked nothing. Labels
- * rather than a row of sliding chips, which said nothing about what they filtered.
+ * Which groups there are and what they are called is the **phone's** answer - a hut is narrowed by
+ * whether it is bookable, a track by how it is walked - so this draws what it is handed rather than
+ * keeping its own idea of DOC's taxonomy. The values in a group are the ones the rows actually carry,
+ * so a filter can never offer a choice that matches nothing.
  */
 function drawDocFilters() {
-  field('doc-controls').hidden = docTracks.length === 0;
-  if (docTracks.length === 0) return;
+  const container = field('doc-filters');
+  container.replaceChildren();
+  field('doc-controls').hidden = docRows.length === 0;
+  if (docRows.length === 0) return;
 
-  docChoices(field('doc-kinds'), 'Kind', docKindsOf(docTracks), docKinds, (kind) => {
-    if (docKinds.has(kind)) docKinds.delete(kind);
-    else docKinds.add(kind);
-  });
-  docChoices(field('doc-types'), 'Track type', docTypesOf(docTracks), docTypes, (type) => {
-    if (docTypes.has(type)) docTypes.delete(type);
-    else docTypes.add(type);
-  });
+  for (const filter of docFilters) {
+    const values = docValuesOf(docRows, filter.field);
+    if (values.length === 0) continue;
+    const group = document.createElement('div');
+    group.className = 'doc-choices';
+    docChoices(group, filter.label, values, docChosen.get(filter.field) || new Set(), (value) => {
+      const chosen = docChosen.get(filter.field) || new Set();
+      if (chosen.has(value)) chosen.delete(value);
+      else chosen.add(value);
+      docChosen.set(filter.field, chosen);
+    });
+    container.append(group);
+  }
+
   docOrders(
     field('doc-sort'),
+    null,
     [
       { value: 'nearest', label: 'Nearest to phone' },
       { value: 'name', label: 'Name' }
@@ -1030,9 +1074,10 @@ function docChoices(container, tag, choices, chosen, onToggle) {
 }
 
 /** One labelled group of orders: radios, because only one order can be on. */
-function docOrders(container, orders, chosen, onChoose) {
+function docOrders(container, tag, orders, chosen, onChoose) {
   container.replaceChildren();
   container.hidden = orders.length === 0;
+  if (tag) container.append(docSub(tag));
   for (const order of orders) {
     const label = document.createElement('label');
     label.className = 'doc-choice';
@@ -1052,7 +1097,7 @@ function docOrders(container, orders, chosen, onChoose) {
   }
 }
 
-/** A small sub-heading inside a Filter group: which part of DOC's taxonomy the choices below are. */
+/** A small sub-heading inside a group: which part of DOC's answer the choices below are. */
 function docSub(text) {
   const span = document.createElement('span');
   span.className = 'doc-sub';
@@ -1060,90 +1105,36 @@ function docSub(text) {
   return span;
 }
 
+/** The chosen values as the plain `field: [values]` the page's own filtering reads. */
+function docChosenNow() {
+  const plain = {};
+  for (const [field, values] of docChosen) plain[field] = [...values];
+  return plain;
+}
+
 function drawDocList() {
   const list = field('doc-list');
   list.replaceChildren();
-  // Filtered and ordered on the page, from the phone's own distances: changing a filter narrows the
-  // page it already has rather than asking DOC again.
-  for (const track of docShowing(docTracks, [...docKinds], [...docTypes], docSort)) {
-    const row = document.createElement('label');
-    // A track the phone already has is shown but not tickable: the box is off, the row says why, and
-    // the click does nothing - so a second search cannot double the work.
-    row.className = track.imported ? 'doc-row imported' : 'doc-row';
-
-    const box = document.createElement('input');
-    box.type = 'checkbox';
-    box.checked = docSelected.has(track.id);
-    box.disabled = track.imported;
-    box.addEventListener('change', () => {
-      if (box.checked) docSelected.add(track.id);
-      else docSelected.delete(track.id);
-      updateDocImport();
-    });
+  // Filtered and ordered on the page, from the phone's own distances: changing a filter narrows what is
+  // already here rather than asking DOC again.
+  for (const row of docShowing(docRows, docChosenNow(), docSort)) {
+    const line = document.createElement('div');
+    line.className = 'doc-row';
 
     const name = document.createElement('span');
     name.className = 'name';
-    // The name the import will give it - the place, then DOC's own name - so a site the phone names
-    // wrongly is seen here, at a glance, rather than after the track has landed.
-    name.textContent = track.assetName || track.name;
+    name.textContent = row.name;
 
-    // The phone's own figures, in the drawing's own words: how the track is walked and how long it is,
-    // so two tracks with the same name can be told apart before one is imported.
+    // The phone's own line about the row - what it is, what DOC says about it, how far away it is - so
+    // the desk reads exactly what the phone would read about the same thing.
     const meta = document.createElement('span');
     meta.className = 'meta';
-    meta.textContent = [
-      track.kind,
-      // How the track is walked, where a vertex count used to be: "584 points" is nothing a walker
-      // uses, where one-way tells them what they are taking on.
-      track.trackType,
-      metresText(track.lengthM),
-      // How far the phone says it is, so "Near the phone" can be seen to be the radius it says.
-      typeof track.distanceM === 'number' ? `${metresText(track.distanceM)} away` : null,
-      track.imported ? 'already imported' : null
-    ]
-      .filter(Boolean)
-      .join(' \u00b7 ');
+    meta.textContent = row.detail;
 
-    row.append(box, name, meta);
-    list.append(row);
-  }
-  updateDocImport();
-}
-
-function updateDocImport() {
-  const count = docSelected.size;
-  field('doc-import').textContent = count === 0 ? 'Import selected' : `Import ${count} selected`;
-  field('doc-import').disabled = count === 0;
-}
-
-async function importDocTracks() {
-  const picked = docTracks.filter((track) => docSelected.has(track.id) && !track.imported);
-  if (picked.length === 0) return;
-
-  const button = field('doc-import');
-  button.disabled = true;
-  try {
-    const { status, answer } = await sendJson('/api/doc/import', 'POST', docImportBody(picked));
-    if (status !== 200) {
-      showNotice(answer.message || 'The phone would not import those tracks.');
-      return;
-    }
-    closeDoc();
-    docTracks = [];
-    docSelected.clear();
-    docKinds.clear();
-    docTypes.clear();
-    // The work the phone holds has changed, and every way the page reads it - the list, the box,
-    // the map - is rebuilt from the document rather than guessed at.
-    await reloadWork();
-    showNotice(answer.message || 'Imported.');
-  } catch (error) {
-    showNotice(error.message);
-  } finally {
-    updateDocImport();
+    line.append(name, meta);
+    list.append(line);
   }
 }
-
 /**
  * Takes a track away, when there is nothing recorded against it.
  *
@@ -1399,7 +1390,6 @@ document.getElementById('doc-overlay').addEventListener('mousedown', (event) => 
   if (event.target.id === 'doc-overlay') closeDoc();
 });
 document.getElementById('doc-search').addEventListener('click', searchDoc);
-document.getElementById('doc-import').addEventListener('click', importDocTracks);
 document.getElementById('doc-name').addEventListener('keydown', (event) => {
   // Enter searches, as it saves everywhere else on this page: the field is the whole question.
   if (event.key === 'Enter') {

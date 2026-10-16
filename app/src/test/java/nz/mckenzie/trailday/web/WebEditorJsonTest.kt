@@ -370,99 +370,95 @@ class WebEditorJsonTest {
     }
 
     @Test
-    fun `a DOC search carries each track with its geometry, kind and the phone's own figures`() {
+    fun `a DOC search says which service it is, what it can be narrowed by, and the rows`() {
         val text = WebEditorJson.docSearch(
-            tracks = listOf(
+            source = DocSource.HUTS,
+            items = listOf(
+                DocItem(
+                    source = DocSource.HUTS,
+                    objectId = 218,
+                    name = "Angelus Hut",
+                    paths = listOf(listOf(GeoPoint(-41.62, 172.65))),
+                    facts = mapOf(
+                        "place" to "Nelson Lakes National Park",
+                        "region" to "Nelson/Tasman",
+                        "bookable" to "Yes"
+                    )
+                )
+            ),
+            from = GeoPoint(-41.6, 172.6),
+            message = null,
+            capped = false
+        )
+        val read = json.decodeFromString(WebEditorDocSearch.serializer(), text)
+
+        assertEquals("the desk is told which of DOC's four services it is looking at", "huts", read.source)
+        assertEquals(
+            "and what a hut can be narrowed by, which is not what a track can",
+            listOf(WebEditorDocFilter(field = "bookable", label = "Bookable"), WebEditorDocFilter(field = "region", label = "Region")),
+            read.filters
+        )
+        assertEquals(1, read.rows.size)
+        assertEquals(218L, read.rows.first().id)
+        assertEquals("Angelus Hut", read.rows.first().name)
+        assertEquals(
+            "the row's own words are the phone's, so both surfaces say the same thing about the same hut",
+            "Nelson Lakes National Park \u00b7 Nelson/Tasman \u00b7 Bookable \u00b7 4.71 km away",
+            read.rows.first().detail
+        )
+        assertEquals(
+            "and its answers to those filters, so the desk's chips are the phone's own rule",
+            mapOf("bookable" to "Yes", "region" to "Nelson/Tasman"),
+            read.rows.first().values
+        )
+        assertTrue(
+            "with the distance the phone worked out, so the desk's nearest order is the phone's",
+            (read.rows.first().distanceM ?: 0.0) > 0.0
+        )
+    }
+
+    @Test
+    fun `with no fix a row carries no distance, and the desk falls back to by name`() {
+        val text = WebEditorJson.docSearch(
+            source = DocSource.TRACKS,
+            items = listOf(
                 DocItem(
                     source = DocSource.TRACKS,
                     objectId = 42,
                     name = "Glory Tk",
                     paths = listOf(listOf(GeoPoint(-46.6, 168.3), GeoPoint(-46.61, 168.31))),
-                    facts = mapOf(
-                        "SubObjectType" to "Walking Track",
-                        "CharName7" to DocSource.TRACK_TYPE_CHARACTERISTIC,
-                        "CharValue7" to "One way",
-                        "FlocID" to "BLUFFHIL-TK02"
-                    )
+                    facts = mapOf("SubObjectType" to "Walking Track")
                 )
             ),
-            importedRefs = setOf("doc-tracks:99"),
-            from = GeoPoint(-46.62, 168.32),
+            from = null,
             message = null,
             capped = false
         )
         val read = json.decodeFromString(WebEditorDocSearch.serializer(), text)
 
-        // The geometry travels to the desk because these tracks are not on the phone yet - the desk
-        // draws them, and ticking one has to be able to make it without asking DOC again.
-        assertEquals(1, read.tracks.size)
-        assertEquals(42L, read.tracks[0].id)
-        assertEquals("Glory Tk", read.tracks[0].name)
+        assertTrue("no fix means no distance", read.rows.first().distanceM == null)
+    }
+
+    @Test
+    fun `an answer with nothing in it still says which service was read`() {
+        // The desk shows "nothing matched" and the service's own name, so a page that found nothing for
+        // huts does not read as a page that looked for tracks.
+        val text = WebEditorJson.docSearch(
+            source = DocSource.CAMPSITES,
+            items = emptyList(),
+            from = null,
+            message = "No DOC campsites matched.",
+            capped = false
+        )
+        val read = json.decodeFromString(WebEditorDocSearch.serializer(), text)
+
+        assertEquals("campsites", read.source)
+        assertTrue(read.rows.isEmpty())
+        assertEquals("No DOC campsites matched.", read.message)
         assertEquals(
-            "the name the import will give it travels too, so a wrong place is seen before it lands",
-            "Bluff Hill Glory Tk",
-            read.tracks[0].assetName
+            "and what a campsite could have been narrowed by, so the page is ready when there is one",
+            listOf("campsiteCategory", "bookable", "region"),
+            read.filters.map { it.field }
         )
-        assertEquals("Walking Track", read.tracks[0].kind)
-        assertEquals("how the track is walked travels so the desk can show and filter it", "One way", read.tracks[0].trackType)
-        assertEquals("the site travels so the phone can prefix the place", "BLUFFHIL-TK02", read.tracks[0].flocId)
-        assertEquals(2, read.tracks[0].points)
-        assertEquals(1, read.tracks[0].paths.size)
-        assertEquals(2, read.tracks[0].paths[0].size)
-        assertEquals(WebEditorPoint(lat = -46.6, lng = 168.3), read.tracks[0].paths[0].first())
-        assertEquals("a track the phone does not have is not marked imported", false, read.tracks[0].imported)
-        assertTrue("and its distance to the phone travels so the desk can order by it",
-            (read.tracks[0].distanceM ?: 0.0) > 0.0)
-    }
-
-    @Test
-    fun `with no fix the distance is left out, and the desk falls back to by name`() {
-        val track = DocItem(
-            source = DocSource.TRACKS,
-            objectId = 42,
-            name = "Glory Tk",
-            paths = listOf(listOf(GeoPoint(-46.6, 168.3), GeoPoint(-46.61, 168.31))),
-            facts = mapOf("SubObjectType" to "Walking Track")
-        )
-
-        val text = WebEditorJson.docSearch(
-            tracks = listOf(track),
-            importedRefs = emptySet(),
-            from = null,
-            message = null,
-            capped = false
-        )
-        val read = json.decodeFromString(WebEditorDocSearch.serializer(), text)
-
-        assertTrue("no fix means no distance", read.tracks[0].distanceM == null)
-    }
-
-    @Test
-    fun `a DOC track the phone already has is marked imported, so the desk will not import it twice`() {
-        val track = DocItem(
-            source = DocSource.TRACKS,
-            objectId = 42,
-            name = "Glory Tk",
-            paths = listOf(listOf(GeoPoint(-46.6, 168.3), GeoPoint(-46.61, 168.31))),
-            facts = mapOf("SubObjectType" to "Walking Track")
-        )
-
-        val text = WebEditorJson.docSearch(
-            tracks = listOf(track),
-            importedRefs = setOf(track.sourceRef),
-            from = null,
-            message = null,
-            capped = false
-        )
-
-        assertTrue("the page is told: $text", text.contains("\"imported\":true"))
-    }
-
-    @Test
-    fun `a DOC import answers with the count and the phone's sentence`() {
-        val text = WebEditorJson.docImported(count = 3, message = "Imported 3 DOC tracks.")
-
-        assertTrue("the page is told: $text", text.contains("\"imported\":3"))
-        assertTrue("and the phone's words: $text", text.contains("Imported 3 DOC tracks."))
     }
 }

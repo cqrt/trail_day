@@ -304,24 +304,26 @@ main { flex: 1; display: flex; min-height: 0; position: relative; }
 
 #doc-list:empty { display: none; }
 
+/*
+ * One thing DOC published: its name, and the phone's own line about it - what it is, what DOC says
+ * about it, how far away it is. Nothing here is a thing to tick: the desk reads DOC's material and
+ * keeps none of it.
+ */
 #doc-list .doc-row {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  flex-direction: column;
+  gap: 2px;
   padding: 6px 0;
   border-bottom: 1px solid var(--line);
-  cursor: pointer;
 }
 
 #doc-list .doc-row .name { font-size: 13.5px; }
 
-/* A track the phone already has: shown, not tickable, and plainly not the walker's to choose. */
-#doc-list .doc-row.imported { cursor: default; opacity: 0.6; }
-
 /*
- * What a search found, narrowed and ordered: a labelled Filter group - the kinds and track types the
- * page actually holds - and a labelled Sort group. Plain labelled controls rather than a row of
- * sliding pills, so what each one is is written above it and nothing scrolls the list away.
+ * What a search found, narrowed and ordered: a labelled group per filter **the phone offered** - a hut
+ * is narrowed by whether it is bookable, a track by how it is walked - and a labelled Sort group. Plain
+ * labelled controls rather than a row of sliding pills, so what each one is is written above it and
+ * nothing scrolls the list away.
  */
 #doc-controls {
   display: flex;
@@ -366,11 +368,8 @@ main { flex: 1; display: flex; min-height: 0; position: relative; }
 }
 
 #doc-list .doc-row .meta {
-  margin-left: auto;
   color: var(--quiet);
   font-size: 12px;
-  text-align: right;
-  white-space: nowrap;
 }
 
 /*
