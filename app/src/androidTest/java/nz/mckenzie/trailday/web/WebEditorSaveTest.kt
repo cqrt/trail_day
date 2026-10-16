@@ -94,7 +94,7 @@ class WebEditorSaveTest {
         points: List<GeoPoint>? = null,
         paths: List<List<GeoPoint>>? = null
     ): String =
-        """{"name":"$name","kind":"ROAD","notes":"$notes",""" +
+        """{"name":"$name","kind":"BIKE_TRACK","notes":"$notes",""" +
             (if (points == null) "" else """"points":${pointsJson(points)},""") +
             (if (paths == null) "" else """"paths":[${paths.joinToString(",") { pointsJson(it) }}],""") +
             """"version":"$version"}"""
@@ -150,7 +150,7 @@ class WebEditorSaveTest {
 
         val stored = assets.getAsset(id)!!
         assertEquals("Estuary road, lower", stored.name)
-        assertEquals("ROAD", stored.kind)
+        assertEquals("BIKE_TRACK", stored.kind)
         // Everything the page never saw, exactly as it was.
         assertTrue(stored.active)
         assertEquals("the length is still the line's own", 111.19, stored.lengthM, 0.5)

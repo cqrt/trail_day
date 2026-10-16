@@ -10,7 +10,6 @@ import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
-import nz.mckenzie.trailday.domain.geo.Ring
 import nz.mckenzie.trailday.domain.track.GpxWriter
 import nz.mckenzie.trailday.domain.track.TrackInterchange
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
@@ -19,8 +18,8 @@ import nz.mckenzie.trailday.domain.tiles.withMinimumSpan
 /**
  * The place list, its geometry, and the shape of a place.
  *
- * "Asset" is the wider word on purpose: the list holds tracks, roads and pieces of
- * infrastructure, and they differ only in their kind and shape.
+ * "Asset" is the wider word on purpose: the list holds tracks, huts, campsites and the walker's own
+ * waypoints, and they differ only in their kind and shape.
  */
 class AssetRepository(
     private val db: TrailDayDatabase
@@ -186,33 +185,16 @@ class AssetRepository(
     ) = db.withTransaction { writeAssetEdits(asset, geometry) }
 
     /**
-     * One asset's row and, when it is given one, its geometry.
+     * One place's row and, when it is given one, its geometry.
      */
     private suspend fun writeAssetEdits(
         asset: AssetEntity,
         geometry: AssetGeometry?
     ) {
         assetDao.update(asset)
-        when {
-            geometry != null -> storeGeometry(asset.id, geometry)
-            // A shape that is ground has to end up with ground under it: the kind decides that the last
-            // corner joins the first, and a line that has just been made a carpark arrives open by
-            // definition. It is closed once, here - and a carpark whose ring is already closed is left
-            // exactly as it is rather than rewritten every time its name is edited.
-            //
-            // **Unless it has no measured ground yet**, which is the fenceline somebody kept a carpark
-            // as and has just re-kinded: a closed fenceline arrives with no area, and the whole point of
-            // the kind is the number. Writing the geometry again is what works the area out from the
-            // corners it already has - and a shape that genuinely encloses nothing goes on saying so,
-            // at the price of one write when somebody edits it.
-            AssetShape.fromStorage(asset.shape) == AssetShape.AREA -> {
-                val stored = getAssetGeometry(asset.id)
-                if (!Ring.isClosed(stored.line) || asset.areaM2 <= 0.0) {
-                    storeGeometry(asset.id, stored)
-                }
-            }
-            else -> Unit
-        }
+        // The row's drawing is written only when the caller brought one: a rename leaves the
+        // geometry exactly as it is.
+        if (geometry != null) storeGeometry(asset.id, geometry)
     }
 
     suspend fun updateAsset(asset: AssetEntity) = assetDao.update(asset)
@@ -224,26 +206,14 @@ class AssetRepository(
     suspend fun deleteAsset(assetId: Long) = assetDao.delete(assetId)
 
     /**
-     * Writes every path of an asset's geometry and the length that goes with it.
+     * Writes every path of a place's geometry and the length that goes with it.
      *
      * The length is [AssetGeometry.lengthM] - every metre of every path, once - rather than a sum the
      * caller worked out: a cached length that disagrees with the vertices beside it is a list that
      * says a track is 800 m when its spur is 200 m of it.
      */
     private suspend fun storeGeometry(assetId: Long, geometry: AssetGeometry) {
-        // Ground with an edge is closed and measured **here**, where every geometry write goes through,
-        // rather than by each caller: a cached length that disagrees with the vertices beside it is a
-        // list that says a track is 800 m when its spur is 200 m of it - and a ground area that
-        // disagrees with them is a carpark claiming an acre it does not have. The shape is one
-        // primary-key lookup inside a transaction this write is already in.
-        val ground = AssetShape.fromStorage(assetDao.getAsset(assetId)?.shape) == AssetShape.AREA
-        val stored = if (ground) {
-            AssetGeometry(listOf(Ring.closed(geometry.line)) + geometry.sideTracks)
-        } else {
-            geometry
-        }
-
-        val rows = stored.paths.flatMapIndexed { pathIndex, path ->
+        val rows = geometry.paths.flatMapIndexed { pathIndex, path ->
             path.mapIndexed { index, point ->
                 AssetPointEntity(
                     assetId = assetId,
@@ -258,8 +228,7 @@ class AssetRepository(
         assetDao.replaceGeometry(
             assetId = assetId,
             points = rows,
-            lengthM = stored.lengthM,
-            areaM2 = if (ground) Ring.areaSqm(stored.line) else 0.0
+            lengthM = geometry.lengthM
         )
     }
 

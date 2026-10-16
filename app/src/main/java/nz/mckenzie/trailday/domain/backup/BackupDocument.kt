@@ -70,12 +70,6 @@ data class AssetRecord(
     val createdAtEpochMs: Long,
     val lengthM: Double = 0.0,
     /**
-     * The ground a ring encloses, for a carpark. Written as a key an older file simply does not have:
-     * everything a file written before this can hold is a line or a place, and neither encloses
-     * anything, so an absent key and a zero mean the same thing.
-     */
-    val areaM2: Double = 0.0,
-    /**
      * Where the asset came from, when it came from a service: `doc:35239046` for a DOC track.
      *
      * Optional and added without a version bump, like the side tracks before it: a file written

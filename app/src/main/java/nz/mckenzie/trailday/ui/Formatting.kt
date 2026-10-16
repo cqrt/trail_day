@@ -14,13 +14,6 @@ fun formatDistance(meters: Double): String = when {
     else -> String.format(Locale.US, "%.2f km", meters / 1000.0)
 }
 
-/** "420 m²" / "1.2 ha" - treated area for a swath width. */
-fun formatArea(squareMetres: Double): String = when {
-    squareMetres <= 0.0 -> "-"
-    squareMetres < 10_000.0 -> "${squareMetres.roundToInt()} m\u00b2"
-    else -> String.format(Locale.US, "%.1f ha", squareMetres / 10_000.0)
-}
-
 /** "45s" / "12m 30s" / "1h 05m" - elapsed recording time. */
 fun formatDuration(millis: Long): String {
     if (millis <= 0L) return "0s"

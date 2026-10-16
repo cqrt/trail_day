@@ -53,7 +53,7 @@ const val DEFAULT_CAMERA_ZOOM = 6.0
 
 internal const val ASSETS_SOURCE = "trailday-assets"
 
-// The four asset layers are named in [AssetLayerIds], which is also where the map's own switches
+// The layers of the work are named in [AssetLayerIds], which is also where the map's own switches
 // find them: the layer that is created and the layer a switch hides are the same name by
 // construction, rather than two strings that have to be kept in step.
 
@@ -72,31 +72,9 @@ private const val POSITION_ACCURACY_FILL = "rgba(33, 33, 33, 0.16)"
 private const val POSITION_ACCURACY_OUTLINE = "rgba(33, 33, 33, 0.38)"
 
 /**
- * How much of the ground's colour a carpark's fill carries.
- *
- * A quarter, in the feature's own colour, which is the carpark's traffic light: solid enough to read
- * as ground from across a paddock, thin enough that the imagery underneath is still readable - the
- * fill says *this is a surface*, and it is not the thing the operator is looking at.
- */
-private const val GROUND_FILL_OPACITY = 0.25f
-
-/**
- * How wide a line of the work is drawn: a track, a road, a fenceline, and the ground's own boundary.
- *
- * The ground's rim is measured from this rather than written down beside it, so a rim is always the
- * line it rims plus two pixels - one number, and the two cannot drift apart if the line's weight
- * changes.
+ * How wide a line of the work is drawn: a track and a bike track.
  */
 private const val ASSET_LINE_WIDTH = 5f
-
-/**
- * How wide the white rim outside a carpark's boundary is drawn.
- *
- * The boundary is drawn at [ASSET_LINE_WIDTH], so a line two pixels wider leaves **one pixel of white
- * showing outside the ring** and hides the other behind the boundary - which is the whole of the mark:
- * a hairline that says where the ground is, without touching the colour that says when it is due.
- */
-private const val CARPARK_CASING_WIDTH = ASSET_LINE_WIDTH + 2f
 
 /** Padding around the track network when the camera frames it. */
 private const val BOUNDS_PADDING_PX = 96
@@ -155,7 +133,7 @@ fun BasemapView(
     /**
      * The deepest the camera may sit when it frames [fitBounds].
      *
-     * A fit is only ever as good as the box: an asset that is one coordinate, or a fenceline a
+     * A fit is only ever as good as the box: a place that is one coordinate, or a track a
      * few metres long, has a box that fills the screen at the deepest zoom the map has - which
      * is past the imagery, so the screen comes up as bare background. A cap says how close is
      * still useful, and the asset's own page asks for 15: a place or a short line lands on that,
@@ -226,7 +204,7 @@ fun BasemapView(
     val mapViewState = remember { mutableStateOf<MapView?>(null) }
     var boundsApplied by remember { mutableStateOf(false) }
 
-    // The houses a place is drawn with are rendered at the device's own density, so a place is
+    // The markers a place is drawn with are rendered at the device's own density, so a place is
     // the size it is meant to be, and sharp, on the screen it lands on. Read here and passed
     // in because a style is loaded from two places - the first frame, and a basemap change -
     // and both want the same answer.
@@ -273,7 +251,7 @@ fun BasemapView(
                     map.uiSettings.isDoubleTapGesturesEnabled = interactive
                     map.uiSettings.isQuickZoomGesturesEnabled = interactive
                     // North stays up. A gloved hand rotates this map by accident, and the
-                    // mistake is invisible until a fenceline points the wrong way - while
+                    // mistake is invisible until a track points the wrong way - while
                     // nothing on it is easier to read at an angle.
                     map.uiSettings.isRotateGesturesEnabled = false
                     map.uiSettings.isTiltGesturesEnabled = false
@@ -440,11 +418,11 @@ fun BasemapView(
 
 /**
  * Loads a trail-day style and installs the track source/layer. Tracks are drawn
- * from a data-driven `stroke` property so each track takes its traffic-light
- * colour, and a place is drawn as a house in the same one.
+ * from a data-driven `stroke` property so each kind takes its own colour,
+ * and a place is drawn as a marker in the kind's colour.
  *
- * [density] is the device's, and it is what the houses are rendered at: see
- * [addPlaceIconImages].
+ * [density] is the device's, and it is what the markers are rendered at: see
+ * [addPlaceMarkerImages].
  */
 internal fun MapLibreMap.loadTrailDayStyle(
     basemap: Basemap,
@@ -486,28 +464,16 @@ internal fun MapLibreMap.loadTrailDayStyle(
             style.addSource(GeoJsonSource(ASSETS_SOURCE, assetGeoJson))
         }
         // One line layer per kind, because line-dasharray is a constant in MapLibre
-        // rather than something a feature can carry. So a track is solid, a road is
-        // dashed and infrastructure is dotted, and the filter is what keeps them apart.
-        // The ground goes under every line, because that is what it is: the surface the lines on it
-        // are drawn over. Added before them, which is what puts it underneath - MapLibre draws a
-        // style's layers in the order the style lists them.
-        addGroundFillLayer(style)
-        // The ground's own rim, straight after its fill and still under every line: it is the ground's
-        // edge, not one of the lines drawn on it. See addGroundCasingLayer.
-        addGroundCasingLayer(style)
+        // rather than something a feature can carry. So a track is solid and a bike track
+        // is dashed, and the filter is what keeps them apart.
         addLineLayer(style, AssetLayerIds.TRACKS, AssetKind.TRACK)
-        addLineLayer(style, AssetLayerIds.ROADS, AssetKind.ROAD)
-        addLineLayer(style, AssetLayerIds.FENCELINES, AssetKind.FENCELINE)
-        // Ground with an edge: a carpark's boundary, and the one line layer whose features are rings
-        // rather than paths. Solid, because what a boundary says is that it closes - the fill and the
-        // measurements are the app's, and the shape is what tells a carpark from a track.
-        addLineLayer(style, AssetLayerIds.CARPARKS, AssetKind.CARPARK, shape = AssetShape.AREA)
+        addLineLayer(style, AssetLayerIds.BIKE_TRACKS, AssetKind.BIKE_TRACK)
         // The names beside tracks: written over the tracks they belong to, and under the places so a
         // name never covers a place. See addTrackNameLayer.
         addTrackNameLayer(style)
-        // A place is a marker, not a short line: drawing a picnic table as a line would claim a
-        // shape the record does not have, and a marker says what the thing is rather than only
-        // where it is - the same glyph the asset's own row carries.
+        // A place is a marker, not a short line: drawing a waypoint as a line would claim a shape the
+        // record does not have, and a marker says what the thing is rather than only where it is - the
+        // same glyph the place's own row carries.
         addPlaceMarkerImages(style, density)
         PlaceIcons.KINDS.forEach { kind -> addPlaceLayer(style, kind) }
 
@@ -563,8 +529,8 @@ internal fun MapLibreMap.loadTrailDayStyle(
  */
 private fun applyLayerVisibility(style: Style, hidden: Set<AssetLayer>) {
     AssetLayer.ALL.forEach { layer ->
-        // Every layer that switch is: for the ground with an edge that is two, and a boundary left
-        // behind with the fill switched off would be half a carpark.
+        // Every layer that switch is: a track is two, because its name goes with it, and leaving
+        // the name behind would be a label on nothing.
         AssetLayerIds.idsOf(layer).forEach inner@{ id ->
             val target = style.getLayer(id) ?: return@inner
             target.setProperties(
@@ -575,13 +541,12 @@ private fun applyLayerVisibility(style: Style, hidden: Set<AssetLayer>) {
 }
 
 /**
- * Hands the style the markers a place is drawn with: one per kind of place, per colour a traffic
- * light can be.
+ * Hands the style the markers a place is drawn with: one per kind of place, in the kind's own colour.
  *
- * Rendered from the same drawing the asset list's glyphs come from - see [MarkerIcons] - rather than
- * painted again here, so a bench seat is a bench seat in both places. Each is rendered at the
+ * Rendered from the same drawing the place list's glyphs come from - see [MarkerIcons] - rather than
+ * painted again here, so a hut is a hut in both places. Each is rendered at the
  * device's own density, which is what draws a place at [PlaceIcons.MARKER_DP] on whatever screen it
- * lands on, and keeps the legs, the posts and the white edge sharp while it does it. There is no size
+ * lands on, and keeps the roof, the tent and the white edge sharp while it does it. There is no size
  * in the style to get wrong and nothing for the map to scale.
  */
 private fun addPlaceMarkerImages(style: Style, density: Float) {
@@ -654,14 +619,12 @@ private fun addPlaceLayer(style: Style, kind: AssetKind) {
  * Adds one of the kind's line layers if it is not already there.
  *
  * The dash pattern comes from [AssetLineStyles], so which kind is drawn dashed is
- * decided in one testable place rather than here. Which *shape* of feature the layer draws comes in
- * from the caller, because one source carries both: a path, and the ring of ground with an edge.
+ * decided in one testable place rather than here.
  */
 private fun addLineLayer(
     style: Style,
     id: String,
-    kind: AssetKind,
-    shape: AssetShape = AssetShape.LINE
+    kind: AssetKind
 ) {
     if (style.getLayer(id) != null) return
 
@@ -680,10 +643,10 @@ private fun addLineLayer(
             .withFilter(
                 Expression.all(
                     Expression.eq(Expression.get("kind"), Expression.literal(kind.name)),
-                    shapeIs(shape),
+                    shapeIs(AssetShape.LINE),
                     // The one stretch of a track that carries the track's name belongs to the name layer
                     // alone. Drawn here as well it would be a second line over the track - and, on a
-                    // half-sprayed track, one line in one colour over the two that say how far the job has
+                    // half-walked track, one line in one colour over the two that say how far the walk has
                     // got. A feature without the property at all passes this, which is every other feature.
                     Expression.neq(Expression.get(TrackNames.CARRIES_NAME), Expression.literal(true))
                 )
@@ -737,76 +700,6 @@ private fun addTrackNameLayer(style: Style) {
     // names crowd the screen and read as a muddle.
     names.minZoom = TrackNames.MIN_ZOOM
     style.addLayer(names)
-}
-
-/**
- * Adds the fill that makes a carpark's ground a surface rather than an outline.
- *
- * Added before the line layers, so it is drawn under them: a track across a carpark is a track on
- * ground rather than a line something has been laid over. The colour is the feature's own - the
- * carpark's traffic light - and the boundary drawn on top of it is solid, so where the ground stops
- * is never in doubt.
- *
- * It asks for polygons as well as for carparks, because a fill layer fills polygons: handed a line it
- * fills whatever pieces the tile boundaries left of it. A part-walked carpark's own halves are lines,
- * and they belong to the boundary layer.
- */
-private fun addGroundFillLayer(style: Style) {
-    if (style.getLayer(AssetLayerIds.CARPARKS_FILL) != null) return
-
-    style.addLayer(
-        FillLayer(AssetLayerIds.CARPARKS_FILL, ASSETS_SOURCE)
-            .withProperties(
-                PropertyFactory.fillColor(Expression.get("stroke")),
-                PropertyFactory.fillOpacity(Expression.literal(GROUND_FILL_OPACITY))
-            )
-            .withFilter(
-                Expression.all(
-                    Expression.eq(Expression.get("kind"), Expression.literal(AssetKind.CARPARK.name)),
-                    shapeIs(AssetShape.AREA),
-                    Expression.eq(Expression.geometryType(), Expression.literal("Polygon"))
-                )
-            )
-    )
-}
-
-/**
- * Adds the white rim outside a carpark's boundary.
- *
- * The boundary carries the traffic light's own colour, so it cannot also be the thing that makes the
- * ground findable - over dark winter imagery a red edge and a green edge are equally hard to see. What
- * makes it findable is white, the one colour the traffic light never uses, and the same white the
- * app's own dot and the desk's in-hand edge wear.
- *
- * Drawn *under* the boundary and two pixels wider, which is what puts the white outside the ring rather
- * than beside it: the sliver inside is behind the boundary, and what is left showing is one pixel of
- * white round the outside. Solid and unblurred, because a hairline that is soft enough to spread is
- * soft enough to disappear - the desk's in-hand edge can afford its blur because it is ten pixels
- * wider; this one cannot.
- *
- * Its filter is the boundary's own, shape and kind, so it draws round exactly the ground the boundary
- * closes - including the halves of a part-walked carpark, which are lines on the map and are drawn by
- * the boundary for the same reason.
- */
-private fun addGroundCasingLayer(style: Style) {
-    if (style.getLayer(AssetLayerIds.CARPARKS_CASING) != null) return
-
-    style.addLayer(
-        LineLayer(AssetLayerIds.CARPARKS_CASING, ASSETS_SOURCE)
-            .withProperties(
-                PropertyFactory.lineColor(Expression.literal("#FFFFFF")),
-                PropertyFactory.lineWidth(Expression.literal(CARPARK_CASING_WIDTH)),
-                PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
-                PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
-                PropertyFactory.lineOpacity(Expression.literal(1f))
-            )
-            .withFilter(
-                Expression.all(
-                    Expression.eq(Expression.get("kind"), Expression.literal(AssetKind.CARPARK.name)),
-                    shapeIs(AssetShape.AREA)
-                )
-            )
-    )
 }
 
 private fun shapeIs(shape: AssetShape): Expression =

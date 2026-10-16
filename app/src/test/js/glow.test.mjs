@@ -172,18 +172,18 @@ test('the halo is named after the layer it belongs under, once', () => {
   assert.equal(haloLayer(track, 7).id, haloId(track.id));
 });
 
-test('ground gets no halo of its own: its edge is a line like any other', () => {
-  // The carpark's fill, as `WebStyleJson` builds it. A halo for it would have to be a circle layer -
-  // `haloLayer` has only two shapes - and a circle draws one disc per corner of the ring.
-  const ground = {
-    id: 'trailday-assets-area-carpark-fill',
+test('a fill layer gets no halo of its own: there is no outline to widen', () => {
+  // A surface drawn by a fill layer. A halo for it would have to be a circle layer - `haloLayer` has
+  // only two shapes - and a circle draws one disc per corner of the shape.
+  const surface = {
+    id: 'trailday-assets-fill',
     type: 'fill',
     source: 'assets',
-    filter: ['all', ['==', ['get', 'kind'], 'CARPARK'], ['==', ['get', 'shape'], 'AREA']],
-    paint: { 'fill-color': ['get', 'stroke'], 'fill-opacity': 0.25 }
+    filter: ['all'],
+    paint: { 'fill-color': ['get', 'fill'], 'fill-opacity': 0.25 }
   };
 
-  assert.equal(wantsHalo(ground), false, 'a surface has no outline to widen');
+  assert.equal(wantsHalo(surface), false, 'a surface has no outline to widen');
   assert.equal(wantsHalo(track), true, 'and a line still gets its white edge');
   assert.equal(
     wantsHalo({ ...place, type: 'line' }),

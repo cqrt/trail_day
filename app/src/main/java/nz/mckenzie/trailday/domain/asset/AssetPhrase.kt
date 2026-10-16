@@ -1,68 +1,45 @@
 package nz.mckenzie.trailday.domain.asset
 
 /**
- * What an asset is and what shape it is, in the operator's words.
+ * What a place is, in the walker's words.
  *
  * One place for these, so the form, the list and the card all say the same thing about
- * the same asset - and so a new kind cannot ship as a picker with a blank label.
+ * the same place - and so a new kind cannot ship as a picker with a blank label.
  */
 object AssetPhrase {
 
     /**
-     * "Track", "Road", "Fenceline", "Carpark", "Building", "Sign", "Bench seat", "Picnic table",
-     * "Pole gate", "Other place".
+     * "Track", "Bike track", "Hut", "Campsite", "Waypoint".
      */
     fun kind(kind: AssetKind): String = when (kind) {
         AssetKind.TRACK -> "Track"
-        AssetKind.ROAD -> "Road"
-        AssetKind.FENCELINE -> "Fenceline"
-        AssetKind.CARPARK -> "Carpark"
-        AssetKind.BUILDING -> "Building"
-        AssetKind.SIGN -> "Sign"
-        AssetKind.BENCH -> "Bench seat"
-        AssetKind.TABLE -> "Picnic table"
-        AssetKind.POLE_GATE -> "Pole gate"
-        AssetKind.OTHER_PLACE -> "Other place"
+        AssetKind.BIKE_TRACK -> "Bike track"
+        AssetKind.HUT -> "Hut"
+        AssetKind.CAMPSITE -> "Campsite"
+        AssetKind.WAYPOINT -> "Waypoint"
     }
 
     /**
-     * The kinds in the order the picker offers them: the lines to travel along, then the ground with
-     * an edge, then the places to stop at.
+     * The kinds in the order the picker offers them: the tracks to travel along, then the places
+     * to stop at.
      */
     val kinds: List<AssetKind> = AssetKind.entries.toList()
 
     /**
-     * What the metres of a shape are called: a line has a length, and a ring has the metres round it.
+     * What the metres of a place are called.
      *
-     * A phrase of its own rather than a word buried in a screen, because the card, the drawing screen
-     * and the desk's card are all making the same statement about the same number.
+     * A line has a length and a place has none - and every kind that has metres is a line - so the
+     * word is the same wherever there is one. It is still a phrase of its own rather than a word
+     * buried in a screen, because the card, the drawing screen and the desk's card are all making
+     * the same statement about the same number.
      */
-    fun lengthLabel(shape: AssetShape): String = when (shape) {
-        AssetShape.AREA -> "Round it"
-        else -> "Length"
-    }
+    fun lengthLabel(): String = "Length"
 
     /**
-     * What changing an asset's shape is called.
+     * What changing a place's drawing is called.
      *
-     * A line is redrawn; ground is re-fenced. The card's own action and the drawing screen's title are
-     * the same errand and so the same words - and before this was one place, the drawing screen told
-     * the operator they were about to "change the line" of a carpark.
+     * The card's own action and the drawing screen's title are the same errand and so the same
+     * words.
      */
-    fun changeLabel(shape: AssetShape): String = when (shape) {
-        AssetShape.AREA -> "Change the boundary"
-        else -> "Change the line"
-    }
-
-    /**
-     * How a figure for ground is said, given the number already written out.
-     *
-     * A ring's own area is **measured** from its corners, so it is said as ground. The line's own
-     * wording is here for a shape that has no measured area at all: a line's area is an estimate,
-     * and an estimate that reads like a measurement is the kind of figure that gets believed.
-     */
-    fun areaPhrase(shape: AssetShape, areaText: String): String = when (shape) {
-        AssetShape.AREA -> "$areaText of ground"
-        else -> "about $areaText"
-    }
+    fun changeLabel(): String = "Change the line"
 }

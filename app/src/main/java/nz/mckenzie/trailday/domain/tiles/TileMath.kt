@@ -103,7 +103,7 @@ const val FRAME_HALF_WIDTH_DEGREES = 0.01
  * A camera told to fit a box with no size goes to the deepest zoom the map has - measured on
  * the asset page at 25.5, against imagery that stops at 22 - and what the operator is left
  * with is the style's dark green background and the marker on it, instead of their paddock
- * (`build/verify/bug1-camera.txt`). A fenceline drawn between two taps a few metres apart is
+ * (`build/verify/bug1-camera.txt`). A track drawn between two taps a few metres apart is
  * the same box with the same ending.
  *
  * A box with a real span in **either** direction is returned exactly as it was: a camera can

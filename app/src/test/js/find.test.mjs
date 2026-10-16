@@ -18,10 +18,10 @@ import { visibleAssets, visibleFeatures } from '../../main/assets/web/find.mjs';
 const row = (id, name, kind) => ({ asset: { id, name, kind } });
 
 const rows = [
-  row(1, 'Estuary road', 'ROAD'),
-  row(2, 'Estuary buildings', 'BUILDING'),
-  row(3, 'Shearing shed', 'BUILDING'),
-  row(4, 'Home fenceline', 'FENCELINE')
+  row(1, 'Estuary road', 'BIKE_TRACK'),
+  row(2, 'Estuary huts', 'HUT'),
+  row(3, 'Tin Hut', 'HUT'),
+  row(4, 'Home track', 'TRACK')
 ];
 
 const names = (shown) => shown.map((one) => one.asset.name);
@@ -43,8 +43,8 @@ test('nothing typed and Anything picked is the whole work, in the order it arriv
 });
 
 test('the typed words narrow it, without case, matching anywhere in the name', () => {
-  assert.deepEqual(names(visibleAssets(rows, 'estuary', null)), ['Estuary road', 'Estuary buildings']);
-  assert.deepEqual(names(visibleAssets(rows, 'SHED', null)), ['Shearing shed']);
+  assert.deepEqual(names(visibleAssets(rows, 'estuary', null)), ['Estuary road', 'Estuary huts']);
+  assert.deepEqual(names(visibleAssets(rows, 'HUT', null)), ['Estuary huts', 'Tin Hut']);
   assert.deepEqual(
     names(visibleAssets(rows, '   ', null)),
     names(rows),
@@ -54,30 +54,30 @@ test('the typed words narrow it, without case, matching anywhere in the name', (
 });
 
 test('the picked type narrows it to that type', () => {
-  assert.deepEqual(names(visibleAssets(rows, '', 'BUILDING')), ['Estuary buildings', 'Shearing shed']);
-  assert.deepEqual(names(visibleAssets(rows, '', 'SIGN')), [], 'a type with nothing in it shows nothing');
+  assert.deepEqual(names(visibleAssets(rows, '', 'HUT')), ['Estuary huts', 'Tin Hut']);
+  assert.deepEqual(names(visibleAssets(rows, '', 'CAMPSITE')), [], 'a type with nothing in it shows nothing');
 });
 
 test('both filters apply, so a name match of another type stays off the list', () => {
-  // The one that matters: "Estuary road" matches the words and is not a building.
-  assert.deepEqual(names(visibleAssets(rows, 'estuary', 'BUILDING')), ['Estuary buildings']);
-  assert.deepEqual(names(visibleAssets(rows, 'fenceline', 'BUILDING')), []);
+  // The one that matters: "Estuary road" matches the words and is not a hut.
+  assert.deepEqual(names(visibleAssets(rows, 'estuary', 'HUT')), ['Estuary huts']);
+  assert.deepEqual(names(visibleAssets(rows, 'track', 'HUT')), []);
 });
 
 test('nothing to show is an empty list rather than a crash', () => {
   assert.deepEqual(visibleAssets([], '', null), []);
-  assert.deepEqual(visibleAssets(undefined, 'anything', 'BUILDING'), []);
+  assert.deepEqual(visibleAssets(undefined, 'anything', 'HUT'), []);
 });
 
 test('the map is handed the rows the desk is showing, and nothing else', () => {
   assert.deepEqual(drawn(visibleAssets(rows, '', null)), [1, 2, 3, 4], 'Anything is the whole work');
   assert.deepEqual(
-    drawn(visibleAssets(rows, '', 'BUILDING')),
+    drawn(visibleAssets(rows, '', 'HUT')),
     [2, 3],
     'a type narrows the map the way it narrows the list'
   );
   assert.deepEqual(
-    drawn(visibleAssets(rows, 'estuary', 'BUILDING')),
+    drawn(visibleAssets(rows, 'estuary', 'HUT')),
     [2],
     'and both together, so the map cannot show what the list has just hidden'
   );
@@ -85,7 +85,7 @@ test('the map is handed the rows the desk is showing, and nothing else', () => {
 });
 
 test('narrowing the work keeps the collection and the features as the phone sent them', () => {
-  const narrowed = visibleFeatures(work, visibleAssets(rows, '', 'ROAD'));
+  const narrowed = visibleFeatures(work, visibleAssets(rows, '', 'BIKE_TRACK'));
 
   assert.equal(narrowed.type, 'FeatureCollection');
   assert.equal(narrowed.source, 'kept', 'the collection is the phone\'s, not a new one of this page\'s');

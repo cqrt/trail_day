@@ -21,7 +21,6 @@ import nz.mckenzie.trailday.domain.asset.AssetPhrase
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
-import nz.mckenzie.trailday.domain.geo.Ring
 import nz.mckenzie.trailday.domain.geo.haversineMeters
 import nz.mckenzie.trailday.domain.geo.nearestPointOnPolyline
 import nz.mckenzie.trailday.domain.tiles.Basemap
@@ -36,12 +35,11 @@ import nz.mckenzie.trailday.tracking.LocationSource
 import nz.mckenzie.trailday.tracking.frameOnDevice
 
 /**
- * Draws a new asset by tapping the map.
+ * Draws a new place by tapping the map.
  *
- * Two shapes, because two things get created here. A line - a track, a road, the
- * fencelines along them - is tapped point by point, and its running length is shown so
- * the operator can sanity-check it before saving. A spot, which is what most
- * infrastructure is, is one tap: a trough or a table is somewhere you stop, not
+ * Two shapes, because two things get created here. A line - a track or a bike track - is tapped
+ * point by point, and its running length is shown so the walker can sanity-check it before saving.
+ * A spot, which is what a hut, a campsite or a waypoint is, is one tap: somewhere you stop, not
  * something you travel along.
  *
  * The draft is held in memory only - nothing is persisted until Save, so an
@@ -103,9 +101,7 @@ class DrawAssetViewModel(
             return
         }
         _trackName.value = asset.name
-        // Read with its shape, so a record written before the types existed opens as what it was:
-        // a fenceline if it is a line, a place if it is a spot.
-        _kind.value = AssetKind.fromStorage(asset.kind, AssetShape.fromStorage(asset.shape))
+        _kind.value = AssetKind.fromStorage(asset.kind)
         _shape.value = AssetShape.fromStorage(asset.shape)
 
         val geometry = runCatching { assetRepository.getAssetGeometry(assetId) }
@@ -196,26 +192,11 @@ class DrawAssetViewModel(
      * down it as part of one line and its metres are in the line twice, so a 500 m track with a 50 m
      * spur read as 600 m of track. As its own path the spur adds its 50 m once, which is what it is.
      */
-    val lengthM: StateFlow<Double> = combine(_paths, _shape) { paths, shape ->
-        AssetGeometry(asStored(paths, shape)).lengthM
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0.0)
+    val lengthM: StateFlow<Double> = _paths
+        .map { paths -> AssetGeometry(paths).lengthM }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0.0)
 
-    /**
-     * The ground a drawing encloses, while it is being drawn.
-     *
-     * Null for a line and a place, which enclose none. For ground with an edge it comes off the same
-     * closed corners the metres do, so the two figures cannot disagree while the operator is choosing
-     * the shape - and the figure they are choosing for is the ground, not the fence round it.
-     */
-    val groundSqm: StateFlow<Double?> = combine(_paths, _shape) { paths, shape ->
-        if (shape != AssetShape.AREA) {
-            null
-        } else {
-            Ring.areaSqm(asStored(paths, shape).firstOrNull().orEmpty())
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
-
-    /** The in-progress track, drawn in the draft colour so it is distinct from saved assets. */
+    /** The in-progress track, drawn in the draft colour so it is distinct from saved places. */
     val draftGeoJson: StateFlow<String> = combine(_paths, _shape, _kind) { paths, shape, kind ->
         AssetGeoJson.build(
             listOf(
@@ -223,12 +204,9 @@ class DrawAssetViewModel(
                     assetId = DRAFT_ID,
                     name = "Draft",
                     colorHex = AssetColors.DRAFT,
-                    points = asStored(paths, shape).firstOrNull().orEmpty(),
+                    points = paths.firstOrNull().orEmpty(),
                     sideTracks = paths.drop(1),
-                    // Ground with an edge is drawn by the carpark's own layer, which filters on the kind
-                    // as well as on the shape, so a ring being drawn has to say what it is. A line and a
-                    // place keep the default kind, which is what they have always been drawn with.
-                    kind = if (shape == AssetShape.AREA) kind else AssetKind.TRACK,
+                    kind = kind,
                     shape = shape
                 )
             )
@@ -290,35 +268,19 @@ class DrawAssetViewModel(
      * A side track that has one point is not a side track, and does not stop the line from being
      * saved: it is dropped rather than counted, because there is nothing there to keep.
      */
-    /**
-     * What is drawn is what is stored: for ground with an edge, the ring is closed while it is drawn.
-     *
-     * The closing side is the side a carpark has and a path does not, so leaving it out until the save
-     * would show a boundary whose metres are short by its last leg - and those metres are what the
-     * operator is choosing as they tap. The app closes the ring; nobody taps the first corner again.
-     */
-    private fun asStored(paths: List<List<GeoPoint>>, shape: AssetShape): List<List<GeoPoint>> =
-        if (shape != AssetShape.AREA) {
-            paths
-        } else {
-            listOf(Ring.closed(paths.firstOrNull().orEmpty())) + paths.drop(1)
-        }
-
     private fun canSave(paths: List<List<GeoPoint>>, shape: AssetShape): Boolean =
         paths.firstOrNull().orEmpty().size >= when (shape) {
             AssetShape.POINT -> 1
             AssetShape.LINE -> 2
-            // Three corners is the least that encloses anything: two is a path there and back again.
-            AssetShape.AREA -> Ring.MIN_CORNERS
         }
 
     /**
      * Picks what is being drawn, and with it the shape.
      *
-     * There is no separate shape to pick: three kinds are lines, one is ground with an edge and five are
-     * places, and the kind decides which (see [AssetKind.shape]). Choosing a place keeps the last tap and
-     * drops the rest - a place is one coordinate and the most recent tap is the one that was meant - and a
-     * place has no side tracks, because there is nothing for one to hang off.
+     * There is no separate shape to pick: two kinds are lines and three are places, and the kind
+     * decides which (see [AssetKind.shape]). Choosing a place keeps the last tap and drops the rest -
+     * a place is one coordinate and the most recent tap is the one that was meant - and a place has no
+     * side tracks, because there is nothing for one to hang off.
      */
     fun chooseKind(chosen: AssetKind) {
         _kind.value = chosen
@@ -478,7 +440,6 @@ class DrawAssetViewModel(
         _message.value = when (_shape.value) {
             AssetShape.POINT -> "Tap the map where it is, then save"
             AssetShape.LINE -> "Tap the map at least twice to draw a line"
-            AssetShape.AREA -> "Tap the corners of the car park - three at least - then save"
         }
         return true
     }
@@ -492,7 +453,7 @@ class DrawAssetViewModel(
             runCatching {
                 assetRepository.createAsset(
                     name = name.trim().ifBlank { "New ${AssetPhrase.kind(kind)}" },
-                    geometry = AssetGeometry(asStored(paths, shape)),
+                    geometry = AssetGeometry(paths),
                     kind = kind,
                     shape = shape
                 )
@@ -522,7 +483,7 @@ class DrawAssetViewModel(
         val paths = normalisedPaths()
         viewModelScope.launch {
             runCatching {
-                assetRepository.replaceGeometry(assetId, AssetGeometry(asStored(paths, _shape.value)))
+                assetRepository.replaceGeometry(assetId, AssetGeometry(paths))
             }.onSuccess {
                 _savedAssetId.value = assetId
             }.onFailure { failure ->

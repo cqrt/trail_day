@@ -24,9 +24,9 @@ import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 
 /**
- * Everything about one asset: its line on the map, its measured ground, and GPX export.
+ * Everything about one place: its line on the map, and GPX export.
  *
- * It is also where an edited asset is saved, and where the asset itself can be deleted.
+ * It is also where an edited place is saved, and where the place itself can be deleted.
  */
 class AssetDetailViewModel(
     private val assetId: Long,
@@ -87,10 +87,6 @@ class AssetDetailViewModel(
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
-
-    /** The ground a ring encloses, or null when it encloses none: the one measured area. */
-    val areaSqm: Double?
-        get() = track.value?.groundSqm
 
     fun exportGpx(uri: Uri) {
         viewModelScope.launch {

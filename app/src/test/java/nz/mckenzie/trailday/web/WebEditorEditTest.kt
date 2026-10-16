@@ -2,11 +2,9 @@ package nz.mckenzie.trailday.web
 
 import kotlinx.serialization.json.Json
 import nz.mckenzie.trailday.data.db.AssetEntity
-import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -28,7 +26,7 @@ class WebEditorEditTest {
     private val asset = AssetEntity(
         id = 7L,
         name = "Estuary road",
-        kind = "ROAD",
+        kind = "BIKE_TRACK",
         shape = "LINE",
         notes = "Both edges",
         active = true,
@@ -172,29 +170,6 @@ class WebEditorEditTest {
     }
 
     @Test
-    fun `a fenceline written by the build before this one is read as a fenceline, not refused`() {
-        // The one kind on the wire this build has no enum value for: every fenceline, trough and shed
-        // sprayed before the types existed carries it, and the row's own shape is what says which of
-        // the two things it was.
-        val fenceline = asset.copy(kind = "INFRASTRUCTURE", shape = "LINE")
-        val result = WebEditorEdits.apply(
-            current = fenceline,
-            paths = listOf(path),
-            body = body(
-                version = WebEditorVersion.of(fenceline, listOf(path)),
-                kind = "INFRASTRUCTURE"
-            )
-        )
-
-        assertTrue("expected the old word to be read: $result", result is WebEditorEditResult.Ok)
-        assertEquals(
-            "and settled to what its shape says it was",
-            AssetKind.FENCELINE.name,
-            (result as WebEditorEditResult.Ok).asset.kind
-        )
-    }
-
-    @Test
     fun `an edit that cannot be read at all is refused rather than thrown`() {
         assertEquals(WebEditorRefusal.INVALID, refused(null).refusal)
         assertEquals(WebEditorRefusal.INVALID, refused("").refusal)
@@ -245,7 +220,7 @@ class WebEditorEditTest {
 
     @Test
     fun `a place drawn as a path is refused in the path rules' words`() {
-        val place = asset.copy(kind = "OTHER_PLACE", shape = "POINT")
+        val place = asset.copy(kind = "WAYPOINT", shape = "POINT")
 
         val result = WebEditorEdits.apply(
             current = place,
@@ -254,7 +229,7 @@ class WebEditorEditTest {
             // hash differently, which is the point of the shape being in the hash at all.
             body = body(
                 version = WebEditorVersion.of(place, listOf(path)),
-                kind = "OTHER_PLACE",
+                kind = "WAYPOINT",
                 points = path
             )
         )
@@ -336,7 +311,7 @@ class WebEditorEditTest {
     @Test
     fun `a new place is one point, because its kind says it is a place`() {
         val draft = drafted(
-            draftBody(name = "Trough", kind = "OTHER_PLACE", points = listOf(path.first()))
+            draftBody(name = "Water source", kind = "WAYPOINT", points = listOf(path.first()))
         )
 
         assertEquals("POINT", draft.asset.shape)
@@ -456,45 +431,6 @@ class WebEditorEditTest {
             path,
             ok(body(version = quoted, paths = listOf(path))).paths!!.first()
         )
-    }
-
-    /* ---- Ground with an edge, drawn from a desk ---------------------------------------- */
-
-    /** The corners of a yard: the least that encloses anything, and the least the app will take. */
-    private val yard = listOf(
-        GeoPoint(-41.5, 173.8),
-        GeoPoint(-41.5, 173.81),
-        GeoPoint(-41.51, 173.81)
-    )
-
-    @Test
-    fun `a carpark drawn on the desk is stored closed, so the last corner joins the first`() {
-        val drawn = drafted(draftBody(name = "Yard", kind = "CARPARK", points = yard))
-
-        assertEquals("CARPARK", drawn.asset.kind)
-        assertEquals("and the kind is what says it is ground", "AREA", drawn.asset.shape)
-        // The page draws the closing side and the app stores it, and both of them are the same corner
-        // list: nothing here is left for a reader of the geometry to work out for itself.
-        assertEquals(yard + yard.first(), drawn.geometry.line)
-    }
-
-    @Test
-    fun `a carpark of two corners is refused in the app's own words rather than closed`() {
-        val refused = createRefused(draftBody(name = "Yard", kind = "CARPARK", points = yard.take(2)))
-
-        // Two corners drawn back to each other is the same side twice and no ground at all, so the
-        // answer is the sentence the phone's own drawing screen gives, not a ring around nothing.
-        assertTrue("says what is missing: ${refused.message}", refused.message.contains("three corners"))
-    }
-
-    @Test
-    fun `a line re-kinded into a carpark from the desk closes into one`() {
-        // The plan's own account of what a carpark kept as a fenceline needs: the kind is the fix, and
-        // the line the card was showing is what becomes the boundary - closed on the way in, because a
-        // boundary that arrives open would be the one shape the rest of the app would have to guess at.
-        val changed = ok(body(kind = "CARPARK", points = yard))
-
-        assertEquals("the same corners, with the closing side added", yard + yard.first(), changed.paths!!.single())
     }
 
     /* ---- A track file dropped on the desk ----------------------------------------------- */

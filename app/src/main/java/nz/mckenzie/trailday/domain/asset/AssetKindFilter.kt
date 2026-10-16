@@ -1,23 +1,21 @@
 package nz.mckenzie.trailday.domain.asset
 
 /**
- * What the asset list is showing: every kind of asset, or one of them.
+ * What the place list is showing: every kind of place, or one of them.
  *
  * A **question being asked now** rather than a way of working, which is why nothing stores it. The
- * map's layer switches are remembered because an operator who hides the places wants them hidden
- * tomorrow as well; "where are my buildings?" is asked, answered and put down. Nothing stored also
+ * map's layer switches are remembered because a walker who hides the huts wants them hidden
+ * tomorrow as well; "where are my huts?" is asked, answered and put down. Nothing stored also
  * means an install that never taps a chip cannot be changed by this feature at all.
  *
- * The answer goes through [AssetKind.fromStorage] - the same reading the rows, the picker and the map
- * use - so a track drawn before the kinds existed, stored as `INFRASTRUCTURE`, is found under
- * **Fenceline** when it is a line and under **Other place** when it is a spot. Comparing the stored
- * word instead would hide every track drawn before v0.6.40 from both.
+ * The answer goes through [AssetKind.fromStorage] - the same reading the rows, the picker and the
+ * map use.
  */
 data class AssetKindFilter(val kind: AssetKind?) {
 
-    /** True for a row stored as [storedKind] with [storedShape] - both as the database keeps them. */
-    fun keeps(storedKind: String, storedShape: String): Boolean = kind == null ||
-        AssetKind.fromStorage(storedKind, AssetShape.fromStorage(storedShape)) == kind
+    /** True for a row stored as [storedKind], which is as the database keeps it. */
+    fun keeps(storedKind: String): Boolean = kind == null ||
+        AssetKind.fromStorage(storedKind) == kind
 
     companion object {
 

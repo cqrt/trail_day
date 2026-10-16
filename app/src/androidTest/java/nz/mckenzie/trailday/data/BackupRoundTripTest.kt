@@ -60,7 +60,7 @@ class BackupRoundTripTest {
         val first = assetRepository.createAsset(
             name = "Winter block",
             geometry = listOf(GeoPoint(-41.5, 173.95), GeoPoint(-41.51, 173.96), GeoPoint(-41.52, 173.97)),
-            notes = "follow the fenceline",
+            notes = "follow the ridge line",
             createdAtEpochMs = 1_700_000_000_000L
         )
         assetRepository.createAsset(

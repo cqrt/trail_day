@@ -2,7 +2,6 @@ package nz.mckenzie.trailday.map
 
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
-import nz.mckenzie.trailday.domain.geo.Ring
 import nz.mckenzie.trailday.domain.geo.distanceToPolylineMeters
 
 /**
@@ -73,19 +72,14 @@ object AssetHitTest {
     /**
      * The id of the nearest track to the tap, or null if the tap was not on one.
      *
-     * [ground] is the map's rings - the geometry of the assets whose shape is an area - and they
-     * answer a tap that no line claims, because a tap *inside* a carpark is a tap on the carpark. The
-     * order is the app's rule rather than this function's convenience: **a line under the fingertip
-     * wins**, so a track crossing a carpark is still the thing the operator tapped, and the ground
-     * answers what is left. Two rings under one tap come out the way two lines always have - the
-     * lowest id - so the answer never depends on the order the map happened to be built in.
+     * Two lines under one tap come out the way two lines always have - the lowest id - so the answer
+     * never depends on the order the map happened to be built in.
      */
     fun nearest(
         geometryByTrack: Map<Long, AssetGeometry>,
         lat: Double,
         lng: Double,
-        toleranceM: Double = DEFAULT_TOLERANCE_M,
-        ground: Map<Long, List<GeoPoint>> = emptyMap()
+        toleranceM: Double = DEFAULT_TOLERANCE_M
     ): Long? {
         val tap = GeoPoint(lat = lat, lng = lng)
 
@@ -96,7 +90,7 @@ object AssetHitTest {
         // than however the map happened to be built.
         for (assetId in geometryByTrack.keys.sorted()) {
             val geometry = geometryByTrack.getValue(assetId)
-            // Every path of the asset, and the nearest of them: a tap on a side track is a tap on the
+            // Every path of the place, and the nearest of them: a tap on a side track is a tap on the
             // track it hangs off, which is the whole point of drawing it there.
             val distance = geometry.paths
                 .map { path -> distanceToPolylineMeters(tap, path) }
@@ -109,11 +103,6 @@ object AssetHitTest {
             }
         }
 
-        if (bestDistance <= toleranceM) return bestId
-
-        return ground.entries
-            .filter { (_, ring) -> Ring.contains(ring, tap) }
-            .minByOrNull { (assetId, _) -> assetId }
-            ?.key
+        return if (bestDistance <= toleranceM) bestId else null
     }
 }

@@ -73,20 +73,14 @@ object WebEditorJson {
         asset = AssetRecord(
             id = asset.id,
             name = asset.name,
-            // The **resolved** kind rather than the stored word. A row drawn before the kinds existed
-            // is stored as INFRASTRUCTURE, and with the raw word the desk would have to keep its own
-            // copy of the rule that reads it back by its shape - which is the mistake v0.6.43 had to
-            // unpick in the page's wording. One reading, on the phone; the page compares names.
-            kind = AssetKind.fromStorage(asset.kind, AssetShape.fromStorage(asset.shape)).name,
+            // The **resolved** kind rather than the stored word, so the page compares names and
+            // never keeps its own copy of the rule that reads one back.
+            kind = AssetKind.fromStorage(asset.kind).name,
             shape = asset.shape,
             notes = asset.notes,
             active = asset.active,
             createdAtEpochMs = asset.createdAtEpochMs,
             lengthM = asset.lengthM,
-            // The measured ground, beside the cached metres and for the same reason: a carpark's card
-            // says how much ground it is, and the desk reads the phone's own number rather than working
-            // one out from the corners it can see. Zero for everything that is not ground.
-            areaM2 = asset.areaM2,
             sourceRef = asset.sourceRef,
             points = emptyList()
         ),
@@ -501,10 +495,9 @@ data class WebEditorChoice(
      *
      * Only the kinds carry one, and it is [nz.mckenzie.trailday.domain.asset.AssetKind.shape] -
      * [AssetShape]'s name, the same word the phone's own screens read and the record stores. The desk
-     * draws a ring differently from a line: the closing side is drawn as it is drawn, the ground
-     * inside is counted, and a side track is not offered. A page that had to recognise "Carpark" by
-     * name to know that would be a second copy of [AssetKind], drifting from this one the day a
-     * second kind of ground ships.
+     * draws a point differently from a line: one click places it, it does not grow, and a side track is
+     * not offered. A page that had to recognise "Hut" by name to know that would be a second copy of
+     * [AssetKind], drifting from this one the day a new kind ships.
      */
     val shape: String? = null
 )
@@ -522,7 +515,7 @@ data class WebEditorChoices(
 ) {
     companion object {
         fun ofApp() = WebEditorChoices(
-            // The shape travels beside the label so the desk can draw a ring as ground - see
+            // The shape travels beside the label so the desk can draw a point as a point - see
             // [WebEditorChoice.shape] - and it is the phone's own answer rather than the page's.
             kinds = AssetPhrase.kinds.map {
                 WebEditorChoice(it.name, AssetPhrase.kind(it), shape = it.shape.name)

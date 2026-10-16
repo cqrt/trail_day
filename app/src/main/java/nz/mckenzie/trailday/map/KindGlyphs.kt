@@ -11,22 +11,21 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import nz.mckenzie.trailday.domain.asset.AssetKind
 
 /**
- * The ten kinds of asset, drawn: one shape each, in whatever colour the job needs.
+ * The five kinds of place, drawn: one shape each, in whatever colour the kind needs.
  *
  * **One geometry, two weights.** The list draws a glyph 20 dp wide beside a name, where a thin
  * outline is enough and anything heavier is a blob; the map draws the same glyph as a marker over
  * aerial imagery, where a thin outline disappears into the ground and a white edge is what makes it
  * findable. Those are the same shapes at different weights, not two sets of shapes - so they live
- * here together, and a bench cannot be a bench in the list and something else on the map.
+ * here together, and a hut cannot be a hut in the list and something else on the map.
  *
  * The colour is the caller's, because the two jobs colour them differently on purpose: beside a name
- * the colour says the *family* (a line to travel along, a place to stop at), and on the map it says
- * *when the thing is next due*, which is what a map of the work is read for. Neither is the kind's,
- * and none of the three may be confusable with another.
+ * the colour says *which kind* it is, and on the map it is the kind's own colour too - see
+ * [AssetColors.forKind]. Only the recorded line and the draft keep a colour that is nobody's kind.
  *
  * What each shape leans on to be told apart at twenty pixels is commented beside it, because that is
  * the thing reading the code cannot recover: two glyphs that are the same shape at this size is a
- * list - or a map - where the operator cannot tell a sign from a seat.
+ * list - or a map - where the walker cannot tell a hut from a campsite.
  */
 internal data class GlyphStyle(
     /** Stroke width, as a fraction of the box. */
@@ -37,7 +36,7 @@ internal data class GlyphStyle(
      * ground.
      */
     val haloFraction: Float = 0f,
-    /** Whether a closed box - a house's walls, a sign's plate - is filled rather than outlined. */
+    /** Whether a closed box - a hut's walls - is filled rather than outlined. */
     val filledBoxes: Boolean = false
 ) {
     companion object {
@@ -67,7 +66,7 @@ internal fun DrawScope.drawKindGlyph(kind: AssetKind, colorHex: String, style: G
     // The halo is a **rim**: every shape is grown by it, so the white edge is that wide and no wider.
     // Growing the *stroke* instead - the same path drawn fatter - looks identical on a long thin
     // shape and is wrong on a small fat one: a 20-pixel plate stroked 25 pixels wide has no hole left
-    // in the middle, so the sign's marker came out as a white block with a red bar in it.
+    // in the middle, so the mark's marker came out as a white block with a colour bar in it.
     val rim = size.minDimension * style.haloFraction
     if (rim > 0f) {
         drawKindShapes(kind, parseHexColor(PlaceIcons.MARKER_OUTLINE), style, grow = rim)
@@ -111,24 +110,9 @@ private fun DrawScope.drawKindShapes(
         )
     }
 
-    /**
-     * A filled piece of ground - the one glyph that is a thing rather than an outline of one, filled
-     * whatever the style says about boxes, and grown all round by the rim like every other shape.
-     *
-     * The rim matters here more than anywhere: a solid shape is what a marker's white edge is for, and
-     * on the list's near-white card a solid slate block needs no edge at all.
-     */
-    fun ground(left: Float, top: Float, wide: Float, tall: Float) {
-        drawRect(
-            color = color,
-            topLeft = Offset(x(left) - grow, y(top) - grow),
-            size = Size(width * wide + grow * 2f, height * tall + grow * 2f),
-            style = Fill
-        )
-    }
-
     when (kind) {
-        // A track wanders, so it is one line with a bend in it.
+        // A track wanders, so it is one line with a bend in it - which is also what tells it from a
+        // bike track's wheels at twenty pixels.
         AssetKind.TRACK -> {
             val path = Path().apply {
                 moveTo(x(0.14f), y(0.86f))
@@ -137,30 +121,24 @@ private fun DrawScope.drawKindShapes(
             drawPath(path, color, style = Stroke(width = drawnStroke, cap = StrokeCap.Round))
         }
 
-        // A road has two edges that go somewhere, so it is two straight lines.
-        AssetKind.ROAD -> {
-            line(0.22f, 0.90f, 0.52f, 0.10f)
-            line(0.64f, 0.90f, 0.92f, 0.10f)
-        }
-
-        // A fence: posts with rails between them. Dotted on the map, because a fenceline is a
-        // series of short things, and this is the same statement drawn small.
-        AssetKind.FENCELINE -> {
-            listOf(0.20f, 0.50f, 0.80f).forEach { post -> line(post, 0.16f, post, 0.90f) }
-            listOf(0.38f, 0.66f).forEach { rail ->
-                line(0.14f, rail, 0.86f, rail, stroke * 0.8f)
+        // A bike track: two wheels joined by a frame, so the kind that is ridden is told from the
+        // kind that is walked even where both are a line on the map.
+        AssetKind.BIKE_TRACK -> {
+            listOf(0.28f, 0.72f).forEach { wheel ->
+                drawCircle(
+                    color = color,
+                    radius = size.minDimension * 0.15f + grow,
+                    center = Offset(x(wheel), y(0.72f)),
+                    style = Stroke(width = drawnStroke)
+                )
             }
+            line(0.28f, 0.72f, 0.50f, 0.40f)
+            line(0.50f, 0.40f, 0.72f, 0.72f)
+            line(0.50f, 0.40f, 0.36f, 0.30f)
         }
 
-        // Ground with an edge: a solid piece of the paddock, and the only filled glyph of the ten.
-        // That is what the kind is - the one kind that is not something standing on the ground - and at
-        // twenty pixels a solid block cannot be taken for any of the eight outlines above it.
-        AssetKind.CARPARK -> {
-            ground(left = 0.14f, top = 0.22f, wide = 0.72f, tall = 0.56f)
-        }
-
-        // A roof over walls: what a shed looks like from the air, and from the ground.
-        AssetKind.BUILDING -> {
+        // A roof over walls: what a hut looks like from the air, and from the ground.
+        AssetKind.HUT -> {
             val roof = Path().apply {
                 moveTo(x(0.10f), y(0.46f))
                 lineTo(x(0.50f), y(0.12f))
@@ -170,47 +148,21 @@ private fun DrawScope.drawKindShapes(
             box(left = 0.26f, top = 0.50f, boxWidth = 0.48f, boxHeight = 0.38f)
         }
 
-        // A plate on one post - and the plate is blank on purpose: anything written on it is
-        // mush at this size, and a sign nobody can read is worse than a plain one.
-        AssetKind.SIGN -> {
-            box(left = 0.16f, top = 0.10f, boxWidth = 0.68f, boxHeight = 0.30f)
-            line(0.50f, 0.40f, 0.50f, 0.90f)
+        // A tent: a ridge and the two sides that fall from it. It is a plain triangle beside the hut's
+        // roof over walls, which is all the two need to be told apart at twenty pixels.
+        AssetKind.CAMPSITE -> {
+            val tent = Path().apply {
+                moveTo(x(0.18f), y(0.78f))
+                lineTo(x(0.50f), y(0.24f))
+                lineTo(x(0.82f), y(0.78f))
+                close()
+            }
+            drawPath(tent, color, style = Stroke(width = drawnStroke, cap = StrokeCap.Round))
         }
 
-        // A backrest and a seat over straight legs. The two bars are 0.42 of the box apart, which is
-        // eight pixels at twenty with a 2.6 pixel stroke - the least that reads as two bars rather
-        // than one smear. A first draft had them 0.28 apart, and did not.
-        AssetKind.BENCH -> {
-            line(0.18f, 0.14f, 0.82f, 0.14f)
-            line(0.14f, 0.56f, 0.86f, 0.56f)
-            line(0.28f, 0.14f, 0.28f, 0.90f)
-            line(0.72f, 0.14f, 0.72f, 0.90f)
-        }
-
-        // One top on splayed legs. Straight legs say bench and splayed legs say table, and at this
-        // size that is the whole difference between the two.
-        AssetKind.TABLE -> {
-            line(0.14f, 0.34f, 0.86f, 0.34f)
-            line(0.42f, 0.34f, 0.20f, 0.88f)
-            line(0.58f, 0.34f, 0.80f, 0.88f)
-        }
-
-        // A gate hung on a post: the post reaches past the gate on the left, one rail runs out to a
-        // stile that hangs from its end - so the deck spans between two uprights and it reads a little
-        // like a bridge. What tells it from a fenceline is that frame: a fence is posts with rails
-        // between them, a gate is one opening with an edge of its own. Every endpoint is kept well
-        // inside the box because the marker's round cap and its white rim are both drawn from the ends
-        // of a line.
-        AssetKind.POLE_GATE -> {
-            line(0.20f, 0.16f, 0.20f, 0.84f)
-            line(0.20f, 0.30f, 0.86f, 0.30f)
-            line(0.86f, 0.30f, 0.86f, 0.70f)
-        }
-
-        // A dot in a ring: something is here, and nothing beyond that. The house this used to wear
-        // belongs to the building now: a trough wearing a house was the app claiming a roof nobody
-        // had recorded.
-        AssetKind.OTHER_PLACE -> {
+        // A dot in a ring: something is here, and nothing beyond that. The plainest of the five on
+        // purpose, because a waypoint is the catch-all and what it has to say is "something is here".
+        AssetKind.WAYPOINT -> {
             drawCircle(
                 color = color,
                 radius = size.minDimension * 0.36f,
@@ -227,7 +179,7 @@ private fun DrawScope.drawKindShapes(
  *
  * Here rather than in the drawing code of a screen because both need it and one of them is this
  * package: a glyph is coloured from [AssetColors]'s strings on the phone and from the map's own
- * traffic-light strings on the map, and those two have to come out as the same colour.
+ * kind strings on the map, and those two have to come out as the same colour.
  */
 internal fun parseHexColor(hex: String): Color = runCatching {
     Color(hex.removePrefix("#").toLong(16) or 0xFF000000L)

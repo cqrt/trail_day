@@ -7,7 +7,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import nz.mckenzie.trailday.domain.asset.AssetKind
-import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import org.junit.Assert.assertEquals
@@ -18,7 +17,7 @@ import org.junit.Test
 /**
  * What the page is told to draw.
  *
- * These are the claims that decide whether the desk and the phone show the same farm: the same layer
+ * These are the claims that decide whether the desk and the phone show the same work: the same layer
  * ids, the same dash patterns, the same pictures, and the tiles coming from the phone rather than
  * from LINZ with a key in them. Every one of them is a copy of a decision made elsewhere, so every
  * one of them is a chance to drift - which is what this file is for.
@@ -75,16 +74,11 @@ class WebStyleJsonTest {
     }
 
     @Test
-    fun `a road is dashed exactly as the app dashes it, and a track is not dashed at all`() {
-        val roads = paint(AssetLayerIds.ROADS)["line-dasharray"]!!.jsonArray
-            .map { it.jsonPrimitive.content.toDouble() }
-        val fencelines = paint(AssetLayerIds.FENCELINES)["line-dasharray"]!!.jsonArray
+    fun `a bike track is dashed exactly as the app dashes it, and a track is not dashed at all`() {
+        val bikeTracks = paint(AssetLayerIds.BIKE_TRACKS)["line-dasharray"]!!.jsonArray
             .map { it.jsonPrimitive.content.toDouble() }
 
-        AssetLineStyles.ROAD.zip(roads).forEach { (expected, actual) ->
-            assertEquals(expected.toDouble(), actual, 1e-6)
-        }
-        AssetLineStyles.FENCELINE.zip(fencelines).forEach { (expected, actual) ->
+        AssetLineStyles.BIKE_TRACK.zip(bikeTracks).forEach { (expected, actual) ->
             assertEquals(expected.toDouble(), actual, 1e-6)
         }
         // Solid means no dash array at all, rather than a dash of zero.
@@ -95,7 +89,7 @@ class WebStyleJsonTest {
     }
 
     @Test
-    fun `a line's colour is the feature's own, so a half-sprayed track is one layer in two colours`() {
+    fun `a line's colour is the feature's own, so a half-walked track is one layer in two colours`() {
         assertEquals(
             """["get","stroke"]""",
             paint(AssetLayerIds.TRACKS)["line-color"].toString()
@@ -110,14 +104,9 @@ class WebStyleJsonTest {
             layer(AssetLayerIds.TRACKS)["filter"].toString()
         )
         assertEquals(
-            """["all",["==",["get","kind"],"ROAD"],["==",["get","shape"],"LINE"],""" +
+            """["all",["==",["get","kind"],"BIKE_TRACK"],["==",["get","shape"],"LINE"],""" +
                 """["!=",["get","carriesName"],true]]""",
-            layer(AssetLayerIds.ROADS)["filter"].toString()
-        )
-        assertEquals(
-            """["all",["==",["get","kind"],"FENCELINE"],["==",["get","shape"],"LINE"],""" +
-                """["!=",["get","carriesName"],true]]""",
-            layer(AssetLayerIds.FENCELINES)["filter"].toString()
+            layer(AssetLayerIds.BIKE_TRACKS)["filter"].toString()
         )
     }
 
@@ -327,14 +316,14 @@ class WebStyleJsonTest {
         // What the zoom floor is for: a name read on a wide view is a muddle, a track seen on a wide view
         // is a track. A floor on the lines as well would hide the work itself from the operator until they
         // zoomed in, which is the opposite of what a map is for.
-        listOf(AssetLayerIds.TRACKS, AssetLayerIds.ROADS, AssetLayerIds.FENCELINES).forEach { id ->
+        listOf(AssetLayerIds.TRACKS, AssetLayerIds.BIKE_TRACKS).forEach { id ->
             assertNull("$id is drawn at every zoom", layer(id)["minzoom"])
         }
     }
 
     @Test
     fun `the line caps and joins are where a browser will accept them`() {
-        val lines = listOf(AssetLayerIds.TRACKS, AssetLayerIds.ROADS, AssetLayerIds.FENCELINES)
+        val lines = listOf(AssetLayerIds.TRACKS, AssetLayerIds.BIKE_TRACKS)
 
         lines.forEach { id ->
             val layout = layer(id)["layout"]!!.jsonObject
@@ -342,7 +331,7 @@ class WebStyleJsonTest {
             assertEquals("round", layout["line-join"]!!.jsonPrimitive.content)
 
             // A paint property the spec does not know is not a warning to MapLibre GL JS: it refuses
-            // the style, and the desk shows a blank rectangle where the farm should be. The app's own
+            // the style, and the desk shows a blank rectangle where the work should be. The app's own
             // map is an Android SDK, which is how this went unnoticed until a browser saw it.
             assertTrue("$id must not carry line-cap in paint", paint(id)["line-cap"] == null)
             assertTrue("$id must not carry line-join in paint", paint(id)["line-join"] == null)
@@ -351,10 +340,10 @@ class WebStyleJsonTest {
 
     @Test
     fun `a place asks for the marker the feature names, and falls back to the grey ring`() {
-        val places = layer(AssetLayerIds.pointOf(AssetKind.OTHER_PLACE))
+        val places = layer(AssetLayerIds.pointOf(AssetKind.HUT))
 
         assertEquals(
-            """["all",["==",["get","kind"],"OTHER_PLACE"],["==",["get","shape"],"POINT"]]""",
+            """["all",["==",["get","kind"],"HUT"],["==",["get","shape"],"POINT"]]""",
             places["filter"].toString()
         )
         assertEquals(
@@ -403,72 +392,6 @@ class WebStyleJsonTest {
     }
 
     @Test
-    fun `a carpark is ground - a surface under the lines, in the feature's own colour`() {
-        val fill = layer(AssetLayerIds.CARPARKS_FILL)
-
-        assertEquals("fill", fill["type"]!!.jsonPrimitive.content)
-        assertEquals(
-            """["all",["==",["get","kind"],"CARPARK"],["==",["get","shape"],"AREA"],["==",["geometry-type"],"Polygon"]]""",
-            fill["filter"].toString()
-        )
-        assertEquals(
-            "the carpark's own traffic light, read off the feature, so the fill and the edge cannot disagree",
-            """["get","stroke"]""",
-            paint(AssetLayerIds.CARPARKS_FILL)["fill-color"].toString()
-        )
-        assertEquals(
-            "the same strength the app's own map draws it at",
-            0.25,
-            paint(AssetLayerIds.CARPARKS_FILL)["fill-opacity"]!!.jsonPrimitive.content.toDouble(),
-            1e-9
-        )
-
-        val ids = layerIds()
-        assertTrue(
-            "a surface is drawn under everything that is drawn on it: $ids",
-            ids.indexOf(AssetLayerIds.CARPARKS_FILL) < ids.indexOf(AssetLayerIds.TRACKS)
-        )
-        assertTrue(
-            "and the boundary is drawn after the fill: $ids",
-            ids.indexOf(AssetLayerIds.CARPARKS_FILL) < ids.indexOf(AssetLayerIds.CARPARKS)
-        )
-    }
-
-    @Test
-    fun `the ground wears a white rim outside its boundary, drawn under it`() {
-        val casing = layer(AssetLayerIds.CARPARKS_CASING)
-        val boundary = layer(AssetLayerIds.CARPARKS)
-
-        assertEquals("line", casing["type"]!!.jsonPrimitive.content)
-        assertEquals(
-            "round exactly the ground the boundary closes, in the boundary's own words",
-            boundary["filter"].toString(),
-            casing["filter"].toString()
-        )
-        assertEquals(
-            "white: the one colour the app's traffic light never uses, so a rim can never say due",
-            "\"#FFFFFF\"",
-            paint(AssetLayerIds.CARPARKS_CASING)["line-color"].toString()
-        )
-        assertEquals(
-            "a pixel wider than the boundary on each side, which is what leaves a pixel of white outside the ring",
-            paint(AssetLayerIds.CARPARKS)["line-width"]!!.jsonPrimitive.content.toDouble() + 2,
-            paint(AssetLayerIds.CARPARKS_CASING)["line-width"]!!.jsonPrimitive.content.toDouble(),
-            1e-9
-        )
-
-        val ids = layerIds()
-        assertTrue(
-            "the boundary is drawn after the rim, or the rim would be a second edge to read: $ids",
-            ids.indexOf(AssetLayerIds.CARPARKS_CASING) < ids.indexOf(AssetLayerIds.CARPARKS)
-        )
-        assertTrue(
-            "and the rim is drawn after the ground it rims: $ids",
-            ids.indexOf(AssetLayerIds.CARPARKS_FILL) < ids.indexOf(AssetLayerIds.CARPARKS_CASING)
-        )
-    }
-
-    @Test
     fun `the other basemap is a different style, with that basemap's tiles and credit`() {
         val osm = Json.parseToJsonElement(
             WebStyleJson.build(Basemap.OPENSTREETMAP, "http://192.168.1.23:8799/tiles/osm/{z}/{x}/{y}.png", assets)
@@ -491,7 +414,7 @@ class WebStyleJsonTest {
      *
      * **This is the test v0.6.97 needed and did not have.** The builder wrote
      * `["literal", "city", "town"]`, and a `literal` takes one argument - the array - so MapLibre
-     * refused the style outright: the desk drew a blank rectangle where the farm should be, and said
+     * refused the style outright: the desk drew a blank rectangle where the work should be, and said
      * so in words the operator could do nothing with ("'literal' expression requires exactly one
      * argument, but found 3 instead"). Every test in this file passed, because they checked the
      * values inside the expressions and the values were right.

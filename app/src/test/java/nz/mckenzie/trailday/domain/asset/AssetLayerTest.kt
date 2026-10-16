@@ -30,23 +30,23 @@ class AssetLayerTest {
 
     @Test
     fun `a stored id reads back as the layer it names`() {
-        assertEquals(setOf(AssetLayer.ROADS), AssetLayer.hiddenIn(setOf("roads")))
+        assertEquals(setOf(AssetLayer.BIKE_TRACKS), AssetLayer.hiddenIn(setOf("bike-tracks")))
         assertEquals(
-            setOf(AssetLayer.TRACKS, AssetLayer.BUILDINGS),
-            AssetLayer.hiddenIn(setOf("tracks", "buildings"))
+            setOf(AssetLayer.TRACKS, AssetLayer.HUTS),
+            AssetLayer.hiddenIn(setOf("tracks", "huts"))
         )
     }
 
     @Test
     fun `an older build's places switch hides every kind of place`() {
-        // Before the map had a layer per kind, one switch hid all six kinds of place. Somebody who
-        // threw it meant the troughs, the sheds and the signs alike - so it is read back as the six,
-        // because a layer that comes back is a map that has quietly changed under them.
+        // Before the map had a layer per kind, one switch hid every kind of place. Somebody who
+        // threw it meant the huts, the campsites and their own spots alike - so it is read back as
+        // the three, because a layer that comes back is a map that has quietly changed under them.
         assertEquals(
             AssetLayer.ALL.filter { it.kind.shape == AssetShape.POINT }.toSet(),
             AssetLayer.hiddenIn(setOf("places"))
         )
-        assertEquals(6, AssetLayer.hiddenIn(setOf("places")).size)
+        assertEquals(3, AssetLayer.hiddenIn(setOf("places")).size)
     }
 
     @Test
@@ -57,8 +57,8 @@ class AssetLayerTest {
     }
 
     @Test
-    fun `there is one switch per kind of asset, and no kind without one`() {
-        assertEquals("ten kinds, ten switches", AssetKind.entries.size, AssetLayer.ALL.size)
+    fun `there is one switch per kind of place, and no kind without one`() {
+        assertEquals("five kinds, five switches", AssetKind.entries.size, AssetLayer.ALL.size)
         assertEquals(
             "and one of them for each kind, so a kind cannot arrive without a switch",
             AssetKind.entries.toSet(),

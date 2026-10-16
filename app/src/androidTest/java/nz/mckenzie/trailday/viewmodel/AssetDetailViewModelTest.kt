@@ -65,7 +65,7 @@ class AssetDetailViewModelTest {
     private fun edit(
         asset: AssetEntity,
         name: String = asset.name,
-        kind: AssetKind = AssetKind.fromStorage(asset.kind, AssetShape.fromStorage(asset.shape)),
+        kind: AssetKind = AssetKind.fromStorage(asset.kind),
         notes: String = asset.notes.orEmpty()
     ) = AssetEdits.apply(
         asset,
@@ -83,7 +83,7 @@ class AssetDetailViewModelTest {
         val edited = edit(
             track,
             name = "Back paddock",
-            kind = AssetKind.ROAD,
+            kind = AssetKind.BIKE_TRACK,
             notes = "keep off when wet"
         )
         assertTrue(edited is AssetEditResult.Ok)
@@ -95,9 +95,9 @@ class AssetDetailViewModelTest {
             assetRepository.observeAsset(assetId).first { it?.name == "Back paddock" }
         }!!
         assertEquals(
-            "a road is still a road after a rename",
-            AssetKind.ROAD,
-            AssetKind.fromStorage(stored.kind, AssetShape.fromStorage(stored.shape))
+            "a bike track is still a bike track after a rename",
+            AssetKind.BIKE_TRACK,
+            AssetKind.fromStorage(stored.kind)
         )
         assertEquals("keep off when wet", stored.notes)
         // The geometry the map draws from must survive an edit.
@@ -116,7 +116,7 @@ class AssetDetailViewModelTest {
         val placeId = assetRepository.createAsset(
             name = "Woolshed",
             geometry = listOf(GeoPoint(-41.5, 173.8)),
-            kind = AssetKind.BUILDING,
+            kind = AssetKind.HUT,
             shape = AssetShape.POINT
         )
         val viewModel = AssetDetailViewModel(

@@ -289,10 +289,10 @@ class WebEditorServer(
 
     /**
      * Where the pictures a place is drawn with are served, e.g.
-     * `/api/markers/trailday-place-sign-2e7d32.png`.
+     * `/api/markers/trailday-place-hut-546e7a.png`.
      *
      * The phone draws every marker it knows how to draw - see `map/MarkerIcons.kt` - and the page
-     * fetches the ones the style names. That way a bench seat on the desk is the bench seat on the
+     * fetches the ones the style names. That way a hut on the desk is the hut on the
      * phone, rather than a second drawing of one that can drift.
      */
     const val MARKERS_PATH_PREFIX = "/api/markers/"

@@ -104,9 +104,9 @@ fun AssetListScreen(
             }
 
             // What the list is showing. One line that scrolls sideways rather than a block of
-            // chips: ten of them wrapped is three rows of screen before the first asset, and the
+            // chips: five of them wrapped is a row of screen before the first place, and the
             // rarer kinds are a swipe away. All leads, so the way back is always at the left - and
-            // tapping the chip already showing is the same way back, from wherever the operator is.
+            // tapping the chip already showing is the same way back, from wherever the walker is.
             if (assets.isNotEmpty()) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     item(key = "all") {
@@ -182,7 +182,6 @@ private fun AssetRow(
     onOpen: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val shape = AssetShape.fromStorage(item.shape)
     ListItem(
         modifier = Modifier.clickable(onClick = onOpen),
         headlineContent = {
@@ -192,7 +191,7 @@ private fun AssetRow(
         // What it is, by its own icon: the kind is the first thing read about a place.
         leadingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                AssetKindIcon(kind = AssetKind.fromStorage(item.kind, shape))
+                AssetKindIcon(kind = AssetKind.fromStorage(item.kind))
             }
         },
         trailingContent = { DestructiveTextButton(text = "Delete", onClick = onDelete) }

@@ -108,7 +108,7 @@ class TileMathTest {
     }
 
     @Test
-    fun `a fenceline a few metres long is opened up the same way`() {
+    fun `a track a few metres long is opened up the same way`() {
         val fewMetres = LatLngBounds(
             minLat = -41.5,
             minLng = 174.5,

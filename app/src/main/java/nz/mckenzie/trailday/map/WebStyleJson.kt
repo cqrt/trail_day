@@ -17,14 +17,13 @@ import nz.mckenzie.trailday.domain.tiles.PlaceLabels
  *
  * The alternative - a `style.json` sitting in `assets/web` with the layer ids, the dash patterns
  * and the due colours written out a second time - is a copy of four decisions that drifts the first
- * time one of them changes, and the drift shows up as a desk that draws a road solid while the
+ * time one of them changes, and the drift shows up as a desk that draws a bike track solid while the
  * phone draws it dashed. So the page is handed what the phone already knows: [AssetLayerIds] for
  * the layer ids (the very ones the map's own switches hide), [AssetLineStyles] for the dashes,
  * [PlaceIcons] for the houses. The only thing left for the page to decide is the pixels.
  *
- * The layer set is the app's own, in the app's own order: the ground's surface first, because
- * everything else is drawn on top of it, the ground's white rim next, then what you spray along, what
- * you drive along, the rest of the infrastructure, the ground's own boundary, and the places on top.
+ * The layer set is the app's own, in the app's own order: the lines you walk or ride, the names
+ * beside the tracks, and the places on top.
  */
 object WebStyleJson {
 
@@ -33,24 +32,6 @@ object WebStyleJson {
 
     /** Just short of opaque, as the app's own map has it, so the imagery reads underneath. */
     private const val LINE_OPACITY = 0.9
-
-    /**
-     * How much of a carpark's own colour its ground carries, as the app's own map has it.
-     *
-     * The two maps drawing the same carpark differently would be the drift this file exists to stop,
-     * so the number is here for the same reason the dash patterns are.
-     */
-    private const val GROUND_FILL_OPACITY = 0.25
-
-    /**
-     * The white rim outside a carpark's boundary, and how wide it is: two pixels wider than the
-     * boundary, so one pixel of white shows outside the ring once the boundary is drawn over it.
-     *
-     * The app's own map draws the same line at the same relationship, so the two maps agree about the
-     * hairline for the same reason they agree about the dash patterns.
-     */
-    private const val CASING_WIDTH = LINE_WIDTH + 2
-    private const val CASING_COLOUR = "#FFFFFF"
 
     /** The near-black green the app shows before any tile arrives. */
     private const val BACKGROUND = "#0B1F13"
@@ -69,8 +50,8 @@ object WebStyleJson {
      *
      * The phone decides which pictures exist, what they are called, and what they look like: it
      * renders each one with the same code the app's own map and list use, and serves them at
-     * `/api/markers/<name>.png`. The page fetches the names in this list - see `app.js` - so a bench
-     * seat on the desk is the bench seat on the phone rather than a second drawing of one.
+     * `/api/markers/<name>.png`. The page fetches the names in this list - see `app.js` - so a hut
+     * on the desk is the hut on the phone rather than a second drawing of one.
      */
     val placeIcons: List<String> = PlaceIcons.IMAGE_NAMES
 
@@ -178,12 +159,6 @@ object WebStyleJson {
         // arrangement, and the reason is the same on both - the work is what the map is for, and a
         // town name is the furniture around it.
         if (placeNames) PlaceLabels.BANDS.forEach { band -> add(placeNameLayer(band)) }
-        // The ground's fill, under everything the phone draws on it - the same arrangement, and the
-        // same reason, as the app's own map.
-        add(groundFillLayer())
-        // The ground's own rim, straight after its fill and still under every line - the same
-        // arrangement the app's own map has, and under the boundary for the reason CASING_WIDTH gives.
-        add(groundCasingLayer())
         lineLayers().forEach { add(it) }
         // The names beside tracks: over the lines they belong to, and under the places, so a name never
         // covers a place - a marker not drawn reads as a marker that has been deleted.
@@ -265,82 +240,13 @@ object WebStyleJson {
     }
 
     /**
-     * The ground inside a carpark's boundary.
-     *
-     * A boundary on its own reads as a fence, which is the report this answers: ground is a surface.
-     * The colour is the feature's own - the carpark's traffic light - so the fill and the edge cannot
-     * disagree, and it is the same quarter strength the app draws it at.
-     *
-     * **Ground, and only ground.** A fill layer fills polygons: handed a line it fills whatever pieces
-     * the tile boundaries left of it, which is a patchwork rather than a surface and was how the ground
-     * used to come out. The ring is written as a Polygon for exactly this reason (`AssetGeoJson`), and
-     * the filter says so as well, because a part-walked carpark's own halves *are* lines - they are
-     * drawn by the boundary layer, over this.
-     */
-    private fun groundFillLayer(): JsonObject = buildJsonObject {
-        put("id", AssetLayerIds.CARPARKS_FILL)
-        put("type", "fill")
-        put("source", ASSETS_SOURCE)
-        put(
-            "filter",
-            buildJsonArray {
-                add("all")
-                add(dataIs("kind", AssetKind.CARPARK.name))
-                add(dataIs("shape", AssetShape.AREA.name))
-                add(geometryIs("Polygon"))
-            }
-        )
-        put(
-            "paint",
-            buildJsonObject {
-                put("fill-color", dataProperty("stroke"))
-                put("fill-opacity", GROUND_FILL_OPACITY)
-            }
-        )
-    }
-
-    /**
-     * The white rim outside a carpark's boundary: the same line the app's own map draws there.
-     *
-     * Solid, white and [CASING_WIDTH] wide, which is a pixel wider than the boundary on each side - and
-     * since the boundary is drawn after this, what is left of it is a hairline outside the ring. It is a
-     * mark about *where* the ground is and never about when it is due: the colour that says that stays
-     * the boundary's alone.
-     */
-    private fun groundCasingLayer(): JsonObject = buildJsonObject {
-        put("id", AssetLayerIds.CARPARKS_CASING)
-        put("type", "line")
-        put("source", ASSETS_SOURCE)
-        put("filter", lineFilter(AssetKind.CARPARK, AssetShape.AREA))
-        put(
-            "layout",
-            buildJsonObject {
-                put("line-cap", "round")
-                put("line-join", "round")
-            }
-        )
-        put(
-            "paint",
-            buildJsonObject {
-                put("line-color", CASING_COLOUR)
-                put("line-width", CASING_WIDTH)
-                put("line-opacity", 1)
-            }
-        )
-    }
-
-    /**
      * One line layer per kind: a dash pattern is a constant in MapLibre rather than something a
      * feature can carry, so the kind picks the layer and the filter keeps them apart - the same
-     * arrangement, and the same ids, as the map the operator holds in their hand.
+     * arrangement, and the same ids, as the map the walker holds in their hand.
      */
     private fun lineLayers(): List<JsonObject> = listOf(
         Triple(AssetLayerIds.TRACKS, AssetKind.TRACK, AssetShape.LINE),
-        Triple(AssetLayerIds.ROADS, AssetKind.ROAD, AssetShape.LINE),
-        Triple(AssetLayerIds.FENCELINES, AssetKind.FENCELINE, AssetShape.LINE),
-        // Ground with an edge is drawn by a line layer too - its boundary is a line round the ground -
-        // and its filter asks for `AREA`, which is what tells a carpark's edge from a track's.
-        Triple(AssetLayerIds.CARPARKS, AssetKind.CARPARK, AssetShape.AREA)
+        Triple(AssetLayerIds.BIKE_TRACKS, AssetKind.BIKE_TRACK, AssetShape.LINE)
     ).map { (layerId, kind, shape) ->
         buildJsonObject {
             put("id", layerId)
@@ -360,7 +266,7 @@ object WebStyleJson {
             put(
                 "paint",
                 buildJsonObject {
-                    // The colour is the feature's own, so a track half sprayed is two colours in
+                    // The colour is the feature's own, so a track half walked is two colours in
                     // one layer rather than two layers to keep in step.
                     put("line-color", dataProperty("stroke"))
                     put("line-width", LINE_WIDTH)
@@ -414,8 +320,8 @@ object WebStyleJson {
         add(dataIs("kind", kind.name))
         add(dataIs("shape", shape.name))
         // The one stretch of a track that carries the track's name is left to the name layer. Drawing it
-        // here as well would put a second line over the track - and, on a half-sprayed track, one line in
-        // one colour over the two colours that say how far the job has got.
+        // here as well would put a second line over the track - and, on a half-walked track, one line in
+        // one colour over the two colours that say how far the walk has got.
         add(dataIsNotTrue(TrackNames.CARRIES_NAME))
     }
 
@@ -474,19 +380,6 @@ object WebStyleJson {
         add("all")
         add(dataIs("kind", kind.name))
         add(dataIs("shape", AssetShape.POINT.name))
-    }
-
-    /**
-     * `["==", ["geometry-type"], value]` - a test on the shape the map has drawn a feature as.
-     *
-     * The layer's own test rather than the feature's `shape` property, because the two are not always
-     * the same thing: a part-walked carpark is a ring in its `shape` and lines on the map, and a fill
-     * layer paints whatever geometry it is handed.
-     */
-    private fun geometryIs(geometry: String): JsonArray = buildJsonArray {
-        add("==")
-        add(buildJsonArray { add("geometry-type") })
-        add(geometry)
     }
 
     /** `["==", ["get", name], value]` - a test the map layer makes on every feature it draws. */

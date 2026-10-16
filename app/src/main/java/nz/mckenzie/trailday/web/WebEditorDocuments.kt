@@ -115,7 +115,7 @@ class WebEditorDocuments(
         val lines = work.map { asset ->
             val geometry = paths[asset.id] ?: AssetGeometry.NONE
             val shape = AssetShape.fromStorage(asset.shape)
-            val kind = AssetKind.fromStorage(asset.kind, shape)
+            val kind = AssetKind.fromStorage(asset.kind)
             AssetLine(
                 assetId = asset.id,
                 name = asset.name,

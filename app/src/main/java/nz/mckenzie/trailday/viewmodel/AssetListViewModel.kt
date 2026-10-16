@@ -49,7 +49,7 @@ class AssetListViewModel(
      * both reading the same list - and so the rule can be tested without a screen.
      */
     val shown: StateFlow<List<AssetEntity>> = combine(assets, _filter) { all, filter ->
-        all.filter { asset -> filter.keeps(asset.kind, asset.shape) }
+        all.filter { asset -> filter.keeps(asset.kind) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     /**

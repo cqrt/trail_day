@@ -36,7 +36,6 @@ const {
   RING_CORNERS,
   activePath,
   add,
-  areaSqm,
   backToLine,
   canRedo,
   canUndo,
@@ -52,7 +51,6 @@ const {
   move,
   otherPathAt,
   pathsFeature,
-  perimeterMeters,
   redo,
   remove,
   samePlace,
@@ -207,7 +205,7 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
    * How far off the traced shape a point may be dropped, in metres.
    *
    * Half the sampling step, worked out from the view the operator is tracing in: a pixel at zoom 17 over
-   * the farm is about 0.9 m, so a wobble smaller than a pixel is the hand and one bigger than a pixel is
+   * the ground is about 0.9 m, so a wobble smaller than a pixel is the hand and one bigger than a pixel is
    * the fence. That is the whole idea of tracing a line off the imagery - the line is as good as what
    * the operator could see and no better - and it is why this is read off the map rather than fixed.
    */
@@ -234,10 +232,8 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
       sideTracks: sideTrackCount(drawing),
       sideTrackInHand: sideTrackInHand(drawing),
       activePoints: activePath(drawing).length,
-      // What the phone calls the number, and what the phone counts: a line is measured along itself,
-      // and ground is measured round its edge and across its middle.
-      lengthM: ground ? perimeterMeters(line(drawing)) : lengthMeters(drawing.paths),
-      groundSqm: ground ? areaSqm(line(drawing)) : null,
+      // What the phone calls the number, and what the phone counts: a line is measured along itself.
+      lengthM: lengthMeters(drawing.paths),
       shape,
       ringCorners: RING_CORNERS,
       junction: junctionPoint(),
@@ -281,8 +277,8 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
         type: 'line',
         source: SOURCE_ID,
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        // Dashed, so the line being drawn is never mistaken for one the phone is already drawing in a
-        // due colour: this is the page's own pencil, not the farm's state.
+        // Dashed, so the line being drawn is never mistaken for one the phone is already drawing: this is
+        // the page's own pencil, not the phone's state.
         paint: { 'line-color': INK, 'line-width': 2, 'line-dasharray': [2, 2] }
       });
       map.addLayer({
@@ -445,9 +441,9 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
       // that part of the track, so that is the junction rather than the far end of the line. This is the whole
       // answer to "I clicked beside the fence I want to branch off and the spur started miles away".
       //
-      // Not for ground with an edge, which has no spurs to hang off it: a click on a carpark's boundary puts a
+      // Not for ground with an edge, which has no spurs to hang off it: a click on a boundary puts a
       // corner in - that is the whole gesture, and it is how a boundary is changed from the desk - and saying
-      // "a side track will leave the line here" over a carpark is a sentence about a move the phone refuses.
+      // "a side track will leave the line here" over a boundary is a sentence about a move the phone refuses.
       if (!sideTrackInHand(drawing) && shape !== 'AREA') junction = at;
       paint();
       return;
@@ -624,7 +620,6 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
       sideTrackInHand: false,
       activePoints: 0,
       lengthM: 0,
-      groundSqm: null,
       shape,
       ringCorners: RING_CORNERS,
       canUndo: false,
@@ -667,12 +662,12 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
 
   return {
     /**
-     * A new line, starting empty: it snaps onto every asset the farm already has.
+     * A new line, starting empty: it snaps onto every place the phone already has.
      *
      * Paths can be handed in, which is how the form's Cancel comes back to a drawing that was already
      * made rather than to a blank map - the line is the operator's work, and a form opened over it is
      * not a reason to lose it. The shape comes back the same way, so cancelling out of the form for a
-     * carpark returns to a carpark being drawn rather than to a line named as one.
+     * closed drawing returns to one being drawn rather than to a line named as one.
      */
     startNew: (paths = [], shape = 'LINE') => start('new', null, paths, shape),
 
@@ -691,7 +686,7 @@ export function createEditor({ map, onFinish, onCancel, onChange, neighboursOf, 
      *
      * Only a new drawing has an answer to change: a track the phone already has is what its kind says it
      * is, and changing that is the details form's business - where the phone judges it, and where a line
-     * closed into a carpark is a shape the phone can say yes or no to rather than a page deciding.
+     * closed into a boundary is a shape the phone can say yes or no to rather than a page deciding.
      */
     setShape: (next) => {
       if (mode === 'off' || next === shape) return;

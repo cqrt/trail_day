@@ -332,7 +332,7 @@ export function lengthMeters(paths) {
 /**
  * Metres between two vertices, on the flat-earth approximation this file uses everywhere else.
  *
- * Over a fence it is exact to a metre, and over a whole farm the error is a few parts in ten thousand -
+ * Over a fence it is exact to a metre, and over a whole country the error is a few parts in ten thousand -
  * which matters for a number nobody navigates by and not at all for the shape of anything.
  */
 function metresBetween(a, b) {
@@ -380,8 +380,8 @@ export function ring(points) {
 /**
  * The ground a ring encloses, in square metres - the phone's own arithmetic, to the metre.
  *
- * The shoelace formula on the flat taken at the ring's own mean latitude, which is what
- * `Ring.areaSqm` does and for the same reason: a carpark is tens of metres across, where a degree of
+ * The shoelace formula on the flat taken at the ring's own mean latitude, which is what the app's own
+ * maths does and for the same reason: a shape like this is tens of metres across, where a degree of
  * longitude is the same length at both ends to within a hand's width. It is worked out from the
  * **corners** rather than from what is drawn, so a ring opened for editing measures the same before
  * and after its closing side is put back - and zero for fewer than three corners, which is the honest
@@ -568,8 +568,8 @@ export function otherPathAt(paths, active, cursor, project, tolerancePx = HANDLE
  * Two things read this: the corners of the other assets to snap onto, and the box the camera is fitted
  * to when an asset is opened from the list. A ring is a Polygon's, so its coordinates sit a level
  * deeper than a line's - and read off the top as pairs they are `[NaN, NaN]`, which MapLibre refuses
- * outright (`flyToAsset` threw on every carpark picked from the list, and a Polygon was invisible to
- * snapping). So the nesting is followed rather than assumed, and one walk does for all five shapes.
+ * outright (`flyToAsset` threw on every ring picked from the list, and a Polygon was invisible to
+ * snapping). So the nesting is followed rather than assumed, and one walk does for every shape.
  */
 export function verticesOf(feature) {
   const geometry = feature && feature.geometry;
@@ -693,7 +693,7 @@ const METRES_PER_DEGREE = 111_320;
  *
  * `METRES_PER_DEGREE` above is one number used for both directions, which is what the page's own
  * metres have always been measured with and is right to a metre over a fence. A ring's ground is not
- * that: it is the number the phone stores, the card shows and a spray carries into the handover, and a
+ * that: it is the number the phone stores and the card shows, and a
  * desk that previewed a different one would be showing a figure the phone replaces the moment it is
  * asked to save. So the area uses the phone's two - `GeoUtils.METRES_PER_DEG_LAT` and
  * `METRES_PER_DEG_LNG_AT_EQUATOR`, the same as `Ring.areaSqm`.

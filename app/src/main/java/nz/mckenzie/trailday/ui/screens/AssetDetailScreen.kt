@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -43,7 +42,6 @@ import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
-import nz.mckenzie.trailday.ui.formatArea
 import nz.mckenzie.trailday.ui.formatDate
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.viewmodel.AssetDetailViewModel
@@ -66,10 +64,8 @@ fun AssetDetailScreen(
 ) {
     val track by viewModel.track.collectAsStateWithLifecycle()
 
-    // What the asset is drawn as, for the one place this screen's own words have to follow it: a
-    // carpark has no line to hang a side track off, so its action says what it actually does.
     val shape = AssetShape.fromStorage(track?.shape)
-    val kind = AssetKind.fromStorage(track?.kind, shape)
+    val kind = AssetKind.fromStorage(track?.kind)
     val geometry by viewModel.geometry.collectAsStateWithLifecycle()
     // The height of the line, from the geometry the phone already holds. Null for a track drawn on
     // a map, which has no heights: the range line and the chart say nothing rather than a zero.
@@ -161,15 +157,11 @@ fun AssetDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(AssetPhrase.kind(kind), style = MaterialTheme.typography.titleMedium)
-                    // The metres, and the ground. A carpark's ground is measured from its own
-                    // corners, so the words say which of the two is being read: "0.4 ha of ground"
-                    // against a line, which has no measured area at all.
+                    // How long the line is: the one figure every kind has, and the one the list
+                    // already shows beside its name.
                     Text(
-                        text = AssetPhrase.lengthLabel(shape) + " " +
-                            formatDistance(track?.lengthM ?: 0.0) +
-                            (viewModel.areaSqm?.let {
-                                " \u00b7 " + AssetPhrase.areaPhrase(shape, formatArea(it))
-                            } ?: ""),
+                        text = AssetPhrase.lengthLabel() + " " +
+                            formatDistance(track?.lengthM ?: 0.0),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     // How high the line goes, when the file it came from said. One line, in the
@@ -268,15 +260,9 @@ fun AssetDetailScreen(
                         actionsOpen = false
                         onChangeLine()
                     },
-                    headlineContent = { Text(AssetPhrase.changeLabel(shape)) },
+                    headlineContent = { Text(AssetPhrase.changeLabel()) },
                     supportingContent = {
-                        Text(
-                            if (shape == AssetShape.AREA) {
-                                "Move it or redraw it - a carpark is one boundary"
-                            } else {
-                                "Move it, redraw it, or add a side track off it"
-                            }
-                        )
+                        Text("Move it, redraw it, or add a side track off it")
                     },
                     leadingContent = { AppIcon(IconGlyph.EDIT) }
                 )
@@ -287,13 +273,7 @@ fun AssetDetailScreen(
                     },
                     headlineContent = { Text("Export GPX") },
                     supportingContent = {
-                        Text(
-                            if (shape == AssetShape.AREA) {
-                                "The corners round it, for another device"
-                            } else {
-                                "The line and its side tracks, for another device"
-                            }
-                        )
+                        Text("The line and its side tracks, for another device")
                     },
                     leadingContent = { AppIcon(IconGlyph.EXPORT) }
                 )

@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "d009716091f42982dceba3d7e8bb88c8",
+    "identityHash": "b4421ecb23c8913170a07466bdeb7bfe",
     "entities": [
       {
         "tableName": "assets",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `kind` TEXT NOT NULL, `shape` TEXT NOT NULL, `notes` TEXT, `active` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `lengthM` REAL NOT NULL, `areaM2` REAL NOT NULL, `sourceRef` TEXT)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `kind` TEXT NOT NULL, `shape` TEXT NOT NULL, `notes` TEXT, `active` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `lengthM` REAL NOT NULL, `sourceRef` TEXT)",
         "fields": [
           {
             "fieldPath": "id",
@@ -52,12 +52,6 @@
           {
             "fieldPath": "lengthM",
             "columnName": "lengthM",
-            "affinity": "REAL",
-            "notNull": true
-          },
-          {
-            "fieldPath": "areaM2",
-            "columnName": "areaM2",
             "affinity": "REAL",
             "notNull": true
           },
@@ -594,7 +588,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd009716091f42982dceba3d7e8bb88c8')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b4421ecb23c8913170a07466bdeb7bfe')"
     ]
   }
 }

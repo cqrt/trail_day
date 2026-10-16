@@ -9,41 +9,36 @@ import org.junit.Test
 /**
  * The colours the map and the list draw with.
  *
- * Every kind must have a colour of its own family, and the kind colours must not be
- * the recorded line's or the position marker's - an icon the operator could read as
- * "the recording" would be worse than no icon at all.
+ * Every kind must have a colour of its own, and the kind colours must not be the recorded line's or
+ * the position marker's - an icon the walker could read as "the recording" would be worse than no
+ * icon at all.
  */
 class AssetColorsTest {
 
     @Test
-    fun `the ten kinds wear the four family colours, and nothing else`() {
-        val families = setOf(
-            AssetColors.TRACK_KIND,
-            AssetColors.ROAD_KIND,
-            AssetColors.PLACE_KIND,
-            AssetColors.GROUND_KIND
-        )
+    fun `each of the five kinds has its own colour, and no two share one`() {
+        val colours = AssetKind.entries.map { AssetColors.forKind(it) }
 
-        AssetKind.entries.forEach { kind ->
-            assertTrue(
-                "$kind wears a colour from outside the four",
-                AssetColors.forKind(kind) in families
-            )
-        }
-        // A track and a road are their own colour, and every kind of place shares the teal: the glyph
-        // is what tells one place from another, because ten colours at twenty pixels is where two of
-        // them start looking alike.
-        assertEquals(AssetColors.TRACK_KIND, AssetColors.forKind(AssetKind.TRACK))
-        assertEquals(AssetColors.ROAD_KIND, AssetColors.forKind(AssetKind.ROAD))
-        assertNotEquals("a road must not look like a track", AssetColors.TRACK_KIND, AssetColors.ROAD_KIND)
-        assertEquals(AssetColors.PLACE_KIND, AssetColors.forKind(AssetKind.FENCELINE))
-        assertEquals(AssetColors.PLACE_KIND, AssetColors.forKind(AssetKind.OTHER_PLACE))
-        // Ground with an edge is neither a line you travel along nor a place you stop at, so it has the
-        // third family's colour of its own - and it must not be one of the three already in use.
-        assertEquals(AssetColors.GROUND_KIND, AssetColors.forKind(AssetKind.CARPARK))
-        assertNotEquals(AssetColors.TRACK_KIND, AssetColors.GROUND_KIND)
-        assertNotEquals(AssetColors.ROAD_KIND, AssetColors.GROUND_KIND)
-        assertNotEquals(AssetColors.PLACE_KIND, AssetColors.GROUND_KIND)
+        assertEquals("a colour per kind", AssetKind.entries.size, colours.size)
+        assertEquals(
+            "two kinds sharing a colour would make the map say less than it claims to: $colours",
+            colours.size,
+            colours.toSet().size
+        )
+    }
+
+    @Test
+    fun `the two lines do not share a colour with each other or with a place`() {
+        val track = AssetColors.forKind(AssetKind.TRACK)
+        val bikeTrack = AssetColors.forKind(AssetKind.BIKE_TRACK)
+
+        assertNotEquals("a bike track must not look like a track", track, bikeTrack)
+        AssetKind.entries
+            .filter { it.shape == nz.mckenzie.trailday.domain.asset.AssetShape.POINT }
+            .forEach { place ->
+                assertNotEquals("$place must not look like a track", track, AssetColors.forKind(place))
+                assertNotEquals("$place must not look like a bike track", bikeTrack, AssetColors.forKind(place))
+            }
     }
 
     @Test

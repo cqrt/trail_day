@@ -12,9 +12,9 @@ import nz.mckenzie.trailday.domain.asset.AssetKind
 /**
  * Draws a kind's glyph as the bitmap the map's style wants.
  *
- * The **same** `DrawScope` code the asset list's glyphs come from, at a marker's weight. Android's
+ * The **same** `DrawScope` code the place list's glyphs come from, at a marker's weight. Android's
  * own graphics would be a second set of shapes to keep in step, and the whole point of the map's
- * markers is that they are the list's glyphs: a bench seat that is a bench seat in a row has to be
+ * markers is that they are the list's glyphs: a hut that is a hut in a row has to be
  * one over the paddock too.
  *
  * A MapLibre image is a bitmap handed over once, so the glyph is rendered into one here - one image

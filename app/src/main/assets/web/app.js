@@ -18,10 +18,9 @@
  * own answer. So there is one place in the world that decides what a track may be called and what may
  * go, and this file is not it.
  *
- * **What is not here is the phone's business.** When a place is next due, the block it sits in, how it
- * is sprayed, how often, how wide, how many passes, how many times it has been over and what was in
- * the tank are all fields the desk neither shows nor sends - so a save from this page cannot wipe any
- * of them. See `WebEditorEdit` for where the phone keeps them.
+ * **What is not here is the phone's business.** Fields the desk neither shows nor sends are the phone's
+ * own, so a save from this page cannot wipe any of them. See `WebEditorEdit` for where the phone keeps
+ * them.
  */
 
 const params = new URLSearchParams(location.search);
@@ -39,7 +38,7 @@ const { drawingBody } = await import(
 /**
  * The glow under the picked-out track, and the one decision in the page's own drawing furniture that is
  * worth pinning: the halo takes the *phone's* layer's shape - its filter, its width, its dashes - so a
- * fenceline's glow is dotted. Imported the same way, for the same reason.
+ * dotted line's glow is dotted. Imported the same way, for the same reason.
  */
 const { NO_ASSET, haloId, haloLayer, pickOut, wantsHalo } = await import(
   TOKEN ? `./glow.mjs?k=${encodeURIComponent(TOKEN)}` : './glow.mjs'
@@ -49,8 +48,8 @@ const { NO_ASSET, haloId, haloLayer, pickOut, wantsHalo } = await import(
  * Where the desk was looking the last time it was open.
  *
  * A refresh, and a basemap switch on the phone - which builds the editor's run again - both throw this page
- * away and build it again, and neither of them is a different desk: an operator working one corner of the
- * farm would otherwise lose it and have to find it again on every basemap. The camera is kept in the
+ * away and build it again, and neither of them is a different desk: a walker working one corner of the
+ * country would otherwise lose it and have to find it again on every basemap. The camera is kept in the
  * browser's own store rather than on the phone, because where a particular desk is looking is the desk's
  * own business, and the plan's rule is that the desk's only write is an asset. Imported the same way as the
  * other two modules, for the same reason.
@@ -85,7 +84,7 @@ const { kindText } = await import(
 /**
  * Every vertex of a feature, whatever its geometry nests: the desk's own arithmetic, tested under node.
  *
- * The card's list and the camera both need it, and a carpark's ring sits a level deeper than a line's.
+ * The card's list and the camera both need it, and a ring sits a level deeper than a line's.
  */
 const { verticesOf } = await import(
   TOKEN ? `./geometry.mjs?k=${encodeURIComponent(TOKEN)}` : './geometry.mjs'
@@ -108,7 +107,7 @@ const { visibleAssets, visibleFeatures } = await import(
  * own (`formatDistance` and `formatArea`), and the module is pure for the same reason `find.mjs` is:
  * the words for a figure are a rule, and a rule that a test can pin cannot drift.
  */
-const { areaText, metresText } = await import(
+const { metresText } = await import(
   TOKEN ? `./stats.mjs?k=${encodeURIComponent(TOKEN)}` : './stats.mjs'
 );
 
@@ -334,7 +333,7 @@ let selectedId = null;
  * Where this desk was looking when it was last open, or null when there is no memory of it.
  *
  * Held as well as handed to the map, because opening on the work's own box has to know whether the desk has
- * already been placed: a memory of a corner of the farm is not to be undone by the map finishing loading.
+ * already been placed: a memory of a corner of the map is not to be undone by the map finishing loading.
  */
 let rememberedCamera = null;
 
@@ -358,7 +357,7 @@ let draftPaths = null;
  * The kind that drawing was being made as: the box's own answer, kept while the form is open.
  *
  * Held beside the line because the form's Cancel has to come back to the *same* drawing - a boundary
- * being drawn as a carpark must not return as a line of the same shape, which is what the box would
+ * being drawn must not return as a line of the same shape, which is what the box would
  * say about it and what the phone would store. The form's kind picker is a draft of it, and a change
  * of kind there is the phone's to judge when the save is made.
  */
@@ -643,8 +642,8 @@ let glowFilters = new Map();
  * Under all of the work rather than over it, because a halo is a light and not a lid: the phone's own line
  * sits on top of its own glow, at full strength, with its dashes unbroken.
  *
- * The ground's fill is passed over - see `wantsHalo` - so a carpark that is picked out wears the edge round
- * its boundary rather than a disc at every one of its corners; the names beside tracks are passed over for
+ * The ground's fill is passed over - see `wantsHalo` - so a boundary that is picked out wears the edge round
+ * its own line rather than a disc at every one of its corners; the names beside tracks are passed over for
  * the same reason in the other shape - their features are a stretch of line, and a disc at every corner of
  * it was the red glow an operator reported on a picked-out track.
  */
@@ -812,7 +811,7 @@ function flyToAsset(id) {
   const feature = featuresById.get(id);
   if (!feature || !map) return;
 
-  // Every vertex, whatever the shape is: a carpark's ring is a Polygon's, so reading the pairs off the
+  // Every vertex, whatever the shape is: a ring is a Polygon's, so reading the pairs off the
   // top of the coordinates fits the camera to [NaN, NaN] - which MapLibre refuses outright.
   const corners = verticesOf(feature);
   if (corners.length === 0) return;
@@ -828,9 +827,7 @@ function flyToAsset(id) {
  * The card: what the place is, and the way into changing its details or its line.
  *
  * Everything on it is the phone's own: what the kind is called, how long the line is, how much ground a
- * ring encloses and what the heights are all arrive in the record. Nothing about when it is next due,
- * what it is sprayed with or how often is here at all - those are the phone's and the desk never sees
- * them.
+ * ring encloses and what the heights are all arrive in the record.
  */
 function showCard(item) {
   document.getElementById('card-name').textContent = item.asset.name;
@@ -850,17 +847,9 @@ function showCard(item) {
   // and not the kind's - and since the kind decides the shape, that was one question answered twice:
   // "Other place" read as "Other place, a place", and a building as "building, a place".
   fact('What it is', kindText(item.asset.kind, state?.choices?.kinds));
-  // A line has a length and a ring has the metres round it; a place has neither. Which of the phone's
-  // own words the card uses is the phone's decision, not the page's - see AssetPhrase.lengthLabel.
-  fact(
-    item.asset.shape === 'AREA' ? 'Round it' : 'Length',
-    item.asset.shape !== 'POINT' ? metresText(item.asset.lengthM) : null
-  );
-  // The ground a ring encloses is **measured** from its own corners, which is the whole reason a carpark
-  // is a kind of its own and the one area in this app that is not an estimate. A line's area would only
-  // ever be an estimate from a swath width somebody typed, which is a spray figure the desk does not
-  // show, so nothing is said about it here.
-  fact('Ground', item.asset.shape === 'AREA' && item.asset.areaM2 ? areaText(item.asset.areaM2) : null);
+  // A place has no length; a line has one. Which of the phone's own words the card uses is the
+  // phone's decision, not the page's - see AssetPhrase.lengthLabel.
+  fact('Length', item.asset.shape !== 'POINT' ? metresText(item.asset.lengthM) : null);
   fact('Notes', item.asset.notes);
 
   // The height, when the file the track came from said one: the phone's range, in the same words its
@@ -874,15 +863,13 @@ function showCard(item) {
   // The ways in from the card. Assigned rather than added, because the card is redrawn on every save and
   // a listener added again on each one would save the asset twice.
   document.getElementById('card-edit').onclick = () => openEdit(item);
-  // What the second button is about to change, in the phone's own word for the shape: a line, or the
-  // boundary round a piece of ground. The label in the page is the line's, which is what most of the
-  // work is - a carpark saying "Change the line" is the wrong word in the operator's face.
-  document.getElementById('card-shape').textContent =
-    item.asset.shape === 'AREA' ? 'Change the boundary' : 'Change the line';
+  // What the second button is about to change. Every place the app keeps is a line or a single spot,
+  // and the line is the one there is a shape to change - see AssetPhrase.changeLabel.
+  document.getElementById('card-shape').textContent = 'Change the line';
   document.getElementById('card-shape').onclick = () => startShape(item);
 
   // Deleting: the phone's own sentence about what is on the track, and its own answer about whether the
-  // desk may take it away at all. A track with a spray on it is not something this page can offer to
+  // desk may take it away at all. A track with a recording on it is not something this page can offer to
   // delete - not because the page has a rule, but because the phone would refuse it, and saying so before
   // the button is pressed is better than saying so after.
   field('card-remove-words').textContent = item.removal.sentence;
@@ -927,7 +914,7 @@ const CARD_ELEVATION_HEIGHT = 30;
  *
  * The **paths** the phone handed over are what is opened, not the feature the map is drawing: a feature
  * is one path per asset, and a line that is changed from here has to hand every path back - a spur is not
- * put back by a page that never held it. The shape travels with them so a carpark's boundary is drawn as
+ * put back by a page that never held it. The shape travels with them so a closed drawing is drawn as
  * ground: the closing side shown, its corners the only handles, and no side-track furniture offered.
  */
 function startShape(item) {
@@ -961,8 +948,6 @@ function showDrawing({
   sideTracks,
   sideTrackInHand,
   lengthM,
-  groundSqm,
-  shape,
   ringCorners,
   junction,
   canUndo,
@@ -978,25 +963,18 @@ function showDrawing({
     return;
   }
 
-  // A ring is a boundary and a line is a line, and the phone has a word for each job: *Change the
-  // boundary* for a carpark (`AssetPhrase.changeLabel`), and the same errand said the same way here.
-  const ground = shape === 'AREA';
-  const job = ground ? 'the boundary' : 'a line';
-  field('drawing-title').textContent = mode === 'new' ? `Draw ${job}` : `Change ${job}`;
+  // Every drawing on this page is a line: what is drawn here is a track, and a spot is placed with a
+  // tap rather than drawn.
+  field('drawing-title').textContent = mode === 'new' ? 'Draw a line' : 'Change the line';
 
   const count = paths.reduce((total, path) => total + path.length, 0);
   // The counts in the phone's own words, and the length only once there is a line to measure: one point
-  // is not a line, and "not measured" is the card's word for a place, not this. Ground adds the number
-  // it is worth - the area inside, measured from the corners, which is what the operator is drawing for.
+  // is not a line, and "not measured" is the card's word for a place, not this.
   const parts = [`${count} point${count === 1 ? '' : 's'}`];
   if (count > 1) {
     parts.push(metresText(lengthM));
   }
-  const groundText = areaText(groundSqm);
-  if (groundText) {
-    parts.push(`${groundText} of ground`);
-  }
-  if (!ground && sideTracks > 0) {
+  if (sideTracks > 0) {
     parts.push(`${sideTracks} side track${sideTracks === 1 ? '' : 's'}`);
   }
   field('drawing-info').textContent = parts.join(' · ');
@@ -1059,8 +1037,8 @@ async function finishDrawing(paths, wasEditing) {
     return;
   }
   draftPaths = paths;
-  // The kind the box was set to becomes the form's answer, so a boundary drawn as a carpark opens a
-  // form that says carpark rather than making the operator say it a second time.
+  // The kind the box was set to becomes the form's answer, so a boundary drawn as one kind opens a
+  // form that says that kind rather than making the walker say it a second time.
   draftKind = field('drawing-kind').value;
   openDraft();
 }
@@ -1101,8 +1079,8 @@ function mapIsNotReady() {
  * same rule the phone's own list screen imports a file with - a line and its side tracks, or a file
  * whose paths never met joined into one line - and answers with the paths. The page draws them as
  * the drawing it would have made by hand, which is the whole point: once the line is on the map it
- * can be traced onto, extended, have a side track hung off it, be given a kind and a block, and be
- * saved by the one path every drawn track takes. Nothing is written until the operator says so, so a
+ * can be traced onto, extended, have a side track hung off it, be given a kind and a name, and be
+ * saved by the one path every drawn track takes. Nothing is written until the walker says so, so a
  * file dropped by mistake costs a reload and nothing else.
  *
  * The file travels as base64 of its own bytes, because a KMZ is a zip and not text: the page cannot
@@ -1159,8 +1137,8 @@ async function importGpxFile(file) {
  * **The phone does the searching** (`GET /api/doc`): the page sends a name and, when Near is on, the
  * phone's own fix from the state document - never the browser's own location, because the work and
  * the service are the phone's - and is handed a page of tracks to draw. Importing sends the ticked
- * tracks' geometry straight back (`POST /api/doc/import`), so the line that lands on the farm is the
- * line the operator was shown, and the whole import is one request rather than a loop.
+ * tracks' geometry straight back (`POST /api/doc/import`), so the line that lands on the phone is the
+ * line the walker was shown, and the whole import is one request rather than a loop.
  */
 let docTracks = [];
 const docSelected = new Set();
@@ -1444,8 +1422,8 @@ async function savePath(assetId, paths) {
  *
  * The phone decides that and not this page: the sentence on the card is the phone's, the button is off
  * when the phone said no, and the answer to the request is the phone's too. A mis-drawn track goes; one
- * with history on it is refused, with the numbers in the sentence, and the operator is sent to the phone
- * where the sprays can be seen going with it.
+ * with history on it is refused, with the numbers in the sentence, and the walker is sent to the phone
+ * where what goes with it can be seen going.
  */
 async function deleteAsset(item) {
   const button = field('card-remove');
@@ -1458,7 +1436,7 @@ async function deleteAsset(item) {
     if (status !== 200) {
       showNotice(answer.message || 'The phone would not delete it.');
       // Either 409 means the page's own copy is the thing that is wrong - the row moved under it, or a
-      // spray arrived that the card had never heard of - so the work is read again rather than argued with.
+      // recording arrived that the card had never heard of - so the work is read again rather than argued with.
       if (status === 409) await reloadWork();
       return;
     }
@@ -1495,9 +1473,9 @@ function formBody({ version = null, points = null, paths = null } = {}) {
  * The body a line's save sends: the row the card is showing, with the drawn line in it.
  *
  * Built from the record rather than from the form's fields, because the form is not open - and the record
- * is the row the phone last handed over, so what goes back is what the operator is looking at. Only the
- * name, the kind and the notes travel: the block, the method and the spray figures are the phone's own
- * and the phone writes its own values back for them.
+ * is the row the phone last handed over, so what goes back is what the walker is looking at. Only the
+ * name, the kind and the notes travel: everything else is the phone's own
+ * and the phone writes its own values back for it.
  *
  * Which of the two drawing shapes it carries - one path, or the line with the track's side tracks - is
  * `wire.mjs`'s decision, so that it can be tested without a browser.
@@ -1682,7 +1660,7 @@ function openDraft(name = '') {
  * For a new track that means back to the drawing rather than back to nothing: the drawing is the
  * operator's work, and a change of mind about the name is not a reason to lose it. The paths go back to
  * the map, so finishing again is one key away - and giving up altogether is the Escape that follows.
- * The kind it was drawn as goes back with them: a boundary drawn as a carpark returns as one, rather
+ * The kind it was drawn as goes back with them: a boundary drawn as one kind returns as one, rather
  * than as a line that happens to have the same shape.
  */
 function cancelForm() {

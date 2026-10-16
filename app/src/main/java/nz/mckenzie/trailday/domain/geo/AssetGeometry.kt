@@ -3,13 +3,13 @@ package nz.mckenzie.trailday.domain.geo
 /**
  * What an asset's geometry is: **a line, and the side tracks hanging off it**.
  *
- * A track on the ground is not always one path. A fenceline has a spur into a gully; a road has a
- * siding; a lane has a gateway you have to drive up and back. The app used to have one shape for an
+ * A track on the ground is not always one path. A track has a spur to a viewpoint; a ride has a
+ * bypass; a lane has a gateway you have to go through and back. The app used to have one shape for an
  * asset's geometry - an ordered list of vertices, start to finish - so the only way to draw one of
  * those was to walk up the spur and back down it as part of the line. That costs twice over:
  *
- *  - **the length**, because the metres of the spur are in the line twice, and the length is what the
- *    handover and the totals use;
+ *  - **the length**, because the metres of the spur are in the line twice, and the length is what a
+ *    trip's totals use;
  *  - **the reading of the line**, because opposite directions over the same metres would otherwise be
  *    taken for one trip up and back rather than one path. One trip up a spur came back as a line with
  *    a doubled section, for a reason that had nothing to do with the spur.
@@ -20,11 +20,11 @@ package nz.mckenzie.trailday.domain.geo
  * database holds.
  *
  * **One level, on purpose.** A side track hangs off the line and has no side tracks of its own: the
- * operator's case is a little side track off a track, and one level keeps the drawing, the storage and
- * the arithmetic honest without pretending to be a road network. [hasSideTracks] is therefore the
+ * common case is a little side track off a track, and one level keeps the drawing, the storage and
+ * the arithmetic honest without pretending to be a network of paths. [hasSideTracks] is therefore the
  * whole of the branching this app knows about.
  *
- * [lengthM] counts every metre of every path **once** - the ground the job covers - which is the
+ * [lengthM] counts every metre of every path **once** - the ground the trip covers - which is the
  * number that stops being wrong the moment a spur leaves the line by itself.
  */
 data class AssetGeometry(val paths: List<List<GeoPoint>> = emptyList()) {

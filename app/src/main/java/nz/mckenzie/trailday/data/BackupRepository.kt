@@ -154,7 +154,6 @@ private fun AssetEntity.toRecord(points: List<AssetPointEntity>) = AssetRecord(
     active = active,
     createdAtEpochMs = createdAtEpochMs,
     lengthM = lengthM,
-    areaM2 = areaM2,
     sourceRef = sourceRef,
     points = points.path(0),
     spurs = points.pathsFrom(1)
@@ -184,7 +183,6 @@ private fun AssetRecord.toEntity() = AssetEntity(
     active = active,
     createdAtEpochMs = createdAtEpochMs,
     lengthM = lengthM,
-    areaM2 = areaM2,
     sourceRef = sourceRef
 )
 

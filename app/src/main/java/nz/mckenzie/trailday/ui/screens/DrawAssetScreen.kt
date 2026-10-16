@@ -29,12 +29,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetPhrase
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.map.BasemapView
-import nz.mckenzie.trailday.ui.formatArea
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.viewmodel.DrawAssetViewModel
 
@@ -52,7 +50,6 @@ fun DrawAssetScreen(viewModel: DrawAssetViewModel, onBack: () -> Unit) {
     val drawingSideTrack by viewModel.drawingSideTrack.collectAsStateWithLifecycle()
     val junctionPicked by viewModel.junctionPicked.collectAsStateWithLifecycle()
     val lengthM by viewModel.lengthM.collectAsStateWithLifecycle()
-    val groundSqm by viewModel.groundSqm.collectAsStateWithLifecycle()
     val geoJson by viewModel.draftGeoJson.collectAsStateWithLifecycle()
     val initialFrame by viewModel.initialFrame.collectAsStateWithLifecycle()
     val canSave by viewModel.canSave.collectAsStateWithLifecycle()
@@ -64,10 +61,6 @@ fun DrawAssetScreen(viewModel: DrawAssetViewModel, onBack: () -> Unit) {
     val trackName by viewModel.trackName.collectAsStateWithLifecycle()
 
     val isSpot = shape == AssetShape.POINT
-
-    // Ground with an edge: drawn as corners, closed by the app when it is saved, and with no side
-    // tracks - a ring has no line for one to hang off.
-    val isGround = shape == AssetShape.AREA
 
     var naming by remember { mutableStateOf(false) }
     var draftName by remember { mutableStateOf("") }
@@ -86,9 +79,8 @@ fun DrawAssetScreen(viewModel: DrawAssetViewModel, onBack: () -> Unit) {
                 title = {
                     Text(
                         when {
-                            editing -> trackName ?: AssetPhrase.changeLabel(shape)
+                            editing -> trackName ?: AssetPhrase.changeLabel()
                             isSpot -> "Add a spot"
-                            isGround -> "Draw the boundary"
                             else -> "Draw a line"
                         }
                     )
@@ -149,9 +141,7 @@ fun DrawAssetScreen(viewModel: DrawAssetViewModel, onBack: () -> Unit) {
                         text = if (isSpot) {
                             if (pointCount == 0) "No spot yet" else "Spot placed"
                         } else {
-                            val track = "$pointCount points \u00b7 ${formatDistance(lengthM)}" +
-                                (groundSqm?.takeIf { it > 0.0 }
-                                    ?.let { " \u00b7 ${formatArea(it)} of ground" } ?: "")
+                            val track = "$pointCount points \u00b7 ${formatDistance(lengthM)}"
                             when (sideTrackCount) {
                                 0 -> track
                                 1 -> "$track \u00b7 1 side track"
@@ -162,14 +152,6 @@ fun DrawAssetScreen(viewModel: DrawAssetViewModel, onBack: () -> Unit) {
                     )
                     Text(
                         text = message ?: when {
-                            // Ground with an edge first: the corners are tapped out and the app closes
-                            // the ring itself, so what the bar says is about a boundary rather than a
-                            // line - and saying it before the empty-drawing messages keeps a carpark
-                            // from being told to "add points" when what it wants is three corners.
-                            isGround && pointCount < 3 ->
-                                "Tap the corners of the car park - three at least."
-                            isGround ->
-                                "Tap any more corners, then save. The last one joins the first."
                             isSpot -> "Tap the map where it is."
                             drawingSideTrack -> "Tap along the side track, then press \u201cBack to the track\u201d."
                             editing && pointCount == 0 -> "No line on this track yet - tap the map to draw one."
@@ -202,9 +184,8 @@ fun DrawAssetScreen(viewModel: DrawAssetViewModel, onBack: () -> Unit) {
                     }
 
                     // A track with a side track off it: the side track leaves the line where the line
-                    // currently ends, so the junction is a vertex of both and the join is exact. A ring
-                    // has no such end and no side tracks: it is one boundary round one piece of ground.
-                    if (!isSpot && !isGround) {
+                    // currently ends, so the junction is a vertex of both and the join is exact.
+                    if (!isSpot) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (drawingSideTrack) {
                                 OutlinedButton(onClick = viewModel::backToTheLine) {
@@ -230,7 +211,6 @@ fun DrawAssetScreen(viewModel: DrawAssetViewModel, onBack: () -> Unit) {
                 Text(
                     when {
                         isSpot -> "Name this spot"
-                        isGround -> "Name this carpark"
                         else -> "Name this line"
                     }
                 )

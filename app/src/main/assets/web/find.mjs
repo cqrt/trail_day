@@ -5,11 +5,10 @@
  * browser does (`app/src/test/js/find.test.mjs`, which CI runs), so which rows are on the screen is
  * pinned by a test rather than read by eye.
  *
- * The type is a plain name comparison because the phone sends the **resolved** kind: a track drawn
- * before the kinds existed arrives as FENCELINE or OTHER_PLACE rather than as INFRASTRUCTURE, so the
- * page needs no copy of the rule that reads an old kind back. That is the point of doing it on the
- * phone - this page has already been caught keeping its own copy of the phone's words (v0.6.43), and
- * the old-kind rule is the same trap.
+ * The type is a plain name comparison because the phone sends the **resolved** kind: a word this build
+ * does not know arrives as TRACK rather than as itself, so the page needs no copy of the rule that
+ * reads a stored kind back. That is the point of doing it on the phone - this page has already been
+ * caught keeping its own copy of the phone's words (v0.6.43), and the old-kind rule is the same trap.
  */
 
 /**

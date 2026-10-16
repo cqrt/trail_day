@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.AssetEntity
@@ -25,7 +24,6 @@ import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetLayer
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
-import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.map.AssetColors
@@ -79,15 +77,6 @@ class MapViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     private val geometryByTrack = MutableStateFlow<Map<Long, AssetGeometry>>(emptyMap())
-
-    /**
-     * The rings on the map, per asset: the geometry of the assets whose shape is an area.
-     *
-     * Held beside the lines rather than inside them, because a tap is answered in two steps - see
-     * [AssetHitTest.nearest] - and only a ring can answer the second one. Built from the geometry that
-     * was read for drawing, so a tap inside a carpark costs the database nothing.
-     */
-    private val groundByTrack = MutableStateFlow<Map<Long, List<GeoPoint>>>(emptyMap())
 
     /**
      * The frame for the camera when the map opens: the operator's own tracks, else
@@ -161,10 +150,10 @@ class MapViewModel(
                 AssetLine(
                     assetId = asset.id,
                     name = asset.name,
-                    colorHex = AssetColors.forKind(AssetKind.fromStorage(asset.kind, shape)),
+                    colorHex = AssetColors.forKind(AssetKind.fromStorage(asset.kind)),
                     points = assetGeometry.line,
                     sideTracks = assetGeometry.sideTracks,
-                    kind = AssetKind.fromStorage(asset.kind, shape),
+                    kind = AssetKind.fromStorage(asset.kind),
                     shape = shape
                 )
             }
@@ -183,17 +172,15 @@ class MapViewModel(
         }
 
         viewModelScope.launch {
-            // The operator's own tracks, keyed on what would actually change the drawn lines:
-            // which assets exist, how long each line is, and whether it is ground - because a
-            // change of shape changes what a tap on it means. Re-reading every line from the
+            // The walker's own lines, keyed on what would actually change the drawn lines:
+            // which places exist, and how long each line is. Re-reading every line from the
             // database on any change was work on a map that had not changed.
             assets
-                .map { tracks ->
-                    tracks.map {
+                .map { places ->
+                    places.map {
                         TrackKey(
                             assetId = it.id,
-                            lengthM = it.lengthM,
-                            ground = AssetShape.fromStorage(it.shape) == AssetShape.AREA
+                            lengthM = it.lengthM
                         )
                     }.sortedBy { it.assetId }
                 }
@@ -201,30 +188,21 @@ class MapViewModel(
                 .collect { keys ->
                     val geometries = keys.associate { it.assetId to loadGeometry(it.assetId) }
                     geometryByTrack.value = geometries
-                    groundByTrack.value = keys.filter { it.ground }.associate { key ->
-                        key.assetId to geometries.getValue(key.assetId).paths.firstOrNull().orEmpty()
-                    }
                 }
         }
     }
 
     /**
-     * What makes the map re-read from the database: which assets exist, how long each line
-     * is, and whether it is ground.
-     *
-     * The shape is in there because turning a line into ground changes what a tap on it means, and
-     * that reads from the same geometry this rebuilds: a change that left the length alone would
-     * otherwise keep answering taps the old way.
+     * What makes the map re-read from the database: which places exist, and how long each line is.
      */
     private data class TrackKey(
         val assetId: Long,
-        val lengthM: Double,
-        val ground: Boolean
+        val lengthM: Double
     )
 
     /** The track under a tap on the map, or null when the tap was not on one. */
     fun assetAt(lat: Double, lng: Double, radiusM: Double = AssetHitTest.DEFAULT_TOLERANCE_M): Long? =
-        AssetHitTest.nearest(geometryByTrack.value, lat, lng, radiusM, groundByTrack.value)
+        AssetHitTest.nearest(geometryByTrack.value, lat, lng, radiusM)
 
     /**
      * Hides or shows one layer of the work, leaving the others as they are.

@@ -34,22 +34,17 @@ class PlaceIconsTest {
             AssetKind.entries.filter { it.shape == AssetShape.POINT },
             PlaceIcons.KINDS
         )
-        assertEquals(6, PlaceIcons.KINDS.size)
+        assertEquals(3, PlaceIcons.KINDS.size)
     }
 
     @Test
     fun `a picture is named after the kind, so the two cannot drift apart`() {
-        assertEquals("trailday-place-building", PlaceIcons.imageName(AssetKind.BUILDING))
-        assertEquals("trailday-place-sign", PlaceIcons.imageName(AssetKind.SIGN))
-        assertEquals("trailday-place-bench", PlaceIcons.imageName(AssetKind.BENCH))
-        assertEquals(
-            "a kind with two words in it is one word in a name",
-            "trailday-place-other-place",
-            PlaceIcons.imageName(AssetKind.OTHER_PLACE)
-        )
+        assertEquals("trailday-place-hut", PlaceIcons.imageName(AssetKind.HUT))
+        assertEquals("trailday-place-campsite", PlaceIcons.imageName(AssetKind.CAMPSITE))
+        assertEquals("trailday-place-waypoint", PlaceIcons.imageName(AssetKind.WAYPOINT))
         assertFalse(
             "a hash in an image name is a URL fragment, not part of a picture",
-            PlaceIcons.imageName(AssetKind.BUILDING).contains("#")
+            PlaceIcons.imageName(AssetKind.HUT).contains("#")
         )
     }
 
@@ -71,9 +66,9 @@ class PlaceIconsTest {
             PlaceIcons.imageName(AssetKind.TRACK)
         )
         assertEquals(
-            "and neither does ground with an edge: a shape is drawn, not stuck on the map",
+            "and neither does a bike track",
             PlaceIcons.FALLBACK_IMAGE_NAME,
-            PlaceIcons.imageName(AssetKind.CARPARK)
+            PlaceIcons.imageName(AssetKind.BIKE_TRACK)
         )
         assertTrue(
             "the fallback has to be a picture the style was given",

@@ -1,11 +1,11 @@
 package nz.mckenzie.trailday.domain.asset
 
 /**
- * One layer of the work on the map, as the operator's switches see it.
+ * One layer of the work on the map, as the walker's switches see it.
  *
- * **One layer per kind of asset** - ten of them, the same ten the list's chips offer - because
- * the reason to hide a layer is to read another: a road network under a set of fencelines is noise,
- * and forty troughs on a block bury the two buildings that are the thing being looked for. Hiding
+ * **One layer per kind of place** - five of them, the same five the list's chips offer - because
+ * the reason to hide a layer is to read another: a network of tracks under a set of waypoints is
+ * noise, and a scatter of waypoints buries the one hut that is the thing being looked for. Hiding
  * "places" was not enough for the second of those, so a place kind can be hidden on its own.
  *
  * [kind] is the kind the layer draws, which is what the map's own style filters on, and what the
@@ -14,7 +14,7 @@ package nz.mckenzie.trailday.domain.asset
  *
  * **What a preference stores is what is hidden, not what is shown.** Everything is drawn until
  * somebody says otherwise, so the map is what it always was for anyone who never opens this, and a
- * layer added in a later build arrives visible rather than missing: an operator who has never touched
+ * layer added in a later build arrives visible rather than missing: a walker who has never touched
  * a switch must not lose a layer because a new one turned up.
  */
 enum class AssetLayer(
@@ -22,7 +22,7 @@ enum class AssetLayer(
     val id: String,
     /** What the switch calls it. */
     val displayName: String,
-    /** One line under it, in the operator's terms rather than the map's. */
+    /** One line under it, in the walker's terms rather than the map's. */
     val summary: String,
     /** What the layer draws. */
     val kind: AssetKind
@@ -34,71 +34,32 @@ enum class AssetLayer(
         kind = AssetKind.TRACK
     ),
 
-    ROADS(
-        id = "roads",
-        displayName = "Roads",
-        summary = "Dashed, so a road reads as a road.",
-        kind = AssetKind.ROAD
+    BIKE_TRACKS(
+        id = "bike-tracks",
+        displayName = "Bike tracks",
+        summary = "Tracks that are ridden, drawn dashed.",
+        kind = AssetKind.BIKE_TRACK
     ),
 
-    FENCELINES(
-        id = "fencelines",
-        displayName = "Fencelines and stopbanks",
-        summary = "Infrastructure you travel along, drawn as a dotted line.",
-        kind = AssetKind.FENCELINE
+    HUTS(
+        id = "huts",
+        displayName = "Huts",
+        summary = "A roof over walls.",
+        kind = AssetKind.HUT
     ),
 
-    /**
-     * Ground with an edge. Drawn as a shape rather than a fence: a solid boundary with the due colour
-     * inside it, so a carpark reads as ground at a glance and not as a line to walk along.
-     */
-    CARPARKS(
-        id = "carparks",
-        displayName = "Carparks",
-        summary = "Ground with an edge, drawn as a shape.",
-        kind = AssetKind.CARPARK
+    CAMPSITES(
+        id = "campsites",
+        displayName = "Campsites",
+        summary = "A tent beside the track.",
+        kind = AssetKind.CAMPSITE
     ),
 
-    BUILDINGS(
-        id = "buildings",
-        displayName = "Buildings",
-        summary = "A roof over walls, in the colour its traffic light shows.",
-        kind = AssetKind.BUILDING
-    ),
-
-    SIGNS(
-        id = "signs",
-        displayName = "Signs",
-        summary = "A plate on a post.",
-        kind = AssetKind.SIGN
-    ),
-
-    BENCHES(
-        id = "bench-seats",
-        displayName = "Bench seats",
-        summary = "Two bars over straight legs.",
-        kind = AssetKind.BENCH
-    ),
-
-    TABLES(
-        id = "picnic-tables",
-        displayName = "Picnic tables",
-        summary = "One top on splayed legs - splayed is what tells it from a seat.",
-        kind = AssetKind.TABLE
-    ),
-
-    POLE_GATES(
-        id = "pole-gates",
-        displayName = "Pole gates",
-        summary = "A post with a three-rail gate hung on it.",
-        kind = AssetKind.POLE_GATE
-    ),
-
-    OTHER_PLACES(
-        id = "other-places",
-        displayName = "Other places",
-        summary = "A dot in a ring: a trough, a tank, a standpipe.",
-        kind = AssetKind.OTHER_PLACE
+    WAYPOINTS(
+        id = "waypoints",
+        displayName = "Waypoints",
+        summary = "A dot in a ring: a spot of your own.",
+        kind = AssetKind.WAYPOINT
     );
 
     companion object {
@@ -110,9 +71,9 @@ enum class AssetLayer(
          * The id an older build stored for the one switch that hid every place.
          *
          * Before this release there were four switches and the fifth kind of thing was "places".
-         * An operator who hid them meant the troughs, the sheds and the signs alike, so the id is
-         * read back as the six place kinds rather than dropped - a hidden layer coming back is a
-         * map that has quietly changed under somebody.
+         * A walker who hid them meant the huts, the campsites and their own spots alike, so the id
+         * is read back as the three place kinds rather than dropped - a hidden layer coming back is
+         * a map that has quietly changed under somebody.
          */
         private const val LEGACY_PLACES = "places"
 
@@ -129,7 +90,7 @@ enum class AssetLayer(
             ?.flatMapTo(mutableSetOf()) { id -> layersFor(id) }
             .orEmpty()
 
-        /** The layers one stored id names: one, or - the old "places" - all six of them. */
+        /** The layers one stored id names: one, or - the old "places" - all three of them. */
         private fun layersFor(id: String): List<AssetLayer> = if (id == LEGACY_PLACES) {
             entries.filter { it.kind.shape == AssetShape.POINT }
         } else {

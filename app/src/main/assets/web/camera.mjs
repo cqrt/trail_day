@@ -7,7 +7,7 @@
  *
  * **The page's own memory of its own view.** Switching the basemap on the phone, or pressing refresh,
  * throws the page away and builds it again - the page never reloads itself, so both arrive as the same
- * thing - and until this existed every one of them opened on the whole farm again. An operator who has
+ * thing - and until this existed every one of them opened on the whole country again. A walker who has
  * spent the morning on one corner of it spends it again after every basemap switch. So the camera is kept
  * and put back before the first frame.
  *
@@ -34,7 +34,7 @@ export const CAMERA_KEY = 'trailday-desk-camera';
  * The map is flat, so past the Mercator limit there is nothing to draw and a latitude beyond it is not a
  * place; MapLibre's own range for a zoom is what the numbers below say; and a tilt past sixty degrees is
  * past what the map itself will do. A stored value outside all of this is treated as no memory at all,
- * which is the one safe answer: a desk that opens on the whole farm is a small nuisance, and a desk that
+ * which is the one safe answer: a desk that opens on the whole country is a small nuisance, and a desk that
  * opens on blank ocean looks broken.
  */
 const MAX_LAT = 85.05113;
@@ -131,7 +131,7 @@ export function remember(storage, camera) {
 
 /**
  * The camera the last visit left, or null when there is none to be had - which is how a page opens on the
- * whole farm the first time, and how it opens on the whole farm again if the store is unreadable, was
+ * whole country the first time, and how it opens on the whole country again if the store is unreadable, was
  * written by something else, or holds a camera from a page whose shape was different.
  *
  * What comes out is built from the five numbers rather than handed over as it was stored, so anything else

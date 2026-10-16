@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetPhrase
-import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.ui.AssetEditFields
 import nz.mckenzie.trailday.ui.AssetEditResult
 import nz.mckenzie.trailday.ui.AssetEdits
@@ -55,12 +54,7 @@ fun AssetEditScreen(
     val current = asset ?: return
 
     var name by remember { mutableStateOf(current.name) }
-    var kind by remember {
-        // Read by its shape as well as its word, because a record written before the types existed
-        // says only "infrastructure": whether that was a line or a spot is what says which of the two
-        // it settles as when it is next saved.
-        mutableStateOf(AssetKind.fromStorage(current.kind, AssetShape.fromStorage(current.shape)))
-    }
+    var kind by remember { mutableStateOf(AssetKind.fromStorage(current.kind)) }
     var notes by remember { mutableStateOf(current.notes.orEmpty()) }
     var problem by remember { mutableStateOf<String?>(null) }
 
@@ -112,9 +106,9 @@ fun AssetEditScreen(
                 label = "What it is",
                 choices = AssetPhrase.kinds,
                 selected = kind,
-                // The shape follows the kind and is not asked about: a fenceline is a line because a
-                // fenceline is something you follow, and a question that could answer otherwise is a
-                // picnic table drawn across a paddock.
+                // The shape follows the kind and is not asked about: a hut is a point because a hut
+                // is somewhere you stop, and a question that could answer otherwise is a waypoint
+                // drawn across a valley.
                 onChoose = { choice -> kind = choice; problem = null },
                 text = AssetPhrase::kind
             )

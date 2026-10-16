@@ -77,19 +77,14 @@ class AssetEditsTest {
     }
 
     @Test
-    fun `what an asset is is kept as chosen, and the shape comes with it`() {
-        val place = ok(apply(kind = AssetKind.BENCH))
-        val line = ok(apply(kind = AssetKind.FENCELINE))
-        val ground = ok(apply(kind = AssetKind.CARPARK))
+    fun `what a place is is kept as chosen, and the shape comes with it`() {
+        val place = ok(apply(kind = AssetKind.HUT))
+        val line = ok(apply(kind = AssetKind.BIKE_TRACK))
 
-        assertEquals(
-            AssetKind.BENCH,
-            AssetKind.fromStorage(place.asset.kind, AssetShape.fromStorage(place.asset.shape))
-        )
+        assertEquals(AssetKind.HUT, AssetKind.fromStorage(place.asset.kind))
         assertEquals(AssetShape.POINT, AssetShape.fromStorage(place.asset.shape))
         // The same field, written from the kind: there is no second answer that could disagree.
         assertEquals(AssetShape.LINE, AssetShape.fromStorage(line.asset.shape))
-        assertEquals(AssetShape.AREA, AssetShape.fromStorage(ground.asset.shape))
     }
 
     @Test

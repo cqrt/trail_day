@@ -39,7 +39,7 @@ class GitHubBackupTargetLiveTest {
         assets = listOf(
             AssetRecord(
                 id = 1,
-                name = "Fenceline, upper",
+                name = "Ridge track, upper",
                 createdAtEpochMs = 1_760_000_000_000L,
                 lengthM = 120.0,
                 points = (0 until pointCount).map { index -> LinePointRecord(-45.0 + index, 170.0) }

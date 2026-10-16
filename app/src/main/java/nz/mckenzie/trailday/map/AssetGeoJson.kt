@@ -3,10 +3,9 @@ package nz.mckenzie.trailday.map
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.GeoPoint
-import nz.mckenzie.trailday.domain.geo.Ring
 
 /**
- * One stretch of an asset's line, drawn in its own colour.
+ * One stretch of a place's line, drawn in its own colour.
  *
  * The map needs these because a track can be in two states at once: half of it walked this
  * morning and half of it still to do. One colour for the whole line cannot say that.
@@ -29,10 +28,10 @@ data class AssetLine(
     val colorHex: String,
     val points: List<GeoPoint>,
     /**
-     * What it is, which decides how it is drawn: solid, dashed, dotted, or a house.
+     * What it is, which decides how it is drawn: solid, dashed, or a marker.
      *
      * Defaulted for the map's previews - a line being drawn, or a planned line shown
-     * over a recording - which are not assets and have no kind to be drawn by.
+     * over a recording - which are not places and have no kind to be drawn by.
      */
     val kind: AssetKind = AssetKind.TRACK,
     /** A line to travel along, or a single place to stop at. */
@@ -83,35 +82,30 @@ object AssetColors {
     const val DRAFT = "#F9A825"
 
     /**
-     * One colour per family of kind, for the icon beside an asset in the list and the line it
+     * One colour per kind of place, for the icon beside a place in the list and the line it
      * is drawn as.
      *
-     * Four colours for ten kinds, on purpose. Colour says which family a thing is in - a line you
-     * travel along, a road, a place you stop at, or ground with an edge - and the glyph says which kind
-     * it is, because ten distinct colours at twenty pixels is where two of them start looking alike.
-     *
-     * They all have to be readable as a thin outline on the card the theme puts behind them - which
-     * the app follows from the system, so that card is near-white in light mode and near-black in dark
-     * mode. Brown and deep purple were fine on the first and all but invisible on the second, which is
-     * what [nz.mckenzie.trailday.map.AssetColorsTest] now tests for.
+     * Five kinds and five colours, so the colour says which kind a thing is as well as the glyph
+     * does - and the two lines, a track and a bike track, are told apart as much by their colour as
+     * by their dashes. They all have to be readable as a thin outline on the card the theme puts
+     * behind them - which the app follows from the system, so that card is near-white in light mode
+     * and near-black in dark mode. Brown and deep purple were fine on the first and all but
+     * invisible on the second, which is what [nz.mckenzie.trailday.map.AssetColorsTest] now tests
+     * for.
      */
     const val TRACK_KIND = "#1E88E5"
 
-    /** Roads. */
-    const val ROAD_KIND = "#AB47BC"
+    /** Bike tracks. */
+    const val BIKE_TRACK_KIND = "#AB47BC"
 
-    /** Fencelines and every kind of place: teal, the one hue left that is nobody else's. */
-    const val PLACE_KIND = "#00897B"
+    /** Huts. */
+    const val HUT_KIND = "#546E7A"
 
-    /**
-     * Ground with an edge: a carpark, and the third family's colour.
-     *
-     * A slate blue-grey, the one hue left that is nobody's - not the track's blue, the road's
-     * purple or the fenceline's teal. It has to hold up as a thin outline on both the near-white card
-     * the light theme puts behind it and the near-black one the dark theme does, which is the test that
-     * decides the exact value and the reason a brown was refused once already.
-     */
-    const val GROUND_KIND = "#546E7A"
+    /** Campsites. */
+    const val CAMPSITE_KIND = "#00897B"
+
+    /** Waypoints. */
+    const val WAYPOINT_KIND = "#E65100"
 
     /**
      * Where the phone is.
@@ -124,31 +118,26 @@ object AssetColors {
     const val POSITION = "#1A73E8"
 
     /**
-     * The colour of the icon that says what an asset *is*, and the line the map draws it as.
+     * The colour of the icon that says what a place *is*, and the line the map draws it as.
      */
     fun forKind(kind: AssetKind): String = when (kind) {
         AssetKind.TRACK -> TRACK_KIND
-        AssetKind.ROAD -> ROAD_KIND
-        AssetKind.CARPARK -> GROUND_KIND
-        AssetKind.FENCELINE,
-        AssetKind.BUILDING,
-        AssetKind.SIGN,
-        AssetKind.BENCH,
-        AssetKind.TABLE,
-        AssetKind.POLE_GATE,
-        AssetKind.OTHER_PLACE -> PLACE_KIND
+        AssetKind.BIKE_TRACK -> BIKE_TRACK_KIND
+        AssetKind.HUT -> HUT_KIND
+        AssetKind.CAMPSITE -> CAMPSITE_KIND
+        AssetKind.WAYPOINT -> WAYPOINT_KIND
     }}
 
 /**
- * Builds the GeoJSON that MapLibre draws for the asset network.
+ * Builds the GeoJSON that MapLibre draws for the place network.
  *
  * Each feature carries what the map needs and nothing more: its id for tapping, its
- * traffic-light colour, its kind and its shape. The kind and shape are properties
- * rather than baked into the geometry because the layers read them - the kind picks
- * which line layer draws a feature, and a point asset is drawn as a house rather
- * than a line at all. A place also carries the name of the picture to draw it with
- * ([ICON_PROPERTY]), because a house is one picture per colour and which picture a
- * colour asks for belongs where the colour is known.
+ * colour, its kind and its shape. The kind and shape are properties rather than baked
+ * into the geometry because the layers read them - the kind picks which line layer draws
+ * a feature, and a point place is drawn as a marker rather than a line at all. A place
+ * also carries the name of the picture to draw it with ([ICON_PROPERTY]), because a
+ * marker is one picture per kind and which picture a kind asks for belongs where the
+ * kind is known.
  *
  * Hand-rolled rather than pulling in a JSON library: the payload is tiny, and
  * keeping it pure Kotlin means it is covered by fast JVM unit tests.
@@ -191,39 +180,24 @@ object AssetGeoJson {
     }
 
     /**
-     * What one asset is drawn as: every path of it in its own colour, or the stretches of those
+     * What one place is drawn as: every path of it in its own colour, or the stretches of those
      * paths that are in different states.
      *
      * A stretch too short to be a line is dropped rather than drawn as a dot where the line
-     * should be, and an asset whose stretches all came out that way falls back to being
+     * should be, and a place whose stretches all came out that way falls back to being
      * drawn whole - a map that has lost a track is worse than one that shows it in one
      * colour.
-     *
-     * Ground is the one thing that is never dropped to a fallback: the ring is drawn whatever
-     * has been walked on it, because the ground is what the kind *is* rather than how far
-     * somebody has got with it.
      */
     private fun stretchesOf(line: AssetLine): List<AssetStretch> {
         if (line.shape == AssetShape.POINT) {
             return listOf(AssetStretch(colorHex = line.colorHex, points = line.points))
-        }
-        // Ground first, and whole, whether or not it has been walked: the ring is the surface the
-        // ground's own layer fills, and the walked halves are drawn over its edge. It used to be the
-        // stretches alone, so a carpark lost its ground the moment somebody started walking it - and
-        // the ground's layer, handed a line instead of a ring, painted patches of it.
-        if (line.shape == AssetShape.AREA) {
-            val ground = AssetStretch(colorHex = line.colorHex, points = line.points)
-            val walked = line.stretches.filter { it.points.size >= 2 }
-            val sideTracks = line.paths.drop(1).filter { it.size >= 2 }
-                .map { AssetStretch(colorHex = line.colorHex, points = it) }
-            return listOf(ground) + walked + sideTracks
         }
         val stretches = line.stretches.filter { it.points.size >= 2 }
         val drawn = if (stretches.isNotEmpty()) {
             stretches
         } else {
             // Nothing part-done: the whole track, one feature per path. A side track is drawn in the same
-            // colour as the line it leaves, because the traffic light is the whole track's answer.
+            // colour as the line it leaves, because the kind is the whole track's answer.
             line.paths
                 .filter { it.size >= 2 }
                 .map { AssetStretch(colorHex = line.colorHex, points = it) }
@@ -235,8 +209,8 @@ object AssetGeoJson {
      * The one stretch of [line] that carries its name, or nothing when this line is not named.
      *
      * Only a track has a name written beside it, and only when there is one to write: a preview line - one
-     * being drawn, or a planned line shown over a recording - has no name at all, and a road or a fence is
-     * not what a name beside the line is for. The stretch is taken from the track's own points rather than
+     * being drawn, or a planned line shown over a recording - has no name at all, and a bike track is
+     * not a name the map writes. The stretch is taken from the track's own points rather than
      * from the pieces above, so a track that is part walked still carries its name once, near the middle
      * of the whole track.
      */
@@ -270,19 +244,6 @@ object AssetGeoJson {
         if (line.shape == AssetShape.POINT) {
             builder.append("\"type\":\"Point\",\"coordinates\":")
             appendPoint(builder, stretch.points.first())
-        } else if (isGround(line.shape, stretch.points)) {
-            // Ground, as the map's own word for it. A fill layer *fills* a Polygon and only *strokes* a
-            // LineString, so a carpark handed over as a line was never a surface: the shade and a click
-            // in the middle of it both came out as whatever pieces a tile boundary happened to leave,
-            // which is the fault this shape answers (build/verify/groundfill.txt). What is stored is
-            // unchanged - still one closed path, and still the one list the metres, the coverage and
-            // the tap rule read.
-            builder.append("\"type\":\"Polygon\",\"coordinates\":[[")
-            stretch.points.forEachIndexed { pointIndex, point ->
-                if (pointIndex > 0) builder.append(',')
-                appendPoint(builder, point)
-            }
-            builder.append("]]")
         } else {
             builder.append("\"type\":\"LineString\",\"coordinates\":[")
             stretch.points.forEachIndexed { pointIndex, point ->
@@ -293,17 +254,6 @@ object AssetGeoJson {
         }
         builder.append("}}")
     }
-
-    /**
-     * Whether a stretch is ground the map can fill: a ring, drawn as an area.
-     *
-     * `Ring.isClosed` is the app's own test for "the last corner is the first again, with at least
-     * three corners to enclose anything", and it is the rule the geometry is written by - so the shape
-     * the map is handed cannot drift from the shape the app measures and taps. A loop a *track* happens
-     * to be drawn as is not ground: the kind has to say so too.
-     */
-    private fun isGround(shape: AssetShape, points: List<GeoPoint>): Boolean =
-        shape == AssetShape.AREA && Ring.isClosed(points)
 
     /** GeoJSON is [longitude, latitude] - the opposite of how humans say it. */
     private fun appendPoint(builder: StringBuilder, point: GeoPoint) {

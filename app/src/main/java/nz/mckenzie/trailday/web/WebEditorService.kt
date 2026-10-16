@@ -239,8 +239,8 @@ class WebEditorService : Service() {
     /**
      * One of the pictures a place is drawn with, at the size the browser asked for.
      *
-     * The drawing is the app's own: [MarkerIcons] renders the same `DrawScope` glyph the asset list's
-     * icons and the map's markers come from, so the desk draws the phone's bench seat rather than a
+     * The drawing is the app's own: [MarkerIcons] renders the same `DrawScope` glyph the place list's
+     * icons and the map's markers come from, so the desk draws the phone's hut rather than a
      * second drawing of one. The name is looked up rather than taken apart - see
      * [PlaceIcons.ofImageName] - so a page asking for a picture gets one the phone would draw, and a
      * page asking for anything else gets nothing.

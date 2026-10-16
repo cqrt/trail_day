@@ -172,7 +172,7 @@ class DrawAssetViewModelTest {
     fun whatTheDrawScreenShowsIsWhatTheAssetIs(): Unit = runBlocking {
         val viewModel = viewModel()
 
-        viewModel.chooseKind(AssetKind.ROAD)
+        viewModel.chooseKind(AssetKind.BIKE_TRACK)
         viewModel.addPoint(-41.5100, 173.9600)
         viewModel.addPoint(-41.5150, 173.9700)
         viewModel.save("Estuary road")
@@ -181,8 +181,8 @@ class DrawAssetViewModelTest {
         val asset = AssetRepository(db).getAsset(saved)!!
         assertEquals(
             "the kind chosen while drawing is the kind stored",
-            AssetKind.ROAD,
-            AssetKind.fromStorage(asset.kind, AssetShape.fromStorage(asset.shape))
+            AssetKind.BIKE_TRACK,
+            AssetKind.fromStorage(asset.kind)
         )
         assertEquals(AssetShape.LINE, AssetShape.fromStorage(asset.shape))
     }
@@ -191,21 +191,21 @@ class DrawAssetViewModelTest {
     fun aSpotIsOneTapAndSavesWhereItIs(): Unit = runBlocking {
         val viewModel = viewModel()
 
-        viewModel.chooseKind(AssetKind.OTHER_PLACE)
+        viewModel.chooseKind(AssetKind.WAYPOINT)
         viewModel.addPoint(-41.5100, 173.9600)
         // Collected rather than read: canSave is a WhileSubscribed flow, so its value is
         // only computed while something is watching it - which the screen always is.
         assertTrue("one tap is enough for a place", withTimeout(5_000) { viewModel.canSave.first { it } })
 
-        viewModel.save("Water trough")
+        viewModel.save("Water source")
 
         val saved = withTimeout(5_000) { viewModel.savedAssetId.first { it != null } }!!
         val repository = AssetRepository(db)
         val asset = repository.getAsset(saved)!!
         assertEquals(
             "the kind chosen while drawing is the kind stored",
-            AssetKind.OTHER_PLACE,
-            AssetKind.fromStorage(asset.kind, AssetShape.fromStorage(asset.shape))
+            AssetKind.WAYPOINT,
+            AssetKind.fromStorage(asset.kind)
         )
         assertEquals(AssetShape.POINT, AssetShape.fromStorage(asset.shape))
         assertEquals("a place has no length", 0.0, asset.lengthM, 1e-9)
@@ -215,7 +215,7 @@ class DrawAssetViewModelTest {
     @Test
     fun tappingAgainMovesTheSpotRatherThanGrowingALine() = runBlocking {
         val viewModel = viewModel()
-        viewModel.chooseKind(AssetKind.OTHER_PLACE)
+        viewModel.chooseKind(AssetKind.WAYPOINT)
 
         viewModel.addPoint(-41.5100, 173.9600)
         viewModel.addPoint(-41.5200, 173.9800)
@@ -230,7 +230,7 @@ class DrawAssetViewModelTest {
         viewModel.addPoint(-41.5100, 173.9600)
         viewModel.addPoint(-41.5150, 173.9700)
 
-        viewModel.chooseKind(AssetKind.OTHER_PLACE)
+        viewModel.chooseKind(AssetKind.WAYPOINT)
 
         assertTrue("the most recent tap is the one that was meant", pointsBecome(viewModel, 1))
         assertEquals(-41.5150, viewModel.paths.value.first().single().lat, 1e-9)
@@ -484,7 +484,7 @@ class DrawAssetViewModelTest {
     @Test
     fun switchingBackToALinePutsTheShapeBackToALine() = runBlocking {
         val viewModel = viewModel()
-        viewModel.chooseKind(AssetKind.OTHER_PLACE)
+        viewModel.chooseKind(AssetKind.WAYPOINT)
         viewModel.addPoint(-41.5100, 173.9600)
 
         viewModel.chooseKind(AssetKind.TRACK)

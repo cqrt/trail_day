@@ -3,7 +3,6 @@ package nz.mckenzie.trailday.map
 import nz.mckenzie.trailday.domain.asset.AssetLayer
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -12,14 +11,14 @@ import org.junit.Test
  *
  * The link between a switch and the layer behind it is the one thing here that no compiler checks:
  * the layer is built in the map view and the switch is built in a sheet, and the two only meet
- * through this table. What is pinned is that every layer an operator can hide has a layer to hide,
+ * through this table. What is pinned is that every layer a walker can hide has a layer to hide,
  * that no two switches share one - two switches hiding one layer would make one of them a lie -
  * and that the names are the ones the map itself builds.
  */
 class AssetLayerIdsTest {
 
     @Test
-    fun `every layer an operator can hide has a style layer behind it`() {
+    fun `every layer a walker can hide has a style layer behind it`() {
         AssetLayer.ALL.forEach { layer ->
             assertTrue(
                 "${layer.displayName} would switch nothing",
@@ -46,49 +45,16 @@ class AssetLayerIdsTest {
             .filter { it.kind.shape == AssetShape.LINE }
             .map { AssetLayerIds.of(it) }
 
-        assertEquals("one layer per place kind", 6, placeIds.size)
+        assertEquals("one layer per place kind", 3, placeIds.size)
         assertTrue(
             "a place kind hidden must not take a line with it: $lineIds",
             lineIds.none { it in placeIds }
         )
         assertEquals(
-            "and those six are what the place kinds' own switches hide",
+            "and those three are what the place kinds' own switches hide",
             placeIds,
             AssetLayer.ALL.filter { it.kind.shape == AssetShape.POINT }.map { AssetLayerIds.of(it) }
         )
-    }
-
-    @Test
-    fun `ground with an edge has a layer of its own, and no place or line shares it`() {
-        val carpark = AssetLayerIds.of(AssetLayer.CARPARKS)
-        val placeIds = PlaceIcons.KINDS.map { AssetLayerIds.pointOf(it) }
-        val lineIds = AssetLayer.ALL
-            .filter { it.kind.shape == AssetShape.LINE }
-            .map { AssetLayerIds.of(it) }
-
-        assertTrue("a carpark is not drawn by a place's marker layer: $carpark", carpark !in placeIds)
-        assertTrue("nor by a line's own layer: $carpark", carpark !in lineIds)
-    }
-
-    @Test
-    fun `the ground's one switch hides all three of its layers`() {
-        val ground = AssetLayerIds.idsOf(AssetLayer.CARPARKS)
-
-        assertEquals(
-            "a surface, the white rim outside it, and the boundary between the two",
-            listOf(AssetLayerIds.CARPARKS_FILL, AssetLayerIds.CARPARKS_CASING, AssetLayerIds.CARPARKS),
-            ground
-        )
-        assertEquals(
-            "and the boundary is still the layer the ground is named by",
-            AssetLayerIds.CARPARKS,
-            AssetLayerIds.of(AssetLayer.CARPARKS)
-        )
-
-        val others = AssetLayer.ALL
-            .filterNot { it == AssetLayer.CARPARKS }
-            .flatMap { AssetLayerIds.idsOf(it) }
-        assertTrue("no other switch hides the ground: $others", others.none { it in ground })
     }
 
     @Test
@@ -96,10 +62,10 @@ class AssetLayerIdsTest {
         val hidden = AssetLayer.ALL.flatMap { AssetLayerIds.idsOf(it) }
 
         // Compared as sets, because the two lists are in different orders on purpose: a switch is
-        // listed where the operator looks for it, and a layer is drawn where it belongs - the ground's
-        // fill under everything, its boundary over the lines.
+        // listed where the walker looks for it, and a layer is drawn where it belongs - the lines
+        // first, then the names beside the tracks, then the places.
         assertEquals(
-            "a style layer with no switch is a layer an operator cannot hide: $hidden",
+            "a style layer with no switch is a layer a walker cannot hide: $hidden",
             AssetLayerIds.ALL.sorted(),
             hidden.sorted()
         )
@@ -113,7 +79,7 @@ class AssetLayerIdsTest {
     @Test
     fun `the tracks' own switch hides the name with the track`() {
         assertEquals(
-            "a track's line and the name written beside it are one thing to the operator",
+            "a track's line and the name written beside it are one thing to the walker",
             listOf(AssetLayerIds.TRACKS, AssetLayerIds.TRACK_NAMES),
             AssetLayerIds.idsOf(AssetLayer.TRACKS)
         )
@@ -135,13 +101,10 @@ class AssetLayerIdsTest {
     @Test
     fun `the names are the map's own, so renaming a layer without this is a failing test`() {
         assertEquals("trailday-assets-line-track", AssetLayerIds.of(AssetLayer.TRACKS))
-        assertEquals("trailday-assets-line-road", AssetLayerIds.of(AssetLayer.ROADS))
-        assertEquals("trailday-assets-line-infrastructure", AssetLayerIds.of(AssetLayer.FENCELINES))
-        assertEquals("trailday-assets-area-carpark", AssetLayerIds.of(AssetLayer.CARPARKS))
-        assertEquals("trailday-assets-area-carpark-fill", AssetLayerIds.CARPARKS_FILL)
-        assertEquals("trailday-assets-area-carpark-casing", AssetLayerIds.CARPARKS_CASING)
+        assertEquals("trailday-assets-line-bike-track", AssetLayerIds.of(AssetLayer.BIKE_TRACKS))
         assertEquals("trailday-assets-line-track-names", AssetLayerIds.TRACK_NAMES)
-        assertEquals("trailday-assets-point-building", AssetLayerIds.of(AssetLayer.BUILDINGS))
-        assertEquals("trailday-assets-point-other-place", AssetLayerIds.of(AssetLayer.OTHER_PLACES))
+        assertEquals("trailday-assets-point-hut", AssetLayerIds.of(AssetLayer.HUTS))
+        assertEquals("trailday-assets-point-campsite", AssetLayerIds.of(AssetLayer.CAMPSITES))
+        assertEquals("trailday-assets-point-waypoint", AssetLayerIds.of(AssetLayer.WAYPOINTS))
     }
 }

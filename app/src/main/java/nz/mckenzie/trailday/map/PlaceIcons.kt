@@ -59,7 +59,7 @@ object PlaceIcons {
     val IMAGE_NAMES: List<String> = KINDS.map { nameOf(it) }
 
     /** The grey ring: what a kind nothing was drawn for falls back to. */
-    val FALLBACK_IMAGE_NAME: String = nameOf(AssetKind.OTHER_PLACE)
+    val FALLBACK_IMAGE_NAME: String = nameOf(AssetKind.WAYPOINT)
 
     /**
      * The image for a place of [kind].

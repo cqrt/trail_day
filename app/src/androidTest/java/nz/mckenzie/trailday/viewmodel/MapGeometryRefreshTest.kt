@@ -13,8 +13,6 @@ import kotlinx.coroutines.withTimeout
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.domain.asset.AssetKind
-import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.tracking.LocationSource
@@ -135,62 +133,6 @@ class MapGeometryRefreshTest {
             viewModel.assetAt(-41.5005, 173.9550)
         )
         assertNull("a tap on empty paddock should open nothing", viewModel.assetAt(-45.0, 170.0))
-    }
-
-    /** A yard about 200 m by 200 m, with its middle at 41.5009S, 173.9513E. */
-    private val yardCorners = listOf(
-        GeoPoint(-41.5000, 173.9500),
-        GeoPoint(-41.5000, 173.9526),
-        GeoPoint(-41.5018, 173.9526),
-        GeoPoint(-41.5018, 173.9500)
-    )
-
-    @Test
-    fun aTapInsideACarparkFindsItAndThePaddockBesideItDoesNot() = runBlocking {
-        val assetId = assetRepository.createAsset(
-            name = "Works",
-            geometry = yardCorners,
-            kind = AssetKind.CARPARK,
-            shape = AssetShape.AREA
-        )
-        val viewModel = viewModel()
-
-        // The middle of the yard: over 100 m from any edge, so nowhere near the boundary the map draws.
-        until("the ground under the middle of the yard") {
-            viewModel.assetAt(-41.5009, 173.9513) == assetId
-        }
-        assertEquals(
-            "the middle of the yard is on the yard",
-            assetId,
-            viewModel.assetAt(-41.5009, 173.9513)
-        )
-        assertNull("bare paddock south of it is not", viewModel.assetAt(-41.5050, 173.9513))
-    }
-
-    @Test
-    fun turningALineIntoGroundMakesTheMiddleOfItTappable() = runBlocking {
-        val assetId = assetRepository.createAsset("Works", yardCorners)
-        val viewModel = viewModel()
-        until("the map to hold the line") {
-            viewModel.assetAt(-41.5000, 173.9513) == assetId
-        }
-        assertNull(
-            "the middle of the yard is nowhere near the line round it",
-            viewModel.assetAt(-41.5009, 173.9513)
-        )
-
-        // The same change the picker makes: the kind and the shape, with the corners it was drawing
-        // with. The shape is part of what makes the map re-read - the ring is cut from geometry the map
-        // already holds, so a change that left the length alone would keep answering taps the old way.
-        val line = assetRepository.getAsset(assetId)!!
-        assetRepository.saveAssetEdits(
-            asset = line.copy(kind = AssetKind.CARPARK.name, shape = AssetShape.AREA.name),
-            geometry = AssetGeometry.of(yardCorners)
-        )
-
-        until("the middle of the yard to answer") {
-            viewModel.assetAt(-41.5009, 173.9513) == assetId
-        }
     }
 
     /** The map tests are about tracks, not about the device's position. */

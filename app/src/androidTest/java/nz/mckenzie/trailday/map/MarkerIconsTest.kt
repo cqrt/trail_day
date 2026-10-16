@@ -15,8 +15,8 @@ import org.junit.runner.RunWith
  *
  * A bitmap cannot be drawn on the JVM, so this is the one place the *drawing* is checked rather than
  * the naming: that every kind of place gives a picture with something in it, and that no two of them
- * are the same picture. `Bitmap.sameAs` compares pixels, so a bench seat and a picnic table that came
- * out identical - the mistake the shapes are most likely to make, since both are bars on legs - fails
+ * are the same picture. `Bitmap.sameAs` compares pixels, so a hut and a campsite that came
+ * out identical - the mistake two similar shapes are most likely to make - fails
  * here rather than being noticed on a hillside.
  */
 @RunWith(AndroidJUnit4::class)
@@ -116,10 +116,10 @@ class MarkerIconsTest {
 
     @Test
     fun theColourAskedForIsTheColourDrawn() {
-        val green = marker(AssetKind.OTHER_PLACE, AssetColors.TRACK_KIND)
-        val red = marker(AssetKind.OTHER_PLACE, AssetColors.RECORDED)
+        val green = marker(AssetKind.HUT, AssetColors.TRACK_KIND)
+        val red = marker(AssetKind.HUT, AssetColors.RECORDED)
 
-        assertFalse("a ring's traffic light is not a decoration", green.sameAs(red))
+        assertFalse("a marker's colour is not a decoration", green.sameAs(red))
     }
 
     @Test

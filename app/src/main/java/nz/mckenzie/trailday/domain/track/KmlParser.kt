@@ -17,10 +17,9 @@ import org.w3c.dom.Node
  *   (the reverse of GPX's `lat`/`lon` attributes, and the trap this reader exists to get right).
  * - `<gx:coord>` is `lon lat [alt]`, space-separated, one per `<when>` child beside it.
  *
- * A `<Polygon>` is read as its boundary rings - a carpark comes in as the closed line around its
- * ground, which is what every other tool reads a KML polygon as, and one edit on the phone turns it
- * back into a carpark. `<Point>` is deliberately not read: a place is not a line, and a file of
- * points is not a track.
+ * A `<Polygon>` is read as its boundary rings - a closed track comes in as the line around its
+ * edge, which is what every other tool reads a KML polygon as. `<Point>` is deliberately not read:
+ * an imported line is a track, and a file of points is not one.
  *
  * Paths are collected in **document order**, not grouped by kind, because the caller's own rule
  * decides which path is the line and which are its side tracks from the order it meets them in.

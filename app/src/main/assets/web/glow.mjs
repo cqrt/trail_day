@@ -8,8 +8,8 @@
  * **The phone's shape, the page's mark.** The desk has a selection and the phone's own map has none, so
  * this is a layer of the page's - but it is built *out of one of the phone's own layers*: the same source,
  * the same filter (narrowed to the one asset), the same width, and the same dash pattern. The dash pattern
- * is the part worth having in a file a test can read: an edge that filled in the gaps between a fenceline's
- * dots would say "solid" about a fenceline, which is the one thing those dots are there to say. So what the
+ * is the part worth having in a file a test can read: an edge that filled in the gaps between a dotted
+ * line's dots would say "solid" about it, which is the one thing those dots are there to say. So what the
  * mark is the *shape* of stays the phone's decision.
  *
  * A line gets a **white edge** under it - the colour chosen for it, and the page's own paper: white is the
@@ -69,8 +69,8 @@ export function pickOut(phoneFilter, id) {
  * Whether a layer of the phone's work gets a halo of its own.
  *
  * A line gets a white edge, and a place's marker gets a disc. A **fill** gets nothing: a surface has no
- * outline to widen, and the carpark it belongs to is drawn with a boundary as well - a line like every
- * other line, whose own halo is what puts the white edge round a carpark that has been picked out. Asking
+ * outline to widen, and the ground it belongs to is drawn with a boundary as well - a line like every
+ * other line, whose own halo is what puts the white edge round a boundary that has been picked out. Asking
  * for one anyway would draw a disc at every corner of the ring.
  *
  * The **names** beside tracks are a symbol layer like a place's marker, but they are about the work rather

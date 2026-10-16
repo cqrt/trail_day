@@ -4,7 +4,6 @@ import kotlinx.serialization.json.Json
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetPhrase
-import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.doc.DocTrack
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.track.TrackInterchange
@@ -24,8 +23,9 @@ import org.junit.Test
  * backup vocabulary is written out in [WebEditorJson], and a column forgotten there is a column the
  * desk never sees.
  *
- * What is *not* in the document is held as firmly: how a place is sprayed, its interval and its
- * last-sprayed date are gone from the app and never travel to the desk at all.
+ * What is *not* in the document is held as firmly: the spray fields the app no longer has - the
+ * method, the interval, the swath width, the pass count and the last-sprayed date - never travel
+ * to the desk at all.
  */
 class WebEditorJsonTest {
 
@@ -35,7 +35,7 @@ class WebEditorJsonTest {
     private val everyField = AssetEntity(
         id = 7L,
         name = "Estuary road",
-        kind = "ROAD",
+        kind = "BIKE_TRACK",
         shape = "LINE",
         notes = "Both edges, twice a year",
         active = true,
@@ -63,27 +63,14 @@ class WebEditorJsonTest {
     )
 
     @Test
-    fun `a track drawn before the kinds existed reaches the desk as what it is`() {
-        // Stored as INFRASTRUCTURE by every build before v0.6.40. The phone reads it back by its
-        // shape, here, once - so the page is handed a kind it can compare with the kinds in its own
-        // filter list, and holds no copy of the old-kind rule itself.
-        val oldLine = everyField.copy(kind = "INFRASTRUCTURE", shape = "LINE")
-        val oldSpot = everyField.copy(kind = "INFRASTRUCTURE", shape = "POINT")
+    fun `a stored word this build does not know reaches the desk as a track`() {
+        // A value from a later build, or a database edited by hand: the phone reads it back once,
+        // here, so the page is handed a kind it can compare with the kinds in its own filter list.
+        val unknown = everyField.copy(kind = "PADDOCK", shape = "LINE")
 
         assertEquals(
-            "a line is a fenceline or stopbank",
-            AssetKind.FENCELINE.name,
-            roundTrip(documentWith(oldLine)).assets.single().asset.kind
-        )
-        assertEquals(
-            "and a spot is some other place",
-            AssetKind.OTHER_PLACE.name,
-            roundTrip(documentWith(oldSpot)).assets.single().asset.kind
-        )
-        assertEquals(
-            "the shape it was stored with still travels, because the card draws a length from it",
-            "LINE",
-            roundTrip(documentWith(oldLine)).assets.single().asset.shape
+            AssetKind.TRACK.name,
+            roundTrip(documentWith(unknown)).assets.single().asset.kind
         )
     }
 
@@ -162,24 +149,18 @@ class WebEditorJsonTest {
     }
 
     @Test
-    fun `the two figures a card is read for travel with the record`() {
-        // A carpark's card says the metres round it and the ground inside it, and both are the phone's own
-        // numbers: the cached length, and the measurement the kind exists for. Worked out again on the
-        // desk from the corners it can see, either would be a second answer to a question the phone has
-        // already answered - and the area is the one figure in this app that is not an estimate, so a page
-        // quietly showing zero for it is the worst version of that mistake.
-        val carpark = everyField.copy(
-            kind = AssetKind.CARPARK.name,
-            shape = AssetKind.CARPARK.shape.name,
-            lengthM = 855.0,
-            areaM2 = 45_000.0
+    fun `the length a card is read for travels with the record`() {
+        // The card says how long the line is, and it is the phone's own number: worked out again on
+        // the desk from the vertices it can see would be a second answer to a question the phone has
+        // already answered.
+        val ridden = everyField.copy(
+            kind = AssetKind.BIKE_TRACK.name,
+            shape = AssetKind.BIKE_TRACK.shape.name,
+            lengthM = 855.0
         )
-        val text = WebEditorJson.build(documentWith(carpark))
 
-        val record = roundTrip(documentWith(carpark)).assets.single()
+        val record = roundTrip(documentWith(ridden)).assets.single()
         assertEquals(855.0, record.asset.lengthM, 1e-9)
-        assertEquals(45_000.0, record.asset.areaM2, 1e-9)
-        assertTrue("and the page is handed it: $text", text.contains("\"areaM2\":45000"))
     }
 
     @Test
@@ -274,16 +255,17 @@ class WebEditorJsonTest {
     }
 
     @Test
-    fun `a kind carries the shape it makes, so the desk draws ground as ground`() {
+    fun `a kind carries the shape it makes, so the desk draws a point as a point`() {
         val kinds = WebEditorChoices.ofApp().kinds.associateBy { it.value }
 
-        // The phone's own answer, not a list of kind names kept in JavaScript: the desk draws the
-        // closing side of a ring, counts its ground and offers it no side tracks, and a page that
-        // decided which kinds those are from their names would drift the day a second one ships.
-        assertEquals(AssetKind.CARPARK.shape.name, kinds.getValue(AssetKind.CARPARK.name).shape)
-        assertEquals("AREA", kinds.getValue(AssetKind.CARPARK.name).shape)
+        // The phone's own answer, not a list of kind names kept in JavaScript: the desk places a
+        // point with one click and offers it no side tracks, and a page that decided which kinds
+        // those are from their names would drift the day a new kind ships.
+        assertEquals(AssetKind.HUT.shape.name, kinds.getValue(AssetKind.HUT.name).shape)
+        assertEquals("POINT", kinds.getValue(AssetKind.HUT.name).shape)
         assertEquals("LINE", kinds.getValue(AssetKind.TRACK.name).shape)
-        assertEquals("POINT", kinds.getValue(AssetKind.OTHER_PLACE.name).shape)
+        assertEquals("LINE", kinds.getValue(AssetKind.BIKE_TRACK.name).shape)
+        assertEquals("POINT", kinds.getValue(AssetKind.WAYPOINT.name).shape)
     }
 
     @Test
@@ -296,7 +278,7 @@ class WebEditorJsonTest {
     }
 
     @Test
-    fun `an empty farm is a document with no assets, not a missing document`() {
+    fun `an empty phone is a document with no places, not a missing document`() {
         val text = WebEditorJson.build(WebEditorDocument())
 
         val restored = json.decodeFromString(WebEditorDocument.serializer(), text)

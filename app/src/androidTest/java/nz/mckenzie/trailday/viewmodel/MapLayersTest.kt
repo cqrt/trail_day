@@ -84,17 +84,17 @@ class MapLayersTest {
     fun hidingOneLayerLeavesTheOthersWhereTheyAre() = runBlocking {
         val viewModel = viewModel()
 
-        viewModel.setLayerHidden(AssetLayer.ROADS, hidden = true)
+        viewModel.setLayerHidden(AssetLayer.BIKE_TRACKS, hidden = true)
         val one = withTimeout(5_000) { viewModel.hiddenLayers.first { it.isNotEmpty() } }
-        assertEquals(setOf(AssetLayer.ROADS), one)
+        assertEquals(setOf(AssetLayer.BIKE_TRACKS), one)
 
-        viewModel.setLayerHidden(AssetLayer.OTHER_PLACES, hidden = true)
+        viewModel.setLayerHidden(AssetLayer.WAYPOINTS, hidden = true)
         val two = withTimeout(5_000) { viewModel.hiddenLayers.first { it.size == 2 } }
-        assertEquals(setOf(AssetLayer.ROADS, AssetLayer.OTHER_PLACES), two)
+        assertEquals(setOf(AssetLayer.BIKE_TRACKS, AssetLayer.WAYPOINTS), two)
 
-        viewModel.setLayerHidden(AssetLayer.OTHER_PLACES, hidden = false)
+        viewModel.setLayerHidden(AssetLayer.WAYPOINTS, hidden = false)
         val back = withTimeout(5_000) { viewModel.hiddenLayers.first { it.size == 1 } }
-        assertEquals("showing one layer again is not a way to show the rest", setOf(AssetLayer.ROADS), back)
+        assertEquals("showing one layer again is not a way to show the rest", setOf(AssetLayer.BIKE_TRACKS), back)
     }
 
     @Test
@@ -105,11 +105,11 @@ class MapLayersTest {
         // used: reading the choice out of a value the view model was holding made the second tap
         // undo the first, and this is the test that says so.
         viewModel.setLayerHidden(AssetLayer.TRACKS, hidden = true)
-        viewModel.setLayerHidden(AssetLayer.FENCELINES, hidden = true)
+        viewModel.setLayerHidden(AssetLayer.HUTS, hidden = true)
 
         val both = withTimeout(5_000) { viewModel.hiddenLayers.first { it.size == 2 } }
 
-        assertEquals(setOf(AssetLayer.TRACKS, AssetLayer.FENCELINES), both)
+        assertEquals(setOf(AssetLayer.TRACKS, AssetLayer.HUTS), both)
     }
 
     @Test
@@ -131,7 +131,7 @@ class MapLayersTest {
     fun showEverythingPutsBackWhatTheSwitchesTookAway() = runBlocking {
         val viewModel = viewModel()
         viewModel.setLayerHidden(AssetLayer.TRACKS, hidden = true)
-        viewModel.setLayerHidden(AssetLayer.FENCELINES, hidden = true)
+        viewModel.setLayerHidden(AssetLayer.HUTS, hidden = true)
         withTimeout(5_000) { viewModel.hiddenLayers.first { it.size == 2 } }
 
         viewModel.showEveryLayer()

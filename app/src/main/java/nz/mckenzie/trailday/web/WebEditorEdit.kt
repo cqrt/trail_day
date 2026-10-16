@@ -400,12 +400,8 @@ object WebEditorEdits {
     private fun judge(edit: WebEditorEdit, current: AssetEntity): WebEditorEditResult {
 
         // Named states rather than typed ones, so an unknown name is a refusal and not a silent
-        // fallback onto a default: a kind the page made up must not become a track. "Infrastructure"
-        // is the one other value read here, and it is not a fallback either: it is what every
-        // fenceline, trough and shed on a farm sprayed before this build was called, and the row's
-        // own shape says which of the two things it was. A page from before the types therefore
-        // still edits a fenceline as a fenceline, and what it writes back is the settled kind.
-        val kind = AssetKind.known(edit.kind, AssetShape.fromStorage(current.shape))
+        // fallback onto a default: a kind the page made up must not become a track.
+        val kind = AssetKind.known(edit.kind)
             ?: return Refused("The phone does not know what kind of thing \"${edit.kind}\" is.")
 
         val fields = AssetEditFields(

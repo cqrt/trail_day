@@ -19,11 +19,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * The asset list's kind chips: which rows they leave on the screen.
+ * The place list's kind chips: which rows they leave on the screen.
  *
  * `AssetKindFilterTest` pins the rule. This pins the wiring - a filter asked the wrong question, or
- * one that hides a row the operator can still see on the map, is the kind of bug that is taken for a
- * lost track.
+ * one that hides a row the walker can still see on the map, is the kind of bug that is taken for a
+ * lost place.
  */
 @RunWith(AndroidJUnit4::class)
 class AssetListViewModelTest {
@@ -50,35 +50,35 @@ class AssetListViewModelTest {
 
     @Test
     fun everythingIsShownUntilAChipIsTapped() = runBlocking {
-        givenABuilding("Woolshed")
-        givenARoad("Estuary road")
+        givenAHut("Tin Hut")
+        givenABikeTrack("Estuary road")
 
-        assertEquals(listOf("Estuary road", "Woolshed"), namesShown(viewModel(), 2))
+        assertEquals(listOf("Estuary road", "Tin Hut"), namesShown(viewModel(), 2))
     }
 
     @Test
     fun aChipShowsThatKindAloneAndItsOwnChipAgainShowsEverything() = runBlocking {
-        givenABuilding("Woolshed")
-        givenARoad("Estuary road")
+        givenAHut("Tin Hut")
+        givenABikeTrack("Estuary road")
         val viewModel = viewModel()
         namesShown(viewModel, 2)
 
-        viewModel.showOnly(AssetKind.BUILDING)
-        assertEquals(listOf("Woolshed"), namesShown(viewModel, 1))
+        viewModel.showOnly(AssetKind.HUT)
+        assertEquals(listOf("Tin Hut"), namesShown(viewModel, 1))
 
-        viewModel.showOnly(AssetKind.BUILDING)
+        viewModel.showOnly(AssetKind.HUT)
         assertEquals("the chip already showing is the way back out", 2, namesShown(viewModel, 2).size)
 
-        viewModel.showOnly(AssetKind.SIGN)
+        viewModel.showOnly(AssetKind.CAMPSITE)
         assertEquals("and a kind with nothing in it shows nothing", 0, namesShown(viewModel, 0).size)
     }
 
     @Test
     fun theAllChipClearsWhateverWasShowing() = runBlocking {
-        givenABuilding("Woolshed")
-        givenARoad("Estuary road")
+        givenAHut("Tin Hut")
+        givenABikeTrack("Estuary road")
         val viewModel = viewModel()
-        viewModel.showOnly(AssetKind.BUILDING)
+        viewModel.showOnly(AssetKind.HUT)
         namesShown(viewModel, 1)
 
         viewModel.showOnly(null)
@@ -87,43 +87,43 @@ class AssetListViewModelTest {
     }
 
     @Test
-    fun aTrackDrawnBeforeTheKindsExistedIsFoundUnderWhatItIs() = runBlocking {
+    fun aStoredWordFromALaterBuildIsFoundUnderTrack() = runBlocking {
         val id = repository.createAsset(
-            name = "Home fenceline",
+            name = "Home track",
             geometry = listOf(GeoPoint(-41.5, 173.8), GeoPoint(-41.5, 173.81)),
-            kind = AssetKind.FENCELINE,
+            kind = AssetKind.TRACK,
             shape = AssetShape.LINE
         )
-        // Stored the way every build before v0.6.40 stored a fenceline, which is the only way a row
-        // like this can come to exist - so this is the real thing, not a trick.
+        // A value this build has never heard of - a word from a later build, or a hand-edited row -
+        // which the phone reads as a track rather than losing.
         val stored = db.assetDao().getAsset(id)!!
-        db.assetDao().update(stored.copy(kind = "INFRASTRUCTURE"))
-        givenARoad("Estuary road")
+        db.assetDao().update(stored.copy(kind = "PADDOCK"))
+        givenABikeTrack("Estuary road")
 
         val viewModel = viewModel()
         namesShown(viewModel, 2)
 
-        viewModel.showOnly(AssetKind.FENCELINE)
-        assertEquals("found under what it is", listOf("Home fenceline"), namesShown(viewModel, 1))
+        viewModel.showOnly(AssetKind.TRACK)
+        assertEquals("found under what it is read as", listOf("Home track"), namesShown(viewModel, 1))
 
-        viewModel.showOnly(AssetKind.OTHER_PLACE)
+        viewModel.showOnly(AssetKind.HUT)
         assertEquals("and not under a word it never had", 0, namesShown(viewModel, 0).size)
     }
 
-    private suspend fun givenABuilding(name: String) {
+    private suspend fun givenAHut(name: String) {
         repository.createAsset(
             name = name,
             geometry = listOf(GeoPoint(-41.5, 173.8)),
-            kind = AssetKind.BUILDING,
+            kind = AssetKind.HUT,
             shape = AssetShape.POINT
         )
     }
 
-    private suspend fun givenARoad(name: String) {
+    private suspend fun givenABikeTrack(name: String) {
         repository.createAsset(
             name = name,
             geometry = listOf(GeoPoint(-41.5, 173.8), GeoPoint(-41.5, 173.82)),
-            kind = AssetKind.ROAD,
+            kind = AssetKind.BIKE_TRACK,
             shape = AssetShape.LINE
         )
     }
