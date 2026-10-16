@@ -214,7 +214,6 @@ class MapGeometryRefreshTest {
         val line = assetRepository.getAsset(assetId)!!
         assetRepository.saveAssetEdits(
             asset = line.copy(kind = AssetKind.CARPARK.name, shape = AssetShape.AREA.name),
-            groupName = null,
             geometry = AssetGeometry.of(yardCorners)
         )
 

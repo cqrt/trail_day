@@ -24,8 +24,8 @@ import org.junit.Test
  * backup vocabulary is written out in [WebEditorJson], and a column forgotten there is a column the
  * desk never sees.
  *
- * What is *not* in the document is held as firmly: nothing about when a place is next due, the block
- * it sits in, how it is sprayed or what was in the tank travels to the desk at all.
+ * What is *not* in the document is held as firmly: nothing about when a place is next due,
+ * how it is sprayed or what was in the tank travels to the desk at all.
  */
 class WebEditorJsonTest {
 
@@ -38,7 +38,6 @@ class WebEditorJsonTest {
         kind = "ROAD",
         shape = "LINE",
         method = "BOOM",
-        groupId = 3L,
         notes = "Both edges, twice a year",
         intervalDays = 120,
         swathWidthM = 12.5,
@@ -58,7 +57,6 @@ class WebEditorJsonTest {
 
     private fun documentWith(
         asset: AssetEntity,
-        groupName: String? = "Estuary",
         recordings: Int = 0,
         sprays: Int = 4
     ) = WebEditorDocument(
@@ -66,7 +64,6 @@ class WebEditorJsonTest {
             WebEditorJson.record(
                 asset = asset,
                 sprayCount = sprays,
-                groupName = groupName,
                 paths = listOf(path),
                 recordingCount = recordings
             )
@@ -107,7 +104,6 @@ class WebEditorJsonTest {
         assertEquals(everyField.kind, restored.kind)
         assertEquals(everyField.shape, restored.shape)
         assertEquals(everyField.method, restored.method)
-        assertEquals(everyField.groupId, restored.groupId)
         assertEquals(everyField.notes, restored.notes)
         assertEquals(everyField.intervalDays, restored.intervalDays)
         assertEquals(everyField.swathWidthM!!, restored.swathWidthM!!, 0.0)
@@ -131,7 +127,6 @@ class WebEditorJsonTest {
                 WebEditorJson.record(
                     asset = everyField,
                     sprayCount = 4,
-                    groupName = "Estuary",
                     paths = listOf(path, spur),
                     recordingCount = 0
                 )
@@ -150,7 +145,6 @@ class WebEditorJsonTest {
                 WebEditorJson.record(
                     asset = everyField,
                     sprayCount = 4,
-                    groupName = "Estuary",
                     paths = emptyList(),
                     recordingCount = 0
                 )
@@ -170,7 +164,6 @@ class WebEditorJsonTest {
         assertTrue("no due status: $text", !text.contains("dueStatus"))
         assertTrue("no due day: $text", !text.contains("dueAtEpochMs"))
         assertTrue("no count of sprays: $text", !text.contains("sprayCount"))
-        assertTrue("no block name: $text", !text.contains("groupName"))
     }
 
     @Test
@@ -215,7 +208,6 @@ class WebEditorJsonTest {
         val withHeights = WebEditorJson.record(
             asset = everyField,
             sprayCount = 0,
-            groupName = null,
             paths = listOf(climbed),
             recordingCount = 0
         )
@@ -255,10 +247,10 @@ class WebEditorJsonTest {
     fun `the record carries the version an edit has to quote back`() {
         val record = roundTrip(documentWith(everyField)).assets.single()
 
-        // Worked out here from the row, the block and the line, exactly as the phone will work it out
+        // Worked out here from the row and the line, exactly as the phone will work it out
         // again when the edit comes back: a desk quoting this cannot have been reading another version
         // of the asset, and the version survives the trip to the page as the rest of the record does.
-        assertEquals(WebEditorVersion.of(everyField, "Estuary", listOf(path)), record.version)
+        assertEquals(WebEditorVersion.of(everyField, listOf(path)), record.version)
     }
 
     @Test

@@ -79,8 +79,6 @@ fun AssetDetailScreen(
     // What the asset is drawn as, for the one place this screen's own words have to follow it: a
     // carpark has no line to hang a side track off, so its action says what it actually does.
     val shape = AssetShape.fromStorage(track?.shape)
-    val editDraft by viewModel.editDraft.collectAsStateWithLifecycle()
-    val groupName by viewModel.groupName.collectAsStateWithLifecycle()
     val geometry by viewModel.geometry.collectAsStateWithLifecycle()
     // The height of the line, from the geometry the phone already holds. Null for a track drawn on
     // a map, which has no heights: the range line and the chart say nothing rather than a zero.
@@ -178,9 +176,6 @@ fun AssetDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(dueText(due), style = MaterialTheme.typography.titleMedium)
-                    groupName?.takeIf { it.isNotBlank() }?.let { group ->
-                        Text(text = group, style = MaterialTheme.typography.bodyMedium)
-                    }
                     // What it is, how it is done, and - for a line that takes two passes - how many
                     // passes that is, because the two are what decide when the light next changes.
                     track?.let { asset ->
@@ -425,9 +420,9 @@ fun AssetDetailScreen(
                     supportingContent = {
                         Text(
                             if (shape == AssetShape.AREA) {
-                                "Name, block, kind, interval and notes"
+                                "Name, kind, interval and notes"
                             } else {
-                                "Name, block, kind, interval, boom width and notes"
+                                "Name, kind, interval, boom width and notes"
                             }
                         )
                     },

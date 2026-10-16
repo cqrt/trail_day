@@ -22,8 +22,7 @@ import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetKindFilter
 
 /**
- * The asset library: every planned asset with its due status, folded into the blocks it is
- * worked with, plus GPX import.
+ * The asset library: every planned asset with its due status, plus GPX import.
  */
 class AssetListViewModel(
     private val assetRepository: AssetRepository,
@@ -46,8 +45,8 @@ class AssetListViewModel(
     /**
      * The rows the list is built from: the whole work, or one kind of it.
      *
-     * Filtered here rather than in the screen so the block tiles, the rows and the "nothing of that
-     * kind" line are all reading the same list - and so the rule can be tested without a screen.
+     * Filtered here rather than in the screen so the rows and the "nothing of that kind" line are
+     * both reading the same list - and so the rule can be tested without a screen.
      */
     val shown: StateFlow<List<AssetWithDue>> = combine(assetsWithDue, _filter) { all, filter ->
         all.filter { item -> filter.keeps(item.asset.kind, item.asset.shape) }
@@ -61,21 +60,6 @@ class AssetListViewModel(
      */
     fun showOnly(kind: AssetKind?) {
         _filter.update { showing -> AssetKindFilter.afterTapping(kind, showing) }
-    }
-
-    /**
-     * Which blocks are open, by name.
-     *
-     * Held here rather than in the screen so it survives the list being rebuilt - and closed
-     * to begin with, because a block's tile is meant to answer the question on its own; the
-     * rows are what you open it for.
-     */
-    private val _expandedBlocks = MutableStateFlow<Set<String>>(emptySet())
-    val expandedBlocks: StateFlow<Set<String>> = _expandedBlocks
-
-    /** Opens a closed block, or closes an open one. */
-    fun toggleBlock(name: String) {
-        _expandedBlocks.update { open -> if (name in open) open - name else open + name }
     }
 
     private val _message = MutableStateFlow<String?>(null)

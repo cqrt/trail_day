@@ -86,7 +86,6 @@ class AssetDetailViewModelTest {
     private fun edit(
         asset: AssetEntity,
         name: String = asset.name,
-        groupName: String = "",
         kind: AssetKind = AssetKind.fromStorage(asset.kind, AssetShape.fromStorage(asset.shape)),
         method: SprayMethod = SprayMethod.fromStorage(asset.method),
         intervalDays: String = asset.intervalDays.toString(),
@@ -96,7 +95,6 @@ class AssetDetailViewModelTest {
         asset,
         AssetEditFields(
             name = name,
-            groupName = groupName,
             kind = kind,
             method = method,
             intervalDays = intervalDays,
@@ -112,7 +110,6 @@ class AssetDetailViewModelTest {
         val edited = edit(
             track,
             name = "Back paddock",
-            groupName = "Back",
             kind = AssetKind.ROAD,
             method = SprayMethod.KNAPSACK,
             intervalDays = "90",
@@ -122,12 +119,11 @@ class AssetDetailViewModelTest {
         assertTrue(edited is AssetEditResult.Ok)
 
         val ok = edited as AssetEditResult.Ok
-        viewModel.save(ok.asset, ok.groupName)
+        viewModel.save(ok.asset)
 
         val stored = withTimeout(5_000) {
             assetRepository.observeAsset(assetId).first { it?.name == "Back paddock" }
         }!!
-        assertEquals("Back", assetRepository.observeGroupName(assetId).first())
         assertEquals(SprayMethod.KNAPSACK, SprayMethod.fromStorage(stored.method))
         assertEquals(
             "a road is still a road after a rename",
@@ -159,7 +155,7 @@ class AssetDetailViewModelTest {
             name = "Home block",
             intervalDays = "10"
         )
-        viewModel.save((edited as AssetEditResult.Ok).asset, (edited as AssetEditResult.Ok).groupName)
+        viewModel.save((edited as AssetEditResult.Ok).asset)
 
         withTimeout(5_000) { assetRepository.observeAsset(assetId).first { it?.intervalDays == 10 } }
         assertEquals(
@@ -175,35 +171,19 @@ class AssetDetailViewModelTest {
 
         val withWidth = edit(track(), intervalDays = "120", swathWidthM = "4.5")
             as AssetEditResult.Ok
-        viewModel.save(withWidth.asset, withWidth.groupName)
+        viewModel.save(withWidth.asset)
         val stored = withTimeout(5_000) { assetRepository.observeAsset(assetId).first { it?.swathWidthM != null } }!!
         assertEquals(4.5, stored.swathWidthM!!, 1e-9)
 
         val withoutWidth = edit(stored, intervalDays = "120", swathWidthM = "")
             as AssetEditResult.Ok
-        viewModel.save(withoutWidth.asset, withoutWidth.groupName)
+        viewModel.save(withoutWidth.asset)
         withTimeout(5_000) { assetRepository.observeAsset(assetId).first { it?.swathWidthM == null } }
 
         assertNull("removing the width must not leave a zero behind", track().swathWidthM)
         // And with no width there is no treated area to claim.
         val finalTrack = track()
         assertNull(finalTrack.swathWidthM)
-    }
-
-    /**
-     * The line the detail screen shows is the asset's block, read on its own.
-     *
-     * It used to be read out of the edit form's state, which is the wrong place for something
-     * only ever displayed: the screen would show nothing until a form had been prepared, and
-     * a field that exists to be typed into is a poor place to keep something being read.
-     */
-    @Test
-    fun theBlockOnTheDetailScreenComesFromItsOwnFlow() = runBlocking {
-        val viewModel = viewModel()
-
-        viewModel.save(track(), groupName = "Estuary")
-
-        assertEquals("Estuary", withTimeout(5_000) { viewModel.groupName.first { it != null } })
     }
 
     /**

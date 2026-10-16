@@ -40,7 +40,7 @@ import nz.mckenzie.trailday.tracking.DevicePosition
  * Searching happens at DOC's service, not on the phone - the whole dataset is 3,255 tracks and the
  * operator wants a handful - so a search is a name and/or a place, and what comes back is a page of
  * tracks. Importing one is the same `createAsset` every drawn or imported track goes through, so a
- * DOC track is a track like any other the moment it lands: it can be edited, sprayed, given a block.
+ * DOC track is a track like any other the moment it lands: it can be edited and sprayed.
  */
 class DocTracksViewModel(
     private val assets: AssetRepository,

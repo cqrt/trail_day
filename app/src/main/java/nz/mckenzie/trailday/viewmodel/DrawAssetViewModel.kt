@@ -513,7 +513,7 @@ class DrawAssetViewModel(
      * and the length they add up to in one transaction, exactly as it does for a track drawn from
      * scratch.
      *
-     * The name, the kind and the block are not touched here: those are the details form's, and a screen
+     * The name and the kind are not touched here: those are the details form's, and a screen
      * that draws lines has no business rewriting a name nobody typed on it.
      */
     fun saveChanges() {

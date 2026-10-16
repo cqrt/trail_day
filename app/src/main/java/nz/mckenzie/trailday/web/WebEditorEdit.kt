@@ -29,7 +29,7 @@ import java.util.Base64
  * the phone holds it now and the repository writes that row back: the desk cannot overwrite a
  * last-sprayed date or an archived flag it never heard of.
  *
- * **And the fields the desk no longer shows are the row's own.** The block, the spray method, the
+ * **And the fields the desk no longer shows are the row's own.** The spray method, the
  * interval, the swath width, the pass count and the pass separation are read straight off [current]
  * and handed to [AssetEdits] as they are, so a save from the desk cannot wipe any of them by not
  * mentioning it - which is the one rule this arrangement has to keep. Only a name, a kind, the notes
@@ -60,7 +60,7 @@ import java.util.Base64
  * Every number arrives as the text the field held, for the reason [AssetEdits] exists: what a
  * blank, a comma or a stray space means is decided in one place, and it is not decided here.
  *
- * Only what the desk actually shows is here. The block, the method, the interval, the swath width,
+ * Only what the desk actually shows is here. The method, the interval, the swath width,
  * the pass count and the pass separation are left out on purpose: they are the phone's own, the desk
  * never touches them, and [WebEditorEdits.judge] puts the row's current values back where the rules
  * expect them.
@@ -148,15 +148,13 @@ enum class WebEditorRefusal(val status: Int, val reason: String) {
 sealed interface WebEditorEditResult {
 
     /**
-     * The row to store and the block it belongs in - the name the operator typed, which the
-     * repository resolves inside the same transaction as the write.
+     * The row to store.
      *
-     * [points] is the line to store with the row, or null when this write said nothing about the
+     * [paths] is the line to store with the row, or null when this write said nothing about the
      * drawing and the geometry stays exactly as it is.
      */
     data class Ok(
         val asset: AssetEntity,
-        val blockName: String?,
         /**
          * The drawing to store, when the write was about where the asset goes: the line first and its
          * side tracks after it, already judged. Null when the write said nothing about the drawing,
@@ -181,7 +179,6 @@ sealed interface WebEditorEditResult {
 /** A new asset, as a desk's drawing and the form beside it describe one. */
 data class WebEditorDraft(
     val asset: AssetEntity,
-    val blockName: String?,
     /**
      * The geometry to store with it, and never empty: an asset with nothing drawn is not something
      * the desk can make, and [AssetPathEdits] refuses that for both shapes - so this type says what is
@@ -268,7 +265,6 @@ object WebEditorVersion {
      */
     fun of(
         asset: AssetEntity,
-        blockName: String?,
         paths: List<List<GeoPoint>> = emptyList()
     ): String {
         // Named fields, one to a line. A hash of joined values would read "Estuary" and "3" the same
@@ -279,7 +275,6 @@ object WebEditorVersion {
             "kind" to asset.kind,
             "shape" to asset.shape,
             "method" to asset.method,
-            "block" to blockName.orEmpty(),
             "notes" to asset.notes.orEmpty(),
             "intervalDays" to asset.intervalDays.toString(),
             "swathWidthM" to asset.swathWidthM?.toString().orEmpty(),
@@ -352,7 +347,6 @@ object WebEditorEdits {
      */
     fun apply(
         current: AssetEntity,
-        blockName: String?,
         paths: List<List<GeoPoint>>,
         body: String?
     ): WebEditorEditResult {
@@ -363,7 +357,7 @@ object WebEditorEdits {
         // range would be an answer about an asset that is no longer there. A body that did not say
         // which version it was written against cannot be taken at all: there is nothing to compare.
         if (edit.version.isBlank()) return Refused(UNREADABLE)
-        if (edit.version != WebEditorVersion.of(current, blockName, paths)) {
+        if (edit.version != WebEditorVersion.of(current, paths)) {
             return Refused(
                 "This was changed on the phone while it was open here, so nothing was saved. " +
                     "Close the card and open it again to see the phone's version.",
@@ -371,7 +365,7 @@ object WebEditorEdits {
             )
         }
 
-        return judge(edit, current, blockName)
+        return judge(edit, current)
     }
 
     /**
@@ -387,7 +381,7 @@ object WebEditorEdits {
     fun create(body: String?, nowEpochMs: Long): WebEditorCreateResult {
         val edit = parse(body) ?: return CreateRefused(UNREADABLE)
 
-        val judged = judge(edit, AssetEntity(name = "", createdAtEpochMs = nowEpochMs), null)
+        val judged = judge(edit, AssetEntity(name = "", createdAtEpochMs = nowEpochMs))
         return when (judged) {
             is WebEditorEditResult.Refused ->
                 WebEditorCreateResult.Refused(judged.refusal, judged.message)
@@ -398,7 +392,6 @@ object WebEditorEdits {
                 WebEditorCreateResult.Ok(
                     WebEditorDraft(
                         asset = judged.asset,
-                        blockName = judged.blockName,
                         // Every path the desk drew, which is now the line *and* any side track it put on
                         // it: `AssetGeometry` keeps the first as the line, and the rules above have
                         // already judged each one.
@@ -418,12 +411,12 @@ object WebEditorEdits {
      * whichever of the two writes is the rarer.
      *
      * **Every field the desk no longer shows is taken from [current]**, so a save that does not
-     * mention the block, the method, the interval, the swath width, the pass count or the pass
+     * mention the method, the interval, the swath width, the pass count or the pass
      * separation writes each row's own value straight back. That is the one rule this whole
      * arrangement has to keep: a desk save cannot wipe them by not mentioning them. For a new asset
      * [current] is a blank row, and its defaults are the phone's starting values.
      */
-    private fun judge(edit: WebEditorEdit, current: AssetEntity, blockName: String?): WebEditorEditResult {
+    private fun judge(edit: WebEditorEdit, current: AssetEntity): WebEditorEditResult {
 
         // Named states rather than typed ones, so an unknown name is a refusal and not a silent
         // fallback onto a default: a kind the page made up must not become a track. "Infrastructure"
@@ -436,7 +429,6 @@ object WebEditorEdits {
 
         val fields = AssetEditFields(
             name = edit.name,
-            groupName = blockName.orEmpty(),
             kind = kind,
             // Each read off the row the phone holds now, and as the number it is rather than rounded:
             // the desk shows none of these, so the row's own are what its edit keeps, to the bit.
@@ -450,7 +442,7 @@ object WebEditorEdits {
 
         // The app's own answer, message and all. The row it hands back is the row the phone holds
         // now with the editable fields replaced, so the write that follows cannot take anything
-        // else with it - and `saveAssetEdits` resolves the block in the same transaction.
+        // else with it.
         return when (val result = AssetEdits.apply(current, fields)) {
             is AssetEditResult.Invalid -> Refused(result.message)
             is AssetEditResult.Ok -> {
@@ -460,11 +452,10 @@ object WebEditorEdits {
                 // judged by the same rules as one drawn on the phone: every path whole, and every side
                 // track starting on the line it hangs off.
                 when (val drawn = drawingOf(kind.shape, edit)) {
-                    null -> WebEditorEditResult.Ok(result.asset, result.groupName)
+                    null -> WebEditorEditResult.Ok(result.asset)
                     is AssetPathResult.Invalid -> Refused(drawn.message)
                     is AssetPathResult.Ok -> WebEditorEditResult.Ok(
                         asset = result.asset,
-                        blockName = result.groupName,
                         paths = drawn.paths,
                         carriedPaths = edit.paths != null
                     )

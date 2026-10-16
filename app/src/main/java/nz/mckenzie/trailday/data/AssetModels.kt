@@ -6,18 +6,12 @@ import nz.mckenzie.trailday.domain.geo.RecordedPass
 
 /**
  * An asset plus everything the map and list need to render it: its traffic-light
- * due state, how many times it has been sprayed, and the block it is worked with.
- *
- * The block arrives as a name rather than an id because a name is what the list shows: the
- * assets in one block are folded together under it, and a rename should change that heading
- * without touching anything else.
+ * due state, and how many times it has been sprayed.
  */
 data class AssetWithDue(
     val asset: AssetEntity,
     val due: DueInfo,
-    val sprayCount: Int,
-    /** Null when the asset stands on its own. */
-    val groupName: String? = null
+    val sprayCount: Int
 )
 
 /**

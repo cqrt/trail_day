@@ -46,8 +46,8 @@ import nz.mckenzie.trailday.offline.HttpResponse
  * may be read, a place's name, kind, notes and line may be changed through the edit rules, a track
  * may be drawn on a computer, and a place with nothing recorded against it may be taken away. The
  * counts behind that last rule are *read* here and never written: sprays and recordings are the
- * phone's business, and the block a place sits in and the interval it is sprayed on are the phone's
- * too - a desk save never mentions them, so it cannot wipe them.
+ * phone's business, and the interval a place is sprayed on is the phone's too - a desk save never
+ * mentions it, so it cannot wipe it.
  */
 class WebEditorDocuments(
     private val assets: AssetRepository,
@@ -80,9 +80,8 @@ class WebEditorDocuments(
 ) : WebEditorData {
 
     override suspend fun state(authority: String): String {
-        // The block name and the spray count are read here without being shown: the version a card
-        // quotes is hashed with the block, and the delete sentence counts the sprays, so both have to
-        // travel out - they are the phone's own and the desk never has to look at either.
+        // The spray count is read here without being shown: the delete sentence counts the sprays, so it
+        // has to travel out - it is the phone's own and the desk never has to look at it.
         val work = withDue()
         // Once for the farm rather than once per asset: every record carries the version of the line
         // it was handed and a sentence about what deleting it would take, and both are built from
@@ -96,7 +95,6 @@ class WebEditorDocuments(
                     WebEditorJson.record(
                         asset = item.asset,
                         sprayCount = item.sprayCount,
-                        groupName = item.groupName,
                         paths = paths[item.asset.id]?.paths.orEmpty(),
                         recordingCount = recordings[item.asset.id] ?: 0
                     )
@@ -139,13 +137,12 @@ class WebEditorDocuments(
     /**
      * `PUT /api/assets/<id>`: the desk's edit, judged against the row the phone holds now.
      *
-     * The row is read through [withDue] rather than straight from the table because that is where the
-     * block name lives - and the block name is part of the version the desk quoted back, even though
-     * the desk never shows it.
+     * The row is read through [withDue] rather than straight from the table because that is the read
+     * the app's own map makes, so the desk is answered from what the phone says.
      *
      * After the write the asset is read a second time and the answer is built from that read, so what
      * the desk is told is what the phone holds: the version it must quote on the next edit, and the
-     * sentence about what deleting it would take. The fields the desk no longer sends - the block, the
+     * sentence about what deleting it would take. The fields the desk no longer sends - the
      * method, the interval, the swath width and the pass count - are taken from the row the phone holds
      * now (see [WebEditorEdits]), so a save from the desk cannot wipe any of them.
      */
@@ -157,7 +154,7 @@ class WebEditorDocuments(
         // there rather than written over.
         val geometry = assets.getAssetGeometry(id)
 
-        return when (val result = WebEditorEdits.apply(before.asset, before.groupName, geometry.paths, body)) {
+        return when (val result = WebEditorEdits.apply(before.asset, geometry.paths, body)) {
             is WebEditorEditResult.Refused -> WebEditorWrite.Refused(result.refusal, result.message)
             is WebEditorEditResult.Ok -> {
                 // A drawing that does not carry the track's side tracks cannot be written: the write
@@ -183,7 +180,6 @@ class WebEditorDocuments(
                 // length the paths add up to.
                 assets.saveAssetEdits(
                     result.asset,
-                    result.blockName,
                     drawn?.let { paths -> AssetGeometry(paths) }
                 )
                 // The second read is the answer, so what the desk is told is what the phone holds.
@@ -197,8 +193,8 @@ class WebEditorDocuments(
     /**
      * `POST /api/assets`: a track or a place drawn on a computer.
      *
-     * The new row is written where the app writes its own - `insertAsset`, which issues the id, resolves
-     * the block and stores the geometry and its length in one transaction - and the answer is the row as
+     * The new row is written where the app writes its own - `insertAsset`, which issues the id and
+     * stores the geometry and its length in one transaction - and the answer is the row as
      * the phone holds it afterwards, read back the same way a save's is. So a desk's new track is
      * indistinguishable, from that moment on, from one drawn by tapping on the phone: same table, same
      * points, same rules on the next page load.
@@ -210,8 +206,7 @@ class WebEditorDocuments(
                 val draft = result.draft
                 val id = assets.insertAsset(
                     asset = draft.asset,
-                    geometry = draft.geometry,
-                    groupName = draft.blockName
+                    geometry = draft.geometry
                 )
                 val created = withDue().firstOrNull { it.asset.id == id }
                     ?: return missing("That track was saved and could not be read back.")
@@ -242,7 +237,7 @@ class WebEditorDocuments(
             WebEditorRefusal.INVALID,
             "That delete did not say which version of the track it was for, so nothing was deleted."
         )
-        if (version != WebEditorVersion.of(item.asset, item.groupName, assets.getAssetGeometry(id).paths)) {
+        if (version != WebEditorVersion.of(item.asset, assets.getAssetGeometry(id).paths)) {
             return refused(
                 WebEditorRefusal.STALE,
                 "This was changed on the phone while it was open here, so nothing was deleted. " +
@@ -272,7 +267,7 @@ class WebEditorDocuments(
      * refused in the same words, and a track made from a dropped file is the track the phone would
      * have made from a picked one. A file of several tracks - a GeoJSON collection - is answered with
      * its first and the count of the rest, because the desk draws one drawing at a time; the phone
-     * imports them all. What it may *do* is deliberately nothing: no row, no id, no block - the desk
+     * imports them all. What it may *do* is deliberately nothing: no row, no id - the desk
      * draws the paths it is handed, so a file dropped by mistake is a page reload and not a track
      * somebody has to find and delete.
      */
@@ -438,7 +433,6 @@ class WebEditorDocuments(
         WebEditorJson.record(
             asset = item.asset,
             sprayCount = item.sprayCount,
-            groupName = item.groupName,
             paths = assets.getAssetGeometry(item.asset.id).paths,
             recordingCount = assets.recordingCountFor(item.asset.id)
         )
@@ -451,10 +445,10 @@ class WebEditorDocuments(
         WebEditorWrite.Refused(refusal, message)
 
     /**
-     * Every active asset with the two fields the desk carries invisibly: the block name the version is
-     * hashed with, and the spray count the delete sentence counts.
+     * Every active asset with the field the desk carries invisibly: the spray count the delete
+     * sentence counts.
      *
-     * Read through the phone's own repository call, which folds in the summaries, the block names and
+     * Read through the phone's own repository call, which folds in the summaries and
      * the due arithmetic - the desk uses neither the due date nor the colour, but the read is the one
      * the app's own map makes, so a document built from it says what the phone says.
      */

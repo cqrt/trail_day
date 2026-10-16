@@ -1,7 +1,6 @@
 package nz.mckenzie.trailday.data.db
 
 import androidx.room.Entity
-import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import nz.mckenzie.trailday.domain.asset.AssetKind
@@ -21,15 +20,7 @@ import nz.mckenzie.trailday.domain.asset.SprayMethod
  */
 @Entity(
     tableName = "assets",
-    foreignKeys = [
-        ForeignKey(
-            entity = GroupEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["groupId"],
-            onDelete = ForeignKey.SET_NULL
-        )
-    ],
-    indices = [Index("active"), Index("lastSprayedAtEpochMs"), Index("groupId")]
+    indices = [Index("active"), Index("lastSprayedAtEpochMs")]
 )
 data class AssetEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
@@ -40,8 +31,6 @@ data class AssetEntity(
     val shape: String = AssetShape.LINE.name,
     /** [SprayMethod] name. [SprayMethod.UNSET] until the operator says otherwise. */
     val method: String = SprayMethod.UNSET.name,
-    /** The group this asset is worked with, if any. Null is "on its own". */
-    val groupId: Long? = null,
     val notes: String? = null,
     /** Target days between sprays; 120 is roughly three times a year. */
     val intervalDays: Int = DEFAULT_INTERVAL_DAYS,
@@ -79,7 +68,7 @@ data class AssetEntity(
      * The ground the shape encloses, in square metres, for a kind that is ground with an edge.
      *
      * Cached from the vertices beside [lengthM] and refreshed by the same write, for the same reason:
-     * a block's tile is added up from rows rather than from geometry, and a carpark's ground is a
+     * the farm's corner totals are added up from rows rather than from geometry, and a carpark's ground is a
      * **measurement** - the one area in this app that is not an estimate from a swath width. Zero for
      * every other kind, which is what a line and a place enclose.
      */
@@ -99,7 +88,7 @@ data class AssetEntity(
     /**
      * The ground this row's shape encloses, or null when it encloses none.
      *
-     * The row's own answer, in one place, so the card, a block's tile and a recorded spray cannot each
+     * The row's own answer, in one place, so the card, the farm's corner totals and a recorded spray cannot each
      * work it out slightly differently - and null rather than zero for a line and a place, because a
      * zero area beside a real one is the kind of figure that gets added up and believed.
      */

@@ -11,7 +11,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -36,18 +35,6 @@ import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 data class SprayHistoryEntry(
     val event: SprayEventEntity,
     val lines: List<ProductQuantityLine>
-)
-
-/**
- * What the edit form starts from: the asset, and the group it is in.
- *
- * The two arrive together rather than as separate states on purpose. A form that
- * opened with the group still loading would save a blank name over a real one, and
- * silently take the asset out of its block.
- */
-data class AssetEditDraft(
-    val asset: AssetEntity,
-    val groupName: String
 )
 
 /**
@@ -81,32 +68,9 @@ class AssetDetailViewModel(
     val track: StateFlow<AssetEntity?> = assetRepository.observeAsset(assetId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
-    /** The asset and its group, ready for the edit form. Null until both are known. */
-    val editDraft: StateFlow<AssetEditDraft?> = combine(
-        assetRepository.observeAsset(assetId),
-        assetRepository.observeGroupName(assetId)
-    ) { asset, groupName ->
-        asset?.let { AssetEditDraft(asset = it, groupName = groupName.orEmpty()) }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
-
-    /**
-     * The block this asset is in, for the line on the detail screen.
-     *
-     * Its own flow rather than a read of [editDraft], which is the edit form's state: the
-     * screen showing it should not depend on a form having been prepared, and a field that
-     * exists to be typed into is a poor place to keep something that is only being read.
-     */
-    val groupName: StateFlow<String?> = assetRepository.observeGroupName(assetId)
+    /** The asset, ready for the edit form. Null until it is known. */
+    val editDraft: StateFlow<AssetEntity?> = assetRepository.observeAsset(assetId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
-
-    /**
-     * The blocks that already exist, for the field on the edit form to offer.
-     *
-     * Held here rather than looked up when the form opens so the list is live: a block started
-     * on another asset while this form is open is offered here too.
-     */
-    val existingBlocks: StateFlow<List<String>> = assetRepository.observeBlockNames()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     val geometry: StateFlow<AssetGeometry> = assetRepository.observeAssetGeometry(assetId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), AssetGeometry.NONE)
@@ -238,12 +202,11 @@ class AssetDetailViewModel(
      *
      * The fields were checked by [nz.mckenzie.trailday.ui.AssetEdits] before this is
      * called, so anything arriving here is already fit to store - which also means the
-     * interval set here is what the traffic light uses from now on. The group name
-     * turns into a group row if it is new, and clears the group when it is blank.
+     * interval set here is what the traffic light uses from now on.
      */
-    fun save(asset: AssetEntity, groupName: String?) {
+    fun save(asset: AssetEntity) {
         viewModelScope.launch {
-            runCatching { assetRepository.saveAssetEdits(asset, groupName) }
+            runCatching { assetRepository.saveAssetEdits(asset) }
                 .onSuccess { _message.value = "Saved" }
                 .onFailure { _message.value = it.message ?: "Could not save the track" }
         }

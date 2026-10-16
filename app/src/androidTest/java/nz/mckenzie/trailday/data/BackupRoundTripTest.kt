@@ -66,7 +66,6 @@ class BackupRoundTripTest {
         val first = assetRepository.createAsset(
             name = "Winter block",
             geometry = listOf(GeoPoint(-41.5, 173.95), GeoPoint(-41.51, 173.96), GeoPoint(-41.52, 173.97)),
-            groupName = "Home",
             notes = "spray the fenceline twice",
             intervalDays = 45,
             swathWidthM = 6.0,
@@ -224,11 +223,6 @@ class BackupRoundTripTest {
         assertNotNull("and still point at a track that exists", track)
         assertEquals("Winter block", track!!.name)
         assertEquals(3, AssetRepository(db).getAssetGeometry(assetId).pointCount)
-        assertEquals(
-            "and its group should have come back with it",
-            "Home",
-            AssetRepository(db).observeGroupName(assetId).first()
-        )
 
         val lines = sprays.getSprayEventProductLines(exported.sprayEvents.single().id)
         assertEquals(

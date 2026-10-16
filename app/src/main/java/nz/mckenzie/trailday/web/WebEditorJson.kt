@@ -35,7 +35,7 @@ import nz.mckenzie.trailday.domain.tiles.LatLngBounds
  * or what colour its kind is. A record here carries `points` empty, and its `lengthM` still says how
  * long it is.
  *
- * Nothing about when a place is next due travels here any more, and neither does a block, a spray
+ * Nothing about when a place is next due travels here any more, and neither does a spray
  * method, an interval or a pass count: they are the phone's own fields, and the desk neither shows nor
  * sends them.
  */
@@ -64,23 +64,20 @@ object WebEditorJson {
      * desk still has to be told which *line* it was handed, or a card would go on talking about a track
      * that has since been moved, or that has grown a spur while the card was open.
      *
-     * [sprayCount] and [groupName] are here for the same kind of reason: neither is shown, one is what
-     * the delete sentence counts and the other is half of the version, and the block a place sits in is
-     * a field the desk no longer sends an edit for - so the row's own is the one that is hashed.
+     * [sprayCount] is here for the same kind of reason: it is not shown, and it is what the delete
+     * sentence counts.
      *
-     * [recordingCount] is the other half of that first one: it is what the delete sentence counts.
+     * [recordingCount] is the other half of that: it is what the delete sentence counts too.
      */
     fun record(
         asset: AssetEntity,
         sprayCount: Int,
-        groupName: String?,
         paths: List<List<GeoPoint>>,
         recordingCount: Int
     ): WebEditorAssetRecord = WebEditorAssetRecord(
         asset = AssetRecord(
             id = asset.id,
             name = asset.name,
-            groupId = asset.groupId,
             // The **resolved** kind rather than the stored word. A row drawn before the kinds existed
             // is stored as INFRASTRUCTURE, and with the raw word the desk would have to keep its own
             // copy of the rule that reads it back by its shape - which is the mistake v0.6.43 had to
@@ -105,7 +102,7 @@ object WebEditorJson {
         ),
         // Sent back by the desk with an edit, so a change made on the phone while the card was open
         // is refused here rather than written over. See [WebEditorVersion].
-        version = WebEditorVersion.of(asset, groupName, paths),
+        version = WebEditorVersion.of(asset, paths),
         paths = paths.map { path ->
             path.map { WebEditorPoint(lat = it.lat, lng = it.lng, altitudeM = it.altitudeM) }
         },

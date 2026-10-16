@@ -13,16 +13,14 @@ import org.junit.Test
  * What the edit form accepts, refuses, and explains.
  *
  * These are the decisions that would otherwise be made silently: blank means "not
- * known" for a swath width but "fix this" for a name, an interval of 0 would make
- * every asset due forever, and a blank group name takes the asset out of its group
- * rather than creating a group called "".
+ * known" for a swath width but "fix this" for a name, and an interval of 0 would make
+ * every asset due forever.
  */
 class AssetEditsTest {
 
     private val asset = AssetEntity(
         id = 7L,
         name = "Home block",
-        groupId = 3L,
         notes = "north end wet",
         intervalDays = 120,
         swathWidthM = 4.5,
@@ -33,7 +31,6 @@ class AssetEditsTest {
 
     private fun apply(
         name: String = asset.name,
-        groupName: String = "Home",
         kind: AssetKind = AssetKind.TRACK,
         method: SprayMethod = SprayMethod.UNSET,
         intervalDays: String = asset.intervalDays.toString(),
@@ -45,7 +42,6 @@ class AssetEditsTest {
         asset,
         AssetEditFields(
             name = name,
-            groupName = groupName,
             kind = kind,
             method = method,
             intervalDays = intervalDays,
@@ -78,7 +74,6 @@ class AssetEditsTest {
         val edited = ok(
             apply(
                 name = "  Back paddock  ",
-                groupName = "  Back  ",
                 intervalDays = "90",
                 swathWidthM = "6",
                 notes = "  spray the fenceline twice  "
@@ -86,14 +81,11 @@ class AssetEditsTest {
         )
 
         assertEquals("Back paddock", edited.asset.name)
-        assertEquals("Back", edited.groupName)
         assertEquals(90, edited.asset.intervalDays)
         assertEquals(6.0, edited.asset.swathWidthM!!, 1e-9)
         assertEquals("spray the fenceline twice", edited.asset.notes)
-        // The fields the form does not show must survive the edit. The group id is one
-        // of them: the form carries the name, and the repository resolves that to an id.
+        // The fields the form does not show must survive the edit.
         assertEquals(7L, edited.asset.id)
-        assertEquals(3L, edited.asset.groupId)
         assertEquals(1_700_000_000_000L, edited.asset.createdAtEpochMs)
         assertEquals(1_710_000_000_000L, edited.asset.lastSprayedAtEpochMs)
         assertEquals(1234.5, edited.asset.lengthM, 1e-9)
@@ -135,11 +127,6 @@ class AssetEditsTest {
         assertTrue(invalid(apply(swathWidthM = "250")).contains("between"))
         assertTrue(invalid(apply(swathWidthM = "0")).contains("number of metres"))
         assertTrue(invalid(apply(swathWidthM = "wide")).contains("number of metres"))
-    }
-
-    @Test
-    fun `a blank group name means no group rather than a group called nothing`() {
-        assertNull(ok(apply(groupName = "   ")).groupName)
     }
 
     @Test
@@ -264,7 +251,6 @@ class AssetEditsTest {
                 twoPass.asset,
                 AssetEditFields(
                     name = twoPass.asset.name,
-                    groupName = "Home",
                     kind = AssetKind.TRACK,
                     method = SprayMethod.UNSET,
                     intervalDays = "120",
@@ -293,47 +279,5 @@ class AssetEditsTest {
         // edited by hand, and the nearest real answer is the safe one.
         assertEquals(2, ok(apply(passesRequired = 7)).asset.passesRequired)
         assertEquals(1, ok(apply(passesRequired = 0)).asset.passesRequired)
-    }
-
-    @Test
-    fun `the block field says which of the two things a typed name is about to do`() {
-        val blocks = listOf("Estuary", "Braemar")
-
-        assertEquals(
-            "In the block \"Estuary\", whatever case it is typed in",
-            "In the block \"Estuary\"",
-            AssetEdits.blockHint("estuary", blocks)
-        )
-        assertEquals(
-            "a name that is not there yet starts one, and says so",
-            "Starts a new block called \"Estuary flatts\"",
-            AssetEdits.blockHint("Estuary flatts", blocks)
-        )
-        assertEquals(
-            "and an empty field explains the empty case",
-            "Type a block, or leave it empty for an asset on its own",
-            AssetEdits.blockHint("  ", blocks)
-        )
-    }
-
-    @Test
-    fun `the block field offers the blocks that match what has been typed`() {
-        val blocks = listOf("Estuary", "Estuary flats", "Braemar")
-
-        assertEquals(
-            "a prefix offers the longer names, and not the one already typed",
-            listOf("Estuary flats"),
-            AssetEdits.blockSuggestions("estuary", blocks)
-        )
-        assertEquals(
-            "nothing typed means nothing offered, so the field is not in the way",
-            emptyList<String>(),
-            AssetEdits.blockSuggestions("", blocks)
-        )
-        assertEquals(
-            "a name nobody has is nothing to offer",
-            emptyList<String>(),
-            AssetEdits.blockSuggestions("Wairau", blocks)
-        )
     }
 }

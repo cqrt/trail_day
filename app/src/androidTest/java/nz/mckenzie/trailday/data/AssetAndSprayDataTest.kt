@@ -493,73 +493,6 @@ class AssetAndSprayDataTest {
         assertTrue(failure.exceptionOrNull() is IllegalArgumentException)
     }
 
-    @Test
-    fun anAssetCarriesTheBlockItIsWorkedWith() = runBlocking {
-        assetRepository.createAsset(
-            name = "Estuary road",
-            geometry = line,
-            groupName = "Estuary"
-        )
-        assetRepository.createAsset(name = "Estuary lagoon", geometry = line, groupName = "estuary")
-        assetRepository.createAsset(name = "Lone track", geometry = line)
-
-        val blocks = assetRepository.observeAssetsWithDue(MinuteTicker.fixed(now))
-            .first()
-            .associate { it.asset.name to it.groupName }
-
-        assertEquals("Estuary", blocks["Estuary road"])
-        assertEquals(
-            "the same block however it was spelled, because the name is the block's",
-            "Estuary",
-            blocks["Estuary lagoon"]
-        )
-        assertNull("an asset in no block has no name to show", blocks["Lone track"])
-    }
-
-    @Test
-    fun takingAnAssetOutOfItsBlockIsCarriedThrough() = runBlocking {
-        val id = assetRepository.createAsset(name = "Estuary road", geometry = line, groupName = "Estuary")
-
-        assetRepository.saveAssetEdits(assetRepository.getAsset(id)!!, groupName = null)
-
-        assertNull(
-            "a blank block name means it stands on its own",
-            assetRepository.observeGroupName(id).first()
-        )
-    }
-
-    @Test
-    fun renamingABlockTakesItsAssetsWithIt() = runBlocking {
-        val id = assetRepository.createAsset(name = "Estuary road", geometry = line, groupName = "Estuary")
-        val block = assetRepository.observeGroups().first().single()
-
-        assetRepository.saveBlockEdits(block.id, name = "Estuary flats", notes = "Road and lagoon")
-
-        val stored = assetRepository.observeGroups().first().single()
-        assertEquals("Estuary flats", stored.name)
-        assertEquals("Road and lagoon", stored.notes)
-        assertEquals(
-            "the asset is in the block it was in, under the new name",
-            "Estuary flats",
-            assetRepository.observeGroupName(id).first()
-        )
-    }
-
-    @Test
-    fun deletingABlockLeavesItsAssetsWhereTheyAre() = runBlocking {
-        val first = assetRepository.createAsset(name = "Estuary road", geometry = line, groupName = "Estuary")
-        val second = assetRepository.createAsset(name = "Estuary lagoon", geometry = line, groupName = "Estuary")
-        val block = assetRepository.observeGroups().first().single()
-
-        assetRepository.deleteBlock(block.id)
-
-        assertTrue("the block is gone", assetRepository.observeGroups().first().isEmpty())
-        assertNull(assetRepository.observeGroupName(first).first())
-        assertNull(assetRepository.observeGroupName(second).first())
-        assertNotNull("and the assets are still here", assetRepository.getAsset(first))
-        assertNotNull(assetRepository.getAsset(second))
-    }
-
     /* ---- Ground with an edge, and the carpark somebody kept as a fenceline ---------------- */
 
     /** A closed square paddock: about 100 m on each side, so the ground it encloses is known. */
@@ -594,7 +527,7 @@ class AssetAndSprayDataTest {
             kind = AssetKind.CARPARK.name,
             shape = AssetKind.CARPARK.shape.name
         )
-        assetRepository.saveAssetEdits(asCarpark, groupName = null)
+        assetRepository.saveAssetEdits(asCarpark)
 
         val measured = assetRepository.getAsset(id)!!.groundSqm
         assertNotNull("the kind is ground, so the app has to know how much ground", measured)

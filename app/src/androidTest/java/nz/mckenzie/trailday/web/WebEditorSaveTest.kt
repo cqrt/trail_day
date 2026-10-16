@@ -29,7 +29,7 @@ import org.junit.runner.RunWith
  * A write from the desk, through the repository the phone's own screens use, into a real database.
  *
  * The JVM tests hold the rules and the routes; what they cannot hold is that a write reaches Room -
- * that the block an operator typed on a laptop becomes a block row, that a drawn line is stored vertex
+ * that a drawn line is stored vertex
  * for vertex with its length worked out, that the spray history is left exactly as it was, and that a
  * version read out of `/api/state` is taken when nothing has moved and refused when something has.
  * That is what this file is for, and it is why each change was put through
@@ -140,7 +140,7 @@ class WebEditorSaveTest {
 
     @Test
     fun aSaveFromTheDeskChangesTheDetailsAndNothingElse() = runBlocking {
-        val id = assets.createAsset(name = "Estuary road", geometry = line, groupName = "Estuary")
+        val id = assets.createAsset(name = "Estuary road", geometry = line)
         // A spray already logged on the phone, a line already measured, and the fields the desk no
         // longer shows set to values of their own: the desk has heard of none of them, and none of
         // them may be lost by a save from the desk.
@@ -166,9 +166,8 @@ class WebEditorSaveTest {
 
         val stored = assets.getAsset(id)!!
         assertEquals("Estuary road, lower", stored.name)
-        // The block, the method, the interval, the swath width and the pass count are the phone's own
+        // The method, the interval, the swath width and the pass count are the phone's own
         // and the desk never mentions them, so a save leaves every one exactly as it was.
-        assertEquals("Estuary", assets.observeGroupName(id).first())
         assertEquals("BOOM", stored.method)
         assertEquals(90, stored.intervalDays)
         assertEquals(12.5, stored.swathWidthM!!, 0.0)
@@ -188,7 +187,7 @@ class WebEditorSaveTest {
         val version = stateRecord(id).version
 
         // Somebody renames it on the phone while the card is open on the desk.
-        assets.saveAssetEdits(assets.getAsset(id)!!.copy(name = "Estuary road, upper"), null)
+        assets.saveAssetEdits(assets.getAsset(id)!!.copy(name = "Estuary road, upper"))
 
         refused(documents.save(id, editBody(version, name = "Estuary road, lower")), WebEditorRefusal.STALE)
 
@@ -213,19 +212,6 @@ class WebEditorSaveTest {
 
         assertEquals("Estuary road, lower", assets.getAsset(id)!!.name)
         assertEquals(1_780_000_000_000L, assets.getAsset(id)!!.lastSprayedAtEpochMs)
-    }
-
-    @Test
-    fun anEditLeavesTheBlockThePhoneHoldsAlone() = runBlocking {
-        val id = assets.createAsset(name = "Estuary road", geometry = line, groupName = "Estuary")
-        val version = stateRecord(id).version
-
-        saved(documents.save(id, editBody(version, name = "Estuary road, lower")))
-
-        // The block is a field the desk no longer shows and never sends, so a save cannot move a place
-        // out of it - the row's own block is written straight back.
-        assertEquals("Estuary", assets.observeGroupName(id).first())
-        assertEquals(listOf("Estuary"), assets.observeBlockNames().first())
     }
 
     @Test
@@ -308,8 +294,6 @@ class WebEditorSaveTest {
             stored.lengthM,
             0.5
         )
-        // The desk has no block field any more, so the new track stands on its own.
-        assertNull("no block was named, so it is on its own", assets.observeGroupName(id).first())
         assertTrue("the new track has a version for the desk to quote", stateRecord(id).version.isNotBlank())
     }
 
@@ -531,7 +515,7 @@ class WebEditorSaveTest {
     fun aDeleteOfSomethingThatMovedIsRefusedRatherThanDone() = runBlocking {
         val id = assets.createAsset(name = "Mis-drawn", geometry = line)
         val version = stateRecord(id).version
-        assets.saveAssetEdits(assets.getAsset(id)!!.copy(name = "Named on the phone"), null)
+        assets.saveAssetEdits(assets.getAsset(id)!!.copy(name = "Named on the phone"))
 
         refused(documents.remove(id, version), WebEditorRefusal.STALE)
 

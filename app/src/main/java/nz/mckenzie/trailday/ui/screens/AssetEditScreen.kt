@@ -9,13 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -60,35 +56,28 @@ fun AssetEditScreen(
     viewModel: AssetDetailViewModel,
     onDone: () -> Unit
 ) {
-    val draft by viewModel.editDraft.collectAsStateWithLifecycle()
+    val asset by viewModel.editDraft.collectAsStateWithLifecycle()
 
-    // The blocks that already exist, to offer under the field rather than to be remembered.
-    val blocks by viewModel.existingBlocks.collectAsStateWithLifecycle()
+    // Nothing until the asset is here: a form that opened with a blank name would save
+    // that name over a real one.
+    val current = asset ?: return
 
-    // The asset and its group arrive together, because a form that opened with the group
-    // still loading would save a blank name over a real one, and quietly take the asset out
-    // of its block. Until both are here there is nothing to edit.
-    val current = draft ?: return
-    val asset = current.asset
-
-    var name by remember { mutableStateOf(asset.name) }
-    var groupName by remember { mutableStateOf(current.groupName) }
-    var blocksOpen by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf(current.name) }
     var kind by remember {
         // Read by its shape as well as its word, because a record written before the types existed
         // says only "infrastructure": whether that was a line or a spot is what says which of the two
         // it settles as when it is next saved.
-        mutableStateOf(AssetKind.fromStorage(asset.kind, AssetShape.fromStorage(asset.shape)))
+        mutableStateOf(AssetKind.fromStorage(current.kind, AssetShape.fromStorage(current.shape)))
     }
-    var method by remember { mutableStateOf(SprayMethod.fromStorage(asset.method)) }
-    var intervalDays by remember { mutableStateOf(asset.intervalDays.toString()) }
+    var method by remember { mutableStateOf(SprayMethod.fromStorage(current.method)) }
+    var intervalDays by remember { mutableStateOf(current.intervalDays.toString()) }
     var swathWidth by remember {
-        mutableStateOf(asset.swathWidthM?.let(::formatPlainNumber).orEmpty())
+        mutableStateOf(current.swathWidthM?.let(::formatPlainNumber).orEmpty())
     }
-    var notes by remember { mutableStateOf(asset.notes.orEmpty()) }
-    var passes by remember { mutableStateOf(asset.passesRequired) }
+    var notes by remember { mutableStateOf(current.notes.orEmpty()) }
+    var passes by remember { mutableStateOf(current.passesRequired) }
     var separation by remember {
-        mutableStateOf(asset.passSeparationM?.let(::formatPlainNumber).orEmpty())
+        mutableStateOf(current.passSeparationM?.let(::formatPlainNumber).orEmpty())
     }
     var problem by remember { mutableStateOf<String?>(null) }
 
@@ -101,10 +90,9 @@ fun AssetEditScreen(
                     TextButton(onClick = {
                         when (
                             val result = AssetEdits.apply(
-                                asset,
+                                current,
                                 AssetEditFields(
                                     name = name,
-                                    groupName = groupName,
                                     kind = kind,
                                     method = method,
                                     intervalDays = intervalDays,
@@ -116,7 +104,7 @@ fun AssetEditScreen(
                             )
                         ) {
                             is AssetEditResult.Ok -> {
-                                viewModel.save(result.asset, result.groupName)
+                                viewModel.save(result.asset)
                                 onDone()
                             }
 
@@ -142,44 +130,6 @@ fun AssetEditScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
-            // The block field offers the blocks that exist, and says what a typed name will do.
-            // This is the only place a block is started, and a misspelling used to be a new
-            // block with one asset in it, with nothing anywhere saying so.
-            val suggestions = AssetEdits.blockSuggestions(groupName, blocks)
-            val showSuggestions = blocksOpen && suggestions.isNotEmpty()
-            ExposedDropdownMenuBox(
-                expanded = showSuggestions,
-                onExpandedChange = { blocksOpen = it }
-            ) {
-                OutlinedTextField(
-                    value = groupName,
-                    onValueChange = { groupName = it; problem = null; blocksOpen = true },
-                    label = { Text("Block or group") },
-                    supportingText = { Text(AssetEdits.blockHint(groupName, blocks)) },
-                    singleLine = true,
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = showSuggestions)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(MenuAnchorType.PrimaryEditable, true)
-                )
-                ExposedDropdownMenu(
-                    expanded = showSuggestions,
-                    onDismissRequest = { blocksOpen = false }
-                ) {
-                    suggestions.forEach { block ->
-                        DropdownMenuItem(
-                            text = { Text(block) },
-                            onClick = {
-                                groupName = block
-                                problem = null
-                                blocksOpen = false
-                            }
-                        )
-                    }
-                }
-            }
             ChoiceRow(
                 label = "What it is",
                 choices = AssetPhrase.kinds,

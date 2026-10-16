@@ -8,15 +8,8 @@ import nz.mckenzie.trailday.domain.asset.SprayMethod
 /** What the edit form made of what was typed into it. */
 sealed interface AssetEditResult {
 
-    /**
-     * The asset to store, with the group it should sit in.
-     *
-     * The group travels as a name rather than an id because that is what the operator
-     * typed, and because a name that matches nothing yet has to mean "start that
-     * group" - resolving it is the repository's job, inside the same transaction as
-     * the write. Blank means "no group", which is how an asset is taken out of one.
-     */
-    data class Ok(val asset: AssetEntity, val groupName: String?) : AssetEditResult
+    /** The asset to store. */
+    data class Ok(val asset: AssetEntity) : AssetEditResult
 
     /** What to tell the operator, in words that say what to fix. */
     data class Invalid(val message: String) : AssetEditResult
@@ -31,7 +24,6 @@ sealed interface AssetEditResult {
  */
 data class AssetEditFields(
     val name: String,
-    val groupName: String,
     val kind: AssetKind,
     val method: SprayMethod,
     val intervalDays: String,
@@ -85,15 +77,6 @@ object AssetEdits {
      */
     const val MIN_PASS_SEPARATION_M = 0.5
     const val MAX_PASS_SEPARATION_M = 50.0
-
-    /**
-     * What the block field says when nothing has been typed.
-     *
-     * A constant rather than a literal inside the branching below, because the desk's form says the
-     * same sentence under the same field - the web editor is handed this and the two dynamic ones,
-     * so a block field on a laptop explains itself in the phone's own words.
-     */
-    const val BLOCK_HINT = "Type a block, or leave it empty for an asset on its own"
 
     /**
      * What the swath field says under itself.
@@ -196,38 +179,7 @@ object AssetEdits {
                 swathWidthM = swath,
                 passesRequired = passes,
                 passSeparationM = separation
-            ),
-            groupName = fields.groupName.trim().ifBlank { null }
+            )
         )
-    }
-
-    /**
-     * What the block field should say under itself.
-     *
-     * This is the only place a block can be started - by naming one that does not exist yet -
-     * so the field says which of the two things the typed name is about to do. A misspelling
-     * used to be a new block with one asset in it, and nothing anywhere said so.
-     */
-    fun blockHint(typed: String, existing: List<String>): String {
-        val name = typed.trim()
-        if (name.isEmpty()) return BLOCK_HINT
-        val match = existing.firstOrNull { it.equals(name, ignoreCase = true) }
-        return if (match != null) "In the block \"$match\"" else "Starts a new block called \"$name\""
-    }
-
-    /**
-     * The blocks worth offering while the operator types.
-     *
-     * Nothing while the field is empty: this is a suggestion, not a menu, and a list that
-     * drops open the moment the field is touched is in the way of the typing that would have
-     * narrowed it. A name that is already there exactly is left out too, since picking it
-     * would change nothing.
-     */
-    fun blockSuggestions(typed: String, existing: List<String>): List<String> {
-        val name = typed.trim()
-        if (name.isEmpty()) return emptyList()
-        return existing.filter { block ->
-            block.contains(name, ignoreCase = true) && !block.equals(name, ignoreCase = true)
-        }
     }
 }

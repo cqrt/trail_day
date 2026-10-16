@@ -508,8 +508,7 @@ class DrawAssetViewModelTest {
         val junction = GeoPoint(0.0, 0.0005)
         return repository.createAsset(
             name = "Gully track",
-            geometry = listOf(GeoPoint(0.0, 0.0), junction, GeoPoint(0.0, 0.001)),
-            groupName = "Home block"
+            geometry = listOf(GeoPoint(0.0, 0.0), junction, GeoPoint(0.0, 0.001))
         )
     }
 

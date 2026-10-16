@@ -7,14 +7,12 @@ import kotlinx.coroutines.flow.map
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.data.db.AssetPointEntity
 import nz.mckenzie.trailday.data.db.AssetProductDefaultEntity
-import nz.mckenzie.trailday.data.db.GroupEntity
 import nz.mckenzie.trailday.data.db.ProductEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.data.db.SprayEventEntity
 import nz.mckenzie.trailday.data.db.SprayEventProductEntity
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
-import nz.mckenzie.trailday.domain.asset.BulkAssetEdits
 import nz.mckenzie.trailday.domain.asset.SprayMethod
 import nz.mckenzie.trailday.domain.due.DueCalculator
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
@@ -35,15 +33,13 @@ import java.time.ZoneId
  * infrastructure, and they differ only in their kind, shape and spray method.
  *
  * Multi-table writes run inside [TrailDayDatabase.withTransaction] so a spray
- * can never be half-recorded, and so an asset and the group it belongs to cannot
- * disagree about who is in what.
+ * can never be half-recorded.
  */
 class AssetRepository(
     private val db: TrailDayDatabase,
     private val zoneId: ZoneId = ZoneId.systemDefault()
 ) {
     private val assetDao = db.assetDao()
-    private val groupDao = db.groupDao()
     private val sprayEventDao = db.sprayEventDao()
     private val productDao = db.productDao()
     private val recordingDao = db.recordingDao()
@@ -60,11 +56,9 @@ class AssetRepository(
     ): Flow<List<AssetWithDue>> = combine(
         assetDao.observeActiveAssets(),
         sprayEventDao.observeSpraySummaries(),
-        assetDao.observeAssetGroupNames(),
         nowProvider
-    ) { assets, summaries, groupNames, now ->
+    ) { assets, summaries, now ->
         val byAsset = summaries.associateBy { it.assetId }
-        val blocks = groupNames.associate { it.assetId to it.name }
         assets.map { asset ->
             val summary = byAsset[asset.id]
             // The event table wins over the denormalised column if they disagree.
@@ -78,10 +72,7 @@ class AssetRepository(
                     nowEpochMs = now,
                     zoneId = zoneId
                 ),
-                sprayCount = summary?.sprayCount ?: 0,
-                // The name rather than the id, because the name is what the list shows and
-                // what a rename would change without touching a single asset row.
-                groupName = blocks[asset.id]
+                sprayCount = summary?.sprayCount ?: 0
             )
         }
     }
@@ -97,9 +88,6 @@ class AssetRepository(
      */
     fun observeAssetGeometry(assetId: Long): Flow<AssetGeometry> =
         assetDao.observeGeometry(assetId).map { rows -> rows.toAssetGeometry() }
-
-    /** The name of the group an asset belongs to, or null when it stands alone. */
-    fun observeGroupName(assetId: Long): Flow<String?> = assetDao.observeGroupName(assetId)
 
     suspend fun getAsset(assetId: Long): AssetEntity? = assetDao.getAsset(assetId)
 
@@ -197,10 +185,6 @@ class AssetRepository(
     /**
      * Creates an asset, stores its planned geometry and computes its length.
      *
-     * The group is given by name rather than id because that is what the operator
-     * types or reads off a backup; an unknown name becomes a new group, which is what
-     * "put this in the Estuary block" means when the block is new.
-     *
      * This is the **one-line** form: a GPX file, a desk's new track and a test all have a line and
      * nothing else. A track with side tracks goes in through the [AssetGeometry] overload below, which
      * is the same nine arguments - the two are one door with two words for what is being carried, and
@@ -213,7 +197,6 @@ class AssetRepository(
         shape: AssetShape = AssetShape.LINE,
         method: SprayMethod = SprayMethod.UNSET,
         notes: String? = null,
-        groupName: String? = null,
         intervalDays: Int = AssetEntity.DEFAULT_INTERVAL_DAYS,
         swathWidthM: Double? = null,
         passesRequired: Int = AssetEntity.DEFAULT_PASSES_REQUIRED,
@@ -228,7 +211,6 @@ class AssetRepository(
         shape = shape,
         method = method,
         notes = notes,
-        groupName = groupName,
         intervalDays = intervalDays,
         swathWidthM = swathWidthM,
         passesRequired = passesRequired,
@@ -245,7 +227,6 @@ class AssetRepository(
         shape: AssetShape = AssetShape.LINE,
         method: SprayMethod = SprayMethod.UNSET,
         notes: String? = null,
-        groupName: String? = null,
         intervalDays: Int = AssetEntity.DEFAULT_INTERVAL_DAYS,
         swathWidthM: Double? = null,
         passesRequired: Int = AssetEntity.DEFAULT_PASSES_REQUIRED,
@@ -267,8 +248,7 @@ class AssetRepository(
             createdAtEpochMs = createdAtEpochMs,
             sourceRef = sourceRef
         ),
-        geometry = geometry,
-        groupName = groupName
+        geometry = geometry
     )
 
     /**
@@ -283,8 +263,8 @@ class AssetRepository(
      * Inserts an asset that has already been built, with its geometry, in one transaction.
      *
      * Here for the desk's new track, which arrives as a row [nz.mckenzie.trailday.ui.AssetEdits] has
-     * already judged rather than as nine loose arguments - and it is the better home for the id, the
-     * group and the length anyway: one place issues an id, and one place writes a new asset's geometry
+     * already judged rather than as nine loose arguments - and it is the better home for the id and the
+     * length anyway: one place issues an id, and one place writes a new asset's geometry
      * and its cached length together, so a row and the length the lists read can never disagree.
      *
      * Any id on the row is dropped: a new asset's number is the database's to give, and a caller that
@@ -293,20 +273,15 @@ class AssetRepository(
      */
     suspend fun insertAsset(
         asset: AssetEntity,
-        geometry: AssetGeometry,
-        groupName: String?
+        geometry: AssetGeometry
     ): Long = db.withTransaction {
-        val assetId = assetDao.insert(asset.copy(id = 0L, groupId = groupIdFor(groupName)))
+        val assetId = assetDao.insert(asset.copy(id = 0L))
         storeGeometry(assetId, geometry)
         assetId
     }
 
     /**
-     * Writes an edited asset back, resolving the group name the form collected.
-     *
-     * Kept apart from [updateAsset] on purpose: this one is allowed to move an asset
-     * between groups (including out of one, when the name is blank), while the plain
-     * update must leave the grouping exactly as it found it.
+     * Writes an edited asset back.
      *
      * A geometry is written *with* the row rather than as a second call, because a desk moving a
      * vertex sends the whole line and the details it is looking at in one write: done in two, a failure
@@ -315,38 +290,17 @@ class AssetRepository(
      */
     suspend fun saveAssetEdits(
         asset: AssetEntity,
-        groupName: String?,
         geometry: AssetGeometry? = null
-    ) = db.withTransaction { writeAssetEdits(asset, groupName, geometry) }
+    ) = db.withTransaction { writeAssetEdits(asset, geometry) }
 
     /**
-     * The same edit made to several assets, in **one transaction**.
-     *
-     * Judge first, write after: what arrives here has already been through
-     * [nz.mckenzie.trailday.domain.asset.BulkAssetEdits], so every row in the list is one the phone
-     * will take - and the transaction is what makes the promise whole, because a write that failed on
-     * the fourth of six would otherwise leave three changed and three not with nothing saying which.
-     * Nothing is written here that one asset's own edit does not write, geometry included: a bulk edit
-     * is about the fields a form holds, and a line is moved one asset at a time.
-     */
-    suspend fun saveAssetEditsAll(edits: List<BulkAssetEdits.AssetEdit>) = db.withTransaction {
-        for (edit in edits) writeAssetEdits(edit.after, edit.blockName, geometry = null)
-    }
-
-    /**
-     * One asset's row and, when it is given one, its geometry - the write both of the two above go
-     * through.
-     *
-     * Kept as the body of a transaction rather than as a public method: a caller outside must not be
-     * able to run it on its own, or the "every row or none" promise of a bulk edit would be a promise
-     * about whichever of its halves you happened to look at.
+     * One asset's row and, when it is given one, its geometry.
      */
     private suspend fun writeAssetEdits(
         asset: AssetEntity,
-        groupName: String?,
         geometry: AssetGeometry?
     ) {
-        assetDao.update(asset.copy(groupId = groupIdFor(groupName)))
+        assetDao.update(asset)
         when {
             geometry != null -> storeGeometry(asset.id, geometry)
             // A shape that is ground has to end up with ground under it: the kind decides that the last
@@ -377,22 +331,6 @@ class AssetRepository(
     }
 
     suspend fun deleteAsset(assetId: Long) = assetDao.delete(assetId)
-
-    /**
-     * The id a typed group name means, creating the group when the name is new.
-     *
-     * Null for a blank name, which is how the operator takes an asset back out of a
-     * group. Two operators typing "Estuary" and "estuary" get the same group, because
-     * the name column is case-insensitive.
-     */
-    private suspend fun groupIdFor(name: String?): Long? {
-        val clean = name?.trim().orEmpty()
-        if (clean.isEmpty()) return null
-        groupDao.findByName(clean)?.let { return it.id }
-        val inserted = groupDao.insertIfAbsent(GroupEntity(name = clean))
-        // -1 means the name appeared between the lookup and the insert.
-        return if (inserted == -1L) groupDao.findByName(clean)?.id else inserted
-    }
 
     /**
      * Writes every path of an asset's geometry and the length that goes with it.
@@ -432,39 +370,6 @@ class AssetRepository(
             lengthM = stored.lengthM,
             areaM2 = if (ground) Ring.areaSqm(stored.line) else 0.0
         )
-    }
-
-    // --- Blocks -----------------------------------------------------------------------
-
-    /** Every block, including one whose assets have all been taken back out of it. */
-    fun observeGroups(): Flow<List<GroupEntity>> = groupDao.observeGroups()
-
-    /** The names of the blocks, for suggesting one rather than starting a second by typo. */
-    fun observeBlockNames(): Flow<List<String>> = groupDao.observeNames()
-
-    fun observeGroup(id: Long): Flow<GroupEntity?> = groupDao.observeGroup(id)
-
-    /**
-     * Renames a block and writes its notes, in one transaction.
-     *
-     * The name has already been checked against the other blocks by
-     * [nz.mckenzie.trailday.ui.BlockEdits]; what is left here is the write, so a rename cannot
-     * land half-done.
-     */
-    suspend fun saveBlockEdits(id: Long, name: String, notes: String?) = db.withTransaction {
-        groupDao.rename(id, name)
-        groupDao.setNotes(id, notes)
-    }
-
-    /**
-     * Deletes a block, leaving its assets exactly where they are.
-     *
-     * Which is the whole promise of the button: a block is a way of working, not a container
-     * that things live inside.
-     */
-    suspend fun deleteBlock(id: Long) = db.withTransaction {
-        groupDao.detachAssets(id)
-        groupDao.delete(id)
     }
 
     // --- GPX interchange ------------------------------------------------------------

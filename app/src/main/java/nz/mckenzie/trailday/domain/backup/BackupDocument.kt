@@ -27,7 +27,6 @@ data class BackupDocument(
     /** Which build wrote it, for a human reading the file later. */
     val appVersion: String,
     val products: List<ProductRecord> = emptyList(),
-    val groups: List<GroupRecord> = emptyList(),
     /**
      * Written as `assets` since format 2. [JsonNames] keeps files written before that
      * readable: a v1 file called this list `tracks`, and its assets come back as tracks
@@ -55,37 +54,20 @@ data class BackupDocument(
         /**
          * Raised only when the shape changes in a way an older app cannot read.
          *
-         * Version 2 added groups, the kind, shape and method of an asset, and the group
-         * an asset belongs to. Adding fields is not such a change - unknown keys are
+         * Version 2 renamed the `tracks` list to `assets`, and added the kind, shape and
+         * method of an asset. Adding fields is not such a change - unknown keys are
          * ignored and missing ones fall back to their defaults - so a v1 file restores
-         * into this build. The reverse is not true: a v2 file holds group rows, so it
-         * needs a build that has groups.
+         * into this build.
          */
         const val VERSION = 2
     }
 }
-
-/** A named collection of assets, e.g. "Estuary" holding the road, the lagoon and the lower track. */
-@Serializable
-data class GroupRecord(
-    val id: Long,
-    val name: String,
-    val notes: String? = null
-)
 
 /** A planned asset, with the geometry that gives it a length. */
 @Serializable
 data class AssetRecord(
     val id: Long,
     val name: String,
-    /**
-     * The pre-2 free-text "block or area". Read when an older file is restored, and
-     * turned into a group of that name; always null in a file this build writes, which
-     * carries [groupId] and the [BackupDocument.groups] instead.
-     */
-    val areaLabel: String? = null,
-    /** The group this asset belongs to, as written in [BackupDocument.groups]. */
-    val groupId: Long? = null,
     /** [AssetKind] name. A pre-2 file has none, and every asset in it was a track. */
     val kind: String = AssetKind.TRACK.name,
     /** [AssetShape] name. A pre-2 file holds lines only. */
@@ -142,7 +124,7 @@ data class AssetRecord(
      *
      * **A file written by a newer build and read by an older one loses these** - the format's oldest
      * rule is that a key a build does not know is ignored, and this key is one an older build does not
-     * know. That is the trade the rule makes, and the same one v2's groups made.
+     * know. That is the trade the rule makes.
      */
     val spurs: List<List<LinePointRecord>> = emptyList()
 )

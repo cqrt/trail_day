@@ -18,9 +18,6 @@ interface BackupDao {
 
     // --- Reading it all -----------------------------------------------------------
 
-    @Query("SELECT * FROM groups ORDER BY id")
-    suspend fun allGroups(): List<GroupEntity>
-
     @Query("SELECT * FROM assets ORDER BY id")
     suspend fun allAssets(): List<AssetEntity>
 
@@ -53,9 +50,6 @@ interface BackupDao {
     @Query("SELECT COUNT(*) FROM assets")
     suspend fun assetCount(): Int
 
-    @Query("SELECT COUNT(*) FROM groups")
-    suspend fun groupCount(): Int
-
     @Query("SELECT COUNT(*) FROM spray_events")
     suspend fun sprayCount(): Int
 
@@ -69,9 +63,6 @@ interface BackupDao {
     suspend fun pointCount(): Int
 
     // --- Writing it back ----------------------------------------------------------
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertGroups(rows: List<GroupEntity>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProducts(rows: List<ProductEntity>)
@@ -116,9 +107,6 @@ interface BackupDao {
 
     @Query("DELETE FROM assets")
     suspend fun clearAssets()
-
-    @Query("DELETE FROM groups")
-    suspend fun clearGroups()
 
     @Query("DELETE FROM products")
     suspend fun clearProducts()

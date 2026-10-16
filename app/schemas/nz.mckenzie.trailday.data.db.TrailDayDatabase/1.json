@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "c1a14b93415d3dd28f35dee18f356af4",
+    "identityHash": "4e7c549dcac643f4edc5aae672a9d475",
     "entities": [
       {
-        "tableName": "tracks",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `areaLabel` TEXT, `notes` TEXT, `intervalDays` INTEGER NOT NULL, `swathWidthM` REAL, `active` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `lastSprayedAtEpochMs` INTEGER, `lengthM` REAL NOT NULL)",
+        "tableName": "assets",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `kind` TEXT NOT NULL, `shape` TEXT NOT NULL, `method` TEXT NOT NULL, `notes` TEXT, `intervalDays` INTEGER NOT NULL, `swathWidthM` REAL, `passesRequired` INTEGER NOT NULL, `passSeparationM` REAL, `active` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `lastSprayedAtEpochMs` INTEGER, `lengthM` REAL NOT NULL, `areaM2` REAL NOT NULL, `sourceRef` TEXT)",
         "fields": [
           {
             "fieldPath": "id",
@@ -21,9 +21,22 @@
             "notNull": true
           },
           {
-            "fieldPath": "areaLabel",
-            "columnName": "areaLabel",
-            "affinity": "TEXT"
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "shape",
+            "columnName": "shape",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "method",
+            "columnName": "method",
+            "affinity": "TEXT",
+            "notNull": true
           },
           {
             "fieldPath": "notes",
@@ -39,6 +52,17 @@
           {
             "fieldPath": "swathWidthM",
             "columnName": "swathWidthM",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "passesRequired",
+            "columnName": "passesRequired",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "passSeparationM",
+            "columnName": "passSeparationM",
             "affinity": "REAL"
           },
           {
@@ -63,6 +87,17 @@
             "columnName": "lengthM",
             "affinity": "REAL",
             "notNull": true
+          },
+          {
+            "fieldPath": "areaM2",
+            "columnName": "areaM2",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceRef",
+            "columnName": "sourceRef",
+            "affinity": "TEXT"
           }
         ],
         "primaryKey": {
@@ -73,28 +108,28 @@
         },
         "indices": [
           {
-            "name": "index_tracks_active",
+            "name": "index_assets_active",
             "unique": false,
             "columnNames": [
               "active"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_tracks_active` ON `${TABLE_NAME}` (`active`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_assets_active` ON `${TABLE_NAME}` (`active`)"
           },
           {
-            "name": "index_tracks_lastSprayedAtEpochMs",
+            "name": "index_assets_lastSprayedAtEpochMs",
             "unique": false,
             "columnNames": [
               "lastSprayedAtEpochMs"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_tracks_lastSprayedAtEpochMs` ON `${TABLE_NAME}` (`lastSprayedAtEpochMs`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_assets_lastSprayedAtEpochMs` ON `${TABLE_NAME}` (`lastSprayedAtEpochMs`)"
           }
         ]
       },
       {
-        "tableName": "track_points",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `trackId` INTEGER NOT NULL, `sequence` INTEGER NOT NULL, `lat` REAL NOT NULL, `lng` REAL NOT NULL, FOREIGN KEY(`trackId`) REFERENCES `tracks`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "tableName": "asset_points",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `assetId` INTEGER NOT NULL, `pathIndex` INTEGER NOT NULL, `sequence` INTEGER NOT NULL, `lat` REAL NOT NULL, `lng` REAL NOT NULL, `altitudeM` REAL, FOREIGN KEY(`assetId`) REFERENCES `assets`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -103,8 +138,14 @@
             "notNull": true
           },
           {
-            "fieldPath": "trackId",
-            "columnName": "trackId",
+            "fieldPath": "assetId",
+            "columnName": "assetId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pathIndex",
+            "columnName": "pathIndex",
             "affinity": "INTEGER",
             "notNull": true
           },
@@ -125,6 +166,11 @@
             "columnName": "lng",
             "affinity": "REAL",
             "notNull": true
+          },
+          {
+            "fieldPath": "altitudeM",
+            "columnName": "altitudeM",
+            "affinity": "REAL"
           }
         ],
         "primaryKey": {
@@ -135,32 +181,33 @@
         },
         "indices": [
           {
-            "name": "index_track_points_trackId",
+            "name": "index_asset_points_assetId",
             "unique": false,
             "columnNames": [
-              "trackId"
+              "assetId"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_track_points_trackId` ON `${TABLE_NAME}` (`trackId`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_asset_points_assetId` ON `${TABLE_NAME}` (`assetId`)"
           },
           {
-            "name": "index_track_points_trackId_sequence",
+            "name": "index_asset_points_assetId_pathIndex_sequence",
             "unique": true,
             "columnNames": [
-              "trackId",
+              "assetId",
+              "pathIndex",
               "sequence"
             ],
             "orders": [],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_track_points_trackId_sequence` ON `${TABLE_NAME}` (`trackId`, `sequence`)"
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_asset_points_assetId_pathIndex_sequence` ON `${TABLE_NAME}` (`assetId`, `pathIndex`, `sequence`)"
           }
         ],
         "foreignKeys": [
           {
-            "table": "tracks",
+            "table": "assets",
             "onDelete": "CASCADE",
             "onUpdate": "NO ACTION",
             "columns": [
-              "trackId"
+              "assetId"
             ],
             "referencedColumns": [
               "id"
@@ -227,7 +274,7 @@
       },
       {
         "tableName": "spray_events",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `trackId` INTEGER NOT NULL, `sprayedAtEpochMs` INTEGER NOT NULL, `waterLitres` REAL, `operatorName` TEXT, `notes` TEXT, `distanceM` REAL, `areaSqm` REAL, `recordedSessionId` INTEGER, FOREIGN KEY(`trackId`) REFERENCES `tracks`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `assetId` INTEGER NOT NULL, `sprayedAtEpochMs` INTEGER NOT NULL, `waterLitres` REAL, `operatorName` TEXT, `notes` TEXT, `distanceM` REAL, `areaSqm` REAL, `recordedSessionId` INTEGER, FOREIGN KEY(`assetId`) REFERENCES `assets`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -236,8 +283,8 @@
             "notNull": true
           },
           {
-            "fieldPath": "trackId",
-            "columnName": "trackId",
+            "fieldPath": "assetId",
+            "columnName": "assetId",
             "affinity": "INTEGER",
             "notNull": true
           },
@@ -286,13 +333,13 @@
         },
         "indices": [
           {
-            "name": "index_spray_events_trackId",
+            "name": "index_spray_events_assetId",
             "unique": false,
             "columnNames": [
-              "trackId"
+              "assetId"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_spray_events_trackId` ON `${TABLE_NAME}` (`trackId`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_spray_events_assetId` ON `${TABLE_NAME}` (`assetId`)"
           },
           {
             "name": "index_spray_events_sprayedAtEpochMs",
@@ -306,11 +353,11 @@
         ],
         "foreignKeys": [
           {
-            "table": "tracks",
+            "table": "assets",
             "onDelete": "CASCADE",
             "onUpdate": "NO ACTION",
             "columns": [
-              "trackId"
+              "assetId"
             ],
             "referencedColumns": [
               "id"
@@ -399,12 +446,12 @@
         ]
       },
       {
-        "tableName": "track_product_defaults",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`trackId` INTEGER NOT NULL, `productId` INTEGER NOT NULL, `defaultQuantityMl` REAL, PRIMARY KEY(`trackId`, `productId`), FOREIGN KEY(`trackId`) REFERENCES `tracks`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`productId`) REFERENCES `products`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "tableName": "asset_product_defaults",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`assetId` INTEGER NOT NULL, `productId` INTEGER NOT NULL, `defaultQuantityMl` REAL, PRIMARY KEY(`assetId`, `productId`), FOREIGN KEY(`assetId`) REFERENCES `assets`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`productId`) REFERENCES `products`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
-            "fieldPath": "trackId",
-            "columnName": "trackId",
+            "fieldPath": "assetId",
+            "columnName": "assetId",
             "affinity": "INTEGER",
             "notNull": true
           },
@@ -423,37 +470,37 @@
         "primaryKey": {
           "autoGenerate": false,
           "columnNames": [
-            "trackId",
+            "assetId",
             "productId"
           ]
         },
         "indices": [
           {
-            "name": "index_track_product_defaults_trackId",
+            "name": "index_asset_product_defaults_assetId",
             "unique": false,
             "columnNames": [
-              "trackId"
+              "assetId"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_track_product_defaults_trackId` ON `${TABLE_NAME}` (`trackId`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_asset_product_defaults_assetId` ON `${TABLE_NAME}` (`assetId`)"
           },
           {
-            "name": "index_track_product_defaults_productId",
+            "name": "index_asset_product_defaults_productId",
             "unique": false,
             "columnNames": [
               "productId"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_track_product_defaults_productId` ON `${TABLE_NAME}` (`productId`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_asset_product_defaults_productId` ON `${TABLE_NAME}` (`productId`)"
           }
         ],
         "foreignKeys": [
           {
-            "table": "tracks",
+            "table": "assets",
             "onDelete": "CASCADE",
             "onUpdate": "NO ACTION",
             "columns": [
-              "trackId"
+              "assetId"
             ],
             "referencedColumns": [
               "id"
@@ -474,7 +521,7 @@
       },
       {
         "tableName": "recorded_sessions",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `trackId` INTEGER, `startedAtEpochMs` INTEGER NOT NULL, `endedAtEpochMs` INTEGER, `status` TEXT NOT NULL, `distanceM` REAL NOT NULL, `durationMs` INTEGER NOT NULL, `pointCount` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `assetId` INTEGER, `startedAtEpochMs` INTEGER NOT NULL, `endedAtEpochMs` INTEGER, `status` TEXT NOT NULL, `distanceM` REAL NOT NULL, `durationMs` INTEGER NOT NULL, `pointCount` INTEGER NOT NULL, `bothSidesClaimed` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -489,8 +536,8 @@
             "notNull": true
           },
           {
-            "fieldPath": "trackId",
-            "columnName": "trackId",
+            "fieldPath": "assetId",
+            "columnName": "assetId",
             "affinity": "INTEGER"
           },
           {
@@ -527,6 +574,12 @@
             "columnName": "pointCount",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "bothSidesClaimed",
+            "columnName": "bothSidesClaimed",
+            "affinity": "INTEGER",
+            "notNull": true
           }
         ],
         "primaryKey": {
@@ -537,13 +590,13 @@
         },
         "indices": [
           {
-            "name": "index_recorded_sessions_trackId",
+            "name": "index_recorded_sessions_assetId",
             "unique": false,
             "columnNames": [
-              "trackId"
+              "assetId"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_recorded_sessions_trackId` ON `${TABLE_NAME}` (`trackId`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_recorded_sessions_assetId` ON `${TABLE_NAME}` (`assetId`)"
           },
           {
             "name": "index_recorded_sessions_startedAtEpochMs",
@@ -657,11 +710,243 @@
             ]
           }
         ]
+      },
+      {
+        "tableName": "recorded_breaks",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sessionId` INTEGER NOT NULL, `fromEpochMs` INTEGER NOT NULL, `toEpochMs` INTEGER, FOREIGN KEY(`sessionId`) REFERENCES `recorded_sessions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fromEpochMs",
+            "columnName": "fromEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toEpochMs",
+            "columnName": "toEpochMs",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_recorded_breaks_sessionId",
+            "unique": false,
+            "columnNames": [
+              "sessionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_recorded_breaks_sessionId` ON `${TABLE_NAME}` (`sessionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "recorded_sessions",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "offline_areas",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `minLat` REAL NOT NULL, `minLng` REAL NOT NULL, `maxLat` REAL NOT NULL, `maxLng` REAL NOT NULL, `minZoom` INTEGER NOT NULL, `maxZoom` INTEGER NOT NULL, `plannedTiles` INTEGER NOT NULL, `downloadedTiles` INTEGER NOT NULL, `bytes` INTEGER NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `completedAtEpochMs` INTEGER, `lastError` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "minLat",
+            "columnName": "minLat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "minLng",
+            "columnName": "minLng",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "maxLat",
+            "columnName": "maxLat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "maxLng",
+            "columnName": "maxLng",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "minZoom",
+            "columnName": "minZoom",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "maxZoom",
+            "columnName": "maxZoom",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "plannedTiles",
+            "columnName": "plannedTiles",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "downloadedTiles",
+            "columnName": "downloadedTiles",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bytes",
+            "columnName": "bytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completedAtEpochMs",
+            "columnName": "completedAtEpochMs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastError",
+            "columnName": "lastError",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_offline_areas_createdAtEpochMs",
+            "unique": false,
+            "columnNames": [
+              "createdAtEpochMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_offline_areas_createdAtEpochMs` ON `${TABLE_NAME}` (`createdAtEpochMs`)"
+          }
+        ]
+      },
+      {
+        "tableName": "offline_doc_tracks",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`objectId` INTEGER NOT NULL, `name` TEXT NOT NULL, `kind` TEXT, `trackType` TEXT, `flocId` TEXT, `lengthM` REAL NOT NULL, `pathsJson` TEXT NOT NULL, `downloadedAtEpochMs` INTEGER NOT NULL, PRIMARY KEY(`objectId`))",
+        "fields": [
+          {
+            "fieldPath": "objectId",
+            "columnName": "objectId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "trackType",
+            "columnName": "trackType",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "flocId",
+            "columnName": "flocId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lengthM",
+            "columnName": "lengthM",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pathsJson",
+            "columnName": "pathsJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "downloadedAtEpochMs",
+            "columnName": "downloadedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "objectId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_offline_doc_tracks_downloadedAtEpochMs",
+            "unique": false,
+            "columnNames": [
+              "downloadedAtEpochMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_offline_doc_tracks_downloadedAtEpochMs` ON `${TABLE_NAME}` (`downloadedAtEpochMs`)"
+          }
+        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'c1a14b93415d3dd28f35dee18f356af4')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4e7c549dcac643f4edc5aae672a9d475')"
     ]
   }
 }

@@ -28,8 +28,6 @@ import nz.mckenzie.trailday.ui.screens.Tab
 import nz.mckenzie.trailday.ui.screens.AssetDetailScreen
 import nz.mckenzie.trailday.ui.screens.AssetEditScreen
 import nz.mckenzie.trailday.ui.screens.AssetListScreen
-import nz.mckenzie.trailday.ui.screens.BlockEditScreen
-import nz.mckenzie.trailday.ui.screens.BlocksScreen
 import nz.mckenzie.trailday.ui.theme.TrailDayTheme
 import nz.mckenzie.trailday.viewmodel.DrawAssetViewModel
 import nz.mckenzie.trailday.viewmodel.DocTracksViewModel
@@ -44,14 +42,12 @@ import nz.mckenzie.trailday.viewmodel.SprayEntryViewModel
 import nz.mckenzie.trailday.viewmodel.UpdateViewModel
 import nz.mckenzie.trailday.viewmodel.AssetDetailViewModel
 import nz.mckenzie.trailday.viewmodel.AssetListViewModel
-import nz.mckenzie.trailday.viewmodel.BlockEditViewModel
-import nz.mckenzie.trailday.viewmodel.BlocksViewModel
 import nz.mckenzie.trailday.offline.OfflinePickerMode
 import nz.mckenzie.trailday.web.WebEditorService
 import nz.mckenzie.trailday.web.WebEditorState
 
 /** Destinations for now; swap for a NavHost when routes need arguments. */
-private enum class Destination { MAP, ASSETS, DRAW, CHANGE_LINE, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, ASSET_DETAIL, ASSET_EDIT, BLOCKS, BLOCK_EDIT, SPRAY_ENTRY, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC_TRACKS }
+private enum class Destination { MAP, ASSETS, DRAW, CHANGE_LINE, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, ASSET_DETAIL, ASSET_EDIT, SPRAY_ENTRY, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC_TRACKS }
 
 class MainActivity : ComponentActivity() {
 
@@ -69,7 +65,6 @@ class MainActivity : ComponentActivity() {
             TrailDayTheme {
                 var destination by rememberSaveable { mutableStateOf(Destination.MAP) }
                 var selectedAssetId by rememberSaveable { mutableStateOf<Long?>(null) }
-                var selectedBlockId by rememberSaveable { mutableStateOf<Long?>(null) }
                 var selectedSessionId by rememberSaveable { mutableStateOf<Long?>(null) }
 
                 /**
@@ -145,7 +140,6 @@ class MainActivity : ComponentActivity() {
                                 destination = Destination.DRAW
                             },
                             onImportDocTracks = { destination = Destination.DOC_TRACKS },
-                            onOpenBlocks = { destination = Destination.BLOCKS },
                             onOpenSettings = { destination = Destination.SETTINGS }
                         )
                     }
@@ -204,39 +198,6 @@ class MainActivity : ComponentActivity() {
                             AssetEditScreen(
                                 viewModel = editViewModel,
                                 onDone = { destination = Destination.ASSET_DETAIL }
-                            )
-                        }
-                    }
-
-                    Destination.BLOCKS -> {
-                        val blocksViewModel: BlocksViewModel = viewModel(
-                            factory = BlocksViewModel.factory(applicationContext)
-                        )
-                        BlocksScreen(
-                            viewModel = blocksViewModel,
-                            onBack = { destination = Destination.ASSETS },
-                            onOpenBlock = { blockId ->
-                                selectedBlockId = blockId
-                                destination = Destination.BLOCK_EDIT
-                            }
-                        )
-                    }
-
-                    // The block form asks for the same view model the list behind it uses,
-                    // keyed by block id, so saving or deleting lands back on the list that
-                    // has already been watching the row.
-                    Destination.BLOCK_EDIT -> {
-                        val blockId = selectedBlockId
-                        if (blockId == null) {
-                            destination = Destination.BLOCKS
-                        } else {
-                            val blockViewModel: BlockEditViewModel = viewModel(
-                                key = "block-$blockId",
-                                factory = BlockEditViewModel.factory(applicationContext, blockId)
-                            )
-                            BlockEditScreen(
-                                viewModel = blockViewModel,
-                                onDone = { destination = Destination.BLOCKS }
                             )
                         }
                     }

@@ -11,7 +11,7 @@ import org.junit.Test
 /**
  * What the map's corner box says about the whole farm.
  *
- * The arithmetic itself is a block's, already tested in its own right; what this pins is the
+ * The arithmetic itself is [AssetGrouping]'s, already tested in its own right; what this pins is the
  * wording - what is said, what is left out when it is not known, and that an area covering only
  * some of the assets is still one plain figure. The assets are built whole and put through the same
  * mapping the screen uses, so a field the mapping forgets shows up here as a figure the box gets wrong.
@@ -37,8 +37,7 @@ class FarmStatsTest {
             areaM2 = areaM2
         ),
         due = DueInfo(status = status, dueDateEpochMs = null, daysUntilDue = null),
-        sprayCount = 0,
-        groupName = null
+        sprayCount = 0
     )
 
     /** A track: so many metres of line, sprayed over a swath width somebody has said. */

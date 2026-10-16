@@ -31,7 +31,6 @@ class WebEditorEditTest {
         kind = "ROAD",
         shape = "LINE",
         method = "BOOM",
-        groupId = 3L,
         notes = "Both edges",
         intervalDays = 120,
         swathWidthM = 12.5,
@@ -42,8 +41,6 @@ class WebEditorEditTest {
         lastSprayedAtEpochMs = 1_750_000_000_000L,
         lengthM = 3300.0
     )
-
-    private val blockName = "Estuary"
 
     /** The line as the phone holds it, which is half of what the version the desk quotes is made of. */
     private val path = listOf(GeoPoint(-41.5, 173.8), GeoPoint(-41.6, 173.9))
@@ -61,7 +58,7 @@ class WebEditorEditTest {
      * The body a page sends back after opening this asset and changing one or two things.
      *
      * Only what the desk shows: a name, a kind, the notes and, when it is about the drawing, the line.
-     * The block, the method, the interval, the swath width and the pass count never travel - the phone
+     * The method, the interval, the swath width and the pass count never travel - the phone
      * keeps its own - so a body here does not carry them either, which is the whole point of the rule
      * `a field the desk never sent survives the edit` holds.
      *
@@ -70,7 +67,7 @@ class WebEditorEditTest {
      * renamed a field, which is exactly the failure a page would see as "nothing saved".
      */
     private fun body(
-        version: String = WebEditorVersion.of(asset, blockName, listOf(path)),
+        version: String = WebEditorVersion.of(asset, listOf(path)),
         name: String = asset.name,
         kind: String = asset.kind,
         notes: String? = asset.notes,
@@ -85,13 +82,13 @@ class WebEditorEditTest {
     }
 
     private fun ok(editBody: String?): WebEditorEditResult.Ok {
-        val result = WebEditorEdits.apply(asset, blockName, listOf(path), editBody)
+        val result = WebEditorEdits.apply(asset, listOf(path), editBody)
         assertTrue("expected this to be taken: $result", result is WebEditorEditResult.Ok)
         return result as WebEditorEditResult.Ok
     }
 
     private fun refused(editBody: String?): WebEditorEditResult.Refused {
-        val result = WebEditorEdits.apply(asset, blockName, listOf(path), editBody)
+        val result = WebEditorEdits.apply(asset, listOf(path), editBody)
         assertTrue("expected this to be refused: $result", result is WebEditorEditResult.Refused)
         return result as WebEditorEditResult.Refused
     }
@@ -120,11 +117,10 @@ class WebEditorEditTest {
     }
 
     @Test
-    fun `a good edit comes back as the row to store, and the block it belongs in`() {
+    fun `a good edit comes back as the row to store`() {
         val result = ok(body(name = "Estuary road, lower"))
 
         assertEquals("Estuary road, lower", result.asset.name)
-        assertEquals("the block is the phone's own and is kept as it stands", "Estuary", result.blockName)
         assertEquals("the id is the phone's, not the desk's to send", 7L, result.asset.id)
     }
 
@@ -133,7 +129,7 @@ class WebEditorEditTest {
         val edited = ok(body(name = "Estuary road, lower")).asset
 
         // The whole promise of writing through the row the phone holds now: the page changes the
-        // details it shows, not records. The block, the method, the interval, the swath width and the
+        // details it shows, not records. The method, the interval, the swath width and the
         // pass count are fields the desk no longer shows and never mentions - so a save cannot wipe
         // any of them - and a spray logged on the phone while the card was open is still there too.
         assertEquals("BOOM", edited.method)
@@ -145,7 +141,6 @@ class WebEditorEditTest {
         assertEquals(asset.active, edited.active)
         assertEquals(asset.createdAtEpochMs, edited.createdAtEpochMs)
         assertEquals(3300.0, edited.lengthM, 0.0)
-        assertEquals(asset.groupId, edited.groupId)
     }
 
     @Test
@@ -156,9 +151,8 @@ class WebEditorEditTest {
 
         val edited = WebEditorEdits.apply(
             current = precise,
-            blockName = blockName,
             paths = listOf(path),
-            body = body(version = WebEditorVersion.of(precise, blockName, listOf(path)))
+            body = body(version = WebEditorVersion.of(precise, listOf(path)))
         )
 
         assertTrue("expected this to be taken: $edited", edited is WebEditorEditResult.Ok)
@@ -168,26 +162,25 @@ class WebEditorEditTest {
 
     @Test
     fun `the version follows the fields the desk may write, and only those`() {
-        val version = WebEditorVersion.of(asset, blockName)
+        val version = WebEditorVersion.of(asset)
 
-        assertNotEquals(version, WebEditorVersion.of(asset.copy(name = "Renamed"), blockName))
-        assertNotEquals(version, WebEditorVersion.of(asset, "Home block"))
-        assertNotEquals(version, WebEditorVersion.of(asset.copy(intervalDays = 90), blockName))
-        assertNotEquals(version, WebEditorVersion.of(asset.copy(kind = "TRACK"), blockName))
+        assertNotEquals(version, WebEditorVersion.of(asset.copy(name = "Renamed")))
+        assertNotEquals(version, WebEditorVersion.of(asset.copy(intervalDays = 90)))
+        assertNotEquals(version, WebEditorVersion.of(asset.copy(kind = "TRACK")))
 
         // A field the desk cannot write must not refuse an edit that could not overwrite it: spraying
         // a line, archiving it or dragging a vertex does not stop somebody renaming it from the desk.
         assertEquals(
             version,
-            WebEditorVersion.of(asset.copy(lastSprayedAtEpochMs = 1_760_000_000_000L), blockName)
+            WebEditorVersion.of(asset.copy(lastSprayedAtEpochMs = 1_760_000_000_000L))
         )
-        assertEquals(version, WebEditorVersion.of(asset.copy(active = false), blockName))
-        assertEquals(version, WebEditorVersion.of(asset.copy(lengthM = 1234.0), blockName))
+        assertEquals(version, WebEditorVersion.of(asset.copy(active = false)))
+        assertEquals(version, WebEditorVersion.of(asset.copy(lengthM = 1234.0)))
     }
 
     @Test
     fun `an edit written against the asset as it was is refused, and says why`() {
-        val stale = refused(body(version = WebEditorVersion.of(asset.copy(name = "Renamed"), blockName)))
+        val stale = refused(body(version = WebEditorVersion.of(asset.copy(name = "Renamed"))))
 
         assertEquals(WebEditorRefusal.STALE, stale.refusal)
         assertTrue("says where it changed: ${stale.message}", stale.message.contains("phone"))
@@ -222,10 +215,9 @@ class WebEditorEditTest {
         val fenceline = asset.copy(kind = "INFRASTRUCTURE", shape = "LINE")
         val result = WebEditorEdits.apply(
             current = fenceline,
-            blockName = blockName,
             paths = listOf(path),
             body = body(
-                version = WebEditorVersion.of(fenceline, blockName, listOf(path)),
+                version = WebEditorVersion.of(fenceline, listOf(path)),
                 kind = "INFRASTRUCTURE"
             )
         )
@@ -293,12 +285,11 @@ class WebEditorEditTest {
 
         val result = WebEditorEdits.apply(
             current = place,
-            blockName = blockName,
             paths = listOf(path),
             // The version the place's own card would carry: a place and a line with the same fields
             // hash differently, which is the point of the shape being in the hash at all.
             body = body(
-                version = WebEditorVersion.of(place, blockName, listOf(path)),
+                version = WebEditorVersion.of(place, listOf(path)),
                 kind = "OTHER_PLACE",
                 points = path
             )
@@ -313,10 +304,10 @@ class WebEditorEditTest {
 
     @Test
     fun `a version quoted against the line as it was is refused once a vertex has moved`() {
-        val quoted = WebEditorVersion.of(asset, blockName, listOf(path))
+        val quoted = WebEditorVersion.of(asset, listOf(path))
         val moved = path + GeoPoint(-41.7, 174.1)
 
-        val refused = WebEditorEdits.apply(asset, blockName, listOf(moved), body(version = quoted))
+        val refused = WebEditorEdits.apply(asset, listOf(moved), body(version = quoted))
 
         assertEquals(WebEditorRefusal.STALE, (refused as WebEditorEditResult.Refused).refusal)
     }
@@ -324,18 +315,18 @@ class WebEditorEditTest {
     @Test
     fun `the version covers the line, so a card cannot undo a move somebody else made`() {
         assertNotEquals(
-            WebEditorVersion.of(asset, blockName, listOf(path)),
-            WebEditorVersion.of(asset, blockName, listOf(path.dropLast(1) + GeoPoint(-41.7, 174.1)))
+            WebEditorVersion.of(asset, listOf(path)),
+            WebEditorVersion.of(asset, listOf(path.dropLast(1) + GeoPoint(-41.7, 174.1)))
         )
         assertNotEquals(
             "a vertex added is a change",
-            WebEditorVersion.of(asset, blockName, listOf(path)),
-            WebEditorVersion.of(asset, blockName, listOf(path + GeoPoint(-41.7, 174.1)))
+            WebEditorVersion.of(asset, listOf(path)),
+            WebEditorVersion.of(asset, listOf(path + GeoPoint(-41.7, 174.1)))
         )
         assertEquals(
             "and the same points hash the same whatever else was read with them",
-            WebEditorVersion.of(asset, blockName, listOf(path)),
-            WebEditorVersion.of(asset, blockName, listOf(path))
+            WebEditorVersion.of(asset, listOf(path)),
+            WebEditorVersion.of(asset, listOf(path))
         )
     }
 
@@ -348,17 +339,16 @@ class WebEditorEditTest {
         // from before the spur was drawn is holding a card that is out of date.
         assertNotEquals(
             "a side track is a change to the track the desk was handed",
-            WebEditorVersion.of(asset, blockName, listOf(path)),
-            WebEditorVersion.of(asset, blockName, listOf(path, spur))
+            WebEditorVersion.of(asset, listOf(path)),
+            WebEditorVersion.of(asset, listOf(path, spur))
         )
         // And the paths are hashed with their boundaries marked, so the same vertices split two ways
         // are two versions rather than one - which is what makes the mark worth having.
         assertNotEquals(
-            WebEditorVersion.of(asset, blockName, listOf(path, spur)),
+            WebEditorVersion.of(asset, listOf(path, spur)),
             WebEditorVersion.of(
                 asset,
-                blockName,
-                listOf(listOf(path.first(), spur.last()), listOf(junction))
+                    listOf(listOf(path.first(), spur.last()), listOf(junction))
             )
         )
     }
@@ -382,7 +372,6 @@ class WebEditorEditTest {
             draft.asset.createdAtEpochMs
         )
         assertEquals(path, draft.geometry.line)
-        assertNull("no block unless the form named one", draft.blockName)
     }
 
     @Test
@@ -439,9 +428,8 @@ class WebEditorEditTest {
         )
         val result = WebEditorEdits.apply(
             asset,
-            blockName,
             listOf(climbed),
-            body(paths = listOf(climbed), version = WebEditorVersion.of(asset, blockName, listOf(climbed)))
+            body(paths = listOf(climbed), version = WebEditorVersion.of(asset, listOf(climbed)))
         )
 
         assertTrue("the line with its heights is taken: $result", result is WebEditorEditResult.Ok)
@@ -453,8 +441,8 @@ class WebEditorEditTest {
 
         // A vertex that moved only in height is a vertex that moved: a card that never saw it is stale.
         assertNotEquals(
-            WebEditorVersion.of(asset, blockName, listOf(climbed)),
-            WebEditorVersion.of(asset, blockName, listOf(listOf(climbed[0].copy(altitudeM = 600.0), climbed[1])))
+            WebEditorVersion.of(asset, listOf(climbed)),
+            WebEditorVersion.of(asset, listOf(listOf(climbed[0].copy(altitudeM = 600.0), climbed[1])))
         )
     }
 
@@ -500,8 +488,8 @@ class WebEditorEditTest {
         // The version is built from the paths the phone holds, so a card that never saw the spur is
         // refused by the same arithmetic as one that never saw a rename: this is that arithmetic, from
         // the desk's side - the body's own paths are what a fresh card would quote.
-        val quoted = WebEditorVersion.of(asset, blockName, listOf(path))
-        val fresh = WebEditorVersion.of(asset, blockName, listOf(path, spur))
+        val quoted = WebEditorVersion.of(asset, listOf(path))
+        val fresh = WebEditorVersion.of(asset, listOf(path, spur))
 
         assertNotEquals(quoted, fresh)
         assertEquals(

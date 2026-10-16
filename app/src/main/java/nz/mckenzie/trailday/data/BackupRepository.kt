@@ -4,7 +4,6 @@ import androidx.room.withTransaction
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.data.db.AssetPointEntity
 import nz.mckenzie.trailday.data.db.AssetProductDefaultEntity
-import nz.mckenzie.trailday.data.db.GroupEntity
 import nz.mckenzie.trailday.data.db.ProductEntity
 import nz.mckenzie.trailday.data.db.RecordedBreakEntity
 import nz.mckenzie.trailday.data.db.RecordedPointEntity
@@ -18,7 +17,6 @@ import nz.mckenzie.trailday.domain.backup.BackupDocument
 import nz.mckenzie.trailday.domain.backup.BackupFormat
 import nz.mckenzie.trailday.domain.backup.BackupSettingsRecord
 import nz.mckenzie.trailday.domain.backup.BackupSummary
-import nz.mckenzie.trailday.domain.backup.GroupRecord
 import nz.mckenzie.trailday.domain.backup.LinePointRecord
 import nz.mckenzie.trailday.domain.backup.ProductRecord
 import nz.mckenzie.trailday.domain.backup.RecordedBreakRecord
@@ -33,16 +31,12 @@ import nz.mckenzie.trailday.domain.backup.SprayProductRecord
  * The ids are carried through both ways because they are what holds a season
  * together: an asset, its geometry, the sprays on it and the recordings that prove
  * them are linked by id, and a restore that renumbered them would leave a database
- * that looks right and connects nothing. Groups are carried by id for the same reason.
+ * that looks right and connects nothing.
  *
  * Restore replaces. It clears the backup's tables and inserts the file's contents
  * inside one transaction, so an interrupted restore leaves the previous data intact
  * rather than a mixture of two seasons. Downloaded offline areas are left alone:
  * they describe tiles on this device, which the file has nothing to say about.
- *
- * Files written before groups existed (format 1) still restore: their per-asset
- * "block or area" becomes a group of that name, so the operator's Estuary block comes
- * back as one.
  */
 class BackupRepository(
     private val db: TrailDayDatabase,
@@ -63,7 +57,6 @@ class BackupRepository(
             exportedAtEpochMs = nowEpochMs(),
             appVersion = appVersion,
             products = dao.allProducts().map { it.toRecord() },
-            groups = dao.allGroups().map { it.toRecord() },
             assets = dao.allAssets().map { asset -> asset.toRecord(pointsByAsset[asset.id].orEmpty()) },
             sprayEvents = dao.allSprayEvents().map { event -> event.toRecord(productsByEvent[event.id].orEmpty()) },
             assetDefaults = dao.allAssetDefaults().map { it.toRecord() },
@@ -101,20 +94,14 @@ class BackupRepository(
         dao.clearSprayEvents()
         dao.clearAssetPoints()
         dao.clearAssets()
-        dao.clearGroups()
         dao.clearProducts()
         dao.clearRecordedBreaks()
         dao.clearRecordedPoints()
         dao.clearRecordedSessions()
 
         // And parents before children on the way back in.
-        val groupIds = restoreGroups(document)
         dao.insertProducts(document.products.map { it.toEntity() })
-        dao.insertAssets(
-            document.assets.map { asset ->
-                asset.toEntity(groupId = asset.groupId ?: groupIds[asset.areaLabel.groupKey()])
-            }
-        )
+        dao.insertAssets(document.assets.map { it.toEntity() })
         dao.insertAssetPoints(
             document.assets.flatMap { asset ->
                 // The line first and the side tracks after it, which is the order `pathIndex` means -
@@ -182,42 +169,7 @@ class BackupRepository(
         BackupFormat.summarise(document)
     }
 
-    /**
-     * Writes the file's groups and returns the id each name means.
-     *
-     * A file written before groups existed has no group rows at all, only a "block or
-     * area" on each asset. Those names become groups here, deduplicated the way the
-     * name column itself compares them, so a season that was labelled "Estuary",
-     * "estuary" and " Estuary " comes back as one group rather than three.
-     */
-    private suspend fun restoreGroups(document: BackupDocument): Map<String, Long> {
-        if (document.groups.isNotEmpty()) {
-            dao.insertGroups(
-                document.groups.map { GroupEntity(id = it.id, name = it.name, notes = it.notes) }
-            )
-            return document.groups.associate { it.name.groupKey() to it.id }
-        }
-
-        val groupDao = db.groupDao()
-        val ids = mutableMapOf<String, Long>()
-        document.assets
-            .mapNotNull { it.areaLabel?.trim()?.takeIf { name -> name.isNotEmpty() } }
-            .distinctBy { it.groupKey() }
-            .forEach { name ->
-                val existing = groupDao.findByName(name)?.id
-                val inserted = existing ?: groupDao.insertIfAbsent(GroupEntity(name = name))
-                val id = if (inserted == -1L) groupDao.findByName(name)?.id else inserted
-                if (id != null) ids[name.groupKey()] = id
-            }
-        return ids
-    }
 }
-
-/**
- * The key two group names are the same under. Lowercase because the name column is
- * NOCASE, trimmed because a name typed with a stray space is the same name.
- */
-private fun String?.groupKey(): String = this?.trim().orEmpty().lowercase()
 
 /**
  * One asset as a backup carries it, its geometry split back into the paths the database stores.
@@ -229,7 +181,6 @@ private fun String?.groupKey(): String = this?.trim().orEmpty().lowercase()
 private fun AssetEntity.toRecord(points: List<AssetPointEntity>) = AssetRecord(
     id = id,
     name = name,
-    groupId = groupId,
     kind = kind,
     shape = shape,
     method = method,
@@ -263,19 +214,12 @@ private fun List<AssetPointEntity>.pathsFrom(from: Int): List<List<LinePointReco
         .map { path(it) }
         .filter { it.isNotEmpty() }
 
-private fun GroupEntity.toRecord() = GroupRecord(
-    id = id,
-    name = name,
-    notes = notes
-)
-
-private fun AssetRecord.toEntity(groupId: Long?) = AssetEntity(
+private fun AssetRecord.toEntity() = AssetEntity(
     id = id,
     name = name,
     kind = kind,
     shape = shape,
     method = method,
-    groupId = groupId,
     notes = notes,
     intervalDays = intervalDays,
     swathWidthM = swathWidthM,
