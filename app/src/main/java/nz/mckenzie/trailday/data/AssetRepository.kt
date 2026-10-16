@@ -2,80 +2,36 @@ package nz.mckenzie.trailday.data
 
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.data.db.AssetPointEntity
-import nz.mckenzie.trailday.data.db.AssetProductDefaultEntity
-import nz.mckenzie.trailday.data.db.ProductEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.data.db.SprayEventEntity
-import nz.mckenzie.trailday.data.db.SprayEventProductEntity
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
-import nz.mckenzie.trailday.domain.asset.SprayMethod
-import nz.mckenzie.trailday.domain.due.DueCalculator
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
-import nz.mckenzie.trailday.domain.geo.RecordedPass
 import nz.mckenzie.trailday.domain.geo.Ring
-import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
 import nz.mckenzie.trailday.domain.track.GpxWriter
 import nz.mckenzie.trailday.domain.track.TrackInterchange
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.domain.tiles.withMinimumSpan
-import java.time.ZoneId
 
 /**
- * The asset list, the product catalogue and spray records.
+ * The place list, its geometry, and the shape of a place.
  *
  * "Asset" is the wider word on purpose: the list holds tracks, roads and pieces of
- * infrastructure, and they differ only in their kind, shape and spray method.
- *
- * Multi-table writes run inside [TrailDayDatabase.withTransaction] so a spray
- * can never be half-recorded.
+ * infrastructure, and they differ only in their kind and shape.
  */
 class AssetRepository(
-    private val db: TrailDayDatabase,
-    private val zoneId: ZoneId = ZoneId.systemDefault()
+    private val db: TrailDayDatabase
 ) {
     private val assetDao = db.assetDao()
-    private val sprayEventDao = db.sprayEventDao()
-    private val productDao = db.productDao()
     private val recordingDao = db.recordingDao()
 
     // --- Assets ----------------------------------------------------------------------
 
-    /**
-     * Active assets with their due status, recalculated whenever the data or the
-     * clock tick changes. Pass [MinuteTicker.minutes] from the UI so the colours
-     * roll over while the app stays open.
-     */
-    fun observeAssetsWithDue(
-        nowProvider: Flow<Long> = MinuteTicker.minutes()
-    ): Flow<List<AssetWithDue>> = combine(
-        assetDao.observeActiveAssets(),
-        sprayEventDao.observeSpraySummaries(),
-        nowProvider
-    ) { assets, summaries, now ->
-        val byAsset = summaries.associateBy { it.assetId }
-        assets.map { asset ->
-            val summary = byAsset[asset.id]
-            // The event table wins over the denormalised column if they disagree.
-            val lastSprayedAt = summary?.lastSprayedAtEpochMs ?: asset.lastSprayedAtEpochMs
-            AssetWithDue(
-                asset = asset,
-                due = DueCalculator.calculate(
-                    lastSprayedAtEpochMs = lastSprayedAt,
-                    intervalDays = asset.intervalDays,
-                    leadDays = AssetEntity.DEFAULT_LEAD_DAYS,
-                    nowEpochMs = now,
-                    zoneId = zoneId
-                ),
-                sprayCount = summary?.sprayCount ?: 0
-            )
-        }
-    }
+    /** The places the operator works from, name-ordered. */
+    fun observeActiveAssets(): Flow<List<AssetEntity>> = assetDao.observeActiveAssets()
 
     fun observeAsset(assetId: Long): Flow<AssetEntity?> = assetDao.observeAsset(assetId)
 
@@ -83,8 +39,7 @@ class AssetRepository(
      * An asset's geometry as it is stored: the line, and the side tracks hanging off it.
      *
      * A [Flow] of the whole thing rather than of the line, because the map draws every path: a track
-     * with a spur into the gully is two lines on the screen, drawn in the one colour the asset's
-     * traffic light gives them.
+     * with a spur into the gully is two lines on the screen.
      */
     fun observeAssetGeometry(assetId: Long): Flow<AssetGeometry> =
         assetDao.observeGeometry(assetId).map { rows -> rows.toAssetGeometry() }
@@ -140,54 +95,11 @@ class AssetRepository(
     }
 
     /**
-     * The sprays of an asset that could still colour part of its line.
-     *
-     * A spray older than the asset's own interval is left out, because whatever part of the
-     * line it covered is due again anyway, and a part that nothing covers is drawn as still
-     * to spray - which is the same answer. Reading every pass a track has ever had would
-     * mean loading years of fixes to draw the same picture.
-     *
-     * The passes are the sprays that carry a recording, since a recording is the only thing
-     * that says which part of the line went out. A spray logged by hand has no fixes behind
-     * it and is reported as [AssetSprayCoverage.lastWithoutRecordingAtEpochMs] instead.
-     */
-    suspend fun getSprayCoverage(assetId: Long): AssetSprayCoverage {
-        val asset = assetDao.getAsset(assetId) ?: return AssetSprayCoverage.NONE
-        val since = System.currentTimeMillis() -
-            (asset.intervalDays.toLong() + AssetEntity.DEFAULT_LEAD_DAYS) * MILLIS_PER_DAY
-        val events = sprayEventDao.eventsSince(assetId, since)
-        if (events.isEmpty()) return AssetSprayCoverage.NONE
-
-        return AssetSprayCoverage(
-            passes = events.mapNotNull { event ->
-                event.recordedSessionId?.let { sessionId ->
-                    RecordedPass(
-                        atEpochMs = event.sprayedAtEpochMs,
-                        points = recordingDao.getPoints(sessionId).map { it.toGeoPoint() },
-                        // A pass read here has to be the same pass the recorder showed: the
-                        // ground it was paused over stays red, and the gaps where the fixes
-                        // only went missing are ground it drove.
-                        breaks = recordingDao.getBreaks(sessionId).map { it.toRecordingBreak() },
-                        // And the operator's word, where they had to give it: a pass whose second
-                        // side the fixes could not vouch for says so, and reads as the second
-                        // pass - see TwoPasses.
-                        bothSidesClaimed =
-                            recordingDao.getSession(sessionId)?.bothSidesClaimed == true
-                    )
-                }
-            },
-            lastWithoutRecordingAtEpochMs = events
-                .lastOrNull { it.recordedSessionId == null }
-                ?.sprayedAtEpochMs
-        )
-    }
-
-    /**
      * Creates an asset, stores its planned geometry and computes its length.
      *
      * This is the **one-line** form: a GPX file, a desk's new track and a test all have a line and
      * nothing else. A track with side tracks goes in through the [AssetGeometry] overload below, which
-     * is the same nine arguments - the two are one door with two words for what is being carried, and
+     * is the same arguments - the two are one door with two words for what is being carried, and
      * they are kept next to each other so they cannot drift apart.
      */
     suspend fun createAsset(
@@ -195,12 +107,7 @@ class AssetRepository(
         geometry: List<GeoPoint>,
         kind: AssetKind = AssetKind.TRACK,
         shape: AssetShape = AssetShape.LINE,
-        method: SprayMethod = SprayMethod.UNSET,
         notes: String? = null,
-        intervalDays: Int = AssetEntity.DEFAULT_INTERVAL_DAYS,
-        swathWidthM: Double? = null,
-        passesRequired: Int = AssetEntity.DEFAULT_PASSES_REQUIRED,
-        passSeparationM: Double? = null,
         createdAtEpochMs: Long = System.currentTimeMillis(),
         /** Where it came from, when it came from a service: see [AssetEntity.sourceRef]. */
         sourceRef: String? = null
@@ -209,12 +116,7 @@ class AssetRepository(
         geometry = AssetGeometry.of(geometry),
         kind = kind,
         shape = shape,
-        method = method,
         notes = notes,
-        intervalDays = intervalDays,
-        swathWidthM = swathWidthM,
-        passesRequired = passesRequired,
-        passSeparationM = passSeparationM,
         createdAtEpochMs = createdAtEpochMs,
         sourceRef = sourceRef
     )
@@ -225,12 +127,7 @@ class AssetRepository(
         geometry: AssetGeometry,
         kind: AssetKind = AssetKind.TRACK,
         shape: AssetShape = AssetShape.LINE,
-        method: SprayMethod = SprayMethod.UNSET,
         notes: String? = null,
-        intervalDays: Int = AssetEntity.DEFAULT_INTERVAL_DAYS,
-        swathWidthM: Double? = null,
-        passesRequired: Int = AssetEntity.DEFAULT_PASSES_REQUIRED,
-        passSeparationM: Double? = null,
         createdAtEpochMs: Long = System.currentTimeMillis(),
         /** Where it came from, when it came from a service: see [AssetEntity.sourceRef]. */
         sourceRef: String? = null
@@ -239,12 +136,7 @@ class AssetRepository(
             name = name,
             kind = kind.name,
             shape = shape.name,
-            method = method.name,
             notes = notes,
-            intervalDays = intervalDays,
-            swathWidthM = swathWidthM,
-            passesRequired = passesRequired,
-            passSeparationM = passSeparationM,
             createdAtEpochMs = createdAtEpochMs,
             sourceRef = sourceRef
         ),
@@ -263,7 +155,7 @@ class AssetRepository(
      * Inserts an asset that has already been built, with its geometry, in one transaction.
      *
      * Here for the desk's new track, which arrives as a row [nz.mckenzie.trailday.ui.AssetEdits] has
-     * already judged rather than as nine loose arguments - and it is the better home for the id and the
+     * already judged rather than as loose arguments - and it is the better home for the id and the
      * length anyway: one place issues an id, and one place writes a new asset's geometry
      * and its cached length together, so a row and the length the lists read can never disagree.
      *
@@ -306,14 +198,13 @@ class AssetRepository(
             // A shape that is ground has to end up with ground under it: the kind decides that the last
             // corner joins the first, and a line that has just been made a carpark arrives open by
             // definition. It is closed once, here - and a carpark whose ring is already closed is left
-            // exactly as it is rather than rewritten every time its name or its interval is edited.
+            // exactly as it is rather than rewritten every time its name is edited.
             //
             // **Unless it has no measured ground yet**, which is the fenceline somebody kept a carpark
-            // as and has just re-kinded: a closed fenceline arrives with no area, because no build
-            // before this one measured one, and the whole point of the kind is the number. Writing the
-            // geometry again is what works the area out from the corners it already has - and a shape
-            // that genuinely encloses nothing goes on saying so, at the price of one write when somebody
-            // edits it.
+            // as and has just re-kinded: a closed fenceline arrives with no area, and the whole point of
+            // the kind is the number. Writing the geometry again is what works the area out from the
+            // corners it already has - and a shape that genuinely encloses nothing goes on saying so,
+            // at the price of one write when somebody edits it.
             AssetShape.fromStorage(asset.shape) == AssetShape.AREA -> {
                 val stored = getAssetGeometry(asset.id)
                 if (!Ring.isClosed(stored.line) || asset.areaM2 <= 0.0) {
@@ -444,10 +335,3 @@ private fun List<AssetPointEntity>.toAssetGeometry(): AssetGeometry {
     if (isEmpty()) return AssetGeometry.NONE
     return AssetGeometry(groupBy { it.pathIndex }.map { (_, rows) -> rows.map { it.toGeoPoint() } })
 }
-
-/**
- * For the window of sprays the map reads. A day of exactly 24 hours is close enough for a
- * window: which sprays are inside it decides what the map *looks at*, never what it says -
- * an hour either side of the edge colours a stretch the same way.
- */
-private const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L

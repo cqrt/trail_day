@@ -6,7 +6,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
-import nz.mckenzie.trailday.domain.asset.SprayMethod
 
 /**
  * The backup file itself: what goes in, what comes out, and what is refused.
@@ -26,40 +25,18 @@ class BackupFormatTest {
         version = version,
         exportedAtEpochMs = 1_789_344_000_000L,
         appVersion = "0.5.0",
-        products = listOf(
-            ProductRecord(id = 1, name = "Glyphosate", unit = "mL", rateText = "10 mL/L", archived = false),
-            ProductRecord(id = 2, name = "Retired product", archived = true)
-        ),
         assets = listOf(
             AssetRecord(
                 id = 7,
                 name = assetName,
                 kind = AssetKind.ROAD.name,
                 shape = AssetShape.LINE.name,
-                method = SprayMethod.BOOM.name,
-                notes = "spray the fenceline twice",
-                intervalDays = 45,
-                swathWidthM = 6.0,
+                notes = "follow the fenceline",
                 createdAtEpochMs = 1_700_000_000_000L,
-                lastSprayedAtEpochMs = 1_789_000_000_000L,
                 lengthM = 1234.5,
                 points = listOf(LinePointRecord(-41.5, 173.95, altitudeM = 553.6), LinePointRecord(-41.51, 173.96))
             )
         ),
-        sprayEvents = listOf(
-            SprayEventRecord(
-                id = 3,
-                assetId = 7,
-                sprayedAtEpochMs = 1_789_000_000_000L,
-                waterLitres = 400.0,
-                operatorName = "Matt",
-                distanceM = 1200.0,
-                areaSqm = 7200.0,
-                recordedSessionId = 5,
-                products = listOf(SprayProductRecord(productId = 1, quantityMl = 1500.0))
-            )
-        ),
-        assetDefaults = listOf(AssetDefaultRecord(assetId = 7, productId = 1, defaultQuantityMl = 1500.0)),
         recordings = listOf(
             RecordingRecord(
                 id = 5,
@@ -148,7 +125,8 @@ class BackupFormatTest {
 
     @Test
     fun `a file missing newer fields still restores`() {
-        // What an older build's file looks like: the fields it never wrote are absent.
+        // What an older build's file looks like: the fields it never wrote are absent, and the fields
+        // this build no longer has are simply ignored.
         val older = """
             {
               "format": "trail-day-backup",
@@ -162,19 +140,18 @@ class BackupFormatTest {
         val restored = BackupFormat.decode(older)
 
         assertEquals("Home block", restored.assets.single().name)
-        assertEquals(120, restored.assets.single().intervalDays)
         assertEquals(0.0, restored.assets.single().lengthM, 0.0)
         assertTrue(restored.assets.single().points.isEmpty())
         // Nothing is invented for a file that predates the fields: it is a track, drawn
-        // as a line, with no spray method recorded.
+        // as a line.
         assertEquals(AssetKind.TRACK.name, restored.assets.single().kind)
         assertEquals(AssetShape.LINE.name, restored.assets.single().shape)
-        assertEquals(SprayMethod.UNSET.name, restored.assets.single().method)
     }
 
     @Test
     fun `a file written before assets existed keeps its ids`() {
-        // Verbatim what 0.5.0 wrote: tracks, trackId and trackDefaults.
+        // Verbatim what 0.5.0 wrote: tracks and trackId. The spray and default lists are keys this
+        // build no longer has, and a restore ignores them rather than refusing the file.
         val v1 = """
             {
               "format": "trail-day-backup",
@@ -191,8 +168,7 @@ class BackupFormatTest {
 
         assertEquals(1, restored.version)
         assertEquals(7L, restored.assets.single().id)
-        assertEquals("the spray must still point at its asset", 7L, restored.sprayEvents.single().assetId)
-        assertEquals(7L, restored.assetDefaults.single().assetId)
+        assertEquals("the spray and default lists are ignored, not refused", 1, restored.assets.size)
     }
 
     @Test
@@ -202,7 +178,6 @@ class BackupFormatTest {
             name = "Works carpark",
             kind = AssetKind.CARPARK.name,
             shape = AssetShape.AREA.name,
-            intervalDays = 120,
             createdAtEpochMs = 1_700_000_000_000L,
             lengthM = 260.0,
             areaM2 = 3_500.0,
@@ -231,7 +206,6 @@ class BackupFormatTest {
             name = "Kiwi Burn",
             kind = AssetKind.TRACK.name,
             shape = AssetShape.LINE.name,
-            intervalDays = 120,
             createdAtEpochMs = 1_700_000_000_000L,
             lengthM = 12_000.0,
             points = listOf(
@@ -272,10 +246,8 @@ class BackupFormatTest {
         val summary = BackupFormat.summarise(document())
 
         assertEquals(1, summary.assets)
-        assertEquals(1, summary.sprays)
         assertEquals(1, summary.recordings)
-        assertEquals(2, summary.products)
-        assertEquals("1 asset, 1 spray, 1 recording, 2 products", summary.describe())
+        assertEquals("1 asset, 1 recording", summary.describe())
     }
 
     @Test

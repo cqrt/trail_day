@@ -564,8 +564,8 @@ fun SettingsScreen(
                 ) {
                     Text("Your data", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        text = "Everything the app holds: assets and their lines, every spray " +
-                            "with its amounts, products, and GPS recordings.",
+                        text = "Everything the app holds: the places and their lines, and " +
+                            "every GPS recording.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     FlowRow(

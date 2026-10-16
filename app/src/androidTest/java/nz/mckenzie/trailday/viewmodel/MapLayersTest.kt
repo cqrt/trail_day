@@ -7,7 +7,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import nz.mckenzie.trailday.data.AssetRepository
@@ -69,7 +68,6 @@ class MapLayersTest {
         assetRepository = AssetRepository(db),
         settingsRepository = settings,
         locationSource = NoLocation,
-        dueNow = flowOf(0L),
         loadGeometry = { AssetGeometry.NONE }
     )
 

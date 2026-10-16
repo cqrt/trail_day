@@ -8,9 +8,9 @@ import androidx.room.PrimaryKey
 /**
  * A raw GPS recording.
  *
- * Deliberately not foreign-keyed to [AssetEntity]: deleting a planned asset must
- * never destroy the evidence of what was actually sprayed. [assetId] is a soft
- * link, and spray events hold the same id as a plain column.
+ * Deliberately not foreign-keyed to [AssetEntity]: deleting a planned place must
+ * never destroy the recording of what was actually walked or ridden. [assetId] is a
+ * soft link.
  */
 @Entity(
     tableName = "recorded_sessions",
@@ -26,17 +26,7 @@ data class RecordedSessionEntity(
     val status: String,
     val distanceM: Double = 0.0,
     val durationMs: Long = 0L,
-    val pointCount: Int = 0,
-    /**
-     * The operator's word that this pass did the other side of a line that is sprayed twice.
-     *
-     * The app can usually tell two passes apart by themselves - one heading each way, or one
-     * each side of the line - and writes down nothing beyond the fixes when it can. When it
-     * cannot, it asks, and this is the answer: the claim that the two passes over this line
-     * were complementary. Stored here rather than derived, because a claim has to outlive the
-     * reading of the fixes - otherwise the question would be asked again on every screen.
-     */
-    val bothSidesClaimed: Boolean = false
+    val pointCount: Int = 0
 )
 
 /**
@@ -76,9 +66,9 @@ data class RecordedPointEntity(
  *
  * Pausing stops the fixes, so a pass that carries on jumps from the last fix before the pause
  * to the first one after it. That jump is the one kind of gap in a recording that is not
- * ground the pass drove - the operator had stopped - so it is written down rather than
- * inferred later from the fixes, which cannot tell a pause from a dropped signal. Coverage
- * reads it: see [nz.mckenzie.trailday.domain.geo.RecordingBreak].
+ * ground the pass crossed - the operator had stopped - so it is written down rather than
+ * inferred later from the fixes, which cannot tell a pause from a dropped signal.
+ * The recorded line reads it: see [nz.mckenzie.trailday.domain.geo.RecordingBreak].
  *
  * [toEpochMs] is null while the pass is still paused, and for a pass that was finished while
  * paused - which reads as a stop that runs to the end of the recording, as it should.

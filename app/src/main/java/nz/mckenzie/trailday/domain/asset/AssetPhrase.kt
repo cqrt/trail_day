@@ -3,9 +3,8 @@ package nz.mckenzie.trailday.domain.asset
 /**
  * What an asset is and what shape it is, in the operator's words.
  *
- * Kept beside [MethodPhrase] so the form, the list and the record all say the same
- * thing about the same asset - and so a new kind cannot ship as a picker with a blank
- * label.
+ * One place for these, so the form, the list and the card all say the same thing about
+ * the same asset - and so a new kind cannot ship as a picker with a blank label.
  */
 object AssetPhrase {
 
@@ -58,10 +57,9 @@ object AssetPhrase {
     /**
      * How a figure for ground is said, given the number already written out.
      *
-     * Two claims, and the words have to tell them apart: a ring's own area is **measured** from its
-     * corners, while a line's is an estimate from a swath width somebody typed - and an estimate that
-     * reads like a measurement is the kind of figure that ends up in a spray diary as though it had
-     * been surveyed.
+     * A ring's own area is **measured** from its corners, so it is said as ground. The line's own
+     * wording is here for a shape that has no measured area at all: a line's area is an estimate,
+     * and an estimate that reads like a measurement is the kind of figure that gets believed.
      */
     fun areaPhrase(shape: AssetShape, areaText: String): String = when (shape) {
         AssetShape.AREA -> "$areaText of ground"

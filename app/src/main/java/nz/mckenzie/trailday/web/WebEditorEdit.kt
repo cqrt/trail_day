@@ -8,7 +8,6 @@ import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetPathEdits
 import nz.mckenzie.trailday.domain.asset.AssetPathResult
 import nz.mckenzie.trailday.domain.asset.AssetShape
-import nz.mckenzie.trailday.domain.asset.SprayMethod
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.track.TrackInterchange
@@ -29,10 +28,7 @@ import java.util.Base64
  * the phone holds it now and the repository writes that row back: the desk cannot overwrite a
  * last-sprayed date or an archived flag it never heard of.
  *
- * **And the fields the desk no longer shows are the row's own.** The spray method, the
- * interval, the swath width, the pass count and the pass separation are read straight off [current]
- * and handed to [AssetEdits] as they are, so a save from the desk cannot wipe any of them by not
- * mentioning it - which is the one rule this arrangement has to keep. Only a name, a kind, the notes
+ * **And the fields the desk no longer shows are the row's own.** Only a name, a kind, the notes
  * and the drawing ever come from the body.
  *
  * **Why a fingerprint and not a version column.** The desk has to be able to say "I am changing the
@@ -60,10 +56,8 @@ import java.util.Base64
  * Every number arrives as the text the field held, for the reason [AssetEdits] exists: what a
  * blank, a comma or a stray space means is decided in one place, and it is not decided here.
  *
- * Only what the desk actually shows is here. The method, the interval, the swath width,
- * the pass count and the pass separation are left out on purpose: they are the phone's own, the desk
- * never touches them, and [WebEditorEdits.judge] puts the row's current values back where the rules
- * expect them.
+ * Only what the desk actually shows is here. The desk edits a name, a kind, the notes and the
+ * drawing, and nothing else.
  */
 @Serializable
 data class WebEditorEdit(
@@ -132,7 +126,7 @@ enum class WebEditorRefusal(val status: Int, val reason: String) {
     STALE(409, "stale"),
 
     /**
-     * The phone will not take it away: sprays, or a recording, are attached.
+     * The phone will not take it away: recordings are attached.
      *
      * Its own status rather than a 409 of the stale kind, because a page does something different
      * with it: nothing has moved and nothing needs reloading, the answer is simply no, with the
@@ -241,8 +235,8 @@ sealed interface WebEditorWrite {
  * The version of an asset as far as the desk is concerned.
  *
  * A hash of the fields the desk may write - the geometry among them, because the desk writes that
- * too - and of nothing else. So a spray recorded while the card is open does not refuse the edit,
- * because the desk cannot overwrite a spray, while a rename on the phone does, because it is a field
+ * too - and of nothing else. So a recording made while the card is open does not refuse the edit,
+ * because the desk cannot overwrite a recording, while a rename on the phone does, because it is a field
  * this edit is about to write. The id is in the hash as well: an edit written against one asset must
  * not be taken for an edit to another that happens to hold the same fields, and the id is where such
  * a mix-up would show.
@@ -274,12 +268,7 @@ object WebEditorVersion {
             "name" to asset.name,
             "kind" to asset.kind,
             "shape" to asset.shape,
-            "method" to asset.method,
-            "notes" to asset.notes.orEmpty(),
-            "intervalDays" to asset.intervalDays.toString(),
-            "swathWidthM" to asset.swathWidthM?.toString().orEmpty(),
-            "passesRequired" to asset.passesRequired.toString(),
-            "passSeparationM" to asset.passSeparationM?.toString().orEmpty()
+            "notes" to asset.notes.orEmpty()
         ) + paths.flatMapIndexed { pathIndex, path ->
             listOf("path$pathIndex" to path.size.toString()) +
                 path.mapIndexed { index, point ->
@@ -373,10 +362,8 @@ object WebEditorEdits {
      *
      * Judged against a blank row so every rule still comes from the phone: [AssetEdits] is handed a
      * row with nothing in it, which is what a new asset is, and answers in its own words about the
-     * name it was not given. The blank row's own defaults are the phone's starting values for a new
-     * place, so the interval, method and pass count the desk never sends are the ones the phone fills
-     * in for itself. The id is the repository's to issue and the date is the phone's clock rather than
-     * the laptop's.
+     * name it was not given. The id is the repository's to issue and the date is the phone's clock
+     * rather than the laptop's.
      */
     fun create(body: String?, nowEpochMs: Long): WebEditorCreateResult {
         val edit = parse(body) ?: return CreateRefused(UNREADABLE)
@@ -409,12 +396,6 @@ object WebEditorEdits {
      * are applied to and in whether a version must be quoted, and in nothing else. Two copies of
      * these rules would be two copies to keep in step, and the one that fell behind would be
      * whichever of the two writes is the rarer.
-     *
-     * **Every field the desk no longer shows is taken from [current]**, so a save that does not
-     * mention the method, the interval, the swath width, the pass count or the pass
-     * separation writes each row's own value straight back. That is the one rule this whole
-     * arrangement has to keep: a desk save cannot wipe them by not mentioning them. For a new asset
-     * [current] is a blank row, and its defaults are the phone's starting values.
      */
     private fun judge(edit: WebEditorEdit, current: AssetEntity): WebEditorEditResult {
 
@@ -430,14 +411,7 @@ object WebEditorEdits {
         val fields = AssetEditFields(
             name = edit.name,
             kind = kind,
-            // Each read off the row the phone holds now, and as the number it is rather than rounded:
-            // the desk shows none of these, so the row's own are what its edit keeps, to the bit.
-            method = SprayMethod.fromStorage(current.method),
-            intervalDays = current.intervalDays.toString(),
-            swathWidthM = current.swathWidthM?.toString().orEmpty(),
-            notes = edit.notes.orEmpty(),
-            passesRequired = current.passesRequired,
-            passSeparationM = current.passSeparationM?.toString().orEmpty()
+            notes = edit.notes.orEmpty()
         )
 
         // The app's own answer, message and all. The row it hands back is the row the phone holds

@@ -7,7 +7,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,9 +19,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
-import nz.mckenzie.trailday.data.AssetSprayCoverage
-import nz.mckenzie.trailday.data.MinuteTicker
-import nz.mckenzie.trailday.data.AssetWithDue
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.asset.AssetKind
@@ -33,11 +29,9 @@ import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.map.AssetColors
-import nz.mckenzie.trailday.map.AssetCoverageStretches
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetHitTest
 import nz.mckenzie.trailday.map.AssetLine
-import nz.mckenzie.trailday.map.AssetStretch
 import nz.mckenzie.trailday.tracking.FusedLocationSource
 import nz.mckenzie.trailday.tracking.LocationSource
 import nz.mckenzie.trailday.tracking.LocationUnavailable
@@ -53,21 +47,14 @@ import nz.mckenzie.trailday.tracking.frameOnDevice
 data class RecentreRequest(val bounds: LatLngBounds, val count: Int)
 
 /**
- * Feeds the map: the due-status of every track plus the GeoJSON MapLibre draws.
+ * Feeds the map: every active place, and the GeoJSON MapLibre draws.
  */
 class MapViewModel(
     private val assetRepository: AssetRepository,
     private val settingsRepository: SettingsRepository,
     private val locationSource: LocationSource,
-    /**
-     * The due-status clock. A parameter so a test can tick it, rather than having to
-     * wait a real minute to find out what happens on the next tick.
-     */
-    private val dueNow: Flow<Long> = MinuteTicker.minutes(),
     /** Injected so a test can count how often a line is re-read from the database. */
-    private val loadGeometry: suspend (Long) -> AssetGeometry = assetRepository::getAssetGeometry,
-    /** Injected for the same reason: the sprays the map reads to colour part of a line. */
-    private val loadCoverage: suspend (Long) -> AssetSprayCoverage = assetRepository::getSprayCoverage
+    private val loadGeometry: suspend (Long) -> AssetGeometry = assetRepository::getAssetGeometry
 ) : ViewModel() {
 
     val linzApiKey: StateFlow<String> = settingsRepository.linzApiKey
@@ -88,7 +75,7 @@ class MapViewModel(
     val hiddenLayers: StateFlow<Set<AssetLayer>> = settingsRepository.hiddenMapLayers
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
-    val assetsWithDue: StateFlow<List<AssetWithDue>> = assetRepository.observeAssetsWithDue(dueNow)
+    val assets: StateFlow<List<AssetEntity>> = assetRepository.observeActiveAssets()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     private val geometryByTrack = MutableStateFlow<Map<Long, AssetGeometry>>(emptyMap())
@@ -101,22 +88,6 @@ class MapViewModel(
      * was read for drawing, so a tap inside a carpark costs the database nothing.
      */
     private val groundByTrack = MutableStateFlow<Map<Long, List<GeoPoint>>>(emptyMap())
-
-    /** The sprays that could colour part of a line, per asset. */
-    private val coverageByTrack = MutableStateFlow<Map<Long, AssetSprayCoverage>>(emptyMap())
-
-    /**
-     * The clock the map colours against, read as a value.
-     *
-     * A stretch's colour is worked out while the GeoJSON is being built, and the only thing
-     * that changes it is a *day* passing - green to yellow - so a value up to a minute behind
-     * the tick that caused the redraw cannot change what any stretch is coloured.
-     */
-    private val clock: StateFlow<Long> = dueNow.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-        System.currentTimeMillis()
-    )
 
     /**
      * The frame for the camera when the map opens: the operator's own tracks, else
@@ -180,22 +151,20 @@ class MapViewModel(
     }
 
     val assetGeoJson: StateFlow<String> = combine(
-        assetsWithDue,
-        geometryByTrack,
-        coverageByTrack
-    ) { tracks, geometry, coverage ->
-        val now = clock.value
+        assets,
+        geometryByTrack
+    ) { tracks, geometry ->
         AssetGeoJson.build(
-            tracks.map { item ->
-                val assetGeometry = geometry[item.asset.id] ?: AssetGeometry.NONE
-                val shape = AssetShape.fromStorage(item.asset.shape)
+            tracks.map { asset ->
+                val assetGeometry = geometry[asset.id] ?: AssetGeometry.NONE
+                val shape = AssetShape.fromStorage(asset.shape)
                 AssetLine(
-                    assetId = item.asset.id,
-                    name = item.asset.name,
-                    colorHex = AssetColors.forKind(AssetKind.fromStorage(item.asset.kind, shape)),
+                    assetId = asset.id,
+                    name = asset.name,
+                    colorHex = AssetColors.forKind(AssetKind.fromStorage(asset.kind, shape)),
                     points = assetGeometry.line,
                     sideTracks = assetGeometry.sideTracks,
-                    kind = AssetKind.fromStorage(item.asset.kind, shape),
+                    kind = AssetKind.fromStorage(asset.kind, shape),
                     shape = shape
                 )
             }
@@ -214,20 +183,17 @@ class MapViewModel(
         }
 
         viewModelScope.launch {
-            // The clock ticks every minute and re-emits the same tracks, so the work is
-            // keyed on what would actually change the drawn lines: which tracks exist, how
-            // long each line is (which is what a redraw changes), and how many times each
-            // has been sprayed (which is what changes the colour of part of a line).
-            // Re-reading every line from the database once a minute was work on a map that
-            // had not changed.
-            assetsWithDue
+            // The operator's own tracks, keyed on what would actually change the drawn lines:
+            // which assets exist, how long each line is, and whether it is ground - because a
+            // change of shape changes what a tap on it means. Re-reading every line from the
+            // database on any change was work on a map that had not changed.
+            assets
                 .map { tracks ->
                     tracks.map {
                         TrackKey(
-                            assetId = it.asset.id,
-                            lengthM = it.asset.lengthM,
-                            sprayCount = it.sprayCount,
-                            ground = AssetShape.fromStorage(it.asset.shape) == AssetShape.AREA
+                            assetId = it.id,
+                            lengthM = it.lengthM,
+                            ground = AssetShape.fromStorage(it.shape) == AssetShape.AREA
                         )
                     }.sortedBy { it.assetId }
                 }
@@ -238,18 +204,13 @@ class MapViewModel(
                     groundByTrack.value = keys.filter { it.ground }.associate { key ->
                         key.assetId to geometries.getValue(key.assetId).paths.firstOrNull().orEmpty()
                     }
-                    coverageByTrack.value = keys.associate { it.assetId to loadCoverage(it.assetId) }
                 }
         }
     }
 
     /**
-     * What makes the map re-read from the database: which tracks exist, how long each line
-     * is, and how many times each has been sprayed.
-     *
-     * The count is in there because a spray does not change a line's geometry and does
-     * change what part of it is drawn in which colour - without it, the first half of a
-     * track would keep looking the way it did before the pass that sprayed it.
+     * What makes the map re-read from the database: which assets exist, how long each line
+     * is, and whether it is ground.
      *
      * The shape is in there because turning a line into ground changes what a tap on it means, and
      * that reads from the same geometry this rebuilds: a change that left the length alone would
@@ -258,7 +219,6 @@ class MapViewModel(
     private data class TrackKey(
         val assetId: Long,
         val lengthM: Double,
-        val sprayCount: Int,
         val ground: Boolean
     )
 

@@ -298,7 +298,6 @@ class WebEditorServerTest {
             asset = AssetRecord(
                 id = id,
                 name = "Estuary road",
-                intervalDays = 120,
                 createdAtEpochMs = 1_700_000_000_000L
             ),
             version = "version-$id",

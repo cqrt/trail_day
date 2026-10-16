@@ -6,20 +6,16 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import nz.mckenzie.trailday.data.RecordingRepository
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.domain.geo.AssetGeometry
-import nz.mckenzie.trailday.domain.geo.Coverage
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.RecordingBreak
 import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
@@ -31,7 +27,7 @@ import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.AssetStretch
 
-/** One recording, in full: what was driven, and how much of the plan it covered. */
+/** One recording, in full: what was walked or ridden, and for which place. */
 data class RecordingDetail(
     val id: Long,
     val name: String,
@@ -43,28 +39,18 @@ data class RecordingDetail(
     /** Distance computed from the stored geometry, which is the same thing re-derived. */
     val geometryDistanceM: Double,
     val points: List<GeoPoint>,
-    /** The stretches of the pass that were paused for, which are not ground it drove. */
+    /** The stretches of the pass that were paused for. */
     val breaks: List<RecordingBreak> = emptyList(),
     val assetId: Long?,
-    val assetName: String?,
-    val plannedGeometry: AssetGeometry,
-    /** Fraction of the planned line covered, or null when there is no plan to compare. */
-    val coverage: Double?
+    val assetName: String?
 ) {
     val durationMs: Long get() = endedAtEpochMs?.let { (it - startedAtEpochMs).coerceAtLeast(0L) } ?: 0L
 
     val isFinished: Boolean get() = status == RecordingStatus.FINISHED
-
-    val hasPlan: Boolean get() = plannedGeometry.isLine
 }
 
 /**
- * Reviews one recording against the track it was made for.
- *
- * This is where the GPS evidence behind a spray can be looked at: the line that
- * was driven, the line that was planned, and how much of the plan it covered.
- * Coverage is recomputed here rather than stored, so it stays honest even if the
- * planned geometry was edited afterwards.
+ * Reviews one recording: the line that was walked or ridden, and which place it followed.
  */
 class RecordingDetailViewModel(
     private val sessionId: Long,
@@ -83,7 +69,11 @@ class RecordingDetailViewModel(
     private val _detail = MutableStateFlow<RecordingDetail?>(null)
     val detail: StateFlow<RecordingDetail?> = _detail
 
-    /** The recorded line in red over the planned line in grey. */
+    /**
+     * The recorded line, broken where the pass was paused and drawn straight through the gaps
+     * where the fixes only went missing: the recording is the evidence, and what the operator
+     * stopped for is part of it.
+     */
     val geoJson: StateFlow<String> = _detail
         .map { detail ->
             val points = detail?.points.orEmpty()
@@ -91,22 +81,12 @@ class RecordingDetailViewModel(
             AssetGeoJson.build(
                 listOf(
                     AssetLine(
-                        assetId = PLANNED_ID,
-                        name = detail?.assetName ?: "Planned",
-                        colorHex = AssetColors.UNKNOWN,
-                        points = detail?.plannedGeometry?.line.orEmpty(),
-                        sideTracks = detail?.plannedGeometry?.sideTracks.orEmpty()
-                    ),
-                    AssetLine(
                         assetId = RECORDED_ID,
                         name = detail?.name ?: "Recording",
-                        colorHex = AssetColors.RED,
+                        colorHex = AssetColors.RECORDED,
                         points = points,
-                        // Broken where the pass was paused, and drawn straight through the gaps
-                        // where the fixes only went missing: the recording is the evidence, and
-                        // what the operator stopped for is part of it.
                         stretches = points.splitAtBreaks(breaks).map { piece ->
-                            AssetStretch(colorHex = AssetColors.RED, points = piece)
+                            AssetStretch(colorHex = AssetColors.RECORDED, points = piece)
                         }
                     )
                 )
@@ -148,20 +128,8 @@ class RecordingDetailViewModel(
 
             val points = recordings.getPoints(sessionId)
             val breaks = recordings.getBreaks(sessionId)
-            val planned = session.assetId?.let { assetId ->
-                runCatching { assetRepository.getAssetGeometry(assetId) }
-                    .getOrDefault(AssetGeometry.NONE)
-            } ?: AssetGeometry.NONE
             val assetName = session.assetId?.let { assetId ->
                 runCatching { assetRepository.getAsset(assetId)?.name }.getOrNull()
-            }
-
-            val coverage = withContext(Dispatchers.Default) {
-                if (planned.isLine && points.isNotEmpty()) {
-                    Coverage.coveredFraction(planned, points, breaks = breaks)
-                } else {
-                    null
-                }
             }
 
             _detail.value = RecordingDetail(
@@ -176,9 +144,7 @@ class RecordingDetailViewModel(
                 points = points,
                 breaks = breaks,
                 assetId = session.assetId,
-                assetName = assetName,
-                plannedGeometry = planned,
-                coverage = coverage
+                assetName = assetName
             )
         }
     }
@@ -196,7 +162,6 @@ class RecordingDetailViewModel(
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L
         private const val RECORDED_ID = -2L
-        private const val PLANNED_ID = -3L
 
         fun factory(context: Context, sessionId: Long): ViewModelProvider.Factory {
             val appContext = context.applicationContext

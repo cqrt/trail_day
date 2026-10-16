@@ -4,18 +4,9 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
-// The brand seed. This green is also the map's "not due" colour, so the buttons and the
-// traffic light are the same green rather than two greens that nearly match.
+// The brand seed green.
 val GreenPrimary = Color(0xFF2E7D32)
 val GreenPrimaryDark = Color(0xFF81C784)
-
-// Semantic colours for the track due-status traffic light.
-// Green = not due, Yellow = due soon, Red = overdue. These are also used for
-// the track strokes on the map, so text on top uses white.
-val StatusGreen = Color(0xFF2E7D32)
-val StatusYellow = Color(0xFFF9A825)
-val StatusRed = Color(0xFFC62828)
-val StatusUnknown = Color(0xFF757575)
 
 /**
  * The light scheme.
@@ -33,7 +24,7 @@ val StatusUnknown = Color(0xFF757575)
  * Three deliberate departures from that output:
  *
  * - `primary` stays the brand green rather than the generated tone 40 (#3C6939), so the
- *   buttons keep the exact green of the "not due" dots on the map.
+ *   buttons keep the exact green of the brand.
  * - `surfaceTint` follows `primary`, so elevated surfaces tint green rather than towards
  *   a green nobody else uses.
  * - the tertiary family comes from a second palette seeded with the old earth brown

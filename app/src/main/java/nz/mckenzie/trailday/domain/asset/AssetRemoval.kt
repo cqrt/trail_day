@@ -38,15 +38,14 @@ data class AssetRemoval(
  * nothing for a screen to show. The column stays as the record's own field, which is what a backup
  * carries and what the state document filters on, and no screen sets it.
  *
- * **The count is read at the moment of the delete, not quoted from the card.** A spray that lands
+ * **The count is read at the moment of the delete, not quoted from the card.** A recording that lands
  * while the sheet is open is exactly the case where a desk's belief about an asset is out of date,
  * so what decides is what the phone holds when the button is pressed.
  */
 object AssetRemovalRules {
 
-    fun of(name: String, sprays: Int, recordings: Int): AssetRemoval {
-        val attached = attachedText(sprays, recordings)
-        return if (attached == null) {
+    fun of(name: String, recordings: Int): AssetRemoval {
+        return if (recordings <= 0) {
             AssetRemoval(
                 allowed = true,
                 sentence = "Nothing is recorded against \"$name\", so deleting it here takes " +
@@ -55,25 +54,13 @@ object AssetRemovalRules {
         } else {
             AssetRemoval(
                 allowed = false,
-                sentence = "\"$name\" has $attached on the phone, so it is not deleted from here. " +
-                    "Delete it on the phone, where what goes with it can be seen first."
+                sentence = "\"$name\" has ${count(recordings, "recording")} on the phone, so it is " +
+                    "not deleted from here. Delete it on the phone, where what goes with it can be " +
+                    "seen first."
             )
         }
     }
 
-    /** What is on the asset, in the operator's words, or null when nothing is. */
-    private fun attachedText(sprays: Int, recordings: Int): String? {
-        val parts = buildList {
-            if (sprays > 0) add(count(sprays, "spray"))
-            if (recordings > 0) add(count(recordings, "recording"))
-        }
-        return when (parts.size) {
-            0 -> null
-            1 -> parts.single()
-            else -> "${parts[0]} and ${parts[1]}"
-        }
-    }
-
-    /** "1 spray", "3 sprays" - a number and its noun, which is how a person says it. */
+    /** "1 recording", "3 recordings" - a number and its noun, which is how a person says it. */
     private fun count(value: Int, noun: String) = "$value $noun" + if (value == 1) "" else "s"
 }

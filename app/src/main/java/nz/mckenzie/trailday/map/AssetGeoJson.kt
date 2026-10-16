@@ -2,14 +2,13 @@ package nz.mckenzie.trailday.map
 
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
-import nz.mckenzie.trailday.domain.due.DueStatus
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.Ring
 
 /**
  * One stretch of an asset's line, drawn in its own colour.
  *
- * The map needs these because a track can be in two states at once: half of it sprayed this
+ * The map needs these because a track can be in two states at once: half of it walked this
  * morning and half of it still to do. One colour for the whole line cannot say that.
  */
 data class AssetStretch(
@@ -47,7 +46,7 @@ data class AssetLine(
      */
     val sideTracks: List<List<GeoPoint>> = emptyList(),
     /**
-     * Set when the line is not all in one state - a track half sprayed - in which case these
+     * Set when the line is not all in one state - a track half walked - in which case these
      * are drawn instead of the single line above, one feature each.
      *
      * Every one of them carries this asset's id, so a tap on any part of the line opens the
@@ -61,30 +60,40 @@ data class AssetLine(
 }
 
 /**
- * Colours for the traffic-light system, matching the Compose theme
- * (ui/theme/Color.kt). Kept here as plain strings so the map layer can be unit
- * tested on the JVM without Compose on the classpath.
+ * Colours for what the map draws, matching the Compose theme (ui/theme/Color.kt).
+ * Kept here as plain strings so the map layer can be unit tested on the JVM without
+ * Compose on the classpath.
  */
 object AssetColors {
-    const val GREEN = "#2E7D32"
-    const val YELLOW = "#F9A825"
-    const val RED = "#C62828"
-    const val UNKNOWN = "#757575"
 
     /**
-     * One colour per family of kind, for the icon beside an asset in the list.
+     * The recorded line, on the recorder and the recording's own screen.
+     *
+     * A red that is nobody's kind: the line is the evidence of what was walked or ridden,
+     * not one of the places, and it must not be read as one.
+     */
+    const val RECORDED = "#C62828"
+
+    /**
+     * The line being drawn, before it is saved.
+     *
+     * Amber, which reads as "in progress" and is not one of the kind families: a draft is not yet
+     * any kind of place, and it must look like something being made rather than something that is.
+     */
+    const val DRAFT = "#F9A825"
+
+    /**
+     * One colour per family of kind, for the icon beside an asset in the list and the line it
+     * is drawn as.
      *
      * Four colours for ten kinds, on purpose. Colour says which family a thing is in - a line you
      * travel along, a road, a place you stop at, or ground with an edge - and the glyph says which kind
      * it is, because ten distinct colours at twenty pixels is where two of them start looking alike.
      *
-     * Two things decide these. None of them may be the traffic-light green, amber or
-     * red, because the icon says what something is while the dot beside it says when it
-     * is due. And they all have to be readable as a thin outline on the card the theme
-     * puts behind them - which the app follows from the system, so that card is
-     * near-white in light mode and near-black in dark mode. Brown and deep purple were
-     * fine on the first and all but invisible on the second, which is what
-     * [nz.mckenzie.trailday.map.AssetColorsTest] now tests for.
+     * They all have to be readable as a thin outline on the card the theme puts behind them - which
+     * the app follows from the system, so that card is near-white in light mode and near-black in dark
+     * mode. Brown and deep purple were fine on the first and all but invisible on the second, which is
+     * what [nz.mckenzie.trailday.map.AssetColorsTest] now tests for.
      */
     const val TRACK_KIND = "#1E88E5"
 
@@ -97,11 +106,10 @@ object AssetColors {
     /**
      * Ground with an edge: a carpark, and the third family's colour.
      *
-     * A slate blue-grey, and the one hue left that is nobody's - not the traffic light's green, amber
-     * or red, not the track's blue, the road's purple or the fenceline's teal. It has to hold up as a
-     * thin outline on both the near-white card the light theme puts behind it and the near-black one
-     * the dark theme does, which is the test that decides the exact value and the reason a brown was
-     * refused once already.
+     * A slate blue-grey, the one hue left that is nobody's - not the track's blue, the road's
+     * purple or the fenceline's teal. It has to hold up as a thin outline on both the near-white card
+     * the light theme puts behind it and the near-black one the dark theme does, which is the test that
+     * decides the exact value and the reason a brown was refused once already.
      */
     const val GROUND_KIND = "#546E7A"
 
@@ -109,26 +117,14 @@ object AssetColors {
      * Where the phone is.
      *
      * Blue with a white ring, the way a device marker reads everywhere else. It must not be
-     * readable as a due colour or as a kind colour: the blue here is deliberately not
-     * [TRACK_KIND]'s, and the white ring - plus the fact that only one such dot is ever on the
-     * map at a time - is what keeps it from being taken for a track.
+     * readable as a kind colour: the blue here is deliberately not [TRACK_KIND]'s, and the white
+     * ring - plus the fact that only one such dot is ever on the map at a time - is what keeps it from
+     * being taken for a track.
      */
     const val POSITION = "#1A73E8"
 
     /**
-     * Never-sprayed tracks are drawn red: they still need spraying, but the
-     * distinct [DueStatus] lets the UI add its own "no history" wording.
-     */
-    fun forStatus(status: DueStatus): String = when (status) {
-        DueStatus.NOT_DUE -> GREEN
-        DueStatus.DUE_SOON -> YELLOW
-        DueStatus.OVERDUE, DueStatus.NEVER_SPRAYED -> RED
-    }
-
-    /**
-     * The colour of the icon that says what an asset *is*, as opposed to when it is
-     * due. None of these is the traffic-light green, amber or red on purpose: an icon
-     * that could be mistaken for a due date would be worse than no icon.
+     * The colour of the icon that says what an asset *is*, and the line the map draws it as.
      */
     fun forKind(kind: AssetKind): String = when (kind) {
         AssetKind.TRACK -> TRACK_KIND
@@ -241,7 +237,7 @@ object AssetGeoJson {
      * Only a track has a name written beside it, and only when there is one to write: a preview line - one
      * being drawn, or a planned line shown over a recording - has no name at all, and a road or a fence is
      * not what a name beside the line is for. The stretch is taken from the track's own points rather than
-     * from the pieces above, so a track that is part sprayed still carries its name once, near the middle
+     * from the pieces above, so a track that is part walked still carries its name once, near the middle
      * of the whole track.
      */
     private fun nameStretch(line: AssetLine): List<AssetStretch> {

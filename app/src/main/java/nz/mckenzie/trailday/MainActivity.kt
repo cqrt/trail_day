@@ -23,7 +23,6 @@ import nz.mckenzie.trailday.ui.screens.RecordScreen
 import nz.mckenzie.trailday.ui.screens.RecordingDetailScreen
 import nz.mckenzie.trailday.ui.screens.RecordingsScreen
 import nz.mckenzie.trailday.ui.screens.SettingsScreen
-import nz.mckenzie.trailday.ui.screens.SprayEntryScreen
 import nz.mckenzie.trailday.ui.screens.Tab
 import nz.mckenzie.trailday.ui.screens.AssetDetailScreen
 import nz.mckenzie.trailday.ui.screens.AssetEditScreen
@@ -38,7 +37,6 @@ import nz.mckenzie.trailday.viewmodel.RecordingDetailViewModel
 import nz.mckenzie.trailday.viewmodel.RecordingsViewModel
 import nz.mckenzie.trailday.viewmodel.RecordingViewModel
 import nz.mckenzie.trailday.viewmodel.SettingsViewModel
-import nz.mckenzie.trailday.viewmodel.SprayEntryViewModel
 import nz.mckenzie.trailday.viewmodel.UpdateViewModel
 import nz.mckenzie.trailday.viewmodel.AssetDetailViewModel
 import nz.mckenzie.trailday.viewmodel.AssetListViewModel
@@ -47,13 +45,13 @@ import nz.mckenzie.trailday.web.WebEditorService
 import nz.mckenzie.trailday.web.WebEditorState
 
 /** Destinations for now; swap for a NavHost when routes need arguments. */
-private enum class Destination { MAP, ASSETS, DRAW, CHANGE_LINE, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, ASSET_DETAIL, ASSET_EDIT, SPRAY_ENTRY, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC_TRACKS }
+private enum class Destination { MAP, ASSETS, DRAW, CHANGE_LINE, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC_TRACKS }
 
 class MainActivity : ComponentActivity() {
 
     /**
-     * A screen asked for by whatever started the activity - today, a tap on a due
-     * reminder. Held outside the composition so `onNewIntent` can set it too.
+     * A screen asked for by whatever started the activity - today, a tap on a backup or
+     * update notification. Held outside the composition so `onNewIntent` can set it too.
      */
     private val requestedDestination = mutableStateOf<Destination?>(null)
 
@@ -66,14 +64,6 @@ class MainActivity : ComponentActivity() {
                 var destination by rememberSaveable { mutableStateOf(Destination.MAP) }
                 var selectedAssetId by rememberSaveable { mutableStateOf<Long?>(null) }
                 var selectedSessionId by rememberSaveable { mutableStateOf<Long?>(null) }
-
-                /**
-                 * The recording a spray is being logged from, when the operator started
-                 * at a recording rather than at a track. Cleared whenever a spray is
-                 * started from the track screen, so a spray is only ever linked to the
-                 * recording it was actually logged from.
-                 */
-                var spraySessionId by rememberSaveable { mutableStateOf<Long?>(null) }
 
                 // Bumped on every visit to the draw screen so it gets its own view
                 // model: a shared one would carry the previous visit's draft (and
@@ -166,10 +156,6 @@ class MainActivity : ComponentActivity() {
                             AssetDetailScreen(
                                 viewModel = detailViewModel,
                                 onBack = { destination = Destination.ASSETS },
-                                onRecordSpray = {
-                                    spraySessionId = null
-                                    destination = Destination.SPRAY_ENTRY
-                                },
                                 onEdit = { destination = Destination.ASSET_EDIT },
                                 onChangeLine = {
                                     drawVisit++
@@ -198,37 +184,6 @@ class MainActivity : ComponentActivity() {
                             AssetEditScreen(
                                 viewModel = editViewModel,
                                 onDone = { destination = Destination.ASSET_DETAIL }
-                            )
-                        }
-                    }
-
-                    Destination.SPRAY_ENTRY -> {
-                        val assetId = selectedAssetId
-                        val linkedSessionId = spraySessionId
-                        if (assetId == null) {
-                            destination = Destination.ASSETS
-                        } else {
-                            val sprayViewModel: SprayEntryViewModel = viewModel(
-                                key = "spray-$assetId-$linkedSessionId",
-                                factory = SprayEntryViewModel.factory(
-                                    applicationContext,
-                                    assetId,
-                                    linkedSessionId
-                                )
-                            )
-                            // Logging a spray from a recording returns to that recording,
-                            // so the operator can see the link they just made.
-                            val onDone = {
-                                destination = if (linkedSessionId != null) {
-                                    Destination.RECORDING_DETAIL
-                                } else {
-                                    Destination.ASSET_DETAIL
-                                }
-                            }
-                            SprayEntryScreen(
-                                viewModel = sprayViewModel,
-                                onBack = onDone,
-                                onSaved = onDone
                             )
                         }
                     }
@@ -298,14 +253,7 @@ class MainActivity : ComponentActivity() {
                             )
                             RecordingDetailScreen(
                                 viewModel = detailViewModel,
-                                onBack = { destination = Destination.RECORDINGS },
-                                onLogSpray = { assetId ->
-                                    selectedAssetId = assetId
-                                    // Carried through so the spray that gets saved points
-                                    // back at the recording it was logged from.
-                                    spraySessionId = selectedSessionId
-                                    destination = Destination.SPRAY_ENTRY
-                                }
+                                onBack = { destination = Destination.RECORDINGS }
                             )
                         }
                     }
@@ -376,14 +324,12 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        /** The screen an intent would like opened, e.g. from a due reminder. */
+        /** The screen an intent would like opened, e.g. from a backup or update notification. */
         const val EXTRA_DESTINATION = "nz.mckenzie.trailday.extra.DESTINATION"
-        const val DESTINATION_ASSETS = "tracks"
         const val DESTINATION_SETTINGS = "settings"
 
         private fun destinationFrom(intent: Intent?): Destination? =
             when (intent?.getStringExtra(EXTRA_DESTINATION)) {
-                DESTINATION_ASSETS -> Destination.ASSETS
                 DESTINATION_SETTINGS -> Destination.SETTINGS
                 else -> null
             }

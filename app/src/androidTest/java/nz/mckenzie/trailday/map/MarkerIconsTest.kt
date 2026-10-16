@@ -32,7 +32,7 @@ class MarkerIconsTest {
      */
     private val drawnEdgePx = 6f
 
-    private fun marker(kind: AssetKind, colorHex: String = AssetColors.GREEN) =
+    private fun marker(kind: AssetKind, colorHex: String = AssetColors.TRACK_KIND) =
         MarkerIcons.bitmap(kind, colorHex, sizePx = 64, outlinePx = drawnEdgePx)
 
     @Test
@@ -116,8 +116,8 @@ class MarkerIconsTest {
 
     @Test
     fun theColourAskedForIsTheColourDrawn() {
-        val green = marker(AssetKind.OTHER_PLACE, AssetColors.GREEN)
-        val red = marker(AssetKind.OTHER_PLACE, AssetColors.RED)
+        val green = marker(AssetKind.OTHER_PLACE, AssetColors.TRACK_KIND)
+        val red = marker(AssetKind.OTHER_PLACE, AssetColors.RECORDED)
 
         assertFalse("a ring's traffic light is not a decoration", green.sameAs(red))
     }
@@ -132,8 +132,8 @@ class MarkerIconsTest {
         // that "thin" is a comparison as well as a number.
         val size = 64
         PlaceIcons.KINDS.forEach { kind ->
-            val thin = MarkerIcons.bitmap(kind, AssetColors.RED, size, edgePx(size))
-            val wide = MarkerIcons.bitmap(kind, AssetColors.RED, size, edgePx(size) * 2f)
+            val thin = MarkerIcons.bitmap(kind, AssetColors.RECORDED, size, edgePx(size))
+            val wide = MarkerIcons.bitmap(kind, AssetColors.RECORDED, size, edgePx(size) * 2f)
 
             val white = thin.whitePixels()
             val whiter = wide.whitePixels()

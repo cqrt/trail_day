@@ -6,7 +6,6 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -36,9 +35,6 @@ class MapGeometryRefreshTest {
     private lateinit var db: TrailDayDatabase
     private lateinit var assetRepository: AssetRepository
 
-    /** Ticked by hand, so the test does not wait a real minute. */
-    private val dueNow = MutableStateFlow(0L)
-
     /** Counts how often a line is read from the database. */
     private var geometryReads = 0
 
@@ -62,7 +58,6 @@ class MapGeometryRefreshTest {
         assetRepository = assetRepository,
         settingsRepository = SettingsRepository(context),
         locationSource = NoLocation,
-        dueNow = dueNow,
         loadGeometry = { assetId ->
             geometryReads++
             assetRepository.getAssetGeometry(assetId)
@@ -94,7 +89,6 @@ class MapGeometryRefreshTest {
             assetRepository = assetRepository,
             settingsRepository = SettingsRepository(context),
             locationSource = FixedLocation,
-            dueNow = dueNow,
             loadGeometry = { assetId ->
                 geometryReads++
                 assetRepository.getAssetGeometry(assetId)
@@ -107,29 +101,6 @@ class MapGeometryRefreshTest {
             "the first frame should be the tracks, not a box around the phone: $frame",
             frame.maxLat > -42.0
         )
-    }
-
-    @Test
-    fun aClockTickWithNothingChangedDoesNotReReadEveryLine() = runBlocking {
-        assetRepository.createAsset("Home block", homeLine)
-        val viewModel = viewModel()
-        withTimeout(5_000) { viewModel.assetsWithDue.first { it.isNotEmpty() } }
-        until("the first read") { geometryReads == 1 }
-
-        // The clock ticks, which is what happens every minute in the app.
-        dueNow.value = 60_000L
-        delay(300)
-
-        assertEquals(
-            "a tick with nothing changed must not re-read the geometry",
-            1,
-            geometryReads
-        )
-
-        // And the pipeline is genuinely alive, so the assertion above is not passing by
-        // accident: a real change does refresh.
-        assetRepository.createAsset("River block", listOf(GeoPoint(-41.6, 173.9), GeoPoint(-41.61, 173.91)))
-        until("the second track's geometry") { geometryReads >= 3 }
     }
 
     @Test

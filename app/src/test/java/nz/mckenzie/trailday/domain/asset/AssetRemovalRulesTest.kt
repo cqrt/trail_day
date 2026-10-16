@@ -18,7 +18,7 @@ class AssetRemovalRulesTest {
 
     @Test
     fun `a track with nothing recorded against it may be deleted, and the sentence says what goes`() {
-        val removal = AssetRemovalRules.of("Estuary road", sprays = 0, recordings = 0)
+        val removal = AssetRemovalRules.of("Estuary road", recordings = 0)
 
         assertTrue(removal.allowed)
         assertEquals(
@@ -28,41 +28,25 @@ class AssetRemovalRulesTest {
     }
 
     @Test
-    fun `a track with sprays on it is refused, and how many is in the sentence`() {
-        val removal = AssetRemovalRules.of("Estuary road", sprays = 3, recordings = 0)
-
-        assertFalse(removal.allowed)
-        assertEquals(
-            "\"Estuary road\" has 3 sprays on the phone, so it is not deleted from here. " +
-                "Delete it on the phone, where what goes with it can be seen first.",
-            removal.sentence
-        )
-    }
-
-    @Test
-    fun `a recording alone is enough to refuse, because the link is the only thing holding it`() {
-        val removal = AssetRemovalRules.of("Old track", sprays = 0, recordings = 1)
+    fun `a recording is enough to refuse, because the link is the only thing holding it`() {
+        val removal = AssetRemovalRules.of("Old track", recordings = 1)
 
         assertFalse(removal.allowed)
         assertTrue("says what is on it: ${removal.sentence}", removal.sentence.contains("1 recording"))
     }
 
     @Test
-    fun `both kinds of thing are counted, and one of each is said in the singular`() {
-        assertTrue(
-            AssetRemovalRules.of("Estuary road", sprays = 1, recordings = 1)
-                .sentence.contains("1 spray and 1 recording")
-        )
-        assertTrue(
-            AssetRemovalRules.of("Estuary road", sprays = 3, recordings = 2)
-                .sentence.contains("3 sprays and 2 recordings")
-        )
+    fun `several recordings are counted and said in the plural`() {
+        val removal = AssetRemovalRules.of("Old track", recordings = 3)
+
+        assertFalse(removal.allowed)
+        assertTrue("says how many: ${removal.sentence}", removal.sentence.contains("3 recordings"))
     }
 
     @Test
     fun `every refusal names the phone, because that is where the delete is done`() {
-        listOf(0 to 1, 1 to 0, 4 to 9).forEach { (sprays, recordings) ->
-            val removal = AssetRemovalRules.of("Estuary road", sprays, recordings)
+        listOf(1, 4).forEach { recordings ->
+            val removal = AssetRemovalRules.of("Estuary road", recordings)
 
             assertFalse(removal.allowed)
             assertTrue(

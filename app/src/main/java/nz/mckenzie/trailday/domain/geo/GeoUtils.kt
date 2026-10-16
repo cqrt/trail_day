@@ -12,7 +12,7 @@ const val EARTH_RADIUS_M: Double = 6_371_008.8
 
 /**
  * Metres per degree of latitude, and per degree of longitude at the equator.
- * Used for the small local projections the coverage and proximity maths need.
+ * Used for the small local projections the proximity maths needs.
  */
 const val METRES_PER_DEG_LAT = 111_132.0
 const val METRES_PER_DEG_LNG_AT_EQUATOR = 111_320.0
@@ -138,14 +138,3 @@ fun nearestPointOnSegment(point: GeoPoint, start: GeoPoint, end: GeoPoint): GeoP
     return GeoPoint(lat = lat, lng = lng)
 }
 
-/**
- * Estimated area treated for a track of [lengthM] sprayed with a swath of [swathWidthM] metres
- * over [passes] passes. Each pass covers its own width beside the line rather than on top of the
- * last one, so a line walked up one side and back down the other treats twice the area.
- */
-fun estimatedAreaSqm(lengthM: Double, swathWidthM: Double, passes: Int = 1): Double =
-    if (lengthM <= 0.0 || swathWidthM <= 0.0 || passes <= 0) {
-        0.0
-    } else {
-        lengthM * swathWidthM * passes
-    }

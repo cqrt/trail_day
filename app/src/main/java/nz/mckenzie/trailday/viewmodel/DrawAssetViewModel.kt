@@ -215,14 +215,14 @@ class DrawAssetViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
-    /** The in-progress track, drawn yellow so it is distinct from saved assets. */
+    /** The in-progress track, drawn in the draft colour so it is distinct from saved assets. */
     val draftGeoJson: StateFlow<String> = combine(_paths, _shape, _kind) { paths, shape, kind ->
         AssetGeoJson.build(
             listOf(
                 AssetLine(
                     assetId = DRAFT_ID,
                     name = "Draft",
-                    colorHex = AssetColors.YELLOW,
+                    colorHex = AssetColors.DRAFT,
                     points = asStored(paths, shape).firstOrNull().orEmpty(),
                     sideTracks = paths.drop(1),
                     // Ground with an edge is drawn by the carpark's own layer, which filters on the kind

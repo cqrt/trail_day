@@ -38,7 +38,6 @@ enum class IconGlyph {
     EDIT,
     EXPORT,
     TRASH,
-    SPRAY,
     CHEVRON,
     LOCATE,
     LAYERS
@@ -221,34 +220,6 @@ internal fun AppIcon(
                 line(0.42f, 0.32f, 0.42f, 0.20f)
                 line(0.42f, 0.20f, 0.58f, 0.20f)
                 line(0.58f, 0.20f, 0.58f, 0.32f)
-            }
-
-            // The drop that comes out of the tank: the mark a spray leaves on the record.
-            IconGlyph.SPRAY -> {
-                val drop = Path().apply {
-                    moveTo(width * 0.50f, height * 0.14f)
-                    cubicTo(
-                        width * 0.50f, height * 0.36f,
-                        width * 0.80f, height * 0.46f,
-                        width * 0.80f, height * 0.64f
-                    )
-                    cubicTo(
-                        width * 0.80f, height * 0.84f,
-                        width * 0.66f, height * 0.88f,
-                        width * 0.50f, height * 0.88f
-                    )
-                    cubicTo(
-                        width * 0.34f, height * 0.88f,
-                        width * 0.20f, height * 0.84f,
-                        width * 0.20f, height * 0.64f
-                    )
-                    cubicTo(
-                        width * 0.20f, height * 0.46f,
-                        width * 0.50f, height * 0.36f,
-                        width * 0.50f, height * 0.14f
-                    )
-                }
-                drawPath(drop, tint, style = Stroke(width = stroke))
             }
         }
     }

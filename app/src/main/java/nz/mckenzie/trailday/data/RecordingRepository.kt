@@ -15,7 +15,7 @@ import nz.mckenzie.trailday.domain.recording.RecordingStatus
 /**
  * What a recording already holds, for whatever picks it back up.
  *
- * Read from the fixes themselves, so a screen that is re-created mid-spray says how far
+ * Read from the fixes themselves, so a screen that is re-created mid-walk says how far
  * the pass has really got rather than starting again from nothing.
  */
 data class RecordingProgress(
@@ -44,7 +44,6 @@ data class RecordingProgress(
 class RecordingRepository(private val db: TrailDayDatabase) {
 
     private val recordingDao = db.recordingDao()
-    private val sprayEventDao = db.sprayEventDao()
 
     suspend fun startRecording(
         name: String,
@@ -88,16 +87,6 @@ class RecordingRepository(private val db: TrailDayDatabase) {
     suspend fun renameSession(sessionId: Long, name: String) =
         recordingDao.renameSession(sessionId, name)
 
-    /**
-     * Writes down the operator's word that both sides of a line were done on this pass.
-     *
-     * The app reads the fixes first and only asks when they cannot say - which pass was heading
-     * which way, or which side of the line each one was on - so this is the answer to a
-     * question, not a setting. Written at Finish so that the claim and the recording that goes
-     * with it are stored together.
-     */
-    suspend fun claimBothSides(sessionId: Long) = recordingDao.claimBothSides(sessionId)
-
     /** Closes a session, storing the distance and point count actually recorded. */
     suspend fun finishRecording(
         sessionId: Long,
@@ -129,7 +118,7 @@ class RecordingRepository(private val db: TrailDayDatabase) {
 
     /**
      * The session to reattach to on launch: one that was left recording or
-     * paused, e.g. because the app was killed mid-spray. Returns null when
+     * paused, e.g. because the app was killed mid-walk. Returns null when
      * everything is finished.
      */
     suspend fun findUnfinishedSession(): RecordedSessionEntity? =
@@ -143,7 +132,7 @@ class RecordingRepository(private val db: TrailDayDatabase) {
 
     /**
      * Opens a break: the operator has paused, so nothing between here and the moment they
-     * carry on is claimed as driven or sprayed.
+     * carry on is claimed as driven.
      *
      * Written the instant the button is pressed rather than when the pass carries on,
      * because a pass can be finished - or the phone put away - while it is paused, and the
@@ -171,16 +160,13 @@ class RecordingRepository(private val db: TrailDayDatabase) {
      *
      * Computed from the fixes rather than remembered, so a recording that outlived the
      * process that started it comes back with the distance and point count it really
-     * has - the same fixes the coverage is measured from, and the last of them, which
-     * is what the next fix has to be a plausible distance and speed from.
+     * has - and the last of them, which is what the next fix has to be a plausible
+     * distance and speed from.
      */
     suspend fun recordingProgress(sessionId: Long): RecordingProgress =
         RecordingProgress.of(getPoints(sessionId))
 
     suspend fun deleteRecording(sessionId: Long) = db.withTransaction {
-        // A spray recorded from this recording stays - it is the history - but its
-        // link is cleared first, so nothing points at a session that is gone.
-        sprayEventDao.clearRecordedSession(sessionId)
         recordingDao.deleteSession(sessionId)
     }
 }

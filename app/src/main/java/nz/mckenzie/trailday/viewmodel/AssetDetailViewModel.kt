@@ -7,48 +7,30 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.data.RecordingRepository
 import nz.mckenzie.trailday.data.SettingsRepository
-import nz.mckenzie.trailday.data.SprayRepository
 import nz.mckenzie.trailday.data.AssetRepository
-import nz.mckenzie.trailday.data.db.ProductQuantityLine
 import nz.mckenzie.trailday.data.db.RecordedSessionEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.data.db.SprayEventEntity
 import nz.mckenzie.trailday.data.db.AssetEntity
-import nz.mckenzie.trailday.domain.due.DueInfo
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
-import nz.mckenzie.trailday.domain.geo.GeoPoint
-import nz.mckenzie.trailday.domain.geo.estimatedAreaSqm
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 
-/** One spray in an asset's history, with the amounts that went out. */
-data class SprayHistoryEntry(
-    val event: SprayEventEntity,
-    val lines: List<ProductQuantityLine>
-)
-
 /**
- * Everything about one asset: its line on the map, when it is next due, what it
- * has been given, and GPX export.
+ * Everything about one asset: its line on the map, its measured ground, and GPX export.
  *
- * It is also where the spray history can be corrected - one entry at a time, or the
- * whole record cleared - which is the same act as setting the asset's colour, since
- * the colour is worked out from that history.
+ * It is also where an edited asset is saved, and where the asset itself can be deleted.
  */
 class AssetDetailViewModel(
     private val assetId: Long,
     private val assetRepository: AssetRepository,
-    private val sprays: SprayRepository,
     private val recordingsRepository: RecordingRepository,
     settingsRepository: SettingsRepository,
     private val context: Context
@@ -95,20 +77,9 @@ class AssetDetailViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
-    val due: StateFlow<DueInfo?> = assetRepository.observeAssetsWithDue()
-        .map { list -> list.firstOrNull { it.asset.id == assetId }?.due }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val history: StateFlow<List<SprayHistoryEntry>> = sprays.observeSprayEvents(assetId)
-        .mapLatest { events ->
-            events.map { event -> SprayHistoryEntry(event, sprays.getSprayEventProductLines(event.id)) }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
-
     /**
-     * Every GPS recording made for this asset. The evidence behind the sprays, and the
-     * way to check a coverage figure after the fact.
+     * Every GPS recording made for this asset. The evidence of the walks and rides it has
+     * been followed on.
      */
     val recordings: StateFlow<List<RecordedSessionEntity>> =
         recordingsRepository.observeSessionsForTrack(assetId)
@@ -117,27 +88,9 @@ class AssetDetailViewModel(
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
 
-    /**
-     * The ground the asset's own spray covers: a ring's measured area, or a line's estimate.
-     *
-     * Two different claims, and the screen's words say which one it is (see
-     * [nz.mckenzie.trailday.domain.asset.AssetPhrase.areaPhrase]). Null when neither is known - a line
-     * with no swath width cannot have its area estimated, and nothing is claimed for it.
-     */
+    /** The ground a ring encloses, or null when it encloses none: the one measured area. */
     val areaSqm: Double?
-        get() = track.value?.let { entity ->
-            if (entity.groundSqm != null) {
-                // Measured from the ring's own corners when it was written, and cached on the row
-                // beside the length: an area the operator can take to a client, not a guess.
-                entity.groundSqm
-            } else {
-                entity.swathWidthM?.let { width ->
-                    // Both passes of a line sprayed twice go on the ground, so the area counts them:
-                    // see estimatedAreaSqm.
-                    estimatedAreaSqm(entity.lengthM, width, entity.passesRequired)
-                }
-            }
-        }
+        get() = track.value?.groundSqm
 
     fun exportGpx(uri: Uri) {
         viewModelScope.launch {
@@ -154,42 +107,6 @@ class AssetDetailViewModel(
         }
     }
 
-    /**
-     * Takes one spray off the asset's history.
-     *
-     * The repository puts the asset's last-sprayed date back to whatever is left, so this is
-     * also what re-colours the line: remove the only spray and the asset reads red again.
-     */
-    fun deleteSpray(eventId: Long) {
-        viewModelScope.launch {
-            runCatching { sprays.deleteSprayEvent(eventId) }
-                .onSuccess { removed ->
-                    _message.value = if (removed) "Spray removed" else "That spray was already gone"
-                }
-                .onFailure { _message.value = it.message ?: "Could not remove the spray" }
-        }
-    }
-
-    /**
-     * Clears the whole spray history, for starting an asset's record again.
-     *
-     * The asset, its line and its recordings are left alone: what goes is every spray recorded
-     * against it, and with them the colour the line was earning from them.
-     */
-    fun clearSprayHistory() {
-        viewModelScope.launch {
-            runCatching { sprays.deleteSprayHistory(assetId) }
-                .onSuccess { removed ->
-                    _message.value = when (removed) {
-                        0 -> "There was no spray history to clear"
-                        1 -> "Spray history cleared \u00b7 1 spray removed"
-                        else -> "Spray history cleared \u00b7 $removed sprays removed"
-                    }
-                }
-                .onFailure { _message.value = it.message ?: "Could not clear the spray history" }
-        }
-    }
-
     fun delete() {
         viewModelScope.launch {
             runCatching { assetRepository.deleteAsset(assetId) }
@@ -201,8 +118,7 @@ class AssetDetailViewModel(
      * Stores edits made on this screen.
      *
      * The fields were checked by [nz.mckenzie.trailday.ui.AssetEdits] before this is
-     * called, so anything arriving here is already fit to store - which also means the
-     * interval set here is what the traffic light uses from now on.
+     * called, so anything arriving here is already fit to store.
      */
     fun save(asset: AssetEntity) {
         viewModelScope.launch {
@@ -223,7 +139,6 @@ class AssetDetailViewModel(
                     AssetDetailViewModel(
                         assetId = assetId,
                         assetRepository = AssetRepository(database),
-                        sprays = SprayRepository(database),
                         recordingsRepository = RecordingRepository(database),
                         settingsRepository = SettingsRepository(appContext),
                         context = appContext

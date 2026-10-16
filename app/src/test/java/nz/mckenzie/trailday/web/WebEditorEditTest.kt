@@ -17,7 +17,7 @@ import java.util.Base64
  * What the phone does with an edit from a desk.
  *
  * The two things held here are the two that make the arrangement safe. The desk cannot write a field
- * it did not send, so a spray recorded or an archive made on the phone while a card was open
+ * it did not send, so a change made on the phone while a card was open
  * survives an edit from a laptop; and it cannot write one somebody else has already changed, which
  * is what the version is for. The wording of a refusal is not invented here either - a field out of
  * range is refused in [nz.mckenzie.trailday.ui.AssetEdits]'s own words, and one of these tests holds
@@ -30,15 +30,9 @@ class WebEditorEditTest {
         name = "Estuary road",
         kind = "ROAD",
         shape = "LINE",
-        method = "BOOM",
         notes = "Both edges",
-        intervalDays = 120,
-        swathWidthM = 12.5,
-        passesRequired = 2,
-        passSeparationM = 3.0,
         active = true,
         createdAtEpochMs = 1_700_000_000_000L,
-        lastSprayedAtEpochMs = 1_750_000_000_000L,
         lengthM = 3300.0
     )
 
@@ -58,8 +52,8 @@ class WebEditorEditTest {
      * The body a page sends back after opening this asset and changing one or two things.
      *
      * Only what the desk shows: a name, a kind, the notes and, when it is about the drawing, the line.
-     * The method, the interval, the swath width and the pass count never travel - the phone
-     * keeps its own - so a body here does not carry them either, which is the whole point of the rule
+     * Nothing else about the asset travels - the phone keeps its own -
+     * so a body here does not carry them either, which is the whole point of the rule
      * `a field the desk never sent survives the edit` holds.
      *
      * [points] is whatever the desk has drawn, as JSON written by hand rather than built from
@@ -129,35 +123,10 @@ class WebEditorEditTest {
         val edited = ok(body(name = "Estuary road, lower")).asset
 
         // The whole promise of writing through the row the phone holds now: the page changes the
-        // details it shows, not records. The method, the interval, the swath width and the
-        // pass count are fields the desk no longer shows and never mentions - so a save cannot wipe
-        // any of them - and a spray logged on the phone while the card was open is still there too.
-        assertEquals("BOOM", edited.method)
-        assertEquals(120, edited.intervalDays)
-        assertEquals(12.5, edited.swathWidthM!!, 0.0)
-        assertEquals(2, edited.passesRequired)
-        assertEquals(3.0, edited.passSeparationM!!, 0.0)
-        assertEquals(1_750_000_000_000L, edited.lastSprayedAtEpochMs)
+        // details it shows, not records. A field the desk does not send is still the row's own.
         assertEquals(asset.active, edited.active)
         assertEquals(asset.createdAtEpochMs, edited.createdAtEpochMs)
         assertEquals(3300.0, edited.lengthM, 0.0)
-    }
-
-    @Test
-    fun `a swath width with more than one decimal keeps every digit through a save`() {
-        // The row's own number is handed to the rules as itself rather than rounded to the field's own
-        // one-decimal shape, so a width an operator typed as 12.55 is still 12.55 afterwards.
-        val precise = asset.copy(swathWidthM = 12.55, passSeparationM = 2.25)
-
-        val edited = WebEditorEdits.apply(
-            current = precise,
-            paths = listOf(path),
-            body = body(version = WebEditorVersion.of(precise, listOf(path)))
-        )
-
-        assertTrue("expected this to be taken: $edited", edited is WebEditorEditResult.Ok)
-        assertEquals(12.55, (edited as WebEditorEditResult.Ok).asset.swathWidthM!!, 0.0)
-        assertEquals(2.25, edited.asset.passSeparationM!!, 0.0)
     }
 
     @Test
@@ -165,15 +134,12 @@ class WebEditorEditTest {
         val version = WebEditorVersion.of(asset)
 
         assertNotEquals(version, WebEditorVersion.of(asset.copy(name = "Renamed")))
-        assertNotEquals(version, WebEditorVersion.of(asset.copy(intervalDays = 90)))
+        assertNotEquals(version, WebEditorVersion.of(asset.copy(notes = "Different notes")))
         assertNotEquals(version, WebEditorVersion.of(asset.copy(kind = "TRACK")))
+        assertNotEquals(version, WebEditorVersion.of(asset.copy(shape = "POINT")))
 
-        // A field the desk cannot write must not refuse an edit that could not overwrite it: spraying
-        // a line, archiving it or dragging a vertex does not stop somebody renaming it from the desk.
-        assertEquals(
-            version,
-            WebEditorVersion.of(asset.copy(lastSprayedAtEpochMs = 1_760_000_000_000L))
-        )
+        // A field the desk cannot write must not refuse an edit that could not overwrite it: archiving
+        // it or dragging a vertex does not stop somebody renaming it from the desk.
         assertEquals(version, WebEditorVersion.of(asset.copy(active = false)))
         assertEquals(version, WebEditorVersion.of(asset.copy(lengthM = 1234.0)))
     }
@@ -190,9 +156,8 @@ class WebEditorEditTest {
     @Test
     fun `a field out of range is refused in the app's own words`() {
         // These sentences are `ui/AssetEdits`'s, word for word: the desk does not get a second set of
-        // rules, and this is what holds the two together. Only the name is a field the desk still
-        // sends that those rules can refuse - the range rules for a spray interval and a swath width
-        // are the phone's own fields, which the desk never mentions.
+        // rules, and this is what holds the two together. The name is the one field those rules can
+        // refuse here.
         assertEquals(
             "Give it a name so it can be found later",
             refused(body(name = "   ")).message
@@ -202,8 +167,7 @@ class WebEditorEditTest {
     @Test
     fun `a kind the phone does not know is refused, not defaulted`() {
         // Named states arrive already decided, so a name this build does not know is a refusal. Let
-        // through, a made-up kind would quietly become a track. The spray method is not on the wire
-        // at all any more, so there is no method name for the phone to be offered.
+        // through, a made-up kind would quietly become a track.
         assertTrue(refused(body(kind = "PADDOCK")).message.contains("PADDOCK"))
     }
 
@@ -359,11 +323,6 @@ class WebEditorEditTest {
 
         assertEquals("Gully track", draft.asset.name)
         assertEquals("TRACK", draft.asset.kind)
-        assertEquals(
-            "the interval is the phone's own default for a new asset, which the desk never sends",
-            120,
-            draft.asset.intervalDays
-        )
         assertTrue("a new asset is active", draft.asset.active)
         assertEquals("the id is the database's to issue", 0L, draft.asset.id)
         assertEquals(

@@ -30,7 +30,7 @@ enum class AssetLayer(
     TRACKS(
         id = "tracks",
         displayName = "Tracks",
-        summary = "The lines you spray along, drawn solid.",
+        summary = "The lines you walk or ride, drawn solid.",
         kind = AssetKind.TRACK
     ),
 
@@ -55,7 +55,7 @@ enum class AssetLayer(
     CARPARKS(
         id = "carparks",
         displayName = "Carparks",
-        summary = "Ground you spray whole, drawn as a shape.",
+        summary = "Ground with an edge, drawn as a shape.",
         kind = AssetKind.CARPARK
     ),
 

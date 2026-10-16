@@ -33,7 +33,7 @@ import java.security.MessageDigest
  * already been downloaded for a trip with no reception.
  *
  * It holds no state and knows no rules. Whether an asset may be edited, what a delete would take
- * with it, what is due: all of that is [WebEditorData], which is where the repository is reached
+ * with it, the delete rule: all of that is [WebEditorData], which is where the repository is reached
  * for and where the answering happens. This class is routing, a token check and a port.
  */
 class WebEditorServer(

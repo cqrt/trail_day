@@ -9,10 +9,6 @@ import androidx.room.RoomDatabase
     entities = [
         AssetEntity::class,
         AssetPointEntity::class,
-        ProductEntity::class,
-        SprayEventEntity::class,
-        SprayEventProductEntity::class,
-        AssetProductDefaultEntity::class,
         RecordedSessionEntity::class,
         RecordedPointEntity::class,
         RecordedBreakEntity::class,
@@ -25,8 +21,6 @@ import androidx.room.RoomDatabase
 abstract class TrailDayDatabase : RoomDatabase() {
 
     abstract fun assetDao(): AssetDao
-    abstract fun productDao(): ProductDao
-    abstract fun sprayEventDao(): SprayEventDao
     abstract fun recordingDao(): RecordingDao
     abstract fun offlineAreaDao(): OfflineAreaDao
 

@@ -2,10 +2,8 @@ package nz.mckenzie.trailday.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -13,12 +11,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -35,19 +31,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import nz.mckenzie.trailday.data.AssetWithDue
+import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetPhrase
 import nz.mckenzie.trailday.domain.asset.AssetShape
-import nz.mckenzie.trailday.domain.due.DueStatus
-import nz.mckenzie.trailday.map.parseHexColor
-import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.viewmodel.AssetListViewModel
 
 /**
- * The track library: what tracks exist, how long they are, and when each is next
- * due. Tracks can be imported from GPX or drawn on the map.
+ * The asset library: what assets exist and how long they are. Tracks can be
+ * imported from GPX or drawn on the map.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -59,7 +52,7 @@ fun AssetListScreen(
     onImportDocTracks: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
-    val tracks by viewModel.assetsWithDue.collectAsStateWithLifecycle()
+    val assets by viewModel.assets.collectAsStateWithLifecycle()
     val shown by viewModel.shown.collectAsStateWithLifecycle()
     val filter by viewModel.filter.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
@@ -114,7 +107,7 @@ fun AssetListScreen(
             // chips: ten of them wrapped is three rows of screen before the first asset, and the
             // rarer kinds are a swipe away. All leads, so the way back is always at the left - and
             // tapping the chip already showing is the same way back, from wherever the operator is.
-            if (tracks.isNotEmpty()) {
+            if (assets.isNotEmpty()) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     item(key = "all") {
                         ChoiceChip(
@@ -137,12 +130,11 @@ fun AssetListScreen(
                 Text(text = it, style = MaterialTheme.typography.bodySmall)
             }
 
-            if (tracks.isEmpty()) {
+            if (assets.isEmpty()) {
                 EmptyState(
                     glyph = IconGlyph.ASSETS,
                     title = "No assets yet",
-                    body = "Import a GPX, KML, KMZ or GeoJSON file, or draw one on the map. Every " +
-                        "asset then keeps its own spray history.",
+                    body = "Import a GPX, KML, KMZ or GeoJSON file, or draw one on the map.",
                     actionLabel = "Draw one",
                     onAction = onDrawAsset
                 )
@@ -158,12 +150,12 @@ fun AssetListScreen(
                 // Rows rather than a card each: a list of assets is a list, and a card per
                 // row made five paddocks look like five unrelated things.
                 LazyColumn {
-                    itemsIndexed(shown, key = { _, item -> item.asset.id }) { index, item ->
+                    itemsIndexed(shown, key = { _, item -> item.id }) { index, item ->
                         if (index > 0) HorizontalDivider()
                         AssetRow(
                             item = item,
-                            onOpen = { onOpenAsset(item.asset.id) },
-                            onDelete = { viewModel.delete(item.asset.id) }
+                            onOpen = { onOpenAsset(item.id) },
+                            onDelete = { viewModel.delete(item.id) }
                         )
                     }
                 }
@@ -186,31 +178,21 @@ private val TRACK_MIME_TYPES = arrayOf(
 
 @Composable
 private fun AssetRow(
-    item: AssetWithDue,
+    item: AssetEntity,
     onOpen: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val shape = AssetShape.fromStorage(item.asset.shape)
+    val shape = AssetShape.fromStorage(item.shape)
     ListItem(
         modifier = Modifier.clickable(onClick = onOpen),
         headlineContent = {
-            Text(item.asset.name, style = MaterialTheme.typography.titleSmall)
+            Text(item.name, style = MaterialTheme.typography.titleSmall)
         },
         supportingContent = { Text(assetRowDetail(item)) },
-        // What it is, then when it is due: the icon is read first, the colour of the dot
-        // second, which is the order the operator asked the questions in.
+        // What it is, by its own icon: the kind is the first thing read about a place.
         leadingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                AssetKindIcon(kind = AssetKind.fromStorage(item.asset.kind, shape))
-                Box(
-                    modifier = Modifier
-                        .padding(start = 10.dp)
-                        .size(14.dp)
-                        .background(
-                            parseHexColor(AssetColors.forStatus(item.due.status)),
-                            CircleShape
-                        )
-                )
+                AssetKindIcon(kind = AssetKind.fromStorage(item.kind, shape))
             }
         },
         trailingContent = { DestructiveTextButton(text = "Delete", onClick = onDelete) }
@@ -220,26 +202,11 @@ private fun AssetRow(
 /**
  * What the row says under an asset's name.
  *
- * A spot has no length, and a line that has not been drawn on yet has none either, so
- * in both cases the length is left out rather than printed as "0 m": the row then says
- * the thing the operator is actually looking for, which is when it is due.
+ * A spot has no length, and a line that has not been drawn on yet has none either, so in both
+ * cases the length is left out rather than printed as "0 m".
  */
-internal fun assetRowDetail(item: AssetWithDue): String {
-    val length = item.asset.lengthM
-    val drawnLine = AssetShape.fromStorage(item.asset.shape) == AssetShape.LINE && length > 0.0
-    return if (drawnLine) "${formatDistance(length)} \u00b7 ${dueLabel(item)}" else dueLabel(item)
-}
-
-/** Operator wording for the traffic light, so the colour is never a mystery. */
-internal fun dueLabel(item: AssetWithDue): String = when (item.due.status) {
-    DueStatus.NEVER_SPRAYED -> "never sprayed"
-    else -> {
-        val days = item.due.daysUntilDue ?: 0L
-        when {
-            days < 0L -> "${-days} days overdue"
-            days == 0L -> "due today"
-            days == 1L -> "due tomorrow"
-            else -> "due in $days days"
-        }
-    }
+internal fun assetRowDetail(item: AssetEntity): String {
+    val length = item.lengthM
+    val drawnLine = AssetShape.fromStorage(item.shape) == AssetShape.LINE && length > 0.0
+    return if (drawnLine) formatDistance(length) else ""
 }

@@ -16,20 +16,20 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.data.AssetRepository
-import nz.mckenzie.trailday.data.AssetWithDue
+import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetKindFilter
 
 /**
- * The asset library: every planned asset with its due status, plus GPX import.
+ * The asset library: every planned asset, plus GPX import.
  */
 class AssetListViewModel(
     private val assetRepository: AssetRepository,
     private val context: Context
 ) : ViewModel() {
 
-    val assetsWithDue: StateFlow<List<AssetWithDue>> = assetRepository.observeAssetsWithDue()
+    val assets: StateFlow<List<AssetEntity>> = assetRepository.observeActiveAssets()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     /**
@@ -43,13 +43,13 @@ class AssetListViewModel(
     val filter: StateFlow<AssetKindFilter> = _filter
 
     /**
-     * The rows the list is built from: the whole work, or one kind of it.
+     * The rows the list is built from: the whole list, or one kind of it.
      *
      * Filtered here rather than in the screen so the rows and the "nothing of that kind" line are
      * both reading the same list - and so the rule can be tested without a screen.
      */
-    val shown: StateFlow<List<AssetWithDue>> = combine(assetsWithDue, _filter) { all, filter ->
-        all.filter { item -> filter.keeps(item.asset.kind, item.asset.shape) }
+    val shown: StateFlow<List<AssetEntity>> = combine(assets, _filter) { all, filter ->
+        all.filter { asset -> filter.keeps(asset.kind, asset.shape) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     /**

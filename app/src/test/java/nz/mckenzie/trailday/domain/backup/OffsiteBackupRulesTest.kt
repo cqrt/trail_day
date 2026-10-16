@@ -21,10 +21,8 @@ class OffsiteBackupRulesTest {
 
     private fun summary(
         assets: Int = 0,
-        sprays: Int = 0,
-        recordings: Int = 0,
-        products: Int = 0
-    ) = BackupSummary(assets = assets, sprays = sprays, recordings = recordings, products = products, points = 0)
+        recordings: Int = 0
+    ) = BackupSummary(assets = assets, recordings = recordings, points = 0)
 
     private fun at(text: String) = Instant.parse(text).toEpochMilli()
 
@@ -36,11 +34,6 @@ class OffsiteBackupRulesTest {
     @Test
     fun `assets on their own are worth copying`() {
         assertTrue(OffsiteBackupRules.isSafeToWrite(summary(assets = 1)))
-    }
-
-    @Test
-    fun `a product catalogue with no season on it is still worth copying`() {
-        assertTrue(OffsiteBackupRules.isSafeToWrite(summary(products = 3)))
     }
 
     @Test
@@ -105,9 +98,9 @@ class OffsiteBackupRulesTest {
 
     @Test
     fun `the comparison names both sides with numbers`() {
-        val line = OffsiteBackupRules.comparison(summary(assets = 4, sprays = 9), summary(assets = 1))
+        val line = OffsiteBackupRules.comparison(summary(assets = 4, recordings = 9), summary(assets = 1))
 
-        assertTrue(line, line.contains("4 assets, 9 sprays"))
+        assertTrue(line, line.contains("4 assets, 9 recordings"))
         assertTrue(line, line.contains("This phone: 1 asset,"))
     }
 }

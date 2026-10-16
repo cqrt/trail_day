@@ -3,35 +3,27 @@ package nz.mckenzie.trailday.data
 import androidx.room.withTransaction
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.data.db.AssetPointEntity
-import nz.mckenzie.trailday.data.db.AssetProductDefaultEntity
-import nz.mckenzie.trailday.data.db.ProductEntity
 import nz.mckenzie.trailday.data.db.RecordedBreakEntity
 import nz.mckenzie.trailday.data.db.RecordedPointEntity
 import nz.mckenzie.trailday.data.db.RecordedSessionEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.data.db.SprayEventEntity
-import nz.mckenzie.trailday.data.db.SprayEventProductEntity
-import nz.mckenzie.trailday.domain.backup.AssetDefaultRecord
 import nz.mckenzie.trailday.domain.backup.AssetRecord
 import nz.mckenzie.trailday.domain.backup.BackupDocument
 import nz.mckenzie.trailday.domain.backup.BackupFormat
 import nz.mckenzie.trailday.domain.backup.BackupSettingsRecord
 import nz.mckenzie.trailday.domain.backup.BackupSummary
 import nz.mckenzie.trailday.domain.backup.LinePointRecord
-import nz.mckenzie.trailday.domain.backup.ProductRecord
 import nz.mckenzie.trailday.domain.backup.RecordedBreakRecord
 import nz.mckenzie.trailday.domain.backup.RecordedPointRecord
 import nz.mckenzie.trailday.domain.backup.RecordingRecord
-import nz.mckenzie.trailday.domain.backup.SprayEventRecord
-import nz.mckenzie.trailday.domain.backup.SprayProductRecord
 
 /**
  * Turning the database into a backup file, and back again.
  *
  * The ids are carried through both ways because they are what holds a season
- * together: an asset, its geometry, the sprays on it and the recordings that prove
- * them are linked by id, and a restore that renumbered them would leave a database
- * that looks right and connects nothing.
+ * together: an asset, its geometry and the recordings made on it are linked by id,
+ * and a restore that renumbered them would leave a database that looks right and
+ * connects nothing.
  *
  * Restore replaces. It clears the backup's tables and inserts the file's contents
  * inside one transaction, so an interrupted restore leaves the previous data intact
@@ -49,17 +41,13 @@ class BackupRepository(
     /** Everything the app holds, ready to be written to a file. */
     suspend fun export(settings: BackupSettingsRecord? = null): BackupDocument {
         val pointsByAsset = dao.allAssetPoints().groupBy { it.assetId }
-        val productsByEvent = dao.allSprayEventProducts().groupBy { it.sprayEventId }
         val pointsBySession = dao.allRecordedPoints().groupBy { it.sessionId }
         val breaksBySession = dao.allRecordedBreaks().groupBy { it.sessionId }
 
         return BackupDocument(
             exportedAtEpochMs = nowEpochMs(),
             appVersion = appVersion,
-            products = dao.allProducts().map { it.toRecord() },
             assets = dao.allAssets().map { asset -> asset.toRecord(pointsByAsset[asset.id].orEmpty()) },
-            sprayEvents = dao.allSprayEvents().map { event -> event.toRecord(productsByEvent[event.id].orEmpty()) },
-            assetDefaults = dao.allAssetDefaults().map { it.toRecord() },
             recordings = dao.allRecordedSessions().map { session ->
                 session.toRecord(
                     points = pointsBySession[session.id].orEmpty(),
@@ -73,9 +61,7 @@ class BackupRepository(
     /** What is in the app right now, for showing beside what a file holds. */
     suspend fun currentSummary(): BackupSummary = BackupSummary(
         assets = dao.assetCount(),
-        sprays = dao.sprayCount(),
         recordings = dao.recordingCount(),
-        products = dao.productCount(),
         points = dao.pointCount()
     )
 
@@ -89,18 +75,13 @@ class BackupRepository(
         }
 
         // Children before parents, so no foreign key is ever left pointing at nothing.
-        dao.clearAssetDefaults()
-        dao.clearSprayEventProducts()
-        dao.clearSprayEvents()
         dao.clearAssetPoints()
         dao.clearAssets()
-        dao.clearProducts()
         dao.clearRecordedBreaks()
         dao.clearRecordedPoints()
         dao.clearRecordedSessions()
 
         // And parents before children on the way back in.
-        dao.insertProducts(document.products.map { it.toEntity() })
         dao.insertAssets(document.assets.map { it.toEntity() })
         dao.insertAssetPoints(
             document.assets.flatMap { asset ->
@@ -120,19 +101,6 @@ class BackupRepository(
                 }
             }
         )
-        dao.insertSprayEvents(document.sprayEvents.map { it.toEntity() })
-        dao.insertSprayEventProducts(
-            document.sprayEvents.flatMap { event ->
-                event.products.map { product ->
-                    SprayEventProductEntity(
-                        sprayEventId = event.id,
-                        productId = product.productId,
-                        quantityMl = product.quantityMl
-                    )
-                }
-            }
-        )
-        dao.insertAssetDefaults(document.assetDefaults.map { it.toEntity() })
         dao.insertRecordedSessions(document.recordings.map { it.toEntity() })
         dao.insertRecordedPoints(
             document.recordings.flatMap { session ->
@@ -168,7 +136,6 @@ class BackupRepository(
 
         BackupFormat.summarise(document)
     }
-
 }
 
 /**
@@ -183,15 +150,9 @@ private fun AssetEntity.toRecord(points: List<AssetPointEntity>) = AssetRecord(
     name = name,
     kind = kind,
     shape = shape,
-    method = method,
     notes = notes,
-    intervalDays = intervalDays,
-    swathWidthM = swathWidthM,
-    passesRequired = passesRequired,
-    passSeparationM = passSeparationM,
     active = active,
     createdAtEpochMs = createdAtEpochMs,
-    lastSprayedAtEpochMs = lastSprayedAtEpochMs,
     lengthM = lengthM,
     areaM2 = areaM2,
     sourceRef = sourceRef,
@@ -219,73 +180,12 @@ private fun AssetRecord.toEntity() = AssetEntity(
     name = name,
     kind = kind,
     shape = shape,
-    method = method,
     notes = notes,
-    intervalDays = intervalDays,
-    swathWidthM = swathWidthM,
-    passesRequired = passesRequired,
-    passSeparationM = passSeparationM,
     active = active,
     createdAtEpochMs = createdAtEpochMs,
-    lastSprayedAtEpochMs = lastSprayedAtEpochMs,
     lengthM = lengthM,
     areaM2 = areaM2,
     sourceRef = sourceRef
-)
-
-private fun ProductEntity.toRecord() = ProductRecord(
-    id = id,
-    name = name,
-    unit = unit,
-    rateText = rateText,
-    notes = notes,
-    archived = archived
-)
-
-private fun ProductRecord.toEntity() = ProductEntity(
-    id = id,
-    name = name,
-    unit = unit,
-    rateText = rateText,
-    notes = notes,
-    archived = archived
-)
-
-private fun SprayEventEntity.toRecord(products: List<SprayEventProductEntity>) = SprayEventRecord(
-    id = id,
-    assetId = assetId,
-    sprayedAtEpochMs = sprayedAtEpochMs,
-    waterLitres = waterLitres,
-    operatorName = operatorName,
-    notes = notes,
-    distanceM = distanceM,
-    areaSqm = areaSqm,
-    recordedSessionId = recordedSessionId,
-    products = products.map { SprayProductRecord(productId = it.productId, quantityMl = it.quantityMl) }
-)
-
-private fun SprayEventRecord.toEntity() = SprayEventEntity(
-    id = id,
-    assetId = assetId,
-    sprayedAtEpochMs = sprayedAtEpochMs,
-    waterLitres = waterLitres,
-    operatorName = operatorName,
-    notes = notes,
-    distanceM = distanceM,
-    areaSqm = areaSqm,
-    recordedSessionId = recordedSessionId
-)
-
-private fun AssetProductDefaultEntity.toRecord() = AssetDefaultRecord(
-    assetId = assetId,
-    productId = productId,
-    defaultQuantityMl = defaultQuantityMl
-)
-
-private fun AssetDefaultRecord.toEntity() = AssetProductDefaultEntity(
-    assetId = assetId,
-    productId = productId,
-    defaultQuantityMl = defaultQuantityMl
 )
 
 private fun RecordedSessionEntity.toRecord(
@@ -301,7 +201,6 @@ private fun RecordedSessionEntity.toRecord(
     distanceM = distanceM,
     durationMs = durationMs,
     pointCount = pointCount,
-    bothSidesClaimed = bothSidesClaimed,
     points = points.sortedBy { it.sequence }.map {
         RecordedPointRecord(
             sequence = it.sequence,
@@ -328,6 +227,5 @@ private fun RecordingRecord.toEntity() = RecordedSessionEntity(
     status = status,
     distanceM = distanceM,
     durationMs = durationMs,
-    pointCount = pointCount,
-    bothSidesClaimed = bothSidesClaimed
+    pointCount = pointCount
 )

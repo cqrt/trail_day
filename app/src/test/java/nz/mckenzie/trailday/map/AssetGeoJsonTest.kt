@@ -2,7 +2,6 @@ package nz.mckenzie.trailday.map
 
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
-import nz.mckenzie.trailday.domain.due.DueStatus
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -18,7 +17,7 @@ class AssetGeoJsonTest {
 
     private fun line(
         name: String = "Track 4",
-        color: String = AssetColors.GREEN,
+        color: String = AssetColors.TRACK_KIND,
         kind: AssetKind = AssetKind.TRACK,
         shape: AssetShape = AssetShape.LINE,
         id: Long = 7L,
@@ -41,7 +40,7 @@ class AssetGeoJsonTest {
 
     @Test
     fun `tracks with fewer than two points are not drawn`() {
-        val single = AssetLine(1L, "Stub", AssetColors.GREEN, listOf(GeoPoint(-41.0, 174.0)))
+        val single = AssetLine(1L, "Stub", AssetColors.TRACK_KIND, listOf(GeoPoint(-41.0, 174.0)))
 
         assertFalse(AssetGeoJson.build(listOf(single)).contains("Feature\",\"propert"))
     }
@@ -52,7 +51,7 @@ class AssetGeoJsonTest {
 
         assertTrue(json.contains("\"type\":\"LineString\""))
         assertTrue(json.contains("\"id\":7"))
-        assertTrue(json.contains("\"stroke\":\"${AssetColors.GREEN}\""))
+        assertTrue(json.contains("\"stroke\":\"${AssetColors.TRACK_KIND}\""))
         assertTrue(json.contains("\"name\":\"Track 4\""))
     }
 
@@ -79,7 +78,7 @@ class AssetGeoJsonTest {
         // Nothing is named here: a named track draws the stretch its name goes on as well, and this test
         // is about the commas between features.
         val json = AssetGeoJson.build(
-            listOf(line(name = ""), line(name = "", color = AssetColors.RED))
+            listOf(line(name = ""), line(name = "", color = AssetColors.RECORDED))
         )
 
         assertEquals(2, Regex("\"type\":\"Feature\",").findAll(json).count())
@@ -90,14 +89,6 @@ class AssetGeoJsonTest {
         val json = AssetGeoJson.build(listOf(line(name = "Block \"4\" \\ east")))
 
         assertTrue(json.contains("Block \\\"4\\\" \\\\ east"))
-    }
-
-    @Test
-    fun `status maps to the traffic light colours`() {
-        assertEquals(AssetColors.GREEN, AssetColors.forStatus(DueStatus.NOT_DUE))
-        assertEquals(AssetColors.YELLOW, AssetColors.forStatus(DueStatus.DUE_SOON))
-        assertEquals(AssetColors.RED, AssetColors.forStatus(DueStatus.OVERDUE))
-        assertEquals(AssetColors.RED, AssetColors.forStatus(DueStatus.NEVER_SPRAYED))
     }
 
     @Test
@@ -128,7 +119,7 @@ class AssetGeoJsonTest {
         val place = AssetLine(
             assetId = 9L,
             name = "Water trough",
-            colorHex = AssetColors.GREEN,
+            colorHex = AssetColors.TRACK_KIND,
             points = listOf(GeoPoint(-41.0, 174.0)),
             kind = AssetKind.TABLE,
             shape = AssetShape.POINT
@@ -157,11 +148,11 @@ class AssetGeoJsonTest {
         ).copy(
             stretches = listOf(
                 AssetStretch(
-                    colorHex = AssetColors.GREEN,
+                    colorHex = AssetColors.TRACK_KIND,
                     points = listOf(GeoPoint(-41.0, 174.0), GeoPoint(-41.0, 174.001))
                 ),
                 AssetStretch(
-                    colorHex = AssetColors.RED,
+                    colorHex = AssetColors.RECORDED,
                     points = listOf(GeoPoint(-41.0, 174.001), GeoPoint(-41.0, 174.002))
                 )
             )
@@ -194,7 +185,7 @@ class AssetGeoJsonTest {
         val place = AssetLine(
             assetId = 9L,
             name = "Picnic table",
-            colorHex = AssetColors.GREEN,
+            colorHex = AssetColors.TRACK_KIND,
             points = listOf(GeoPoint(-41.2865, 174.7762)),
             kind = AssetKind.TABLE,
             shape = AssetShape.POINT
@@ -210,8 +201,8 @@ class AssetGeoJsonTest {
     @Test
     fun `a place needs only one point, but a line still needs two`() {
         val onePoint = listOf(GeoPoint(-41.0, 174.0))
-        val place = AssetLine(9L, "Shelter", AssetColors.GREEN, onePoint, shape = AssetShape.POINT)
-        val stub = AssetLine(1L, "Stub", AssetColors.GREEN, onePoint, shape = AssetShape.LINE)
+        val place = AssetLine(9L, "Shelter", AssetColors.TRACK_KIND, onePoint, shape = AssetShape.POINT)
+        val stub = AssetLine(1L, "Stub", AssetColors.TRACK_KIND, onePoint, shape = AssetShape.LINE)
 
         assertTrue(AssetGeoJson.build(listOf(place)).contains("\"type\":\"Point\""))
         assertFalse(
@@ -225,7 +216,7 @@ class AssetGeoJsonTest {
         val place = AssetLine(
             assetId = 9L,
             name = "Trough",
-            colorHex = AssetColors.forStatus(DueStatus.NEVER_SPRAYED),
+            colorHex = AssetColors.PLACE_KIND,
             points = listOf(GeoPoint(-41.2865, 174.7762)),
             kind = AssetKind.OTHER_PLACE,
             shape = AssetShape.POINT
@@ -259,7 +250,7 @@ class AssetGeoJsonTest {
                 AssetLine(
                     assetId = 12L,
                     name = "Works carpark",
-                    colorHex = AssetColors.GREEN,
+                    colorHex = AssetColors.TRACK_KIND,
                     points = corners,
                     kind = AssetKind.CARPARK,
                     shape = AssetShape.AREA
@@ -296,13 +287,13 @@ class AssetGeoJsonTest {
         val started = AssetLine(
             assetId = 12L,
             name = "Works carpark",
-            colorHex = AssetColors.GREEN,
+            colorHex = AssetColors.TRACK_KIND,
             points = ring,
             kind = AssetKind.CARPARK,
             shape = AssetShape.AREA,
             stretches = listOf(
-                AssetStretch(colorHex = AssetColors.GREEN, points = ring.take(3)),
-                AssetStretch(colorHex = AssetColors.RED, points = ring.drop(2))
+                AssetStretch(colorHex = AssetColors.TRACK_KIND, points = ring.take(3)),
+                AssetStretch(colorHex = AssetColors.RECORDED, points = ring.drop(2))
             )
         )
 
@@ -313,8 +304,8 @@ class AssetGeoJsonTest {
             "the ground is the first of them, so the halves are drawn on top of its edge: $json",
             json.indexOf("\"type\":\"Polygon\"") < json.indexOf("\"type\":\"LineString\"")
         )
-        assertTrue("and it is the asset's own colour", json.contains("\"stroke\":\"${AssetColors.GREEN}\""))
-        assertTrue("with the half that was walked in its own", json.contains("\"stroke\":\"${AssetColors.RED}\""))
+        assertTrue("and it is the asset's own colour", json.contains("\"stroke\":\"${AssetColors.TRACK_KIND}\""))
+        assertTrue("with the half that was walked in its own", json.contains("\"stroke\":\"${AssetColors.RECORDED}\""))
     }
 
     @Test
@@ -346,12 +337,12 @@ class AssetGeoJsonTest {
         val halfSprayed = AssetLine(
             assetId = 7L,
             name = "Track 4",
-            colorHex = AssetColors.GREEN,
+            colorHex = AssetColors.TRACK_KIND,
             points = wellingtonLine,
             stretches = listOf(
-                AssetStretch(colorHex = AssetColors.GREEN, points = wellingtonLine),
+                AssetStretch(colorHex = AssetColors.TRACK_KIND, points = wellingtonLine),
                 AssetStretch(
-                    colorHex = AssetColors.RED,
+                    colorHex = AssetColors.RECORDED,
                     points = listOf(GeoPoint(-41.2867, 174.7764), GeoPoint(-41.2868, 174.7765))
                 )
             )
@@ -364,8 +355,8 @@ class AssetGeoJsonTest {
             3,
             Regex("\"type\":\"Feature\",").findAll(json).count()
         )
-        assertTrue(json.contains("\"stroke\":\"${AssetColors.GREEN}\""))
-        assertTrue(json.contains("\"stroke\":\"${AssetColors.RED}\""))
+        assertTrue(json.contains("\"stroke\":\"${AssetColors.TRACK_KIND}\""))
+        assertTrue(json.contains("\"stroke\":\"${AssetColors.RECORDED}\""))
         assertEquals(
             "every part is the same asset, so a tap on any of them opens it",
             3,
@@ -378,10 +369,10 @@ class AssetGeoJsonTest {
         val shortStretch = AssetLine(
             assetId = 7L,
             name = "Track 4",
-            colorHex = AssetColors.GREEN,
+            colorHex = AssetColors.TRACK_KIND,
             points = wellingtonLine,
             stretches = listOf(
-                AssetStretch(colorHex = AssetColors.RED, points = listOf(GeoPoint(-41.2865, 174.7762)))
+                AssetStretch(colorHex = AssetColors.RECORDED, points = listOf(GeoPoint(-41.2865, 174.7762)))
             )
         )
 
@@ -392,8 +383,8 @@ class AssetGeoJsonTest {
             2,
             Regex("\"type\":\"Feature\",").findAll(json).count()
         )
-        assertTrue(json.contains("\"stroke\":\"${AssetColors.GREEN}\""))
-        assertFalse("a dot where the line should be is worse than the line", json.contains(AssetColors.RED))
+        assertTrue(json.contains("\"stroke\":\"${AssetColors.TRACK_KIND}\""))
+        assertFalse("a dot where the line should be is worse than the line", json.contains(AssetColors.RECORDED))
     }
 
     @Test

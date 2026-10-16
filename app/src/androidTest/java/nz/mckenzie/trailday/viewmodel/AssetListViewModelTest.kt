@@ -46,7 +46,7 @@ class AssetListViewModelTest {
 
     /** The names the list would draw, waited for rather than slept on. */
     private suspend fun namesShown(viewModel: AssetListViewModel, count: Int): List<String> =
-        withTimeout(5_000) { viewModel.shown.first { it.size == count } }.map { it.asset.name }
+        withTimeout(5_000) { viewModel.shown.first { it.size == count } }.map { it.name }
 
     @Test
     fun everythingIsShownUntilAChipIsTapped() = runBlocking {

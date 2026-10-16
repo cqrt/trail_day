@@ -56,9 +56,7 @@ object BackupFormat {
      */
     fun summarise(document: BackupDocument): BackupSummary = BackupSummary(
         assets = document.assets.size,
-        sprays = document.sprayEvents.size,
         recordings = document.recordings.size,
-        products = document.products.size,
         points = document.assets.sumOf { it.points.size } + document.recordings.sumOf { it.points.size }
     )
 }
@@ -66,19 +64,15 @@ object BackupFormat {
 /** What a backup file, or the app itself, holds. */
 data class BackupSummary(
     val assets: Int,
-    val sprays: Int,
     val recordings: Int,
-    val products: Int,
     val points: Int
 ) {
-    val isEmpty: Boolean get() = assets == 0 && sprays == 0 && recordings == 0 && products == 0
+    val isEmpty: Boolean get() = assets == 0 && recordings == 0
 
-    /** "2 assets, 3 sprays, 1 recording, 4 products" - for a person to check against. */
+    /** "2 assets, 1 recording" - for a person to check against. */
     fun describe(): String = listOf(
         count(assets, "asset"),
-        count(sprays, "spray"),
-        count(recordings, "recording"),
-        count(products, "product")
+        count(recordings, "recording")
     ).joinToString(", ")
 
     private fun count(value: Int, noun: String): String = "$value $noun" + if (value == 1) "" else "s"

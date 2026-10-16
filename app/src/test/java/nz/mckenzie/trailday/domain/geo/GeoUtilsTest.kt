@@ -131,20 +131,4 @@ class GeoUtilsTest {
         assertEquals(0.0, past.lat, 0.00002)
         assertEquals(0.001, past.lng, 0.00002)
     }
-
-    @Test
-    fun `estimated area multiplies length by swath width`() {
-        assertEquals(300.0, estimatedAreaSqm(100.0, 3.0), 0.0001)
-        assertEquals(0.0, estimatedAreaSqm(0.0, 3.0), 0.0)
-        assertEquals(0.0, estimatedAreaSqm(100.0, 0.0), 0.0)
-        assertEquals(0.0, estimatedAreaSqm(-5.0, 3.0), 0.0)
-    }
-
-    @Test
-    fun `a line that is sprayed twice treats twice the ground`() {
-        // The second pass runs beside the first, not over the top of it, so it is another swath
-        // of ground rather than the same one again.
-        assertEquals(600.0, estimatedAreaSqm(100.0, 3.0, passes = 2), 0.0001)
-        assertEquals(0.0, estimatedAreaSqm(100.0, 3.0, passes = 0), 0.0)
-    }
 }

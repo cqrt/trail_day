@@ -7,14 +7,10 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import nz.mckenzie.trailday.data.db.ProductEntity
 import nz.mckenzie.trailday.data.db.RecordedBreakEntity
 import nz.mckenzie.trailday.data.db.RecordedPointEntity
 import nz.mckenzie.trailday.data.db.RecordedSessionEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.data.db.SprayEventEntity
-import nz.mckenzie.trailday.data.db.SprayEventProductEntity
-import nz.mckenzie.trailday.data.db.AssetProductDefaultEntity
 import nz.mckenzie.trailday.domain.backup.BackupDocument
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import org.junit.After
@@ -57,31 +53,20 @@ class BackupRoundTripTest {
         // live observer takes the process down with it.
     }
 
-    /** A small but complete season: two tracks, a spray each on one, and a recording. */
+    /** A small but complete season: two tracks and a recording made for one of them. */
     private suspend fun populate() {
         val assetRepository = AssetRepository(db)
-        val glyphosate = db.productDao().insert(ProductEntity(name = "Glyphosate", rateText = "10 mL/L"))
-        val marker = db.productDao().insert(ProductEntity(name = "Marker dye", archived = true))
 
         val first = assetRepository.createAsset(
             name = "Winter block",
             geometry = listOf(GeoPoint(-41.5, 173.95), GeoPoint(-41.51, 173.96), GeoPoint(-41.52, 173.97)),
-            notes = "spray the fenceline twice",
-            intervalDays = 45,
-            swathWidthM = 6.0,
+            notes = "follow the fenceline",
             createdAtEpochMs = 1_700_000_000_000L
         )
-        val second = assetRepository.createAsset(
+        assetRepository.createAsset(
             name = "River block",
             geometry = listOf(GeoPoint(-41.6, 173.9), GeoPoint(-41.61, 173.91)),
-            intervalDays = 120,
             createdAtEpochMs = 1_701_000_000_000L
-        )
-
-        // The first of them is sprayed twice, and how far apart the two passes run is known: the
-        // two-pass fields have to survive the file as surely as the interval does.
-        assetRepository.updateAsset(
-            assetRepository.getAsset(first)!!.copy(passesRequired = 2, passSeparationM = 3.0)
         )
 
         val session = db.recordingDao().insertSession(
@@ -129,58 +114,6 @@ class BackupRoundTripTest {
         db.recordingDao().insertBreak(
             RecordedBreakEntity(sessionId = session, fromEpochMs = 1_788_000_001_500L)
         )
-
-        val spray = db.sprayEventDao().insertEvent(
-            SprayEventEntity(
-                assetId = first,
-                sprayedAtEpochMs = 1_789_000_000_000L,
-                waterLitres = 400.0,
-                operatorName = "Matt",
-                notes = "wind from the south",
-                distanceM = 1200.0,
-                areaSqm = 7200.0,
-                recordedSessionId = session
-            )
-        )
-        db.sprayEventDao().insertEventProducts(
-            listOf(
-                SprayEventProductEntity(sprayEventId = spray, productId = glyphosate, quantityMl = 1500.0),
-                SprayEventProductEntity(sprayEventId = spray, productId = marker, quantityMl = 250.0)
-            )
-        )
-        db.sprayEventDao().upsertDefault(
-            AssetProductDefaultEntity(assetId = first, productId = glyphosate, defaultQuantityMl = 1500.0)
-        )
-        db.sprayEventDao().upsertDefault(
-            AssetProductDefaultEntity(assetId = second, productId = glyphosate)
-        )
-
-        // And the operator had to say the two passes were both sides of that line.
-        db.recordingDao().claimBothSides(session)
-    }
-
-    /**
-     * The two-pass fields survive the file like everything else.
-     *
-     * Covered by the byte-identical comparison below, but said out loud here because the failure
-     * it guards against is quiet: a track walked twice coming back as a track that is done after
-     * one pass, with nothing on any screen to suggest the file lost anything.
-     */
-    @Test
-    fun aTwoPassLineAndTheOperatorsWordComeBackThroughTheFile(): Unit = runBlocking {
-        populate()
-
-        val file = repository().export()
-
-        repository().restore(file)
-
-        val asset = db.assetDao().observeAllAssets().first().first { it.name == "Winter block" }
-        assertEquals("the line still takes two passes", 2, asset.passesRequired)
-        assertEquals("and still knows how far apart they run", 3.0, asset.passSeparationM!!, 1e-9)
-        assertTrue(
-            "and the pass that finished it still carries the operator's word",
-            db.recordingDao().observeSessions().first().single().bothSidesClaimed
-        )
     }
 
     @Test
@@ -190,9 +123,7 @@ class BackupRoundTripTest {
         val summary = repository().currentSummary()
 
         assertEquals(2, summary.assets)
-        assertEquals(1, summary.sprays)
         assertEquals(1, summary.recordings)
-        assertEquals(2, summary.products)
         assertEquals("3 + 2 line points and 2 recorded fixes", 7, summary.points)
 
         // Empty the app the way a new phone would be empty.
@@ -215,7 +146,6 @@ class BackupRoundTripTest {
         repository().restore(exported)
 
         // Read it back the way the app does, rather than by looking at raw rows.
-        val sprays = SprayRepository(db)
         val session = db.recordingDao().getSession(exported.recordings.single().id)
         assertNotNull("the recording should be back", session)
         val assetId = session!!.assetId!!
@@ -223,18 +153,7 @@ class BackupRoundTripTest {
         assertNotNull("and still point at a track that exists", track)
         assertEquals("Winter block", track!!.name)
         assertEquals(3, AssetRepository(db).getAssetGeometry(assetId).pointCount)
-
-        val lines = sprays.getSprayEventProductLines(exported.sprayEvents.single().id)
-        assertEquals(
-            "the amounts should come back as the spray screen shows them",
-            listOf("Glyphosate" to 1500.0, "Marker dye" to 250.0),
-            lines.map { it.name to it.quantityMl }.sortedBy { it.first }
-        )
-        assertEquals(
-            "and the spray should still say which recording proves it",
-            session.id,
-            db.sprayEventDao().getEvent(exported.sprayEvents.single().id)!!.recordedSessionId
-        )
+        assertEquals("and the recording's pauses came back", 2, db.recordingDao().getBreaks(session.id).size)
     }
 
     @Test
@@ -255,9 +174,9 @@ class BackupRoundTripTest {
         assertEquals(
             "the track that was not in the file must be gone",
             listOf("River block", "Winter block"),
-            AssetRepository(db).observeAssetsWithDue(nowProvider = kotlinx.coroutines.flow.flowOf(clock))
+            AssetRepository(db).observeActiveAssets()
                 .first()
-                .map { it.asset.name }
+                .map { it.name }
                 .sorted()
         )
     }

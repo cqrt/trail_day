@@ -1,9 +1,8 @@
 package nz.mckenzie.trailday.web
 
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
 import nz.mckenzie.trailday.data.AssetRepository
-import nz.mckenzie.trailday.data.AssetWithDue
+import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.doc.ArcGisDocTracks
 import nz.mckenzie.trailday.doc.DocTracksResult
 import nz.mckenzie.trailday.doc.DocTracksSource
@@ -45,9 +44,8 @@ import nz.mckenzie.trailday.offline.HttpResponse
  * *allowed* to read or change is decided here and nowhere else: the places and the phone's own fix
  * may be read, a place's name, kind, notes and line may be changed through the edit rules, a track
  * may be drawn on a computer, and a place with nothing recorded against it may be taken away. The
- * counts behind that last rule are *read* here and never written: sprays and recordings are the
- * phone's business, and the interval a place is sprayed on is the phone's too - a desk save never
- * mentions it, so it cannot wipe it.
+ * counts behind that last rule are *read* here and never written: recordings are the
+ * phone's business, and a desk save never takes one with it.
  */
 class WebEditorDocuments(
     private val assets: AssetRepository,
@@ -80,9 +78,7 @@ class WebEditorDocuments(
 ) : WebEditorData {
 
     override suspend fun state(authority: String): String {
-        // The spray count is read here without being shown: the delete sentence counts the sprays, so it
-        // has to travel out - it is the phone's own and the desk never has to look at it.
-        val work = withDue()
+        val work = activeAssets()
         // Once for the farm rather than once per asset: every record carries the version of the line
         // it was handed and a sentence about what deleting it would take, and both are built from
         // these two reads.
@@ -91,12 +87,11 @@ class WebEditorDocuments(
 
         return WebEditorJson.build(
             WebEditorDocument(
-                assets = work.map { item ->
+                assets = work.map { asset ->
                     WebEditorJson.record(
-                        asset = item.asset,
-                        sprayCount = item.sprayCount,
-                        paths = paths[item.asset.id]?.paths.orEmpty(),
-                        recordingCount = recordings[item.asset.id] ?: 0
+                        asset = asset,
+                        paths = paths[asset.id]?.paths.orEmpty(),
+                        recordingCount = recordings[asset.id] ?: 0
                     )
                 },
                 bounds = assets.assetBounds()?.let { WebEditorBounds.of(it) },
@@ -109,7 +104,7 @@ class WebEditorDocuments(
     }
 
     override suspend fun assets(): String {
-        val work = withDue()
+        val work = activeAssets()
         // One read for every asset's vertices rather than a query each: the whole farm is what this
         // document is, and the state document asks for the same read in the same breath.
         val paths = assets.allAssetGeometry()
@@ -117,13 +112,13 @@ class WebEditorDocuments(
         // The same lines the map draws, so a track is where the phone says it is. Each is drawn in the
         // colour of its kind - the same colour the phone's own map paints that kind - so a place's
         // family is what the desk's map says, and nothing here works a colour out for itself.
-        val lines = work.map { item ->
-            val geometry = paths[item.asset.id] ?: AssetGeometry.NONE
-            val shape = AssetShape.fromStorage(item.asset.shape)
-            val kind = AssetKind.fromStorage(item.asset.kind, shape)
+        val lines = work.map { asset ->
+            val geometry = paths[asset.id] ?: AssetGeometry.NONE
+            val shape = AssetShape.fromStorage(asset.shape)
+            val kind = AssetKind.fromStorage(asset.kind, shape)
             AssetLine(
-                assetId = item.asset.id,
-                name = item.asset.name,
+                assetId = asset.id,
+                name = asset.name,
                 colorHex = AssetColors.forKind(kind),
                 points = geometry.line,
                 sideTracks = geometry.sideTracks,
@@ -137,7 +132,7 @@ class WebEditorDocuments(
     /**
      * `PUT /api/assets/<id>`: the desk's edit, judged against the row the phone holds now.
      *
-     * The row is read through [withDue] rather than straight from the table because that is the read
+     * The row is read through [activeAssets] rather than straight from the table because that is the read
      * the app's own map makes, so the desk is answered from what the phone says.
      *
      * After the write the asset is read a second time and the answer is built from that read, so what
@@ -147,14 +142,14 @@ class WebEditorDocuments(
      * now (see [WebEditorEdits]), so a save from the desk cannot wipe any of them.
      */
     override suspend fun save(id: Long, body: String?): WebEditorWrite {
-        val before = withDue().firstOrNull { it.asset.id == id }
+        val before = activeAssets().firstOrNull { it.id == id }
             ?: return missing("There is no track or place with that number on the phone.")
         // Read once and handed to the rules: the same paths are half of the version the desk quoted, so
         // a vertex moved - on the line **or on a side track** - since the card was opened is caught
         // there rather than written over.
         val geometry = assets.getAssetGeometry(id)
 
-        return when (val result = WebEditorEdits.apply(before.asset, geometry.paths, body)) {
+        return when (val result = WebEditorEdits.apply(before, geometry.paths, body)) {
             is WebEditorEditResult.Refused -> WebEditorWrite.Refused(result.refusal, result.message)
             is WebEditorEditResult.Ok -> {
                 // A drawing that does not carry the track's side tracks cannot be written: the write
@@ -183,7 +178,7 @@ class WebEditorDocuments(
                     drawn?.let { paths -> AssetGeometry(paths) }
                 )
                 // The second read is the answer, so what the desk is told is what the phone holds.
-                val after = withDue().firstOrNull { it.asset.id == id }
+                val after = activeAssets().firstOrNull { it.id == id }
                     ?: return missing("That track is not on the phone any more.")
                 WebEditorWrite.Saved(recordOf(after))
             }
@@ -208,7 +203,7 @@ class WebEditorDocuments(
                     asset = draft.asset,
                     geometry = draft.geometry
                 )
-                val created = withDue().firstOrNull { it.asset.id == id }
+                val created = activeAssets().firstOrNull { it.id == id }
                     ?: return missing("That track was saved and could not be read back.")
                 WebEditorWrite.Created(recordOf(created))
             }
@@ -220,8 +215,8 @@ class WebEditorDocuments(
      *
      * **What is attached is counted here, now.** Not from the card - a sheet that has been open for ten
      * minutes is exactly where a desk's belief about an asset goes out of date, and this is the one
-     * write where acting on that belief would take a season's spray record with it. So the sprays and
-     * the recordings are read at the moment of the delete, and
+     * write where acting on that belief would take something with it. So the recordings
+     * are read at the moment of the delete, and
      * [nz.mckenzie.trailday.domain.asset.AssetRemovalRules] decides - which, for anything with history
      * on it, is a refusal in numbers with the phone named as the place to do it.
      *
@@ -230,14 +225,14 @@ class WebEditorDocuments(
      * because "somebody changed it" is the more useful sentence when both are true.
      */
     override suspend fun remove(id: Long, version: String?): WebEditorWrite {
-        val item = withDue().firstOrNull { it.asset.id == id }
+        val item = activeAssets().firstOrNull { it.id == id }
             ?: return missing("There is no track or place with that number on the phone.")
 
         if (version.isNullOrBlank()) return refused(
             WebEditorRefusal.INVALID,
             "That delete did not say which version of the track it was for, so nothing was deleted."
         )
-        if (version != WebEditorVersion.of(item.asset, assets.getAssetGeometry(id).paths)) {
+        if (version != WebEditorVersion.of(item, assets.getAssetGeometry(id).paths)) {
             return refused(
                 WebEditorRefusal.STALE,
                 "This was changed on the phone while it was open here, so nothing was deleted. " +
@@ -246,8 +241,7 @@ class WebEditorDocuments(
         }
 
         val removal = AssetRemovalRules.of(
-            name = item.asset.name,
-            sprays = item.sprayCount,
+            name = item.name,
             recordings = assets.recordingCountFor(id)
         )
         if (!removal.allowed) return refused(WebEditorRefusal.IN_USE, removal.sentence)
@@ -255,7 +249,7 @@ class WebEditorDocuments(
         assets.deleteAsset(id)
         // The phone's own sentence about what happened, in the app's own words: the row is gone, so
         // there is no record to answer with, and the page's next move is to read the work again.
-        return WebEditorWrite.Removed("${item.asset.name} is gone from the phone.")
+        return WebEditorWrite.Removed("${item.name} is gone from the phone.")
     }
 
     /**
@@ -429,12 +423,11 @@ class WebEditorDocuments(
      * reads on purpose: this answers one write about one asset, where the whole-farm reads in `state`
      * would be work nobody asked for.
      */
-    private suspend fun recordOf(item: AssetWithDue): WebEditorAssetRecord =
+    private suspend fun recordOf(item: AssetEntity): WebEditorAssetRecord =
         WebEditorJson.record(
-            asset = item.asset,
-            sprayCount = item.sprayCount,
-            paths = assets.getAssetGeometry(item.asset.id).paths,
-            recordingCount = assets.recordingCountFor(item.asset.id)
+            asset = item,
+            paths = assets.getAssetGeometry(item.id).paths,
+            recordingCount = assets.recordingCountFor(item.id)
         )
 
     /** An asset the desk named that the phone does not have, in the words the page shows. */
@@ -445,15 +438,13 @@ class WebEditorDocuments(
         WebEditorWrite.Refused(refusal, message)
 
     /**
-     * Every active asset with the field the desk carries invisibly: the spray count the delete
-     * sentence counts.
+     * Every active asset.
      *
-     * Read through the phone's own repository call, which folds in the summaries and
-     * the due arithmetic - the desk uses neither the due date nor the colour, but the read is the one
-     * the app's own map makes, so a document built from it says what the phone says.
+     * Read through the phone's own repository call, which is the read the app's own map and list
+     * make, so a document built from it says what the phone says.
      */
-    private suspend fun withDue(): List<AssetWithDue> =
-        assets.observeAssetsWithDue(nowProvider = flowOf(now())).first()
+    private suspend fun activeAssets(): List<AssetEntity> =
+        assets.observeActiveAssets().first()
 
     override suspend fun style(authority: String): String {
         val chosen = basemap()

@@ -1,37 +1,17 @@
 package nz.mckenzie.trailday.domain.geo
 
 /**
- * One pass over a planned line that could account for part of it: when it happened, and
- * the fixes that prove it.
- *
- * A pass with no fixes proves nothing, and is ignored wherever one of these is read.
- *
- * [breaks] are the stretches the pass was paused for, and are the only gaps in the fixes
- * that are not ground the pass drove - see [RecordingBreak].
- *
- * [bothSidesClaimed] is the operator's word that this pass did the other side of a line that
- * is sprayed twice, given when the fixes could not say so themselves - see
- * [nz.mckenzie.trailday.domain.geo.TwoPasses]. It is a claim, and a claim is not evidence:
- * a line whose second pass rests on one of these reads as done because the operator said it
- * was, the same way a spray logged by hand covers a whole line.
- */
-data class RecordedPass(
-    val atEpochMs: Long,
-    val points: List<GeoPoint>,
-    val breaks: List<RecordingBreak> = emptyList(),
-    val bothSidesClaimed: Boolean = false
-)
-
-/**
  * A stretch of a pass the operator was paused for.
  *
  * Pausing stops the fixes, so a pass that carries on always jumps from the last fix before
  * the pause to the first one after it. Every other jump of that kind is the fixes going
  * missing rather than the driving stopping - under trees, in a gully, with the phone in a
- * pocket - and the ground between two fixes the pass drove is ground it covered, which is
- * why the plan in between counts as sprayed. A pause is different in the one way that
- * matters: the operator said they had stopped, so nothing is claimed for the ground in
- * between. The plan there stays red, and the recording's own line is drawn in two pieces.
+ * pocket - and the ground between two fixes the pass drove is ground it covered, so the
+ * recorded line is drawn through it. A pause is different in the one way that matters: the
+ * operator said they had stopped, so the recorded line is drawn in two pieces there.
+ *
+ * [toEpochMs] is null while the pass is still paused, and for a pass that was finished while
+ * paused - which reads as a stop that runs to the end of the recording, as it should.
  */
 data class RecordingBreak(
     val fromEpochMs: Long,

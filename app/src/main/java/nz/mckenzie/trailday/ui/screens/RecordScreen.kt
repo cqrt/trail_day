@@ -3,7 +3,6 @@ package nz.mckenzie.trailday.ui.screens
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,18 +13,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
@@ -49,35 +43,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
-import nz.mckenzie.trailday.data.AssetWithDue
 import nz.mckenzie.trailday.domain.geo.ElevationPhrase
 import nz.mckenzie.trailday.domain.geo.ElevationProfile
-import nz.mckenzie.trailday.domain.geo.TwoPassPhrase
-import nz.mckenzie.trailday.domain.geo.formatCoveragePercent
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.domain.tiles.Basemap
-import nz.mckenzie.trailday.map.parseHexColor
 import nz.mckenzie.trailday.map.BasemapView
-import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.formatDuration
 import nz.mckenzie.trailday.viewmodel.RecordingViewModel
 
 /**
- * Records a GPS track, and records the spray while doing it.
+ * Records a walk or a ride.
  *
  * Location is requested here (rather than at app launch) so the permission prompt
- * arrives with an obvious reason. Choosing the track being sprayed turns this into
- * the whole job in one screen: the planned line is drawn behind the one being
- * driven, the products are pre-filled from last time, the coverage tells you
- * whether the whole line is done, and finishing saves the recording and the spray
- * together.
+ * arrives with an obvious reason. Choosing a place turns the recording into one that
+ * followed that line: the recorded line is drawn as it is made, and finishing saves
+ * the recording with its soft link to the place.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,33 +74,26 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
     val geoJson by viewModel.recordedGeoJson.collectAsStateWithLifecycle()
     val initialFrame by viewModel.initialFrame.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
-    val coverage by viewModel.coverage.collectAsStateWithLifecycle()
-    val trackLengthM by viewModel.trackLengthM.collectAsStateWithLifecycle()
     val summary by viewModel.summary.collectAsStateWithLifecycle()
     val finished by viewModel.finished.collectAsStateWithLifecycle()
-    // The height of the pass just saved, from the fixes it stored. The recorder has kept a height on
-    // every fix all along; this is the first thing to read one back. Null while nothing is saved, or
+    // The height of the pass just saved, from the fixes it stored. Null while nothing is saved, or
     // when the fixes carried no height.
     val passElevation = remember(finished) {
         finished?.recorded?.let { ElevationProfile.of(it) }
     }
     val following by viewModel.following.collectAsStateWithLifecycle()
     val followPhone by viewModel.followPhone.collectAsStateWithLifecycle()
-    val rows by viewModel.rows.collectAsStateWithLifecycle()
     val assetName by viewModel.selectedTrackName.collectAsStateWithLifecycle()
-    val tracks by viewModel.assetsToSpray.collectAsStateWithLifecycle()
-    val remember by viewModel.rememberDefaults.collectAsStateWithLifecycle()
+    val assets by viewModel.assets.collectAsStateWithLifecycle()
     val pendingTrackName by viewModel.pendingTrackName.collectAsStateWithLifecycle()
-    val twoPasses by viewModel.twoPasses.collectAsStateWithLifecycle()
-    val pendingBothSides by viewModel.pendingBothSides.collectAsStateWithLifecycle()
 
     var permissionGranted by remember { mutableStateOf(viewModel.hasLocationPermission()) }
     var pickingTrack by remember { mutableStateOf(false) }
     var assetNameDraft by remember { mutableStateOf("") }
 
     // The picker opens fully rather than at half height. Half a sheet is a third of the
-    // blocks hidden below the fold, and the row that matters - the one just recorded, or
-    // "no asset" - is as likely as any other to be the hidden one.
+    // places hidden below the fold, and the row that matters - the one just recorded, or
+    // "no place" - is as likely as any other to be the hidden one.
     val pickerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // Finish asks what to call the line; the suggested name arrives with the prompt.
@@ -124,10 +103,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
 
     // The pass that has just been saved is on the card while the operator is here to see it -
     // that is what stops Save looking like it wiped the work - and is given up when they leave:
-    // another tab, back to the map, or the app put down. A card waiting to start the next job
-    // must not still be carrying the last job's distance, points and save message, which is what
-    // it did until the app was killed, because this view model lives as long as the activity.
-    // A pass still being driven is untouched: see RecordingViewModel.onScreenLeft.
+    // another tab, back to the map, or the app put down.
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.onScreenLeft() }
     DisposableEffect(Unit) {
         onDispose { viewModel.onScreenLeft() }
@@ -156,9 +132,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Record") }) },
-        // No back arrow: recording is a tab, and the bar below is how you leave it. The
-        // arrow that used to be here sent the operator to the asset list, which is not
-        // where they came from.
+        // No back arrow: recording is a tab, and the bar below is how you leave it.
         bottomBar = { TrailDayNavBar(current = Tab.RECORD, onSelect = onOpenTab) }
     ) { innerPadding ->
         Box(
@@ -182,14 +156,12 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
 
             // Following, and whether it is on. The map follows a pass by itself, so the
             // question the operator actually has is the one this answers at a glance: is it
-            // following me or not? Tapping it back on also puts the camera back on them at
-            // once, which is the fastest way to find yourself again after a drag.
+            // following me or not?
             //
             // Only while the pass is being driven. Paused, the map deliberately does not follow
             // - the operator is stopped, with both hands free and the map theirs to read - so a
             // control that said "Following the phone" while nothing moved was telling them
-            // something untrue, and tapping it did nothing either way. Resume turns following
-            // back on by itself, so nothing is lost by its not being there.
+            // something untrue. Resume turns following back on by itself.
             if (state.status == RecordingStatus.RECORDING) {
                 FilledTonalIconButton(
                     onClick = { viewModel.setFollowing(!following) },
@@ -243,8 +215,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                         style = MaterialTheme.typography.titleMedium
                     )
                     // The pass being driven, or - once Save has been pressed - the one just
-                    // saved: its own distance, its own time and its own points, rather than
-                    // the zeros the screen used to fall back to the moment it was saved.
+                    // saved: its own distance, its own time and its own points.
                     Text(
                         text = "${formatDistance(summary.distanceM)} \u00b7 " +
                             "${formatDuration(elapsedMs)} \u00b7 ${summary.pointCount} " +
@@ -263,21 +234,6 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                         )
                     }
 
-                    coverage?.let { covered ->
-                        Text(
-                            text = "Covered ${formatCoveragePercent(covered)} of " +
-                                (assetName ?: finished?.trackName ?: "the line"),
-                            style = MaterialTheme.typography.titleSmall
-                        )
-                    }
-
-                    trackLengthM?.let { length ->
-                        Text(
-                            text = "Track ${formatDistance(length)}",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-
                     // The pass just saved, as the ground it climbed: the range in words and the
                     // shape under it. A pass with no heights says nothing at all.
                     ElevationPhrase.range(passElevation)?.let { range ->
@@ -292,35 +248,10 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                         )
                     }
 
-                    // A line that takes two passes: whether it is done, and what it is still owed.
-                    // A line sprayed in one pass - every line the app knew before this - says
-                    // nothing here, because there is nothing to say.
-                    TwoPassPhrase.state(twoPasses)?.let { owed ->
-                        Text(text = owed, style = MaterialTheme.typography.titleSmall)
-                    }
-
                     message?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
 
                     TextButton(onClick = { pickingTrack = true }) {
-                        Text(assetName?.let { "Spraying: $it" } ?: "Choose the asset being sprayed")
-                    }
-
-                    if (assetName != null && rows.isNotEmpty()) {
-                        Text("Spray used", style = MaterialTheme.typography.titleSmall)
-                        rows.forEach { row ->
-                            QuantityRow(
-                                name = row.name,
-                                value = row.quantityText,
-                                onChange = { text -> viewModel.updateQuantity(row.productId, text) }
-                            )
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = remember, onCheckedChange = viewModel::setRememberDefaults)
-                            Text(
-                                text = "Remember these amounts for this asset",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
+                        Text(assetName?.let { "Following: $it" } ?: "Choose a place to follow")
                     }
 
                     if (!permissionGranted) {
@@ -368,9 +299,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
         ) {
             Column(modifier = Modifier.padding(bottom = 24.dp)) {
                 // The picker asks a question, so it takes an answer. Cancel is the answer that
-                // means "never mind", and it sits with the question rather than behind a swipe
-                // - which is the gesture a gloved hand makes by accident, and the one an
-                // operator with a tank waiting should not have to know.
+                // means "never mind", and it sits with the question rather than behind a swipe.
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -378,13 +307,13 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Which asset are you spraying?",
+                        text = "Which place are you following?",
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.weight(1f)
                     )
                     TextButton(onClick = { pickingTrack = false }) { Text("Cancel") }
                 }
-                if (tracks.isEmpty()) {
+                if (assets.isEmpty()) {
                     Text(
                         text = "Nothing planned yet. You can still record a line.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -393,44 +322,30 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                     )
                 }
                 // The rows scroll inside a window of their own rather than running off the
-                // bottom of the sheet: a season is dozens of blocks, and the sheet's content
+                // bottom of the sheet: a season is dozens of places, and the sheet's content
                 // does not scroll by itself, so everything past the screen edge - a track
                 // recorded this morning included - could not be reached at all.
                 LazyColumn(modifier = Modifier.heightIn(max = PICKER_LIST_MAX_HEIGHT)) {
-                    itemsIndexed(tracks, key = { _, item -> item.asset.id }) { index, item ->
+                    itemsIndexed(assets, key = { _, item -> item.id }) { index, item ->
                         if (index > 0) HorizontalDivider()
                         ListItem(
                             modifier = Modifier.clickable {
-                                viewModel.selectTrack(item.asset.id)
+                                viewModel.selectTrack(item.id)
                                 pickingTrack = false
                             },
-                            headlineContent = { Text(item.asset.name) },
-                            // The due colour travels with the name, because which block to
-                            // spray next is the question this sheet is answering.
-                            leadingContent = {
-                                Box(
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .background(
-                                            parseHexColor(AssetColors.forStatus(item.due.status)),
-                                            CircleShape
-                                        )
-                                )
-                            }
+                            headlineContent = { Text(item.name) }
                         )
                     }
                 }
-                if (tracks.isNotEmpty()) HorizontalDivider()
-                // Recording without choosing an asset stays possible: the line that was
-                // driven is the evidence, and which asset it belongs to can be settled later.
-                // It sits outside the scrolling rows, so it stays one tap away however long
-                // the list gets.
+                if (assets.isNotEmpty()) HorizontalDivider()
+                // Recording without choosing a place stays possible: the line that was
+                // recorded is the evidence, and which place it belongs to can be settled later.
                 ListItem(
                     modifier = Modifier.clickable {
                         viewModel.selectTrack(null)
                         pickingTrack = false
                     },
-                    headlineContent = { Text("Just record, no asset") },
+                    headlineContent = { Text("Just record, no place") },
                     leadingContent = { AppIcon(IconGlyph.RECORD) }
                 )
             }
@@ -446,8 +361,8 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = "The line you recorded is saved as an asset, so it appears on " +
-                            "the Assets page and can be sprayed again. Cancelling leaves the " +
-                            "recording going, so the line can be named whenever you finish.",
+                            "the Assets page. Cancelling leaves the recording going, so the line " +
+                            "can be named whenever you finish.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     OutlinedTextField(
@@ -462,36 +377,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                 TextButton(onClick = { viewModel.confirmFinish(assetNameDraft) }) { Text("Save") }
             },
             dismissButton = {
-                // "Keep recording" read as the same answer as Save - it means "carry on", which
-                // is what cancelling a dialog does.
                 TextButton(onClick = { viewModel.cancelFinish() }) { Text("Cancel") }
-            }
-        )
-    }
-
-    // Two passes that look the same, on a line that needs two: the fixes have said all they can,
-    // and the operator's word is the only thing left that can settle it. Yes is what closes the
-    // job and records the spray; no finishes the pass with the line still owing its other one.
-    // Cancelling leaves the recording going, as the naming dialog does.
-    if (pendingBothSides) {
-        AlertDialog(
-            onDismissRequest = { viewModel.cancelFinish() },
-            title = { Text("Did you do both sides?") },
-            text = {
-                Text(
-                    text = "This line has had two passes, both the same way along it, and they are " +
-                        "too close together for the app to tell which side each one was on. " +
-                        "Saying yes records the spray and marks the line done.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { viewModel.confirmBothSides(true) }) {
-                    Text("Both sides done")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.confirmBothSides(false) }) { Text("One side to go") }
             }
         )
     }
@@ -501,32 +387,8 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
  * How tall the picker's rows may get before they scroll.
  *
  * About seven rows - the height the sheet happened to come to before - so the list looks
- * the same as it always did, and the blocks below it are reached by scrolling the rows
- * rather than lost off the bottom of the screen. The title and "Just record, no asset"
+ * the same as it always did, and the places below it are reached by scrolling the rows
+ * rather than lost off the bottom of the screen. The title and "Just record, no place"
  * stay outside it, because those are the two things that must not need finding.
  */
 private val PICKER_LIST_MAX_HEIGHT = 400.dp
-
-/** One product and the amount that went in, typed where it is being sprayed. */
-@Composable
-private fun QuantityRow(name: String, value: String, onChange: (String) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(
-            text = name,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium
-        )
-        OutlinedTextField(
-            value = value,
-            onValueChange = onChange,
-            label = { Text("mL") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.width(120.dp)
-        )
-    }
-}

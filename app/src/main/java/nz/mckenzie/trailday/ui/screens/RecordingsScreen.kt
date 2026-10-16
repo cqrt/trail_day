@@ -35,9 +35,9 @@ import nz.mckenzie.trailday.viewmodel.RecordingsViewModel
 /**
  * Every GPS recording on the device, newest first.
  *
- * Recordings are the evidence behind a spray, and they deliberately outlive the
- * tracks they were recorded against - so a recording whose track has been deleted
- * is still listed, and says so.
+ * A recording is a walk or a ride, and it deliberately outlives the place it was
+ * recorded against - so a recording whose place has been deleted is still listed,
+ * and says so.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,8 +62,7 @@ fun RecordingsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "What was actually driven, kept as evidence for the spray records " +
-                    "made from it.",
+                text = "Every walk and ride, kept as the line that was actually followed.",
                 style = MaterialTheme.typography.bodySmall
             )
 
@@ -73,8 +72,8 @@ fun RecordingsScreen(
                 EmptyState(
                     glyph = IconGlyph.RECORDINGS,
                     title = "No recordings yet",
-                    body = "A recording is the evidence behind a spray: the line that was " +
-                        "actually driven. Start one from the Record tab and it appears here.",
+                    body = "A recording is a walk or a ride: the line that was actually " +
+                        "followed. Start one from the Record tab and it appears here.",
                     actionLabel = "Record a line",
                     onAction = { onOpenTab(Tab.RECORD) }
                 )
@@ -101,8 +100,7 @@ fun RecordingsScreen(
                 Text(
                     "${row.name}: ${row.pointCount} points, " +
                         "${formatDistance(row.distanceM)}. " +
-                        "Any spray recorded from it stays in the history, but loses its " +
-                        "link to the recording. This cannot be undone."
+                        "This cannot be undone."
                 )
             },
             confirmButton = {

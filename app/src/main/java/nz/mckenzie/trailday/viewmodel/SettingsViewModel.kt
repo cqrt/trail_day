@@ -83,8 +83,7 @@ sealed interface OffsiteCheckState {
 }
 
 /**
- * The app's settings: the LINZ Basemaps key, and whether to be reminded about tracks
- * that come due.
+ * The app's settings: the LINZ Basemaps key, the update checks and the backups.
  *
  * The key matters because a standard-access key expires every 90 days and the failure
  * is silent: the map just stops drawing. Before this screen there was no way to enter
@@ -616,7 +615,7 @@ class SettingsViewModel(
                             !answer.isPrivate -> OffsiteCheckState.Worked(
                                 note = "${answer.fullName} answered, and the token can write to it.",
                                 warning = "That repository is public, so anyone can read your " +
-                                    "tracks, sprays and recordings. Make it private before " +
+                                    "tracks and recordings. Make it private before " +
                                     "backing up."
                             )
 

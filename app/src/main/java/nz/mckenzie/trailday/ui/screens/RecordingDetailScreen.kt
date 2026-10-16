@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
@@ -32,9 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import nz.mckenzie.trailday.domain.geo.Coverage
 import nz.mckenzie.trailday.domain.geo.GeoPoint
-import nz.mckenzie.trailday.domain.geo.formatCoveragePercent
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.map.BasemapView
@@ -46,18 +43,13 @@ import nz.mckenzie.trailday.viewmodel.RecordingDetailViewModel
 import kotlin.math.abs
 
 /**
- * One recording in full: the line that was driven, the line that was planned, and
- * how much of the plan it covered.
- *
- * Coverage is recomputed from the stored geometry rather than remembered, so this
- * stays truthful even if the planned track has been edited since.
+ * One recording in full: the line that was walked or ridden, and which place it followed.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun RecordingDetailScreen(
     viewModel: RecordingDetailViewModel,
-    onBack: () -> Unit,
-    onLogSpray: (Long) -> Unit = {}
+    onBack: () -> Unit
 ) {
     val detail by viewModel.detail.collectAsStateWithLifecycle()
     val apiKey by viewModel.apiKey.collectAsStateWithLifecycle()
@@ -131,7 +123,7 @@ fun RecordingDetailScreen(
                                 style = MaterialTheme.typography.titleSmall
                             )
                             Text(
-                                text = "Driven ${formatDistance(recording.geometryDistanceM)} \u00b7 " +
+                                text = "Recorded ${formatDistance(recording.geometryDistanceM)} \u00b7 " +
                                     "${formatDuration(recording.durationMs)} \u00b7 " +
                                     "${recording.points.size} points",
                                 style = MaterialTheme.typography.bodyMedium
@@ -145,42 +137,12 @@ fun RecordingDetailScreen(
                             }
                             Text(
                                 text = when {
-                                    recording.assetName != null -> "Recorded for ${recording.assetName}"
+                                    recording.assetName != null -> "Followed for ${recording.assetName}"
                                     recording.assetId != null -> "Its asset has since been deleted"
                                     else -> "Not linked to a planned asset"
                                 },
                                 style = MaterialTheme.typography.bodySmall
                             )
-                        }
-                    }
-
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text("Coverage", style = MaterialTheme.typography.titleSmall)
-                            Text(
-                                text = when {
-                                    recording.points.isEmpty() ->
-                                        "Nothing was recorded, so there is nothing to compare."
-
-                                    !recording.hasPlan ->
-                                        "No planned line to compare against."
-
-                                    else ->
-                                        "Covered ${formatCoveragePercent(recording.coverage ?: 0.0)} of " +
-                                            "the planned line, within " +
-                                            "${Coverage.DEFAULT_TOLERANCE_M.toInt()} m."
-                                },
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            if (recording.hasPlan) {
-                                Text(
-                                    text = "The driven line is drawn in red over the planned line in grey.",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
                         }
                     }
                 }
@@ -192,9 +154,6 @@ fun RecordingDetailScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    detail?.assetId?.let { assetId ->
-                        Button(onClick = { onLogSpray(assetId) }) { Text("Log a spray") }
-                    }
                     DestructiveOutlinedButton(text = "Delete recording", onClick = { confirmingDelete = true })
                 }
             }
@@ -207,8 +166,7 @@ fun RecordingDetailScreen(
             title = { Text("Delete this recording?") },
             text = {
                 Text(
-                    "Its points go with it. Any spray recorded from it stays in the history, " +
-                        "but loses its link to the recording. This cannot be undone."
+                    "Its points go with it. This cannot be undone."
                 )
             },
             confirmButton = {
@@ -227,9 +185,9 @@ fun RecordingDetailScreen(
     }
 }
 
-/** Camera bounds covering both the driven and the planned line. */
+/** Camera bounds covering the recorded line. */
 private fun boundsOf(detail: RecordingDetail?): LatLngBounds? {
-    val points: List<GeoPoint> = detail?.let { it.points + it.plannedGeometry.points }.orEmpty()
+    val points: List<GeoPoint> = detail?.points.orEmpty()
     if (points.size < 2) return null
     return LatLngBounds(
         minLat = points.minOf { it.lat },

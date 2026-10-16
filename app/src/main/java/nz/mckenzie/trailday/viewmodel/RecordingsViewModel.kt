@@ -44,7 +44,7 @@ data class RecordingRow(
 
 /**
  * The recordings browser: every GPS recording on the device, what it was for, and
- * how far it went - the way back to the evidence for a spray.
+ * how far it went - the way back to the line it followed.
  */
 class RecordingsViewModel(
     private val recordings: RecordingRepository,
@@ -52,8 +52,8 @@ class RecordingsViewModel(
 ) : ViewModel() {
 
     val sessions: StateFlow<List<RecordingRow>> =
-        combine(recordings.observeSessions(), assetRepository.observeAssetsWithDue()) { sessions, assetList ->
-            val names = assetList.associate { item -> item.asset.id to item.asset.name }
+        combine(recordings.observeSessions(), assetRepository.observeActiveAssets()) { sessions, assetList ->
+            val names = assetList.associate { asset -> asset.id to asset.name }
             sessions.map { session -> session.toRow(names) }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 

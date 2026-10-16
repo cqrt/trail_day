@@ -35,9 +35,8 @@ import nz.mckenzie.trailday.domain.tiles.LatLngBounds
  * or what colour its kind is. A record here carries `points` empty, and its `lengthM` still says how
  * long it is.
  *
- * Nothing about when a place is next due travels here any more, and neither does a spray
- * method, an interval or a pass count: they are the phone's own fields, and the desk neither shows nor
- * sends them.
+ * Nothing about a spray method, an interval or a pass count travels here: those fields are gone
+ * from the app.
  */
 object WebEditorJson {
 
@@ -64,14 +63,10 @@ object WebEditorJson {
      * desk still has to be told which *line* it was handed, or a card would go on talking about a track
      * that has since been moved, or that has grown a spur while the card was open.
      *
-     * [sprayCount] is here for the same kind of reason: it is not shown, and it is what the delete
-     * sentence counts.
-     *
-     * [recordingCount] is the other half of that: it is what the delete sentence counts too.
+     * [recordingCount] is what the delete sentence counts.
      */
     fun record(
         asset: AssetEntity,
-        sprayCount: Int,
         paths: List<List<GeoPoint>>,
         recordingCount: Int
     ): WebEditorAssetRecord = WebEditorAssetRecord(
@@ -84,20 +79,15 @@ object WebEditorJson {
             // unpick in the page's wording. One reading, on the phone; the page compares names.
             kind = AssetKind.fromStorage(asset.kind, AssetShape.fromStorage(asset.shape)).name,
             shape = asset.shape,
-            method = asset.method,
             notes = asset.notes,
-            intervalDays = asset.intervalDays,
-            swathWidthM = asset.swathWidthM,
-            passesRequired = asset.passesRequired,
-            passSeparationM = asset.passSeparationM,
             active = asset.active,
             createdAtEpochMs = asset.createdAtEpochMs,
-            lastSprayedAtEpochMs = asset.lastSprayedAtEpochMs,
             lengthM = asset.lengthM,
             // The measured ground, beside the cached metres and for the same reason: a carpark's card
             // says how much ground it is, and the desk reads the phone's own number rather than working
             // one out from the corners it can see. Zero for everything that is not ground.
             areaM2 = asset.areaM2,
+            sourceRef = asset.sourceRef,
             points = emptyList()
         ),
         // Sent back by the desk with an edit, so a change made on the phone while the card was open
@@ -110,7 +100,7 @@ object WebEditorJson {
         // does rather than working out its own: one place decides what a climb is, and the page reads
         // it. Null for a line with no heights, which is most of them.
         elevation = ElevationProfile.of(paths.firstOrNull().orEmpty())?.let(WebEditorElevation::of),
-        removal = WebEditorRemoval.of(AssetRemovalRules.of(asset.name, sprayCount, recordingCount))
+        removal = WebEditorRemoval.of(AssetRemovalRules.of(asset.name, recordingCount))
     )
 
     /**
@@ -324,7 +314,7 @@ data class WebEditorElevation(
 /**
  * What deleting an asset from the desk would take with it.
  *
- * [allowed] is false once anything is recorded against it - a spray, a recording - and then the
+ * [allowed] is false once anything is recorded against it - a recording - and then the
  * sentence says how much and where the delete belongs instead. See
  * [nz.mckenzie.trailday.domain.asset.AssetRemovalRules] for why the desk may not put an asset away.
  */
@@ -524,8 +514,7 @@ data class WebEditorChoice(
  *
  * Every list here is a list the phone's own edit screen offers, and every label is the string that
  * screen shows. What the page does with them is draw a `<select>`; what it must not do is decide what
- * the options are. Only the kinds are offered: a place's spray method, interval and pass count are the
- * phone's business, and the desk neither shows nor sends them.
+ * the options are. Only the kinds are offered: nothing else about a place is the desk's.
  */
 @Serializable
 data class WebEditorChoices(

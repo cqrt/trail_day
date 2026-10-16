@@ -543,7 +543,7 @@ class DrawAssetViewModelTest {
         assertEquals(
             "and the list still holds the one row",
             1,
-            repository.observeAssetsWithDue().first().size
+            repository.observeActiveAssets().first().size
         )
 
         val stored = repository.getAssetGeometry(id)
@@ -618,7 +618,7 @@ class DrawAssetViewModelTest {
 
         val saved = withTimeout(5_000) { viewModel.savedAssetId.first { it != null } }!!
         assertTrue("a new row, not the track that exists", saved != existing)
-        assertEquals(2, repository.observeAssetsWithDue().first().size)
+        assertEquals(2, repository.observeActiveAssets().first().size)
         assertEquals(
             "and the track that exists was not written to",
             3,

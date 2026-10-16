@@ -7,7 +7,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import nz.mckenzie.trailday.data.AssetRepository
@@ -41,7 +40,6 @@ class MapPositionTest {
     private lateinit var db: TrailDayDatabase
     private lateinit var assetRepository: AssetRepository
 
-    private val now = 1_790_000_000_000L
 
     @Before
     fun setUp() {
@@ -65,7 +63,6 @@ class MapPositionTest {
         assetRepository = assetRepository,
         settingsRepository = SettingsRepository(context),
         locationSource = source,
-        dueNow = flowOf(now),
         loadGeometry = { AssetGeometry.NONE }
     )
 

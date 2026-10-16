@@ -9,7 +9,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.RecordingRepository
-import nz.mckenzie.trailday.data.SprayRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
@@ -30,20 +29,19 @@ import org.junit.runner.RunWith
  *
  * The JVM tests hold the rules and the routes; what they cannot hold is that a write reaches Room -
  * that a drawn line is stored vertex
- * for vertex with its length worked out, that the spray history is left exactly as it was, and that a
+ * for vertex with its length worked out, and that a
  * version read out of `/api/state` is taken when nothing has moved and refused when something has.
  * That is what this file is for, and it is why each change was put through
  * `connectedDebugAndroidTest` rather than only the unit tests.
  *
  * The delete half is here for a reason the unit tests cannot reach either: what a delete would take
- * with it is two counts in two tables, one of which - the recordings - outlives the asset it names.
+ * with it is a count of the recordings, which outlive the asset they name.
  */
 @RunWith(AndroidJUnit4::class)
 class WebEditorSaveTest {
 
     private lateinit var db: TrailDayDatabase
     private lateinit var assets: AssetRepository
-    private lateinit var sprays: SprayRepository
     private lateinit var recordings: RecordingRepository
     private lateinit var documents: WebEditorDocuments
 
@@ -55,7 +53,6 @@ class WebEditorSaveTest {
         val context: Context = ApplicationProvider.getApplicationContext()
         db = Room.inMemoryDatabaseBuilder(context, TrailDayDatabase::class.java).build()
         assets = AssetRepository(db)
-        sprays = SprayRepository(db)
         recordings = RecordingRepository(db)
         documents = WebEditorDocuments(
             assets = assets,
@@ -141,19 +138,6 @@ class WebEditorSaveTest {
     @Test
     fun aSaveFromTheDeskChangesTheDetailsAndNothingElse() = runBlocking {
         val id = assets.createAsset(name = "Estuary road", geometry = line)
-        // A spray already logged on the phone, a line already measured, and the fields the desk no
-        // longer shows set to values of their own: the desk has heard of none of them, and none of
-        // them may be lost by a save from the desk.
-        assets.updateAsset(
-            assets.getAsset(id)!!.copy(
-                lastSprayedAtEpochMs = 1_780_000_000_000L,
-                method = "BOOM",
-                intervalDays = 90,
-                swathWidthM = 12.5,
-                passesRequired = 2,
-                passSeparationM = 3.0
-            )
-        )
         val version = stateRecord(id).version
 
         val answer = saved(documents.save(id, editBody(version, name = "Estuary road, lower")))
@@ -166,16 +150,8 @@ class WebEditorSaveTest {
 
         val stored = assets.getAsset(id)!!
         assertEquals("Estuary road, lower", stored.name)
-        // The method, the interval, the swath width and the pass count are the phone's own
-        // and the desk never mentions them, so a save leaves every one exactly as it was.
-        assertEquals("BOOM", stored.method)
-        assertEquals(90, stored.intervalDays)
-        assertEquals(12.5, stored.swathWidthM!!, 0.0)
-        assertEquals(2, stored.passesRequired)
-        assertEquals(3.0, stored.passSeparationM!!, 0.0)
         assertEquals("ROAD", stored.kind)
         // Everything the page never saw, exactly as it was.
-        assertEquals(1_780_000_000_000L, stored.lastSprayedAtEpochMs)
         assertTrue(stored.active)
         assertEquals("the length is still the line's own", 111.19, stored.lengthM, 0.5)
         assertEquals("and the line is still where it was", 2, assets.getAssetGeometry(id).pointCount)
@@ -199,19 +175,18 @@ class WebEditorSaveTest {
     }
 
     @Test
-    fun aSprayLoggedWhileTheCardIsOpenDoesNotRefuseTheEdit() = runBlocking {
+    fun aChangeTheDeskCannotWriteDoesNotRefuseTheEdit() = runBlocking {
         val id = assets.createAsset(name = "Estuary road", geometry = line)
         val version = stateRecord(id).version
 
-        // The version is about the fields a desk may write, and a spray is not one of them: an edit
-        // refused because a tractor went past while somebody was typing a new name would be the
-        // feature getting in the way of the work.
-        assets.updateAsset(assets.getAsset(id)!!.copy(lastSprayedAtEpochMs = 1_780_000_000_000L))
+        // The version is about the fields a desk may write, and a cached length is not one of them:
+        // an edit refused because something the desk cannot change moved would be the feature getting
+        // in the way of the work.
+        assets.updateAsset(assets.getAsset(id)!!.copy(lengthM = 1234.0))
 
         saved(documents.save(id, editBody(version, name = "Estuary road, lower")))
 
         assertEquals("Estuary road, lower", assets.getAsset(id)!!.name)
-        assertEquals(1_780_000_000_000L, assets.getAsset(id)!!.lastSprayedAtEpochMs)
     }
 
     @Test
@@ -280,12 +255,6 @@ class WebEditorSaveTest {
         val stored = assets.getAsset(id)!!
         assertEquals("Gully track", stored.name)
         assertEquals("TRACK", stored.kind)
-        assertEquals(
-            "the starting values the desk never sends are the phone's own defaults",
-            120,
-            stored.intervalDays
-        )
-        assertEquals("UNSET", stored.method)
         assertTrue("a new asset is active", stored.active)
         assertEquals(line, assets.getAssetGeometry(id).line)
         assertEquals(
@@ -304,7 +273,7 @@ class WebEditorSaveTest {
         assertEquals("A line needs at least two points", answer.message)
         assertTrue(
             "nothing was created by a drawing with no line",
-            assets.observeAssetsWithDue().first().isEmpty()
+            assets.observeActiveAssets().first().isEmpty()
         )
     }
 
@@ -473,23 +442,6 @@ class WebEditorSaveTest {
             "and its points went with it, because a point belongs to an asset",
             assets.getAssetGeometry(id).paths.isEmpty()
         )
-    }
-
-    @Test
-    fun aTrackWithASprayOnItIsNotDeletedFromTheDesk() = runBlocking {
-        val id = assets.createAsset(name = "Estuary road", geometry = line)
-        val version = stateRecord(id).version
-        sprays.recordSpray(assetId = id, sprayedAtEpochMs = 1_780_000_000_000L)
-
-        val refusal = refused(documents.remove(id, version), WebEditorRefusal.IN_USE)
-
-        assertTrue("says how many: ${refusal.message}", refusal.message.contains("1 spray on the phone"))
-        assertTrue(
-            "and where the delete is done: ${refusal.message}",
-            refusal.message.contains("Delete it on the phone")
-        )
-        assertEquals("the track is still there", id, assets.getAsset(id)!!.id)
-        assertEquals("and so is its spray", 1, sprays.observeSprayEvents(id).first().size)
     }
 
     @Test

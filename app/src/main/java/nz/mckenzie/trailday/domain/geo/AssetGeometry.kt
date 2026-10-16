@@ -9,10 +9,10 @@ package nz.mckenzie.trailday.domain.geo
  * those was to walk up the spur and back down it as part of the line. That costs twice over:
  *
  *  - **the length**, because the metres of the spur are in the line twice, and the length is what the
- *    handover and the coverage denominator use;
- *  - **the two-pass reading**, because [TwoPasses] treats opposite directions over the same metres as
- *    "up one side and back down the other" - which is right for a road and wrong for a dead end. One
- *    trip up a spur came back as both passes done, for a reason that had nothing to do with the spur.
+ *    handover and the totals use;
+ *  - **the reading of the line**, because opposite directions over the same metres would otherwise be
+ *    taken for one trip up and back rather than one path. One trip up a spur came back as a line with
+ *    a doubled section, for a reason that had nothing to do with the spur.
  *
  * So an asset's geometry is a list of paths. **[paths]`[0]` is the line** and the rest are side
  * tracks, in the order they were drawn - the storage's own order (`asset_points.pathIndex`), so
@@ -48,8 +48,8 @@ data class AssetGeometry(val paths: List<List<GeoPoint>> = emptyList()) {
     /**
      * The metres the job covers: every path's own length, each counted once.
      *
-     * A zero-length path contributes nothing, which is what a place comes to - it has no length to
-     * spray - and is why a spot is drawn as a point rather than a line of no length.
+     * A zero-length path contributes nothing, which is what a place comes to - it has no length - and is
+     * why a spot is drawn as a point rather than a line of no length.
      */
     val lengthM: Double get() = paths.sumOf { polylineLengthMeters(it) }
 

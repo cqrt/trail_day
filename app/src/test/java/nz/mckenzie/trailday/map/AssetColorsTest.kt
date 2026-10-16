@@ -1,7 +1,6 @@
 package nz.mckenzie.trailday.map
 
 import nz.mckenzie.trailday.domain.asset.AssetKind
-import nz.mckenzie.trailday.domain.due.DueStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -10,24 +9,11 @@ import org.junit.Test
 /**
  * The colours the map and the list draw with.
  *
- * Two vocabularies share this file: the traffic light says when something is due, and
- * the kind colours say what it is. They must not overlap - an icon the operator could
- * read as "overdue" would be worse than no icon at all - and every kind must have a
- * colour of its own, or two kinds would be indistinguishable wherever icons are small.
+ * Every kind must have a colour of its own family, and the kind colours must not be
+ * the recorded line's or the position marker's - an icon the operator could read as
+ * "the recording" would be worse than no icon at all.
  */
 class AssetColorsTest {
-
-    @Test
-    fun `no kind colour is a due colour`() {
-        val dueColours = DueStatus.entries.map { AssetColors.forStatus(it) }.toSet()
-
-        AssetKind.entries.forEach { kind ->
-            assertTrue(
-                "$kind shares a colour with the traffic light",
-                AssetColors.forKind(kind) !in dueColours
-            )
-        }
-    }
 
     @Test
     fun `the ten kinds wear the four family colours, and nothing else`() {
@@ -79,18 +65,6 @@ class AssetColorsTest {
     }
 
     @Test
-    fun `the phone's own position is not a due colour`() {
-        // The marker must not be readable as "overdue": it says where you are standing, not
-        // what needs doing, and it is drawn on the same map as both.
-        val dueColours = DueStatus.entries.map { AssetColors.forStatus(it) }.toSet()
-
-        assertTrue(
-            "the position marker shares a colour with the traffic light",
-            AssetColors.POSITION !in dueColours
-        )
-    }
-
-    @Test
     fun `and not a kind colour either, even though it is now blue`() {
         AssetKind.entries.forEach { kind ->
             assertTrue(
@@ -127,13 +101,5 @@ class AssetColorsTest {
         /** A Material light card, and a dark one. */
         const val LIGHT_CARD = "#FFFFFF"
         const val DARK_CARD = "#121212"
-    }
-
-    @Test
-    fun `the traffic light still says what it always said`() {
-        assertEquals(AssetColors.GREEN, AssetColors.forStatus(DueStatus.NOT_DUE))
-        assertEquals(AssetColors.YELLOW, AssetColors.forStatus(DueStatus.DUE_SOON))
-        assertEquals(AssetColors.RED, AssetColors.forStatus(DueStatus.OVERDUE))
-        assertEquals(AssetColors.RED, AssetColors.forStatus(DueStatus.NEVER_SPRAYED))
     }
 }

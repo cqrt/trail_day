@@ -1,12 +1,8 @@
 package nz.mckenzie.trailday.ui.screens
 
-import nz.mckenzie.trailday.data.AssetWithDue
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.domain.asset.AssetShape
-import nz.mckenzie.trailday.domain.due.DueInfo
-import nz.mckenzie.trailday.domain.due.DueStatus
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -20,49 +16,27 @@ class AssetListRowTest {
 
     private fun row(
         shape: AssetShape = AssetShape.LINE,
-        lengthM: Double = 2350.0,
-        status: DueStatus = DueStatus.DUE_SOON,
-        daysUntilDue: Long? = 3L
-    ) = AssetWithDue(
-        asset = AssetEntity(
-            id = 1L,
-            name = "Home block",
-            shape = shape.name,
-            createdAtEpochMs = 0L,
-            lengthM = lengthM
-        ),
-        due = DueInfo(status = status, dueDateEpochMs = null, daysUntilDue = daysUntilDue),
-        sprayCount = 0
+        lengthM: Double = 2350.0
+    ) = AssetEntity(
+        id = 1L,
+        name = "Home block",
+        shape = shape.name,
+        createdAtEpochMs = 0L,
+        lengthM = lengthM
     )
 
     @Test
-    fun `a drawn line says how long it is, and when it is due`() {
-        val detail = assetRowDetail(row())
-
-        assertTrue("the length comes first: $detail", detail.contains("\u00b7"))
-        assertTrue("and the due wording after it: $detail", detail.endsWith("due in 3 days"))
+    fun `a drawn line says how long it is`() {
+        assertEquals("2.35 km", assetRowDetail(row()))
     }
 
     @Test
-    fun `a spot says when it is due, and nothing about a length it does not have`() {
-        val detail = assetRowDetail(row(shape = AssetShape.POINT, lengthM = 0.0))
-
-        assertEquals("due in 3 days", detail)
+    fun `a spot says nothing about a length it does not have`() {
+        assertEquals("", assetRowDetail(row(shape = AssetShape.POINT, lengthM = 0.0)))
     }
 
     @Test
     fun `a line with nothing drawn on it yet is not described as zero metres`() {
-        val detail = assetRowDetail(row(lengthM = 0.0))
-
-        assertEquals("due in 3 days", detail)
-    }
-
-    @Test
-    fun `a never-sprayed spot still says so`() {
-        val detail = assetRowDetail(
-            row(shape = AssetShape.POINT, lengthM = 0.0, status = DueStatus.NEVER_SPRAYED, daysUntilDue = null)
-        )
-
-        assertEquals("never sprayed", detail)
+        assertEquals("", assetRowDetail(row(lengthM = 0.0)))
     }
 }

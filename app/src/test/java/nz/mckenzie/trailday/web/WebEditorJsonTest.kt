@@ -24,8 +24,8 @@ import org.junit.Test
  * backup vocabulary is written out in [WebEditorJson], and a column forgotten there is a column the
  * desk never sees.
  *
- * What is *not* in the document is held as firmly: nothing about when a place is next due,
- * how it is sprayed or what was in the tank travels to the desk at all.
+ * What is *not* in the document is held as firmly: how a place is sprayed, its interval and its
+ * last-sprayed date are gone from the app and never travel to the desk at all.
  */
 class WebEditorJsonTest {
 
@@ -37,15 +37,9 @@ class WebEditorJsonTest {
         name = "Estuary road",
         kind = "ROAD",
         shape = "LINE",
-        method = "BOOM",
         notes = "Both edges, twice a year",
-        intervalDays = 120,
-        swathWidthM = 12.5,
-        passesRequired = 2,
-        passSeparationM = 3.0,
         active = true,
         createdAtEpochMs = 1_700_000_000_000L,
-        lastSprayedAtEpochMs = 1_750_000_000_000L,
         lengthM = 3300.0
     )
 
@@ -57,13 +51,11 @@ class WebEditorJsonTest {
 
     private fun documentWith(
         asset: AssetEntity,
-        recordings: Int = 0,
-        sprays: Int = 4
+        recordings: Int = 0
     ) = WebEditorDocument(
         assets = listOf(
             WebEditorJson.record(
                 asset = asset,
-                sprayCount = sprays,
                 paths = listOf(path),
                 recordingCount = recordings
             )
@@ -103,15 +95,9 @@ class WebEditorJsonTest {
         assertEquals(everyField.name, restored.name)
         assertEquals(everyField.kind, restored.kind)
         assertEquals(everyField.shape, restored.shape)
-        assertEquals(everyField.method, restored.method)
         assertEquals(everyField.notes, restored.notes)
-        assertEquals(everyField.intervalDays, restored.intervalDays)
-        assertEquals(everyField.swathWidthM!!, restored.swathWidthM!!, 0.0)
-        assertEquals(everyField.passesRequired, restored.passesRequired)
-        assertEquals(everyField.passSeparationM!!, restored.passSeparationM!!, 0.0)
         assertEquals(everyField.active, restored.active)
         assertEquals(everyField.createdAtEpochMs, restored.createdAtEpochMs)
-        assertEquals(everyField.lastSprayedAtEpochMs, restored.lastSprayedAtEpochMs)
         assertEquals(everyField.lengthM, restored.lengthM, 0.0)
     }
 
@@ -126,7 +112,6 @@ class WebEditorJsonTest {
             assets = listOf(
                 WebEditorJson.record(
                     asset = everyField,
-                    sprayCount = 4,
                     paths = listOf(path, spur),
                     recordingCount = 0
                 )
@@ -144,7 +129,6 @@ class WebEditorJsonTest {
             assets = listOf(
                 WebEditorJson.record(
                     asset = everyField,
-                    sprayCount = 4,
                     paths = emptyList(),
                     recordingCount = 0
                 )
@@ -155,15 +139,17 @@ class WebEditorJsonTest {
     }
 
     @Test
-    fun `nothing about when a place is next due reaches the desk`() {
+    fun `nothing about how a place is sprayed reaches the desk`() {
         val text = WebEditorJson.build(documentWith(everyField))
 
-        // The traffic light, the day it is due and the count of sprays were the desk's own once; they
-        // are the phone's business now, and a document that still carried them would be one the page
-        // could show without meaning to.
-        assertTrue("no due status: $text", !text.contains("dueStatus"))
-        assertTrue("no due day: $text", !text.contains("dueAtEpochMs"))
-        assertTrue("no count of sprays: $text", !text.contains("sprayCount"))
+        // The method, the interval, the swath width, the pass count and the last-sprayed date were the
+        // desk's own once; they are gone from the app, and a document that still carried them would be
+        // one the page could show without meaning to.
+        assertTrue("no method: $text", !text.contains("method"))
+        assertTrue("no interval: $text", !text.contains("intervalDays"))
+        assertTrue("no swath width: $text", !text.contains("swathWidthM"))
+        assertTrue("no count of passes: $text", !text.contains("passesRequired"))
+        assertTrue("no last-sprayed date: $text", !text.contains("lastSprayedAtEpochMs"))
     }
 
     @Test
@@ -185,9 +171,6 @@ class WebEditorJsonTest {
         val carpark = everyField.copy(
             kind = AssetKind.CARPARK.name,
             shape = AssetKind.CARPARK.shape.name,
-            swathWidthM = null,
-            passesRequired = 1,
-            passSeparationM = null,
             lengthM = 855.0,
             areaM2 = 45_000.0
         )
@@ -207,7 +190,6 @@ class WebEditorJsonTest {
         )
         val withHeights = WebEditorJson.record(
             asset = everyField,
-            sprayCount = 0,
             paths = listOf(climbed),
             recordingCount = 0
         )
@@ -256,7 +238,7 @@ class WebEditorJsonTest {
     @Test
     fun `the record carries what deleting it would take, in the phone's own words`() {
         // A track nothing has ever been recorded against, which is the only kind the desk may delete.
-        val clean = roundTrip(documentWith(everyField, sprays = 0)).assets.single()
+        val clean = roundTrip(documentWith(everyField, recordings = 0)).assets.single()
 
         assertTrue("a track nothing is recorded against may be deleted", clean.removal.allowed)
         assertTrue(
@@ -264,19 +246,17 @@ class WebEditorJsonTest {
             clean.removal.sentence.contains("nothing else with it")
         )
 
-        // The four sprays the record already carries are counted by the same rule the delete uses, so a
-        // card cannot say "4 sprays recorded" and offer to delete the track in the same breath. The
-        // recording is in there too: a recording outlives its asset, and this is the sentence that has
-        // to say so before anything goes.
-        val sprayed = roundTrip(documentWith(everyField, recordings = 1)).assets.single()
-        assertFalse(sprayed.removal.allowed)
+        // A recording outlives its asset, and this is the sentence that has to say so before anything
+        // goes: the count is read by the same rule the delete uses.
+        val recorded = roundTrip(documentWith(everyField, recordings = 1)).assets.single()
+        assertFalse(recorded.removal.allowed)
         assertTrue(
-            "counts both: ${sprayed.removal.sentence}",
-            sprayed.removal.sentence.contains("4 sprays and 1 recording")
+            "counts the recording: ${recorded.removal.sentence}",
+            recorded.removal.sentence.contains("1 recording")
         )
         assertTrue(
-            "and sends the operator to the phone: ${sprayed.removal.sentence}",
-            sprayed.removal.sentence.contains("Delete it on the phone")
+            "and sends the operator to the phone: ${recorded.removal.sentence}",
+            recorded.removal.sentence.contains("Delete it on the phone")
         )
     }
 
@@ -286,8 +266,7 @@ class WebEditorJsonTest {
 
         // Not a second copy of the vocabulary: the phone's own phrase table, value and label, so a
         // kind added on the phone appears on the desk with nothing to remember here. The kinds are
-        // all the form offers: a place's spray method, interval and pass count are the phone's own
-        // fields and never travel to the desk.
+        // all the form offers: nothing else about a place travels to the desk.
         assertEquals(
             AssetPhrase.kinds.map { it.name to AssetPhrase.kind(it) },
             choices.kinds.map { it.value to it.label }
@@ -312,8 +291,7 @@ class WebEditorJsonTest {
         val fresh = roundTrip(documentWith(everyField)).newAsset
 
         // What a track somebody draws from scratch starts as: the phone's own default kind, rather
-        // than a name written into the page. The interval, method and pass count it starts with are
-        // the phone's own fields and never travel to the desk.
+        // than a name written into the page.
         assertEquals(AssetKind.TRACK.name, fresh.kind)
     }
 
