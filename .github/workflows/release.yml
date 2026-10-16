@@ -140,8 +140,8 @@ jobs:
             for any phone from the last few years. The `universal` APK runs anywhere but is
             four times the size; `x86_64` is only for emulators.
 
-            Signed with the same key as previous releases, so it installs straight over
-            an existing install.
+            Signed, so Android's installer will take it, and later updates of Trail Day
+            install over it cleanly.
           files: |
             app/build/outputs/apk/release/trail-day-*.apk
             app/build/outputs/bundle/release/trail-day-*.aab
