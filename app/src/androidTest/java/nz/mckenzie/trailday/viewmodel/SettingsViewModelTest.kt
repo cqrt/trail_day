@@ -205,6 +205,9 @@ class SettingsViewModelTest {
     @Test
     fun checkingAsksTheServiceAboutTheKeyInForce(): Unit = runBlocking {
         val settings = SettingsRepository(context)
+        // A key entered for this test, rather than one baked in at build time: the check must use
+        // whatever key is in force, and a test must not depend on the app having been built with one.
+        settings.setLinzApiKey("a-key-entered-for-this-test")
         // Written from the view model's coroutines, read here: an AtomicReference keeps
         // that a real hand-off rather than a hopeful one.
         val askedWith = AtomicReference<String?>(null)
@@ -224,6 +227,9 @@ class SettingsViewModelTest {
 
     @Test
     fun aRejectedKeyIsReportedInTheWordsTheServiceUsed(): Unit = runBlocking {
+        // A key in force, so the check is reached at all: what it answers is stubbed, but the view
+        // model refuses to ask when there is nothing to ask about.
+        SettingsRepository(context).setLinzApiKey("a-key-entered-for-this-test")
         val expired = "LINZ rejected the key (HTTP 400): it may have expired"
         val viewModel = viewModel { KeyCheck.Failed(expired) }
 
