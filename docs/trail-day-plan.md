@@ -402,3 +402,12 @@ downloaded DOC track on the main thread on every fix. The emulator showed it as 
 a phone with a downloaded area would have done the same. That arithmetic runs off the main thread now.
 
 **Next screens, in the plan's order**: the DOC browser, Record, Trips, a trip's page, Offline, Settings.
+
+**Step 10: the DOC browser is dressed.** The controls are the mock screens': a search pill with a magnifier at
+the top - the field is the button, and the keyboard's search key asks the question, so there is no second button
+beside it - "Near me" as a pill that says how far around the phone it is looking, the four sources as chips, and
+the filter and the order as pills. And every result is a **card**: the kind's tile, the name, DOC's own facts
+under it ("Tramping Track - One way - 3.98 km"), and how far away it is in the app's own colour with the time on
+foot beside it. With no fix there is no distance rather than a made-up one.
+
+**Next screens, in the plan's order**: Record, Trips, a trip's page, Offline, Settings.
