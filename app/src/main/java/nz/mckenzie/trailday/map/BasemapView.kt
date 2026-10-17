@@ -53,6 +53,9 @@ const val DEFAULT_CAMERA_ZOOM = 6.0
 
 internal const val ASSETS_SOURCE = "trailday-assets"
 
+/** The gold line under a recorded line: see [AssetColors.RECORDED_EDGE]. */
+internal const val RECORDED_CASING = "trailday-recorded-casing"
+
 /**
  * Where DOC's material is drawn from: its own source, so it can be styled, ordered and tapped
  * separately from the walker's own work - which is the whole difference between the two.
@@ -542,6 +545,23 @@ internal fun MapLibreMap.loadTrailDayStyle(
                         PropertyFactory.lineWidth(Expression.literal(TARGET_WIDTH)),
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
+                    )
+            )
+        }
+        // The recorded line's own gold edge, under it, filtered on the line's own colour so every screen that
+        // draws a recorded line wears it without knowing about layers: the mock screens draw what was walked
+        // with an edge, and that edge is what says "this line happened" rather than "this line is planned".
+        if (style.getLayer(RECORDED_CASING) == null) {
+            style.addLayer(
+                LineLayer(RECORDED_CASING, ASSETS_SOURCE)
+                    .withProperties(
+                        PropertyFactory.lineColor(Expression.literal(AssetColors.RECORDED_EDGE)),
+                        PropertyFactory.lineWidth(Expression.literal(ASSET_LINE_WIDTH + 4f)),
+                        PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                        PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
+                    )
+                    .withFilter(
+                        Expression.eq(Expression.get("stroke"), Expression.literal(AssetColors.RECORDED))
                     )
             )
         }

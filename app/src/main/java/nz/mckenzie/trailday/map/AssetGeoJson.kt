@@ -75,6 +75,14 @@ object AssetColors {
     const val RECORDED = "#2E7D32"
 
     /**
+     * The gold edge around the recorded line, as the mock screens draw it.
+     *
+     * Not a kind's colour and not the line's: it is a casing, saying "this is the line that was actually
+     * walked" wherever a recorded line is drawn - the recorder, a trip's page, a trip's card.
+     */
+    const val RECORDED_EDGE = "#D89B2A"
+
+    /**
      * One colour per kind of place, for the tile beside a place in the list and the line the map draws it
      * as - **the mock screens' colours**, which is what makes the list and the map agree about a hut.
      *

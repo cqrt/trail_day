@@ -39,26 +39,37 @@ internal fun FiguresCard(rows: List<List<Figure>>, modifier: Modifier = Modifier
                         color = MaterialTheme.colorScheme.outlineVariant
                     )
                 }
-                Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-                    row.forEachIndexed { cellIndex, figure ->
-                        if (cellIndex > 0) {
-                            VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        }
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 16.dp, vertical = 12.dp)
-                        ) {
-                            Text(
-                                text = figure.label.uppercase(),
-                                style = MaterialTheme.typography.labelSmall,
-                                letterSpacing = 1.1.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(text = figure.value, style = MaterialTheme.typography.titleMedium)
-                        }
-                    }
-                }
+                FigureCells(figures = row)
+            }
+        }
+    }
+}
+
+/**
+ * One row of figures, divided into cells: each a small capital label over its value.
+ *
+ * Apart from [FiguresCard] because a card is not the only place a row of figures belongs - the recorder's own
+ * card puts its distance above a row like this one, in the same card.
+ */
+@Composable
+internal fun FigureCells(figures: List<Figure>, modifier: Modifier = Modifier) {
+    Row(modifier = modifier.height(IntrinsicSize.Min)) {
+        figures.forEachIndexed { index, figure ->
+            if (index > 0) {
+                VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Text(
+                    text = figure.label.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    letterSpacing = 1.1.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(text = figure.value, style = MaterialTheme.typography.titleMedium)
             }
         }
     }
