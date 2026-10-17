@@ -13,22 +13,24 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,6 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.R
@@ -99,22 +102,9 @@ fun MapScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.app_name)) },
-                // Settings is the map's own key and switches. What used to be words up here -
-                // Places, Offline - are tabs in the bar below now, which is where a place belongs;
-                // and the key is set once, so the icon is enough.
-                actions = {
-                    IconButton(onClick = { layersOpen = true }) {
-                        AppIcon(IconGlyph.LAYERS, contentDescription = "What the map draws")
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        AppIcon(IconGlyph.SETTINGS, contentDescription = "Settings")
-                    }
-                }
-            )
-        },
+        // No bar over the map: the mock screens give the map the whole screen, and the three things that
+        // used to sit in a bar - what the map draws, the settings, and where I am - are round buttons over
+        // the map's top corner instead. The title has no job on a screen that is a place.
         bottomBar = { TrailDayNavBar(current = Tab.MAP, onSelect = onOpenTab) }
     ) { innerPadding ->
         Box(
@@ -171,13 +161,24 @@ fun MapScreen(
             // Where the app asks for the permission the marker needs, and asked on a tap: a
             // prompt that arrives with the map is a prompt for nothing, and one that arrived
             // from the record screen has an answer already.
-            FilledTonalIconButton(
-                onClick = locate,
+            //
+            // The three buttons over the map's top corner, as the mock screens draw them: white circles
+            // with a shadow, settings above what-the-map-draws above where-I-am. The mock screens have the
+            // last two; the settings need a door of their own once the bar is gone, and this is the corner
+            // the walker's thumb is already going to.
+            Column(
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 16.dp)
+                    .align(Alignment.TopEnd)
+                    .padding(end = 12.dp, top = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                AppIcon(IconGlyph.LOCATE, contentDescription = "Show where I am")
+                MapRoundButton(glyph = IconGlyph.SETTINGS, description = "Settings", onClick = onOpenSettings)
+                MapRoundButton(
+                    glyph = IconGlyph.LAYERS,
+                    description = "What the map draws",
+                    onClick = { layersOpen = true }
+                )
+                MapRoundButton(glyph = IconGlyph.LOCATE, description = "Show where I am", onClick = locate)
             }
 
             // Only when the chosen basemap needs a key and none is set. OpenStreetMap needs none,
@@ -209,9 +210,11 @@ fun MapScreen(
                     onOpenAsset = onOpenAsset,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        // Clear of the locator button on the right and of the licence line below: an
-                        // attribution the card covers is an attribution not shown.
-                        .padding(start = 12.dp, end = 88.dp, bottom = 64.dp)
+                        // The mock screens' card does not cross the whole screen: the map is the subject and
+                        // the card sits in its corner. Clear of the licence line below, which is not the
+                        // app's to hide.
+                        .padding(start = 12.dp, bottom = 44.dp)
+                        .widthIn(max = 250.dp)
                 )
             }
         }
@@ -390,6 +393,30 @@ internal fun AttributionStrip(
 }
 
 /**
+ * A round button over the map: a white circle with a shadow, as the mock screens draw the map's own controls.
+ *
+ * White rather than tinted because it sits over imagery: a tinted circle has to argue with whatever colour
+ * the ground happens to be, and a white one reads on all of them.
+ */
+@Composable
+private fun MapRoundButton(
+    glyph: IconGlyph,
+    description: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 3.dp
+    ) {
+        Box(modifier = Modifier.size(52.dp), contentAlignment = Alignment.Center) {
+            AppIcon(glyph = glyph, contentDescription = description, dimension = 24.dp)
+        }
+    }
+}
+
+/**
  * What is nearest, and what else is around: the map's own answer to "am I where I think I am".
  *
  * The shape is the mock screens': what kind of thing it is, its name, how far and how long on foot, then a
@@ -410,9 +437,11 @@ private fun NearbyCard(
         ) {
             Text(
                 text = "Nearest ${nearest.what}".uppercase(),
-                style = MaterialTheme.typography.labelSmall
+                style = MaterialTheme.typography.labelSmall,
+                // Spaced out, as the mock screens write that line: it is a label, not a sentence.
+                letterSpacing = 1.2.sp
             )
-            Text(text = nearest.name, style = MaterialTheme.typography.titleMedium)
+            Text(text = nearest.name, style = MaterialTheme.typography.titleLarge)
             Text(
                 text = listOfNotNull(
                     formatDistance(nearest.distanceM),
