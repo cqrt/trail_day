@@ -51,7 +51,7 @@ fun DocSource.drawingShape(): AssetShape =
  * The style layers DOC's material is drawn by.
  *
  * Its own names rather than the walker's, because they are a different thing on the map: the reference
- * layer has no switches, is drawn under the work, and cannot be tapped into anything.
+ * layer has no switches, is drawn under the work, and has no editor: a tap on it is answered by the map's card.
  */
 object DocLayerIds {
 

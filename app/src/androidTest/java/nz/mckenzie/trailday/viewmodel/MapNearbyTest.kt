@@ -16,6 +16,7 @@ import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
+import nz.mckenzie.trailday.domain.doc.DocHitTest
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
@@ -26,6 +27,7 @@ import nz.mckenzie.trailday.tracking.LocationSource
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -129,6 +131,62 @@ class MapNearbyTest {
             nearby.within.first { it.what == "hut" }.distanceM >
                 nearby.within.first { it.what == "campsite" }.distanceM
         )
+    }
+
+    @Test
+    fun pickingOneOfDocsTracksPutsItOnTheCard() = runBlocking {
+        // A track DOC publishes through the walker's own feet, and a hut a kilometre off: a tap on the line
+        // is a tap on the track, not on the hut.
+        val track = DocItem(
+            source = DocSource.TRACKS,
+            objectId = 42,
+            name = "Routeburn Track",
+            paths = listOf(
+                listOf(
+                    GeoPoint(lat = -44.9000, lng = 168.1000),
+                    GeoPoint(lat = -44.9050, lng = 168.1050)
+                )
+            ),
+            facts = mapOf("SubObjectType" to "Great Walk", "Region" to "Fiordland")
+        )
+        val hut = DocItem(
+            source = DocSource.HUTS,
+            objectId = 43,
+            name = "Mackenzie Hut",
+            paths = listOf(listOf(GeoPoint(lat = -44.9090, lng = 168.1090))),
+            facts = mapOf("place" to "Fiordland")
+        )
+        val docs = OfflineDocStore(dao = db.offlineDocItemDao(), downloader = DocDownloader(ArcGisDoc()))
+        docs.store(listOf(track, hut))
+        DevicePosition.useForTest(FakeLocation(listOf(fix(-44.9000, 168.1000))))
+
+        val viewModel = MapViewModel(
+            assetRepository = assetRepository,
+            settingsRepository = SettingsRepository(context),
+            locationSource = FakeLocation(emptyList()),
+            docStore = docs,
+            loadGeometry = { AssetGeometry.NONE }
+        )
+
+        // Halfway along the line, with a walking-scale radius.
+        viewModel.pickDocAt(-44.9010, 168.1010, DocHitTest.DEFAULT_TOLERANCE_M)
+
+        // The picked thing and the phone's own fix arrive separately, so the test waits for the card it is
+        // asserting about - the one with the distance worked out - rather than for the first thing to turn up.
+        val pick = withTimeout(5_000) {
+            viewModel.docPick.first { it != null && it.distanceM != null }
+        }!!
+        assertEquals("the track under the finger, not the hut nearby", "Routeburn Track", pick.item.name)
+        assertEquals("with what DOC says about it", DocSource.TRACKS, pick.item.source)
+        assertTrue(
+            "measured from where the phone is, not from where the finger was",
+            (pick.distanceM ?: Double.MAX_VALUE) < 200.0
+        )
+        assertNotNull("and how long getting there takes on foot", pick.onFootSeconds())
+
+        // A tap on empty ground lets it go, and the card is about what is nearest again.
+        viewModel.pickDocAt(-45.5000, 169.0000, DocHitTest.DEFAULT_TOLERANCE_M)
+        assertNull(viewModel.pickedDoc.value)
     }
 
     @Test

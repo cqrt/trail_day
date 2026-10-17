@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.AssetEntity
@@ -33,9 +34,11 @@ import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.domain.doc.DocCache
+import nz.mckenzie.trailday.domain.doc.DocHitTest
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.EmptyDocCache
+import nz.mckenzie.trailday.domain.nearby.DocPick
 import nz.mckenzie.trailday.domain.nearby.Nearby
 import nz.mckenzie.trailday.domain.nearby.NearbyThing
 import nz.mckenzie.trailday.map.AssetGeoJson
@@ -166,6 +169,46 @@ class MapViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     /**
+     * The thing DOC publishes the walker last tapped, or null.
+     *
+     * DOC's material is not the walker's to change and has no page of its own, so a tap on it is a question -
+     * "what is that?" - and the answer is the card at the bottom of the map. It is held here rather than in
+     * the screen so that it survives the map being redrawn, and the next tap that lands on nothing lets it go.
+     */
+    private val _pickedDoc = MutableStateFlow<DocItem?>(null)
+    val pickedDoc: StateFlow<DocItem?> = _pickedDoc
+
+    /**
+     * The picked thing with how far the phone is from it, measured again on every fix - the card says where
+     * the thing is now, not where it was when it was tapped.
+     *
+     * Declared after [here], which it reads in its initialiser.
+     */
+    val docPick: StateFlow<DocPick?> = combine(_pickedDoc, here) { item, position ->
+        item?.let { DocPick(it, position?.let { at -> DocHitTest.distanceTo(it, at) }) }
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    /**
+     * Makes the thing DOC publishes under a tap the card's subject, or puts what is nearest back when the tap
+     * landed on nothing.
+     *
+     * Read from the cache rather than from the map's own flow, so a tap answers from what the phone holds even
+     * if nothing is watching the reference layer at that moment - and worked out off the main thread, because
+     * DOC's cache can hold thousands of things and a tap must not stop the map drawing.
+     */
+    suspend fun pickDocAt(lat: Double, lng: Double, radiusM: Double) {
+        val held = withContext(Dispatchers.Default) { cached() }
+        _pickedDoc.value = withContext(Dispatchers.Default) { DocHitTest.nearest(held, lat, lng, radiusM) }
+    }
+
+    /** Lets go of a picked thing, so the card is about what is nearest again. */
+    fun clearPickedDoc() {
+        _pickedDoc.value = null
+    }
+
+    /**
      * Everything within reach of the walker, as distances: the walker's places first, then DOC's.
      *
      * A line is measured to the line and a place to the place - the difference between "the track is at my
@@ -188,7 +231,7 @@ class MapViewModel(
             )
         }
         val theirs = docs.mapNotNull { item ->
-            val distance = distanceTo(position, item.paths) ?: return@mapNotNull null
+            val distance = DocHitTest.distanceTo(item, position) ?: return@mapNotNull null
             NearbyThing(
                 name = item.name,
                 what = item.source.singular.lowercase(),

@@ -517,6 +517,30 @@ published app was installed fresh on the emulator, the map opened on the phone's
 it, and the laptop page that app serves was opened in a browser: the app's look, the new empty sentence, and a
 kind's tile asked for on its own and answered.
 
+## After the plan: a tap on something DOC publishes
+
+The map's card showed what was **nearest**. That is the right answer to "am I where I think I am", and the wrong
+answer to "what is that line?", which is what a walker looking at a track on the map is actually asking. Requested
+from the field, and built as asked: **tapping one of DOC's tracks puts that track on the card**, with what DOC says
+about it and how far the phone is from it now.
+
+- **The card says what it is showing.** "NEAREST TRACK" when it is what is nearest; "DOC TRACK" when it is the
+  thing that was tapped, with DOC's own facts under the name ("Tramping Track - 1.09 km") and the distance and
+  walking time from the phone. A line the walker's own place sits on still opens that place, so the tap means the
+  same thing everywhere on the map.
+- **Tapping the map anywhere else puts what is nearest back.** No dismiss button, no mode to get out of.
+- **The distance is worked out again on every fix**, not kept from the tap: a card saying "800 m away" about the
+  track under the walker's boots would be worse than one saying nothing.
+- **The tap is measured against the lines DOC's material is drawn from**, on the ground, in a circle the map's own
+  zoom decides - the same rule the walker's own places are picked with. The arithmetic runs away from the drawing,
+  because DOC's cache is far bigger than the walker's own list, and a tap must not stop the map.
+- **Nothing is saved and nothing opens.** DOC's material has no page of its own, and the card says so in as many
+  words rather than looking like a door that opens onto nothing.
+
+It was looked at on the emulator against a downloaded area of Arthur's Pass: the card showed the nearest track when
+the map opened, changed to "Coral Track - Tramping Track - 1.09 km - 404 m away - about 5 min on foot" when that
+line was tapped, and went back to the nearest track when the map was tapped away from any line.
+
 **The plan is complete**: eleven steps, each landed and each looked at on a screen. What is left in the plan's own
 words is nothing; what is left in the project is the pair of tests that wait on a stored preference with a clock,
 which is worth its own small change, and the question of DOC's duplicate hut records.

@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,13 +50,16 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.R
 import nz.mckenzie.trailday.domain.asset.AssetLayer
+import nz.mckenzie.trailday.domain.nearby.DocPick
 import nz.mckenzie.trailday.domain.nearby.Nearby
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.ui.formatDistance
+import nz.mckenzie.trailday.ui.docRowDetail
 import nz.mckenzie.trailday.ui.formatEstimate
 import nz.mckenzie.trailday.viewmodel.MapViewModel
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -76,8 +80,10 @@ fun MapScreen(
     val hiddenLayers by viewModel.hiddenLayers.collectAsStateWithLifecycle()
     val placeNames by viewModel.placeNames.collectAsStateWithLifecycle()
     val nearby by viewModel.nearby.collectAsStateWithLifecycle()
+    val docPick by viewModel.docPick.collectAsStateWithLifecycle()
 
     var layersOpen by remember { mutableStateOf(false) }
+    val mapScope = rememberCoroutineScope()
 
     val context = LocalContext.current
 
@@ -117,8 +123,8 @@ fun MapScreen(
                 apiKey = apiKey,
                 assetGeoJson = geoJson,
                 // DOC's material, under the walker's own work: the tracks, huts, campsites and bike
-                // locations kept on the phone for offline use. It is not the walker's to change, and
-                // nothing on this screen can open one - see DocGeoJson.
+                // locations kept on the phone for offline use. It is not the walker's to change and has
+                // no page of its own - a tap on it is answered by the card at the bottom of the map.
                 docGeoJson = docGeoJson,
                 // What the walker has switched off. The home map is the one these apply to: a
                 // screen that is about one place, or about the spot being drawn, draws it
@@ -140,7 +146,20 @@ fun MapScreen(
                 // Tapping a track opens it: the map is where they are looking when they
                 // wonder about a block. The radius comes from the map's zoom, so the tap
                 // works at country scale as well as at paddock height.
-                onMapClick = { lat, lng, radiusM -> viewModel.assetAt(lat, lng, radiusM)?.let(onOpenAsset) },
+                //
+                // A tap that lands on nothing of the walker's but on something DOC publishes
+                // asks the card below about it, and one that lands on nothing at all puts what
+                // is nearest back. The question is worked out away from the drawing, because
+                // DOC's cache is far bigger than the walker's own list.
+                onMapClick = { lat, lng, radiusM ->
+                    val asset = viewModel.assetAt(lat, lng, radiusM)
+                    if (asset != null) {
+                        viewModel.clearPickedDoc()
+                        onOpenAsset(asset)
+                    } else {
+                        mapScope.launch { viewModel.pickDocAt(lat, lng, radiusM) }
+                    }
+                },
                 modifier = Modifier.fillMaxSize()
             )
 
@@ -204,18 +223,21 @@ fun MapScreen(
             // What is nearest, at the bottom of the map where the mock screens put it: the quickest answer
             // there is to "am I where I think I am". Above the attribution line, and clear of the locate
             // button so neither is in the other's way.
-            nearby?.let { card ->
-                NearbyCard(
-                    nearby = card,
-                    onOpenAsset = onOpenAsset,
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        // The mock screens' card does not cross the whole screen: the map is the subject and
-                        // the card sits in its corner. Clear of the licence line below, which is not the
-                        // app's to hide.
-                        .padding(start = 12.dp, bottom = 44.dp)
-                        .widthIn(max = 250.dp)
-                )
+            // The card's subject: the thing DOC publishes that was tapped, or failing that what is nearest.
+            val cardModifier = Modifier
+                .align(Alignment.BottomStart)
+                // The mock screens' card does not cross the whole screen: the map is the subject and the card
+                // sits in its corner. Clear of the licence line below, which is not the app's to hide.
+                .padding(start = 12.dp, bottom = 44.dp)
+                .widthIn(max = 250.dp)
+
+            val picked = docPick
+            if (picked != null) {
+                DocCard(pick = picked, modifier = cardModifier)
+            } else {
+                nearby?.let { card ->
+                    NearbyCard(nearby = card, onOpenAsset = onOpenAsset, modifier = cardModifier)
+                }
             }
         }
     }
@@ -440,5 +462,49 @@ private fun NearbyCard(
         Card(onClick = { onOpenAsset(nearest.assetId) }, modifier = modifier) { content() }
     } else {
         Card(modifier = modifier) { content() }
+    }
+}
+
+/**
+ * What DOC publishes, as the walker tapped it: the kind of thing, its name, DOC's own facts about it, and how
+ * far the phone is from it now.
+ *
+ * **A card and no more, deliberately.** This material is not the walker's to change and has no page of its
+ * own, so the card says so rather than looking like a door that opens onto nothing. The facts are the phone's
+ * own words for the row - the same line the browser puts under a name - so the two surfaces cannot drift.
+ * Tapping the map anywhere else puts what is nearest back.
+ */
+@Composable
+private fun DocCard(pick: DocPick, modifier: Modifier = Modifier) {
+    val item = pick.item
+    val facts = docRowDetail(item, distanceM = null)
+    val away = listOfNotNull(
+        pick.distanceM?.let { formatDistance(it) + " away" },
+        pick.onFootSeconds()?.let { "about ${formatEstimate(it)} on foot" }
+    )
+
+    Card(modifier = modifier) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = "DOC ${item.source.singular}".uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                letterSpacing = 1.2.sp
+            )
+            Text(text = item.name, style = MaterialTheme.typography.titleLarge)
+            if (facts.isNotBlank()) {
+                Text(text = facts, style = MaterialTheme.typography.bodySmall)
+            }
+            if (away.isNotEmpty()) {
+                Text(text = away.joinToString(" \u00b7 "), style = MaterialTheme.typography.bodySmall)
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+            Text(
+                text = "From DOC - not one of your places",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
     }
 }
