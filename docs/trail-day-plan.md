@@ -386,3 +386,19 @@ is still to come**: a DOC result has no page to open yet, so a hit there would b
 
 **Next screens, in the plan's order**: a place's page, the DOC browser, Record, Trips, a trip's page, Offline,
 Settings.
+
+**Step 10: a place's page is dressed.** The place is on its own ground at the top of the page - the map across
+the full width, with round white buttons for back and for everything else over its corners - and a white sheet
+with rounded top corners lifts over the foot of the map carrying the name, the figures, the height chart, the
+notes and the trips. The figures are the mock screens' card rather than a line of facts: a white card divided
+into cells, LENGTH, CLIMB and TIME, the last from the one rule for time. A spot has no length, climb or time, so
+it says where it is instead.
+
+**And the page starts the recorder**: "Record this" - "Head for this" for a spot - opens the recorder with the
+place already chosen, so the walker does not pick the same target twice.
+
+**A fault found here and fixed**: the map's nearest-thing card was measuring the walker against every
+downloaded DOC track on the main thread on every fix. The emulator showed it as a screen that stopped answering;
+a phone with a downloaded area would have done the same. That arithmetic runs off the main thread now.
+
+**Next screens, in the plan's order**: the DOC browser, Record, Trips, a trip's page, Offline, Settings.
