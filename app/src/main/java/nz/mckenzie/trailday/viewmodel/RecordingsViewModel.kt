@@ -57,15 +57,31 @@ class RecordingsViewModel(
             sessions.map { session -> session.toRow(names) }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
+    /**
+     * What the walker has typed into the list's search: the trips whose name holds it.
+     *
+     * Local and instant, like the places list's: these trips are on the phone already.
+     */
+    private val _query = MutableStateFlow("")
+    val query: StateFlow<String> = _query
+
+    fun search(text: String) {
+        _query.value = text
+    }
+
+    /**
+     * The trips the list is built from: all of them, or the ones the search leaves.
+     *
+     * The delete is not here: a trip is removed from its own page, where the walker can see the line and its
+     * numbers before it goes - see [nz.mckenzie.trailday.ui.screens.RecordingsScreen].
+     */
+    val shown: StateFlow<List<RecordingRow>> = combine(sessions, _query) { all, query ->
+        val typed = query.trim()
+        all.filter { row -> typed.isEmpty() || row.name.contains(typed, ignoreCase = true) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
-
-    fun delete(sessionId: Long) {
-        viewModelScope.launch {
-            runCatching { recordings.deleteRecording(sessionId) }
-                .onFailure { _message.value = it.message ?: "Could not delete the trip" }
-        }
-    }
 
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L

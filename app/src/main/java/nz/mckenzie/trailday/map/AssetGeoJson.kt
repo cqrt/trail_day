@@ -82,6 +82,9 @@ object AssetColors {
      */
     const val RECORDED_EDGE = "#D89B2A"
 
+    /** The recorded green, light enough to read on a dark card - derived, like the kinds'. */
+    const val RECORDED_DARK = "#81C784"
+
     /**
      * One colour per kind of place, for the tile beside a place in the list and the line the map draws it
      * as - **the mock screens' colours**, which is what makes the list and the map agree about a hut.

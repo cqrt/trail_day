@@ -20,12 +20,13 @@ class RecordingsRowTest {
     private fun row(
         status: RecordingStatus = RecordingStatus.FINISHED,
         assetId: Long? = 7L,
-        assetName: String? = "Home block"
+        assetName: String? = "Home block",
+        distanceM: Double = 2350.0
     ) = RecordingRow(
         id = 1L,
         name = "Home block 14 Sep",
         startedAtEpochMs = 0L,
-        distanceM = 2350.0,
+        distanceM = distanceM,
         durationMs = 750_000L,
         pointCount = 412,
         status = status,
@@ -67,5 +68,20 @@ class RecordingsRowTest {
             "Not linked to a place",
             recordingAsset(row(assetId = null, assetName = null))
         )
+    }
+
+    @Test
+    fun `the list says what it holds, and one trip is its own sentence`() {
+        assertEquals(
+            "2 trips \u00b7 14.35 km between them",
+            summaryOf(listOf(row(distanceM = 10_000.0), row(distanceM = 4_350.0)))
+        )
+        assertEquals(
+            "a crowd of one is not a crowd",
+            "1 trip \u00b7 2.35 km",
+            summaryOf(listOf(row(distanceM = 2_350.0)))
+        )
+        assertEquals("no distance is no distance to say", "2 trips", summaryOf(listOf(row(distanceM = 0.0), row(distanceM = 0.0))))
+        assertEquals("No trips", summaryOf(emptyList()))
     }
 }
