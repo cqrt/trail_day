@@ -39,6 +39,7 @@ import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.offline.OfflineArea
 import nz.mckenzie.trailday.offline.docHeldWords
+import nz.mckenzie.trailday.offline.pictureCountWords
 import nz.mckenzie.trailday.viewmodel.OfflineViewModel
 
 /**
@@ -65,6 +66,7 @@ fun OfflineScreen(
     val docDataCount by viewModel.docDataCount.collectAsStateWithLifecycle()
     val docBounds by viewModel.docBounds.collectAsStateWithLifecycle()
     val docCounts by viewModel.docCounts.collectAsStateWithLifecycle()
+    val docPictures by viewModel.docPictures.collectAsStateWithLifecycle()
 
     var chosenTab by rememberSaveable { mutableStateOf(0) }
     var confirmingClearImagery by rememberSaveable { mutableStateOf(false) }
@@ -113,6 +115,7 @@ fun OfflineScreen(
                         apiKey = apiKey,
                         count = docDataCount,
                         counts = docCounts,
+                        pictures = docPictures,
                         bounds = docBounds,
                         onChooseArea = onChooseDocArea,
                         onClear = { confirmingClearDocData = true }
@@ -154,9 +157,10 @@ fun OfflineScreen(
             title = { Text("Delete downloaded DOC data?") },
             text = {
                 Text(
-                    "This removes the ${docHeldWords(docCounts)} kept for offline use. The map's DOC " +
-                        "layer and the DOC browser will need reception until an area is downloaded " +
-                        "again. Nothing of your own is touched."
+                    "This removes the ${docHeldWords(docCounts)}" +
+                        (docPictures.takeIf { it > 0 }?.let { " and ${pictureCountWords(it)}" } ?: "") +
+                        " kept for offline use. The map's DOC layer and the DOC browser will need " +
+                        "reception until an area is downloaded again. Nothing of your own is touched."
                 )
             },
             confirmButton = {
@@ -267,13 +271,15 @@ private fun ImageryTab(
  *
  * One entry for four services, because a walker keeps an area rather than a kind of thing: the same
  * download, the same count, the same clearing. What arrived is listed by service, because "412 tracks,
- * 38 huts" is the shape a walker checks their area against.
+ * 38 huts" is the shape a walker checks their area against, and the pictures DOC publishes for those
+ * things are counted with them.
  */
 @Composable
 private fun DocDataTab(
     apiKey: String,
     count: Int,
     counts: Map<DocSource, Int>,
+    pictures: Int,
     bounds: LatLngBounds?,
     onChooseArea: () -> Unit,
     onClear: () -> Unit
@@ -315,8 +321,14 @@ private fun DocDataTab(
                         text = "${docHeldWords(counts)} kept",
                         style = MaterialTheme.typography.titleSmall
                     )
+                    val picturesLine = pictureCountWords(pictures)
                     Text(
-                        text = "Available to the map and the DOC browser with no reception.",
+                        text = if (picturesLine.isEmpty()) {
+                            "Available to the map and the DOC browser with no reception."
+                        } else {
+                            "$picturesLine of them. Available to the map and the DOC browser with no " +
+                                "reception."
+                        },
                         style = MaterialTheme.typography.bodySmall
                     )
                 }

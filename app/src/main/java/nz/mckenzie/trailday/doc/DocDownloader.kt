@@ -35,7 +35,13 @@ data class DocAreaDownload(
     /** How many of each service answered with, zero included: a service that was empty is not a failure. */
     val counts: Map<DocSource, Int>,
     /** The services that could not be read at all, with the phone's sentence about each. */
-    val failed: Map<DocSource, String>
+    val failed: Map<DocSource, String>,
+    /**
+     * The pictures of what arrived, once they have been fetched: empty here, because reading the
+     * services and keeping pictures are two steps and this is the first of them - see
+     * [nz.mckenzie.trailday.offline.OfflineDocStore].
+     */
+    val pictures: DocPictures = DocPictures.NONE
 )
 
 /**

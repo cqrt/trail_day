@@ -4,6 +4,7 @@ import androidx.room.testing.MigrationTestHelper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import nz.mckenzie.trailday.domain.doc.DocFactsJson
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -94,6 +95,29 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun theDocCacheGainsThePicturesOfWhatItHolds() {
+        // From version 2, which had the material and nowhere to put a picture of it. Nothing is carried
+        // across, because there is nothing to carry: a picture arrives with the next download of an area,
+        // and DOC is still publishing it.
+        helper.createDatabase(TEST_DATABASE_PICTURES, 2).close()
+
+        val migrated = helper.runMigrationsAndValidate(TEST_DATABASE_PICTURES, 3, true, MIGRATION_2_3)
+
+        migrated.execSQL(
+            """
+            INSERT INTO offline_doc_pictures (url, bytes, fetchedAtEpochMs)
+            VALUES ('https://www.doc.govt.nz/thumbs/large/link/abc.jpg', X'01020304', 1790000000000)
+            """.trimIndent()
+        )
+
+        migrated.query("SELECT url, bytes FROM offline_doc_pictures").use { rows ->
+            assertTrue("the picture is there", rows.moveToFirst())
+            assertEquals("https://www.doc.govt.nz/thumbs/large/link/abc.jpg", rows.getString(0))
+            assertArrayEquals(byteArrayOf(1, 2, 3, 4), rows.getBlob(1))
+        }
+    }
+
     private companion object {
         /** Names of this test's own: the real database is never opened by a test. */
         const val TEST_DATABASE = "migration-test.db"
@@ -103,5 +127,8 @@ class MigrationTest {
          * would be two tests fighting over one database rather than two cases of one change.
          */
         const val TEST_DATABASE_SHARED = "migration-test-shared.db"
+
+        /** And a third, for the version 2 to 3 change, so neither file is migrated twice. */
+        const val TEST_DATABASE_PICTURES = "migration-test-pictures.db"
     }
 }

@@ -1,6 +1,7 @@
 package nz.mckenzie.trailday.offline
 
 import nz.mckenzie.trailday.doc.DocAreaDownload
+import nz.mckenzie.trailday.doc.DocPictures
 import nz.mckenzie.trailday.domain.doc.DocSource
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -16,8 +17,9 @@ class DocWordsTest {
 
     private fun download(
         counts: Map<DocSource, Int>,
-        failed: Map<DocSource, String> = emptyMap()
-    ) = DocAreaDownload(items = emptyList(), counts = counts, failed = failed)
+        failed: Map<DocSource, String> = emptyMap(),
+        pictures: DocPictures = DocPictures.NONE
+    ) = DocAreaDownload(items = emptyList(), counts = counts, failed = failed, pictures = pictures)
 
     @Test
     fun `the sentence names each service with its own count, in DOC's own order`() {
@@ -87,5 +89,34 @@ class DocWordsTest {
             )
         )
         assertEquals("", docHeldWords(emptyMap()))
+    }
+
+    @Test
+    fun `the download's sentence names the pictures that came with it`() {
+        assertEquals(
+            "Kept 3 tracks and 12 pictures.",
+            docDownloadedMessage(
+                download(mapOf(DocSource.TRACKS to 3), pictures = DocPictures(asked = 12, kept = 12))
+            )
+        )
+        assertEquals(
+            "and says how many came when some did not",
+            "Kept 3 tracks and 9 of 12 pictures.",
+            docDownloadedMessage(
+                download(mapOf(DocSource.TRACKS to 3), pictures = DocPictures(asked = 12, kept = 9))
+            )
+        )
+        assertEquals(
+            "and an area with no pictures says nothing about them",
+            "Kept 3 tracks.",
+            docDownloadedMessage(download(mapOf(DocSource.TRACKS to 3)))
+        )
+    }
+
+    @Test
+    fun `pictures are counted the way the tab says them, and nothing is said of none`() {
+        assertEquals("", pictureCountWords(0))
+        assertEquals("1 picture", pictureCountWords(1))
+        assertEquals("12 pictures", pictureCountWords(12))
     }
 }

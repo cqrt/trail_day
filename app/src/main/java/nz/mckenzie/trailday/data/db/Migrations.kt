@@ -70,3 +70,30 @@ internal val MIGRATION_1_2 = object : Migration(1, 2) {
         )
     }
 }
+
+/**
+ * Where the DOC cache gains the pictures of what it holds.
+ *
+ * **Nothing is carried across, because there is nothing to carry.** The table is new and every picture
+ * arrives with the next download of an area: a picture is a copy of something DOC publishes, and DOC is
+ * still publishing it. A walker's downloaded material is untouched - what changes is that the next area
+ * they download brings the huts' and campsites' pictures with it.
+ *
+ * From here on, clearing the cache clears the pictures too: they belong to the material, and a picture
+ * left behind would be storage nobody could see or get rid of.
+ */
+internal val MIGRATION_2_3 = object : Migration(2, 3) {
+
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS offline_doc_pictures (
+                url TEXT NOT NULL,
+                bytes BLOB NOT NULL,
+                fetchedAtEpochMs INTEGER NOT NULL,
+                PRIMARY KEY(url)
+            )
+            """.trimIndent()
+        )
+    }
+}

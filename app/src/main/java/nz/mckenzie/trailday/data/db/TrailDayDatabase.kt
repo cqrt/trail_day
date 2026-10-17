@@ -13,9 +13,10 @@ import androidx.room.RoomDatabase
         RecordedPointEntity::class,
         RecordedBreakEntity::class,
         OfflineAreaEntity::class,
-        OfflineDocItemEntity::class
+        OfflineDocItemEntity::class,
+        OfflineDocPictureEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class TrailDayDatabase : RoomDatabase() {
@@ -39,9 +40,10 @@ abstract class TrailDayDatabase : RoomDatabase() {
         /**
          * One database for the whole app; tests build their own in memory instead.
          *
-         * The migration is named here rather than left to be discovered: an install from before the DOC
-         * cache was keyed by source has data in the old shape, and Room refuses to open a database it has
-         * no path to - which would be the app failing to start rather than a cache being rebuilt.
+         * The migrations are named here rather than left to be discovered: an install from before the DOC
+         * cache was keyed by source has data in the old shape, and an install from before it kept the
+         * pictures has no table for them. Room refuses to open a database it has no path to - which would
+         * be the app failing to start rather than a cache being rebuilt.
          */
         fun get(context: Context): TrailDayDatabase =
             instance ?: synchronized(this) {
@@ -50,7 +52,7 @@ abstract class TrailDayDatabase : RoomDatabase() {
                     TrailDayDatabase::class.java,
                     NAME
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build().also { instance = it }
             }
     }

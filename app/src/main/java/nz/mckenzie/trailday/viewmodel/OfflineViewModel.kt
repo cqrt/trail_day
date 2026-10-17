@@ -73,6 +73,15 @@ class OfflineViewModel(
      */
     val docCounts: StateFlow<Map<DocSource, Int>> = _docCounts
 
+    /**
+     * How many pictures of DOC's material are kept: they arrive with the material and go with it.
+     *
+     * Live from the database rather than refreshed with the material's count, because the two move at
+     * different moments - the records land first and the pictures follow.
+     */
+    val docPictures: StateFlow<Int> = docStore.observePictureCount()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
+
     init {
         refreshSummary()
 
