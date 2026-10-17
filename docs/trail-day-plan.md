@@ -263,6 +263,34 @@ Four things came out of asking DOC rather than assuming them, and they shape the
   a time. The app calls it "Bike locations".
 - **DOC's text arrives with HTML in it**, truncated mid-tag, so it is stripped before anyone reads it.
 
-**The screens still show tracks, and the download still covers tracks.** The browser over four sources
-is step 4 and the area's DOC data in one act is step 5; this step was the reading, and the reading is
-what everything after it stands on.
+**Step 3 is done.** DOC's material is a reference layer on the map - cased in white, drawn under the
+walker's own work, and not a place of theirs: it cannot be renamed, moved or deleted, it is not in the
+Places list and not in a backup. The places that had already been pulled out of DOC were counted, said out
+loud, and dropped - the layer fetches them again.
+
+**Step 4 is done.** One browser over four sources, on the phone and on the desk: the source across the
+top, the search field, how far away each row is, the filters each service's own facts allow, and the order.
+The desk stopped importing what it read - the last place a DOC thing could still be copied into a walker's
+places - and it reads through the phone, which is the only one of the two that talks to DOC.
+
+**Step 5 is done.** It landed as **four commits rather than one**, because a download over four services,
+the pictures of what it keeps, the size shown before it is taken, and the ground around one track are four
+subjects:
+
+- Downloading an area reads all four of DOC's services in one act and keeps what arrived under one entry,
+  listed and cleared as one thing. A service that will not answer is named and does not stop the others.
+- The pictures DOC publishes are fetched with the material and cleared with it, counted on the same entry,
+  and fetched only where DOC's address for one really is a picture rather than a page about the thing.
+- The picker says what is inside the box, service by service, and roughly what it weighs, before the button
+  is tapped - DOC's own counts, and the app's own arithmetic for the bytes.
+- A track's own page can keep the ground around it: the box is drawn around the line, and the imagery and
+  DOC's material inside it are kept in one act.
+
+Two things found along the way, neither of them a screen's:
+
+- **DOC publishes the same Angelus Hut twice**, under two of its own numbers and one asset id, and the app
+  shows what DOC publishes. Collapsing the two on DOC's own id would tidy both the browser and the map; it
+  is a decision about what is *kept*, so it is waiting on the walker's call.
+- **The mock's offline screen puts imagery and DOC data in one list** with a single "Download an area"
+  button, where the app still has two tabs. That is the look stage's to settle, and nothing depends on it.
+
