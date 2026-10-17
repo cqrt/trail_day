@@ -360,3 +360,15 @@ rules, the search field, the recorder's gold edge, and the layouts themselves.
 
 **Step 10 is next**, one screen per change with a screenshot, in this order: Map, Places, a place's page, the
 DOC browser, Record, Trips, a trip's page, Offline, Settings.
+
+**Step 10: the map is dressed.** The map is the whole screen now, as the mock screens draw it - no bar over it,
+round white buttons for the settings, for what the map draws and for where I am over its top corner, and the
+nearest card in the corner rather than across the bottom, with its label spaced out and its name large.
+
+Two deliberate departures from the mock, recorded so they are decisions rather than drift: **a third button**,
+because with the bar gone the settings need a door of their own and the top corner is where the thumb already
+goes; and **a blue position marker**, because the mock's green is the recorded line's colour now, and two
+greens saying different things on one screen is worse than one blue that says only "you are here".
+
+**The rest of step 10, in the plan's order**: Places, a place's page, the DOC browser, Record, Trips, a trip's
+page, Offline, Settings.
