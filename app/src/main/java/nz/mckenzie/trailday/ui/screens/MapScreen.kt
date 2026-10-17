@@ -46,10 +46,14 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.R
 import nz.mckenzie.trailday.domain.asset.AssetLayer
+import nz.mckenzie.trailday.domain.nearby.Nearby
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.map.BasemapView
+import nz.mckenzie.trailday.ui.formatDistance
+import nz.mckenzie.trailday.ui.formatEstimate
 import nz.mckenzie.trailday.viewmodel.MapViewModel
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,6 +72,7 @@ fun MapScreen(
     val locationNotice by viewModel.locationNotice.collectAsStateWithLifecycle()
     val hiddenLayers by viewModel.hiddenLayers.collectAsStateWithLifecycle()
     val placeNames by viewModel.placeNames.collectAsStateWithLifecycle()
+    val nearby by viewModel.nearby.collectAsStateWithLifecycle()
 
     var layersOpen by remember { mutableStateOf(false) }
 
@@ -194,6 +199,21 @@ fun MapScreen(
                     .align(Alignment.BottomStart)
                     .padding(bottom = 6.dp)
             )
+
+            // What is nearest, at the bottom of the map where the mock screens put it: the quickest answer
+            // there is to "am I where I think I am". Above the attribution line, and clear of the locate
+            // button so neither is in the other's way.
+            nearby?.let { card ->
+                NearbyCard(
+                    nearby = card,
+                    onOpenAsset = onOpenAsset,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        // Clear of the locator button on the right and of the licence line below: an
+                        // attribution the card covers is an attribution not shown.
+                        .padding(start = 12.dp, end = 88.dp, bottom = 64.dp)
+                )
+            }
         }
     }
 
@@ -367,4 +387,52 @@ internal fun AttributionStrip(
             .clickable { uriHandler.openUri(basemap.attributionLink) }
             .padding(horizontal = 8.dp, vertical = 4.dp)
     )
+}
+
+/**
+ * What is nearest, and what else is around: the map's own answer to "am I where I think I am".
+ *
+ * The shape is the mock screens': what kind of thing it is, its name, how far and how long on foot, then a
+ * rule and a count of what else is inside a few kilometres. A place of the walker's opens when it is
+ * tapped; a thing DOC publishes has no page to open yet, so its card is a card and no more.
+ */
+@Composable
+private fun NearbyCard(
+    nearby: Nearby,
+    onOpenAsset: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val nearest = nearby.nearest
+    val content: @Composable () -> Unit = {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = "Nearest ${nearest.what}".uppercase(),
+                style = MaterialTheme.typography.labelSmall
+            )
+            Text(text = nearest.name, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = listOfNotNull(
+                    formatDistance(nearest.distanceM),
+                    "about ${formatEstimate(nearest.onFootSeconds())} on foot",
+                    nearest.place
+                ).joinToString(" \u00b7 "),
+                style = MaterialTheme.typography.bodySmall
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+            Text(
+                text = nearby.counted.joinToString(" \u00b7 ") +
+                    " within ${(nearby.radiusM / 1000.0).roundToInt()} km",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+
+    if (nearest.assetId != null) {
+        Card(onClick = { onOpenAsset(nearest.assetId) }, modifier = modifier) { content() }
+    } else {
+        Card(modifier = modifier) { content() }
+    }
 }

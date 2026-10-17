@@ -22,8 +22,11 @@ import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetLayer
+import nz.mckenzie.trailday.domain.asset.AssetPhrase
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
+import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.geo.distanceToPolylineMeters
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.map.AssetColors
@@ -33,11 +36,14 @@ import nz.mckenzie.trailday.domain.doc.DocCache
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.EmptyDocCache
+import nz.mckenzie.trailday.domain.nearby.Nearby
+import nz.mckenzie.trailday.domain.nearby.NearbyThing
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.DocGeoJson
 import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.map.AssetHitTest
 import nz.mckenzie.trailday.map.AssetLine
+import nz.mckenzie.trailday.tracking.DevicePosition
 import nz.mckenzie.trailday.tracking.FusedLocationSource
 import nz.mckenzie.trailday.tracking.LocationSource
 import nz.mckenzie.trailday.tracking.LocationUnavailable
@@ -95,8 +101,11 @@ class MapViewModel(
      * without a restart - and read from the cache rather than from DOC, because the reference layer is
      * what is on the phone: that is what makes it draw where reception does not.
      */
-    val docGeoJson: StateFlow<String> = docStore.observeCount()
+    private val docItems: StateFlow<List<DocItem>> = docStore.observeCount()
         .map { cached() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
+    val docGeoJson: StateFlow<String> = docItems
         .map { items -> DocGeoJson.build(items) }
         .stateIn(
             viewModelScope,
@@ -117,7 +126,80 @@ class MapViewModel(
     val assets: StateFlow<List<AssetEntity>> = assetRepository.observeActiveAssets()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
+    /**
+     * Where the phone is, for the card. One subscriber to the fixes, and no marker: the marker belongs to
+     * the map, which draws one wherever a map is drawn - see `DevicePosition`.
+     */
+    private val here: StateFlow<GeoPoint?> = DevicePosition.updates(viewModelScope)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
     private val geometryByTrack = MutableStateFlow<Map<Long, AssetGeometry>>(emptyMap())
+
+    /**
+     * What is nearest, and what else is within a few kilometres: the card at the bottom of the map.
+     *
+     * **Everything the map draws is in the running**, the walker's own places and DOC's material both, and
+     * the distances are measured to the thing itself - a line's line, not its nearest vertex - so a hut
+     * across the valley is not reported as nearer than the track under the walker's feet.
+     *
+     * DOC's side is what is on the phone, the same cache the reference layer draws from: a card that
+     * offered a hut the map cannot show would be a card that stops working exactly where it is wanted.
+     *
+     * Declared after [geometryByTrack] deliberately: a property that reads another in its initialiser has
+     * to come after it, or it reads a null.
+     */
+    val nearby: StateFlow<Nearby?> = combine(
+        assets,
+        geometryByTrack,
+        docItems,
+        here
+    ) { places, geometry, docs, position ->
+        if (position == null) {
+            null
+        } else {
+            Nearby.of(around(places, geometry, docs, position))
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    /**
+     * Everything within reach of the walker, as distances: the walker's places first, then DOC's.
+     *
+     * A line is measured to the line and a place to the place - the difference between "the track is at my
+     * feet" and "the track's nearest corner is at my feet" - and a thing whose geometry will not read is
+     * left out rather than counted at zero.
+     */
+    private fun around(
+        places: List<AssetEntity>,
+        geometry: Map<Long, AssetGeometry>,
+        docs: List<DocItem>,
+        position: GeoPoint
+    ): List<NearbyThing> {
+        val mine = places.mapNotNull { place ->
+            val distance = distanceTo(position, geometry[place.id]?.paths.orEmpty()) ?: return@mapNotNull null
+            NearbyThing(
+                name = place.name,
+                what = AssetPhrase.kind(AssetKind.fromStorage(place.kind)).lowercase(),
+                distanceM = distance,
+                assetId = place.id
+            )
+        }
+        val theirs = docs.mapNotNull { item ->
+            val distance = distanceTo(position, item.paths) ?: return@mapNotNull null
+            NearbyThing(
+                name = item.name,
+                what = item.source.singular.lowercase(),
+                distanceM = distance,
+                place = item.place
+            )
+        }
+        return mine + theirs
+    }
+
+    /** How far [position] is from the nearest of [paths], or null when there is nothing to measure. */
+    private fun distanceTo(position: GeoPoint, paths: List<List<GeoPoint>>): Double? =
+        paths.filter { it.isNotEmpty() }
+            .minOfOrNull { path -> distanceToPolylineMeters(position, path) }
+
 
     /**
      * The frame for the camera when the map opens: the walker's own tracks, else
