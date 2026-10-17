@@ -45,6 +45,7 @@ fun TrailDayTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
+        shapes = TrailDayShapes,
         content = content
     )
 }

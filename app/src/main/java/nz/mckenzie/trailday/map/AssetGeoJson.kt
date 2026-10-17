@@ -68,36 +68,46 @@ object AssetColors {
     /**
      * The recorded line, on the recorder and the recording's own screen.
      *
-     * A red that is nobody's kind: the line is the evidence of what was walked or ridden,
-     * not one of the places, and it must not be read as one.
+     * The mock screens' green, with a gold edge on the recorder (that edge is a drawing detail of the
+     * recorder's own map, and is still to come). A green that is nobody's kind: the line is the evidence
+     * of what was walked or ridden, not one of the places, and it must not be read as one.
      */
-    const val RECORDED = "#C62828"
+    const val RECORDED = "#2E7D32"
 
     /**
-     * One colour per kind of place, for the icon beside a place in the list and the line it
-     * is drawn as.
+     * One colour per kind of place, for the tile beside a place in the list and the line the map draws it
+     * as - **the mock screens' colours**, which is what makes the list and the map agree about a hut.
      *
-     * Five kinds and five colours, so the colour says which kind a thing is as well as the glyph
-     * does - and the two lines, a track and a bike track, are told apart as much by their colour as
-     * by their dashes. They all have to be readable as a thin outline on the card the theme puts
-     * behind them - which the app follows from the system, so that card is near-white in light mode
-     * and near-black in dark mode. Brown and deep purple were fine on the first and all but
-     * invisible on the second, which is what [nz.mckenzie.trailday.map.AssetColorsTest] now tests
-     * for.
+     * Five kinds and five colours, so the colour says which kind a thing is as well as the glyph does, and
+     * the two lines, a track and a bike track, are told apart as much by their colour as by their dashes.
      */
-    const val TRACK_KIND = "#1E88E5"
+    const val TRACK_KIND = "#1565C0"
 
     /** Bike tracks. */
-    const val BIKE_TRACK_KIND = "#AB47BC"
+    const val BIKE_TRACK_KIND = "#6A1B9A"
 
-    /** Huts. */
-    const val HUT_KIND = "#546E7A"
+    /** Huts: orange in the mock screens, which is what a walker looks for on a hillside. */
+    const val HUT_KIND = "#EF6C00"
 
-    /** Campsites. */
+    /** Campsites: unchanged, and the one kind the look did not move. */
     const val CAMPSITE_KIND = "#00897B"
 
-    /** Waypoints. */
-    const val WAYPOINT_KIND = "#E65100"
+    /** Waypoints: the mock screens' slate, the colour huts used to wear. */
+    const val WAYPOINT_KIND = "#546E7A"
+
+    /**
+     * The same five kinds, for a dark background.
+     *
+     * **Derived, not invented**: each is the light colour's own hue taken to a lighter tone, because a
+     * colour that reads on a white card disappears on a black one - which is exactly what a deep purple
+     * and a brown did before the last look. The app follows the system theme, so the icon beside a place
+     * and the tile behind it have to be readable in both.
+     */
+    const val TRACK_KIND_DARK = "#64B5F6"
+    const val BIKE_TRACK_KIND_DARK = "#CE93D8"
+    const val HUT_KIND_DARK = "#FFB74D"
+    const val CAMPSITE_KIND_DARK = "#4DB6AC"
+    const val WAYPOINT_KIND_DARK = "#90A4AE"
 
     /**
      * Where the phone is.
@@ -118,6 +128,20 @@ object AssetColors {
         AssetKind.HUT -> HUT_KIND
         AssetKind.CAMPSITE -> CAMPSITE_KIND
         AssetKind.WAYPOINT -> WAYPOINT_KIND
+    }
+
+    /**
+     * The same kind of thing, on a dark background: [forKind]'s hue, light enough to read there.
+     *
+     * The map keeps the light colours whatever the theme: its lines and markers are over imagery rather
+     * than over a card, and the white edges and casings are what make them readable there.
+     */
+    fun forKindOnDark(kind: AssetKind): String = when (kind) {
+        AssetKind.TRACK -> TRACK_KIND_DARK
+        AssetKind.BIKE_TRACK -> BIKE_TRACK_KIND_DARK
+        AssetKind.HUT -> HUT_KIND_DARK
+        AssetKind.CAMPSITE -> CAMPSITE_KIND_DARK
+        AssetKind.WAYPOINT -> WAYPOINT_KIND_DARK
     }}
 
 /**

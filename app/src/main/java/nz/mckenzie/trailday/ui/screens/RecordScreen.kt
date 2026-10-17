@@ -223,14 +223,29 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                         },
                         style = MaterialTheme.typography.titleMedium
                     )
-                    // The pass being driven, or - once Save has been pressed - the one just
-                    // saved: its own distance, its own time and its own points.
-                    Text(
-                        text = "${formatDistance(summary.distanceM)} \u00b7 " +
-                            "${formatDuration(elapsedMs)} \u00b7 ${summary.pointCount} " +
-                            (if (summary.pointCount == 1) "point" else "points"),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    // The pass being driven, or - once Save has been pressed - the one just saved: its own
+                    // distance, its own time and its own points, each in a tile with its own label rather
+                    // than as one line of figures to be read twice.
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        FigureTile(
+                            value = formatDistance(summary.distanceM),
+                            label = "Distance",
+                            modifier = Modifier.weight(1f)
+                        )
+                        FigureTile(
+                            value = formatDuration(elapsedMs),
+                            label = "Time",
+                            modifier = Modifier.weight(1f)
+                        )
+                        FigureTile(
+                            value = summary.pointCount.toString(),
+                            label = if (summary.pointCount == 1) "point" else "points",
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                     summary.accuracyM?.let { accuracy ->
                         Text(
                             text = "Accuracy \u00b1${accuracy.toInt()} m" +

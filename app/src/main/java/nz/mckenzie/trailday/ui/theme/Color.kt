@@ -4,36 +4,26 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
-// The brand seed green.
+// The brand seed green: the colour of the mock screens' buttons and the app's own since it was built.
 val GreenPrimary = Color(0xFF2E7D32)
 val GreenPrimaryDark = Color(0xFF81C784)
 
 /**
- * The light scheme.
+ * The light scheme: **the mock screens' surfaces.**
  *
- * Every role is set, not just primary, secondary and tertiary. Setting three of them
- * left every container and surface role on Material's baseline palette, which is
- * lavender - and that lavender was the legend card, the asset rows, the offline card
- * and the body of every dialog.
+ * A pale sage page with white cards on it, rather than Material's near-white page with grey-green cards:
+ * the mock screens are a walker's outdoor palette, and the difference is what makes a card read as a card.
+ * Text is a soft near-black rather than pure black, and the muted text is a grey-green, the way the mock
+ * screens write the supporting line under a place.
  *
- * The tones are not hand-picked. They are the Material 3 tonal palettes for seed
- * #2E7D32 (HCT 145.6 / 53.0 / 46.3), read out of Google's own colour utilities with the
- * Tonal Spot variant, so each role is the tone Material specifies for it: primary 40,
- * containers 90 and 10, surfaces 98 down to 90, outline 50, error 40.
+ * Every role is set, not just primary, secondary and tertiary - setting three of them leaves every
+ * container and surface role on Material's baseline palette, and that lavender was once the legend card,
+ * the rows and the body of every dialog.
  *
- * Three deliberate departures from that output:
- *
- * - `primary` stays the brand green rather than the generated tone 40 (#3C6939), so the
- *   buttons keep the exact green of the brand.
- * - `surfaceTint` follows `primary`, so elevated surfaces tint green rather than towards
- *   a green nobody else uses.
- * - the tertiary family comes from a second palette seeded with the old earth brown
- *   (#8D6E63), because that role was the app's warm accent. The tonal spot variant
- *   rotates the tertiary hue 60 degrees, which is why that accent lands on khaki.
- *
- * The expressive *colour* variant of the same generator was tried and rejected: it
- * rotates the seed hue by 240 degrees and returns primary #94483F, a brick red. This is
- * a green app. Expressive here means expressive motion, shape and type - see Theme.kt.
+ * The tones are the Material 3 tonal palettes for the seed, read out of Google's own colour utilities with
+ * the Tonal Spot variant, with three deliberate departures: `primary` stays the brand green rather than
+ * the generated tone 40, `surfaceTint` follows it, and the tertiary family comes from a second palette
+ * seeded with the old earth brown, because that role was the app's warm accent.
  */
 internal val LightColors = lightColorScheme(
     primary = GreenPrimary,
@@ -53,66 +43,70 @@ internal val LightColors = lightColorScheme(
     onError = Color(0xFFFFFFFF),
     errorContainer = Color(0xFFFFDAD6),
     onErrorContainer = Color(0xFF410002),
-    background = Color(0xFFF7FBF1),
-    onBackground = Color(0xFF191D17),
-    surface = Color(0xFFF7FBF1),
-    onSurface = Color(0xFF191D17),
-    surfaceVariant = Color(0xFFDEE5D8),
-    onSurfaceVariant = Color(0xFF424940),
+    // The page: the mock screens' pale sage.
+    background = Color(0xFFF4F7EC),
+    onBackground = Color(0xFF1B1D18),
+    surface = Color(0xFFF4F7EC),
+    onSurface = Color(0xFF1B1D18),
+    surfaceVariant = Color(0xFFE4EADD),
+    onSurfaceVariant = Color(0xFF45493F),
     surfaceTint = GreenPrimary,
     inverseSurface = Color(0xFF2D322C),
     inverseOnSurface = Color(0xFFEFF2E9),
-    outline = Color(0xFF72796F),
-    outlineVariant = Color(0xFFC2C9BD),
+    outline = Color(0xFF757A6D),
+    outlineVariant = Color(0xFFC6CCBC),
     scrim = Color(0xFF000000),
-    surfaceBright = Color(0xFFF7FBF1),
-    surfaceDim = Color(0xFFD8DBD2),
-    surfaceContainer = Color(0xFFECEFE6),
-    surfaceContainerHigh = Color(0xFFE6E9E0),
-    surfaceContainerHighest = Color(0xFFE0E4DB),
-    surfaceContainerLow = Color(0xFFF1F5EB),
-    surfaceContainerLowest = Color(0xFFFFFFFF)
+    surfaceBright = Color(0xFFF9FCF3),
+    surfaceDim = Color(0xFFDCE3D2),
+    // Cards and sheets are white, whichever container role a component reaches for.
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFFFFFFF),
+    surfaceContainer = Color(0xFFFBFDF6),
+    surfaceContainerHigh = Color(0xFFEDF1E4),
+    surfaceContainerHighest = Color(0xFFFFFFFE)
 )
 
-/** The dark scheme, the same roles and the same provenance as [LightColors]. */
+/**
+ * The dark scheme, **derived from the light one rather than invented separately**: the same roles, the same
+ * sage family taken to a dark tone, and the same kind colours' hues at a lighter weight - see
+ * [nz.mckenzie.trailday.map.AssetColors.forKindOnDark] for that half.
+ */
 internal val DarkColors = darkColorScheme(
     primary = GreenPrimaryDark,
-    // Not white: on a light green the label has to go dark, which is what the generated
-    // tone 20 is for. Leaving this unset is what put dark purple labels on light green.
-    onPrimary = Color(0xFF0A390F),
-    primaryContainer = Color(0xFF245024),
+    // Not white: on a light green the label has to go dark.
+    onPrimary = Color(0xFF00390A),
+    primaryContainer = Color(0xFF1B5E20),
     onPrimaryContainer = Color(0xFFBCF0B4),
-    inversePrimary = Color(0xFF3C6939),
-    secondary = Color(0xFFBACCB3),
-    onSecondary = Color(0xFF253423),
-    secondaryContainer = Color(0xFF3B4B38),
+    inversePrimary = GreenPrimary,
+    secondary = Color(0xFFB9CCB2),
+    onSecondary = Color(0xFF243422),
+    secondaryContainer = Color(0xFF3A4B37),
     onSecondaryContainer = Color(0xFFD6E8CE),
-    tertiary = Color(0xFFD5C78E),
+    tertiary = Color(0xFFD5C68E),
     onTertiary = Color(0xFF383005),
-    tertiaryContainer = Color(0xFF50471A),
+    tertiaryContainer = Color(0xFF50461A),
     onTertiaryContainer = Color(0xFFF2E3A8),
     error = Color(0xFFFFB4AB),
     onError = Color(0xFF690005),
     errorContainer = Color(0xFF93000A),
     onErrorContainer = Color(0xFFFFDAD6),
-    background = Color(0xFF10140F),
-    onBackground = Color(0xFFE0E4DB),
-    surface = Color(0xFF10140F),
-    onSurface = Color(0xFFE0E4DB),
-    surfaceVariant = Color(0xFF424940),
-    onSurfaceVariant = Color(0xFFC2C9BD),
+    background = Color(0xFF12150F),
+    onBackground = Color(0xFFE3E7DA),
+    surface = Color(0xFF12150F),
+    onSurface = Color(0xFFE3E7DA),
+    surfaceVariant = Color(0xFF43483E),
+    onSurfaceVariant = Color(0xFFC3C9B9),
     surfaceTint = GreenPrimaryDark,
-    inverseSurface = Color(0xFFE0E4DB),
+    inverseSurface = Color(0xFFE3E7DA),
     inverseOnSurface = Color(0xFF2D322C),
-    outline = Color(0xFF8C9388),
-    outlineVariant = Color(0xFF424940),
+    outline = Color(0xFF8D9384),
+    outlineVariant = Color(0xFF43483E),
     scrim = Color(0xFF000000),
-    surfaceBright = Color(0xFF363A34),
-    surfaceDim = Color(0xFF10140F),
-    surfaceContainer = Color(0xFF1D211B),
-    surfaceContainerHigh = Color(0xFF272B25),
-    surfaceContainerHighest = Color(0xFF323630),
-    surfaceContainerLow = Color(0xFF191D17),
-    surfaceContainerLowest = Color(0xFF0B0F0A)
+    surfaceBright = Color(0xFF383D33),
+    surfaceDim = Color(0xFF12150F),
+    surfaceContainerLowest = Color(0xFF0D100A),
+    surfaceContainerLow = Color(0xFF1D211A),
+    surfaceContainer = Color(0xFF1A1E17),
+    surfaceContainerHigh = Color(0xFF232A20),
+    surfaceContainerHighest = Color(0xFF1D211A)
 )
-

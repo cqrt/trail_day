@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,6 +23,9 @@ internal fun ChoiceChip(selected: Boolean, label: String, onClick: () -> Unit) {
     FilterChip(
         selected = selected,
         onClick = onClick,
+        // A pill, which is the mock screens' chip: the app's shapes make it round, and a chip's own height
+        // comes with the component.
+        shape = CircleShape,
         // Material marks the chosen chip with a tick as well as the tint. Out in the sun, a tint is
         // not enough to read, and this is a screen the walker uses in exactly that light.
         leadingIcon = if (selected) {

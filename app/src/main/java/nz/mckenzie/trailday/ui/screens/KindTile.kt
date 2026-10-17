@@ -1,0 +1,92 @@
+package nz.mckenzie.trailday.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import nz.mckenzie.trailday.domain.asset.AssetKind
+import nz.mckenzie.trailday.map.AssetColors
+import nz.mckenzie.trailday.ui.theme.TileSize
+
+/**
+ * A place's kind as the mock screens draw it: **the glyph on a tile in a pale tint of the kind's own
+ * colour.**
+ *
+ * A bare glyph on a row is a small mark on whatever is behind it; a tile gives the eye something to land on
+ * and says which kind it is from further away than a 20-point outline can. The tint is the kind's own colour
+ * at a low alpha rather than a second palette, so a kind's tile cannot drift from a kind's line or marker.
+ *
+ * The colour comes from [AssetColors]: the light set on a light screen, the derived dark set on a dark one,
+ * because a deep purple glyph on a dark tile is a glyph nobody sees.
+ */
+@Composable
+fun KindTile(
+    kind: AssetKind,
+    modifier: Modifier = Modifier,
+    size: Dp = TileSize
+) {
+    val dark = isSystemInDarkTheme()
+    val colour = kindColour(kind, dark)
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(size / 3.5f))
+            .background(colour.copy(alpha = if (dark) 0.22f else 0.14f)),
+        contentAlignment = Alignment.Center
+    ) {
+        AssetKindIcon(kind = kind, dimension = size * 0.52f)
+    }
+}
+
+/**
+ * One figure in a tile: a big number, with its own label underneath it.
+ *
+ * The mock screens say a pass's distance, its time and its points this way rather than as one line of
+ * figures: each figure gets its own label, and each is big enough to read at arm's length with the phone
+ * still in a pocket.
+ */
+@Composable
+fun FigureTile(
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Text(text = value, style = MaterialTheme.typography.titleLarge)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** The kind's colour for the screen it is on: the light set, or the derived dark one. */
+@Composable
+internal fun kindColour(kind: AssetKind, dark: Boolean = isSystemInDarkTheme()): Color {
+    val hex = remember(kind, dark) { kindHex(kind, dark) }
+    return remember(hex) { Color(android.graphics.Color.parseColor(hex)) }
+}
+
+/** The same colour as the hex the map's own drawing takes: one choice, two shapes of it. */
+internal fun kindHex(kind: AssetKind, dark: Boolean): String =
+    if (dark) AssetColors.forKindOnDark(kind) else AssetColors.forKind(kind)

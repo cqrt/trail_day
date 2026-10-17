@@ -1,8 +1,10 @@
 package nz.mckenzie.trailday.ui.screens
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -10,7 +12,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetPhrase
-import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.GlyphStyle
 import nz.mckenzie.trailday.map.drawKindGlyph
 
@@ -34,12 +35,15 @@ fun AssetKindIcon(
     modifier: Modifier = Modifier,
     dimension: Dp = 20.dp
 ) {
+    val dark = isSystemInDarkTheme()
+    val colour = remember(kind, dark) { kindHex(kind, dark) }
+
     Canvas(
         modifier = modifier
             .size(dimension)
             .semantics { contentDescription = AssetPhrase.kind(kind) }
     ) {
-        drawKindGlyph(kind, AssetColors.forKind(kind), GlyphStyle.LIST)
+        drawKindGlyph(kind, colour, GlyphStyle.LIST)
     }
 }
 

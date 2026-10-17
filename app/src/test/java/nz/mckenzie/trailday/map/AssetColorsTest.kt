@@ -9,21 +9,28 @@ import org.junit.Test
 /**
  * The colours the map and the list draw with.
  *
- * Every kind must have a colour of its own, and the kind colours must not be the recorded line's or
- * the position marker's - an icon the walker could read as "the recording" would be worse than no
- * icon at all.
+ * Every kind must have a colour of its own in both themes, and no kind colour may be the recorded line's or
+ * the position marker's - an icon the walker could read as "the recording" would be worse than no icon at
+ * all. The mock screens are light only, so the dark set is derived from the light one: the same five hues,
+ * light enough to read on a dark card, which is what [AssetColors.forKindOnDark] is for.
  */
 class AssetColorsTest {
 
     @Test
-    fun `each of the five kinds has its own colour, and no two share one`() {
-        val colours = AssetKind.entries.map { AssetColors.forKind(it) }
+    fun `each of the five kinds has its own colour, and no two share one, in both themes`() {
+        val light = AssetKind.entries.map { AssetColors.forKind(it) }
+        val dark = AssetKind.entries.map { AssetColors.forKindOnDark(it) }
 
-        assertEquals("a colour per kind", AssetKind.entries.size, colours.size)
+        assertEquals("a colour per kind", AssetKind.entries.size, light.size)
         assertEquals(
-            "two kinds sharing a colour would make the map say less than it claims to: $colours",
-            colours.size,
-            colours.toSet().size
+            "two kinds sharing a light colour would make the list say less than it claims to: $light",
+            light.size,
+            light.toSet().size
+        )
+        assertEquals(
+            "and two sharing a dark one would do the same on a dark phone: $dark",
+            dark.size,
+            dark.toSet().size
         )
     }
 
@@ -50,21 +57,33 @@ class AssetColorsTest {
     }
 
     @Test
-    fun `and on the dark one, because the app follows the system theme`() {
-        // This is the case that made a brown icon disappear: fine on white, all but
-        // invisible on the dark grey a phone in dark mode puts behind it.
+    fun `and the derived dark one on the dark card, because the app follows the system theme`() {
+        // This is the case that made a brown icon disappear: fine on white, all but invisible on the dark
+        // grey a phone in dark mode puts behind it. A deep purple is the same story, which is why the dark
+        // set exists rather than the light one being reused.
         AssetKind.entries.forEach { kind ->
-            val ratio = contrastRatio(AssetColors.forKind(kind), DARK_CARD)
+            val ratio = contrastRatio(AssetColors.forKindOnDark(kind), DARK_CARD)
             assertTrue("$kind on a dark card is only ${round(ratio)}:1", ratio >= MIN_CONTRAST)
         }
     }
 
     @Test
-    fun `and not a kind colour either, even though it is now blue`() {
+    fun `the recorded line is nobody's kind, in either theme`() {
         AssetKind.entries.forEach { kind ->
-            assertTrue(
+            assertNotEquals(
+                "$kind looks like the line being recorded",
+                AssetColors.RECORDED,
+                AssetColors.forKind(kind)
+            )
+            assertNotEquals(
+                "$kind looks like the line being recorded in dark mode",
+                AssetColors.RECORDED,
+                AssetColors.forKindOnDark(kind)
+            )
+            assertNotEquals(
                 "$kind and the position marker are the same colour",
-                AssetColors.forKind(kind) != AssetColors.POSITION
+                AssetColors.forKind(kind),
+                AssetColors.POSITION
             )
         }
     }
@@ -93,8 +112,8 @@ class AssetColorsTest {
         /** Enough for a thin outline to be read on the card behind it. */
         const val MIN_CONTRAST = 3.0
 
-        /** A Material light card, and a dark one. */
+        /** The app's own card colours: white in the light scheme, a sage-charcoal in the dark one. */
         const val LIGHT_CARD = "#FFFFFF"
-        const val DARK_CARD = "#121212"
+        const val DARK_CARD = "#1D211A"
     }
 }

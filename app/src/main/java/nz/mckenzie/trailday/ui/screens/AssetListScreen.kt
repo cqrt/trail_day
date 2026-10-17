@@ -200,9 +200,7 @@ private fun AssetRow(
         supportingContent = { Text(assetRowDetail(item)) },
         // What it is, by its own icon: the kind is the first thing read about a place.
         leadingContent = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                AssetKindIcon(kind = AssetKind.fromStorage(item.kind))
-            }
+            KindTile(kind = AssetKind.fromStorage(item.kind))
         },
         trailingContent = { DestructiveTextButton(text = "Delete", onClick = onDelete) }
     )
