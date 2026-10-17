@@ -316,3 +316,28 @@ something DOC publishes needs the browser to offer it, and a target that is not 
 
 **Next is step 8**, the nearest-thing card at the bottom of the map - which is also the natural home for
 "what is nearest" among DOC's huts and campsites.
+
+**Step 8 is done.** The map answers "what is nearest": a card at the bottom of the screen saying what kind of
+thing is nearest, its name, how far away it is and how long on foot, the place DOC puts it in, then a rule and
+what else is within five kilometres - "6 tracks - 2 huts - 1 campsite within 5 km". It takes in the walker's
+own places and DOC's published ones from the same cache the map's reference layer draws from, so it works with
+no reception; a place of the walker's opens when it is tapped, and a thing DOC publishes has no page to open
+yet. Distances are to the thing itself, a line to its line, and the time is the one rule from step 6.
+
+Two things came out of looking at it on the phone: the counts said "1 campsites", and the card covered the
+licence line. Both fixed in the same change.
+
+**Stage 2 is done.** A walk now has a target and the screens say what it costs: a track's own page says how
+long it takes both ways, the recorder says how far off, how far along and how long to go against the place
+being followed - or which way and how far to a spot - with a quiet word when the walker drifts, and the map
+says what is nearest wherever they are standing.
+
+Two gaps are recorded rather than forgotten:
+
+- **DOC things as recorder targets.** The plan's "any of the four things can be a target" is half done: the
+  walker's own lines and spots are, DOC's tracks and huts are not, because that needs the browser to offer it
+  and a target that is not a stored place.
+- **A hut's page.** Step 6 named it as one of the three screens that would use the time rule; a DOC thing's
+  own page does not exist yet, and it is the mock's hut record screen of the look stage.
+
+**Next is stage 3**, the look: the design system first, then one screen per change from the mock screens.
