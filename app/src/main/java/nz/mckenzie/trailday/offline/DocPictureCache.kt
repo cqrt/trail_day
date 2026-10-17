@@ -5,6 +5,7 @@ import kotlinx.coroutines.withContext
 import nz.mckenzie.trailday.data.db.OfflineDocItemDao
 import nz.mckenzie.trailday.data.db.OfflineDocPictureEntity
 import nz.mckenzie.trailday.doc.DocPictures
+import nz.mckenzie.trailday.domain.doc.PICTURE_SUFFIXES
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -21,8 +22,6 @@ fun isPictureAddress(url: String): Boolean {
     val path = url.substringBefore('?').substringBefore('#').lowercase()
     return PICTURE_SUFFIXES.any { path.endsWith(it) }
 }
-
-private val PICTURE_SUFFIXES = listOf(".jpg", ".jpeg", ".png", ".webp", ".gif")
 
 /**
  * The pictures DOC publishes for its huts, campsites and bike locations, kept in the cache the material

@@ -7,9 +7,12 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -20,6 +23,7 @@ import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDownloader
+import nz.mckenzie.trailday.doc.DocInventory
 import nz.mckenzie.trailday.domain.doc.DocBounds
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
@@ -127,6 +131,22 @@ class OfflineAreaPickerViewModel(
     private val _docMessage = MutableStateFlow<String?>(null)
     val docMessage: StateFlow<String?> = _docMessage
 
+    private val _docInventory = MutableStateFlow<DocInventory?>(null)
+
+    /**
+     * What DOC says is in the box drawn, or null while there is no box or the answer is still coming.
+     *
+     * Asked when the box is drawn rather than when the button is tapped, because the point of it is to be
+     * read *before* the download: the size of an area is the one thing a phone in the hills cannot change
+     * its mind about afterwards.
+     */
+    val docInventory: StateFlow<DocInventory?> = _docInventory
+
+    private val _docCounting = MutableStateFlow(false)
+
+    /** True while DOC is being asked what is in the drawn box, so the screen can say so. */
+    val docCounting: StateFlow<Boolean> = _docCounting
+
     fun consumeSaved() {
         _saved.value = false
     }
@@ -145,6 +165,28 @@ class OfflineAreaPickerViewModel(
                     )
                 }
             centre?.let { _startBounds.value = boxAround(it, degrees = START_FRAME_DEGREES) }
+        }
+
+        // What the drawn box would take on, asked as soon as it is a box and asked again when it changes.
+        // `collectLatest` with a short pause is the debounce: dragging a corner asks once at the end
+        // rather than once a frame, and a box that is still being drawn is never asked about.
+        viewModelScope.launch {
+            _draft
+                .map { draft -> draft.plan(name = draft.name, fallbackName = "") }
+                .distinctUntilChanged()
+                .collectLatest { plan ->
+                    if (mode != OfflinePickerMode.DOC_DATA || plan == null) {
+                        _docInventory.value = null
+                        _docCounting.value = false
+                        return@collectLatest
+                    }
+                    _docCounting.value = true
+                    delay(INVENTORY_PAUSE_MS)
+                    _docInventory.value = runCatching {
+                        docStore.inventory(plan.bounds.toDocBounds())
+                    }.getOrNull()
+                    _docCounting.value = false
+                }
         }
     }
 
@@ -268,6 +310,14 @@ class OfflineAreaPickerViewModel(
 
         /** How much of the world the picker opens on: about 4 km across. */
         private const val START_FRAME_DEGREES = 0.02
+
+        /**
+         * How long a drawn box waits before DOC is asked what is in it.
+         *
+         * A box is drawn corner by corner, and the second corner is the one that makes it a box; this is
+         * long enough that a corner being dragged does not ask once a frame.
+         */
+        private const val INVENTORY_PAUSE_MS = 400L
 
         private const val OUTLINE_ID = -1L
         private const val OUTLINE_COLOUR = "#FFFFFF"

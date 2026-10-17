@@ -32,6 +32,44 @@ private const val CHARACTERISTIC_SLOT_COUNT = 11
 private const val TRACK_TYPE_SLOT_NAME = "WEB_TRACK_TYPE"
 
 /**
+ * The field DOC keeps a thing's picture address in, where it publishes one.
+ *
+ * Top-level for the same reason the slot count is: the table below is built before the companion exists.
+ */
+private const val PICTURE_FIELD = "introductionThumbnail"
+
+/**
+ * The suffixes DOC's picture addresses end in.
+ *
+ * **One list, used by both questions about a picture**: what the app fetches ([isPictureAddress]) and what
+ * DOC is asked to count. DOC's own data holds the address of a page about some things in the very field
+ * that usually holds a picture (`.aspx`, which answers with HTML), so without this the picker would
+ * promise pictures the download would not keep - and a walker counting them afterwards would be right to
+ * wonder which of the two was lying.
+ */
+val PICTURE_SUFFIXES = listOf(".jpg", ".jpeg", ".png", ".webp", ".gif")
+
+/** The `where` that finds the records DOC publishes a picture for, or null when it publishes none. */
+fun DocSource.pictureWhere(): String? {
+    val field = pictureField ?: return null
+    val isPicture = PICTURE_SUFFIXES.joinToString(" OR ") { suffix -> "LOWER($field) LIKE '%$suffix'" }
+    return "$field IS NOT NULL AND $field <> '' AND ($isPicture)"
+}
+
+/**
+ * Whether DOC's address for a picture is one to fetch.
+ *
+ * DOC publishes a picture's address as `introductionThumbnail`, and for some things that field holds the
+ * address of a **page about them** rather than a picture - `.aspx`, which answers with HTML. Fetching those
+ * would keep a page as though it were a picture, so what is fetched is what has a picture's suffix; the
+ * rest is DOC's own data being what it is, and the thing it is of is still kept whole.
+ */
+fun isPictureAddress(url: String): Boolean {
+    val path = url.substringBefore('?').substringBefore('#').lowercase()
+    return PICTURE_SUFFIXES.any { path.endsWith(it) }
+}
+
+/**
  * One of DOC's published services, with everything about it that the app has to know.
  *
  * Four sources, and the differences between them are real: tracks are lines drawn on the ground, and
@@ -182,6 +220,16 @@ enum class DocSource(
 
     /** Whether this source publishes lines rather than places. */
     val isLine: Boolean get() = shape == DocShape.LINE
+
+    /**
+     * The field DOC keeps this thing's picture address in, or null when it publishes no picture for it.
+     *
+     * Read off [fields] rather than written out twice: a service says it has a picture by asking DOC for
+     * the field that holds one, and the tracks - which have none - are the ones that do not. What a
+     * download spends most of its time on is exactly this, so where it comes from is worth keeping in one
+     * place.
+     */
+    val pictureField: String? get() = PICTURE_FIELD.takeIf { fields.contains(it) }
 
     /**
      * What to ask DOC for: the key, the name, and everything this source says about a thing.

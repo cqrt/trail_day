@@ -1,5 +1,9 @@
 package nz.mckenzie.trailday.domain.doc
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import nz.mckenzie.trailday.domain.track.GeoJsonParser
 import nz.mckenzie.trailday.domain.track.TrackInterchange
 
@@ -19,6 +23,19 @@ object DocJson {
     /** The items in [text], as the service [source] publishes them. */
     fun parse(source: DocSource, text: String): List<DocItem> =
         GeoJsonParser.parse(text).mapNotNull { feature -> itemOf(source, feature) }
+
+    /**
+     * How many records a count query answered with, or null when the answer was not a count.
+     *
+     * `returnCountOnly` answers with `{"count": N}` and nothing else. An error answers with an `error`
+     * object instead, and a body that is neither is not a number to put in front of a walker: null says
+     * "not counted", and the caller decides what to say about that.
+     */
+    fun parseCount(text: String): Int? = runCatching {
+        CountJson.parseToJsonElement(text).jsonObject["count"]?.jsonPrimitive?.int
+    }.getOrNull()
+
+    private val CountJson = Json { ignoreUnknownKeys = true }
 
     private fun itemOf(source: DocSource, feature: GeoJsonParser.Feature): DocItem? {
         val objectId = feature.properties[DocSource.OBJECT_ID_FIELD]?.toLongOrNull() ?: 0L

@@ -149,4 +149,31 @@ class DocUrlTest {
         assertTrue(minLat < -46.6 && maxLat > -46.6)
         assertTrue("wider than tall, far south", (maxLng - minLng) > (maxLat - minLat))
     }
+
+    @Test
+    fun `a count asks the same question with the records left behind`() {
+        val query = DocQuery(
+            source = DocSource.HUTS,
+            bounds = DocBounds(minLat = -46.7, minLng = 168.1, maxLat = -46.5, maxLng = 168.6)
+        )
+
+        val url = DocUrl.countOf(query)
+
+        assertTrue("it asks for a number", url.contains("returnCountOnly=true"))
+        assertTrue("and not for the records themselves", !url.contains("returnGeometry"))
+        assertTrue("or their fields", !url.contains("outFields"))
+        assertTrue("over the same box", url.contains("geometryType=esriGeometryEnvelope"))
+        assertTrue("against the service the query names", url.contains(DocSource.HUTS.service))
+        assertTrue("in a shape this build can read", url.contains("f=json"))
+    }
+
+    @Test
+    fun `a count can be narrowed to the records with something the app cares about`() {
+        val query = DocQuery(source = DocSource.CAMPSITES)
+
+        val url = DocUrl.countOf(query, DocSource.CAMPSITES.pictureWhere()!!)
+
+        assertTrue("the narrowed question goes in the where clause", url.contains("introductionThumbnail"))
+        assertTrue("and the count is still a count", url.contains("returnCountOnly=true"))
+    }
 }

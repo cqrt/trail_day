@@ -28,10 +28,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import nz.mckenzie.trailday.doc.whatDocHasIn
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.offline.OfflineAreaDraft
 import nz.mckenzie.trailday.offline.OfflinePickerMode
+import nz.mckenzie.trailday.offline.formatBytes
 import nz.mckenzie.trailday.viewmodel.OfflineAreaPickerViewModel
 import kotlin.math.roundToInt
 
@@ -66,6 +68,8 @@ fun OfflineAreaPickerScreen(
     val saved by viewModel.saved.collectAsStateWithLifecycle()
     val docWorking by viewModel.docWorking.collectAsStateWithLifecycle()
     val docMessage by viewModel.docMessage.collectAsStateWithLifecycle()
+    val docInventory by viewModel.docInventory.collectAsStateWithLifecycle()
+    val docCounting by viewModel.docCounting.collectAsStateWithLifecycle()
 
     val imagery = viewModel.mode == OfflinePickerMode.IMAGERY
 
@@ -197,6 +201,28 @@ fun OfflineAreaPickerScreen(
                             )
                         }
                     } else {
+                        // What the box would take on, asked before the button is tapped: the size of the
+                        // download is the one thing a phone in the hills cannot change its mind about.
+                        // DOC's own counts, and the app's own rough arithmetic for the bytes.
+                        val inventory = docInventory
+                        Text(
+                            text = when {
+                                docCounting -> "Asking DOC what is in this box..."
+
+                                inventory == null -> "Draw a box to see what DOC has inside it."
+
+                                !inventory.complete ->
+                                    "DOC could not be asked what is in this box. Try again in a moment."
+
+                                inventory.totalRecords == 0 && inventory.pictures == 0 ->
+                                    "DOC has nothing inside this box."
+
+                                else ->
+                                    "${whatDocHasIn(inventory)} inside this box, roughly " +
+                                        "${formatBytes(inventory.estimatedBytes)}."
+                            },
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                         Text(
                             text = "Everything DOC publishes inside the box is downloaded and drawn on " +
                                 "the map as DOC's own layer. Nothing else is fetched, and no LINZ key " +

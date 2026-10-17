@@ -138,4 +138,26 @@ class DocLiveTest {
             download.items.all { it.source in DocSource.entries }
         )
     }
+
+    @Test
+    fun anAreasInventoryIsCountedWithoutFetchingAnyOfIt() = runBlocking {
+        // The count a walker reads before taking an area on: what DOC has in the box, and how many of the
+        // pictures it would have to spend its time on. Counted, not fetched - see `DocInventory`.
+        val box = DocBounds(minLat = -41.75, minLng = 172.55, maxLat = -41.50, maxLng = 172.85)
+
+        val inventory = DocDownloader(reader).inventory(box)
+
+        assumeTrue(
+            "DOC could not be asked: ${inventory.failed}",
+            inventory.failed.keys.size < DocSource.entries.size
+        )
+        assertTrue(
+            "something is in that box, and DOC's own figures say so: ${inventory.records}",
+            inventory.totalRecords > 0
+        )
+        assertTrue(
+            "and the pictures of it are counted as well: ${inventory.pictures}",
+            inventory.pictures > 0
+        )
+    }
 }

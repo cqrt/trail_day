@@ -141,11 +141,15 @@ class DocPictureCacheTest {
 
             pictures.keep(listOf("https://www.doc.govt.nz/a.jpg", "https://www.doc.govt.nz/b.jpg"))
 
-            assertEquals(
-                "and both as soon as they land, with no record of the material changing",
-                2,
-                withTimeout(5_000) { seen.receive() }
-            )
+            // The count follows the pictures as they land - one insert is one invalidation, so which
+            // values arrive on the way is Room's business. What matters is that it arrives at two, with
+            // no record of the material having changed.
+            val settled = withTimeout(5_000) {
+                var value = seen.receive()
+                while (value != 2) value = seen.receive()
+                value
+            }
+            assertEquals("and both once they have landed", 2, settled)
         } finally {
             watching.cancel()
         }

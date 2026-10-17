@@ -83,6 +83,40 @@ object DocUrl {
     }
 
     /**
+     * The URL that asks one of DOC's services **how many** records match, and nothing else.
+     *
+     * The same question as [of] with the records left behind: `returnCountOnly` answers with a number
+     * rather than the records, which is what a walker wants before deciding whether to take a whole area
+     * onto a phone. The box and the name filter are built by the same code as a search's, so the count is
+     * of exactly what a download would read - a count of something else would be worse than no count.
+     *
+     * [where] is overridable because one question is not about all of a service's records but about those
+     * with something: what DOC addresses a picture for, which is what a download spends most of its time
+     * on.
+     */
+    fun countOf(query: DocQuery, where: String = where(query.source, query.nameContains)): String {
+        val parameters = linkedMapOf("where" to where)
+        val envelope = when {
+            query.bounds != null -> envelope(query.bounds)
+            query.near != null -> envelope(query.near, query.radiusKm)
+            else -> null
+        }
+        if (envelope != null) {
+            parameters["geometry"] = envelope
+            parameters["geometryType"] = "esriGeometryEnvelope"
+            parameters["inSR"] = "4326"
+            parameters["spatialRel"] = "esriSpatialRelIntersects"
+        }
+        parameters["returnCountOnly"] = "true"
+        parameters["f"] = "json"
+
+        val queryString = parameters.entries.joinToString("&") { (key, value) ->
+            "$key=${URLEncoder.encode(value, "UTF-8")}"
+        }
+        return "${query.source.serviceUrl}?$queryString"
+    }
+
+    /**
      * What to filter on: the name, in whichever field **this** service keeps it.
      *
      * A hut's name is in `name` and a track's is in `TechObjectName`, so a `where` clause written once

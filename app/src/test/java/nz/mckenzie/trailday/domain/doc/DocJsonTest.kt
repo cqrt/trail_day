@@ -215,4 +215,16 @@ class DocJsonTest {
         assertTrue("nothing that cannot be used is kept", DocJson.parse(DocSource.TRACKS, answer).isEmpty())
         assertTrue(DocJson.parse(DocSource.HUTS, answer).isEmpty())
     }
+
+    @Test
+    fun `a count is read from the number DOC answers with, and nothing else is a count`() {
+        assertEquals(412, DocJson.parseCount("""{"count":412}"""))
+        assertEquals("zero is a real answer", 0, DocJson.parseCount("""{"count":0}"""))
+
+        // An error answers with an error object instead, and a body that is neither is not a number to
+        // put in front of a walker: null says "not counted" rather than "none".
+        assertNull(DocJson.parseCount("""{"error":{"code":400,"message":"Invalid URL"}}"""))
+        assertNull(DocJson.parseCount("""{"type":"FeatureCollection","features":[]}"""))
+        assertNull(DocJson.parseCount("not json at all"))
+    }
 }

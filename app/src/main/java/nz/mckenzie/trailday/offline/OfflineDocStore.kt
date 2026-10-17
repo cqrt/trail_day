@@ -5,6 +5,7 @@ import nz.mckenzie.trailday.data.db.OfflineDocItemDao
 import nz.mckenzie.trailday.data.db.OfflineDocItemEntity
 import nz.mckenzie.trailday.doc.DocAreaDownload
 import nz.mckenzie.trailday.doc.DocDownloader
+import nz.mckenzie.trailday.doc.DocInventory
 import nz.mckenzie.trailday.doc.DocPictures
 import nz.mckenzie.trailday.domain.doc.DocBounds
 import nz.mckenzie.trailday.domain.doc.DocCache
@@ -103,6 +104,14 @@ class OfflineDocStore(
         store(result.items)
         return result.copy(pictures = pictures.keep(result.items.mapNotNull { it.pictureUrl }))
     }
+
+    /**
+     * What DOC says is in [bounds], for the picker to show before anything is downloaded.
+     *
+     * Nothing is stored and nothing is written: it is the same services asked a smaller question, and
+     * the answer is a figure for a walker to decide on.
+     */
+    suspend fun inventory(bounds: DocBounds): DocInventory = downloader.inventory(bounds)
 }
 
 /**

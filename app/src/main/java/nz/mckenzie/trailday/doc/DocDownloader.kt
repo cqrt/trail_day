@@ -4,6 +4,7 @@ import nz.mckenzie.trailday.domain.doc.DocBounds
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocQuery
 import nz.mckenzie.trailday.domain.doc.DocSource
+import nz.mckenzie.trailday.domain.doc.pictureWhere
 
 /** How a download of DOC's material for an area went. */
 sealed interface DocDownloadResult {
@@ -88,6 +89,39 @@ class DocDownloader(
             }
         }
         return DocAreaDownload(items = items, counts = counts, failed = failed)
+    }
+
+    /**
+     * Asks all four services **how much** they have in [bounds], and how many pictures DOC addresses for
+     * it, without fetching any of it.
+     *
+     * One question a service, and one more for the three that publish pictures: seven small requests
+     * where a download would be seven pages of records. It is asked before an area is taken on so the
+     * walker knows what it costs them - and it is asked of the same services, with the same box and the
+     * same filters, that the download itself would read, because a count of something else is worse than
+     * no count at all.
+     */
+    suspend fun inventory(bounds: DocBounds): DocInventory {
+        val records = mutableMapOf<DocSource, Int>()
+        val failed = mutableMapOf<DocSource, String>()
+        var pictures = 0
+
+        for (source in DocSource.entries) {
+            val query = DocQuery(source = source, bounds = bounds, limit = 1)
+            when (val result = reader.count(query)) {
+                is DocCountResult.Done -> records[source] = result.count
+                is DocCountResult.Failed -> failed[source] = result.message
+            }
+
+            // A service that publishes no picture address for its records is not asked for one: the
+            // tracks carry none, and a question about nothing has no answer worth waiting for.
+            val where = source.pictureWhere() ?: continue
+            when (val result = reader.count(query, where)) {
+                is DocCountResult.Done -> pictures += result.count
+                is DocCountResult.Failed -> failed[source] = result.message
+            }
+        }
+        return DocInventory(records = records, pictures = pictures, failed = failed)
     }
 
     suspend fun download(bounds: DocBounds, source: DocSource): DocDownloadResult {

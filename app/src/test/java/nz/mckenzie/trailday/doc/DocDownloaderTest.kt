@@ -4,6 +4,7 @@ import nz.mckenzie.trailday.domain.doc.DocBounds
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.DocQuery
+import nz.mckenzie.trailday.domain.doc.pictureWhere
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -40,6 +41,9 @@ class DocDownloaderTest {
             call++
             return DocReadResult.Found(page)
         }
+
+        override suspend fun count(query: DocQuery, where: String): DocCountResult =
+            DocCountResult.Done(0)
     }
 
     @Test
@@ -79,6 +83,9 @@ class DocDownloaderTest {
                     DocReadResult.Failed("Unable to resolve host")
                 }
             }
+
+            override suspend fun count(query: DocQuery, where: String): DocCountResult =
+                DocCountResult.Done(0)
         }
 
         val failed = runBlocking { DocDownloader(source).download(box, DocSource.TRACKS) } as DocDownloadResult.Failed
@@ -107,6 +114,9 @@ class DocDownloaderTest {
                 )
             )
         }
+
+        override suspend fun count(query: DocQuery, where: String): DocCountResult =
+            DocCountResult.Done(if (query.source in fail) 0 else 1)
     }
 
     @Test
@@ -135,5 +145,84 @@ class DocDownloaderTest {
         assertEquals("and the huts are the ones named as unread", setOf(DocSource.HUTS), download.failed.keys)
         assertEquals("with no huts counted, because none arrived", 0, download.counts[DocSource.HUTS])
         assertEquals("while the three that answered are counted", 1, download.counts[DocSource.TRACKS])
+    }
+
+    /**
+     * A reader that counts what it would give, and what DOC addresses a picture for, keeping the two
+     * questions apart the way the services do.
+     */
+    private class Counting(
+        private val records: Map<DocSource, Int>,
+        private val pictures: Map<DocSource, Int> = emptyMap(),
+        private val fail: Set<DocSource> = emptySet()
+    ) : DocReader {
+
+        val asked = mutableListOf<Pair<DocSource, String>>()
+
+        override suspend fun search(query: DocQuery): DocReadResult =
+            DocReadResult.Found(emptyList())
+
+        override suspend fun count(query: DocQuery, where: String): DocCountResult {
+            asked += query.source to where
+            if (query.source in fail) {
+                return DocCountResult.Failed("the ${query.source.displayName.lowercase()} are down")
+            }
+            val picturesWanted = where == query.source.pictureWhere()
+            return DocCountResult.Done(
+                (if (picturesWanted) pictures[query.source] else records[query.source]) ?: 0
+            )
+        }
+    }
+
+    @Test
+    fun `an inventory counts every service, and the pictures of the three that publish them`() {
+        val source = Counting(
+            records = mapOf(
+                DocSource.TRACKS to 412,
+                DocSource.HUTS to 38,
+                DocSource.CAMPSITES to 6,
+                DocSource.BIKES to 93
+            ),
+            pictures = mapOf(DocSource.HUTS to 38, DocSource.CAMPSITES to 4, DocSource.BIKES to 20)
+        )
+
+        val inventory = runBlocking { DocDownloader(source).inventory(box) }
+
+        assertEquals(
+            "every service's own count is here",
+            mapOf(
+                DocSource.TRACKS to 412,
+                DocSource.HUTS to 38,
+                DocSource.CAMPSITES to 6,
+                DocSource.BIKES to 93
+            ),
+            inventory.records
+        )
+        assertEquals("the pictures of the three place services, added up", 62, inventory.pictures)
+        assertEquals("and 549 things in all", 549, inventory.totalRecords)
+        assertTrue("with every question answered: ${inventory.failed}", inventory.complete)
+
+        // The tracks carry no picture address, so DOC is not asked for one: a question about nothing has
+        // no answer worth the walker's time.
+        assertTrue(
+            "and the tracks are never asked about pictures",
+            source.asked.none { (service, where) -> service == DocSource.TRACKS && where == service.pictureWhere() }
+        )
+    }
+
+    @Test
+    fun `a service that will not answer makes the whole count unknown`() {
+        // A partial inventory is not offered as an estimate: a service that could not be asked is a
+        // service whose records and size are missing, and "500 KB" about an area with three services
+        // unheard from is a figure that misleads rather than informs.
+        val source = Counting(
+            records = mapOf(DocSource.TRACKS to 412),
+            fail = setOf(DocSource.HUTS)
+        )
+
+        val inventory = runBlocking { DocDownloader(source).inventory(box) }
+
+        assertTrue("the answer is marked as not the whole truth", !inventory.complete)
+        assertEquals(setOf(DocSource.HUTS), inventory.failed.keys)
     }
 }
