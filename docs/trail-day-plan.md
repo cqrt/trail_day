@@ -372,3 +372,17 @@ greens saying different things on one screen is worse than one blue that says on
 
 **The rest of step 10, in the plan's order**: Places, a place's page, the DOC browser, Record, Trips, a trip's
 page, Offline, Settings.
+
+**Step 10: Places is dressed.** The list is the screen now: a search field at the top, the two ways a place
+arrives and the door to what DOC publishes under it, the kind chips, and the places as **cards** - the kind's
+tile, the name, how long the line is, and a chevron saying the card opens. **Nothing destructive in a row and no
+rules between them**: a place is removed from its own page, which already offered that and shows what goes with
+it. The search narrows the list as the walker types - local and instant, case-blind, part of a name - and the
+buttons and chips step aside while it is being used, so the answer has the room.
+
+Two notes worth keeping. **The mock screens' buttons are pills after all**, so the shared button shape step 9
+deferred is closed rather than wanted. And **the one grouped search over the walker's places and DOC's material
+is still to come**: a DOC result has no page to open yet, so a hit there would be a name with nowhere to go.
+
+**Next screens, in the plan's order**: a place's page, the DOC browser, Record, Trips, a trip's page, Offline,
+Settings.
