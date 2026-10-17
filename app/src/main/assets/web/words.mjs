@@ -11,8 +11,6 @@
  * falls behind in one of them.
  */
 
-import { metresText } from './stats.mjs';
-
 /**
  * The phone's own word for a kind - "Track", "Bike track", "Hut", "Campsite", "Waypoint".
  *
@@ -35,11 +33,17 @@ function plainWords(code) {
  * What a row says under a place's name: what it is, and how long it is when it has a length.
  *
  * "Track - 2.08 km" and "Hut": a spot has no length, and a zero is not a measurement - the same rule the
- * phone's own rows keep (`formatLengthOf`), said with the same figure formatter (`metresText`).
+ * phone's own rows keep (`formatLengthOf`).
+ *
+ * [metresText] is the phone's own figure formatter, handed in rather than imported. Every module the page
+ * loads is asked for with its token in the address, and a module that imported another from inside itself
+ * would ask for it without one - so the page's own formatter is passed along the same way the figures on a
+ * trip are.
  */
-export function assetDetail(kindLabel, lengthM) {
+export function assetDetail(kindLabel, lengthM, metresText) {
   const label = kindLabel ?? '';
   const metres = Number(lengthM) || 0;
   if (metres <= 0) return label;
-  return label ? `${label} \u00b7 ${metresText(metres)}` : metresText(metres);
+  const length = metresText(metres);
+  return label ? `${label} \u00b7 ${length}` : length;
 }

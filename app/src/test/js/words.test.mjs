@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { assetDetail, kindText } from '../../main/assets/web/words.mjs';
+import { metresText } from '../../main/assets/web/stats.mjs';
 
 /** A few of the phone's own kinds, as they arrive in the state document: the phone's words. */
 const kinds = [
@@ -35,9 +36,9 @@ test('a kind the phone does not name is said in plain words rather than in its c
 });
 
 test('a row says what a place is, and how long it is when it has a length', () => {
-  assert.equal(assetDetail('Track', 2080), 'Track \u00b7 2.08 km');
-  assert.equal(assetDetail('Track', 850), 'Track \u00b7 850 m');
-  assert.equal(assetDetail('Hut', 0), 'Hut', 'a spot has no length, and a zero is not a measurement');
-  assert.equal(assetDetail('Hut', undefined), 'Hut');
-  assert.equal(assetDetail('', 2080), '2.08 km', 'a kind with no word still says the length');
+  assert.equal(assetDetail('Track', 2080, metresText), 'Track \u00b7 2.08 km');
+  assert.equal(assetDetail('Track', 850, metresText), 'Track \u00b7 850 m');
+  assert.equal(assetDetail('Hut', 0, metresText), 'Hut', 'a spot has no length, and a zero is not a measurement');
+  assert.equal(assetDetail('Hut', undefined, metresText), 'Hut');
+  assert.equal(assetDetail('', 2080, metresText), '2.08 km', 'a kind with no word still says the length');
 });

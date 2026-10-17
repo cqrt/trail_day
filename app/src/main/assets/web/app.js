@@ -719,7 +719,7 @@ function listRow(item) {
   const detail = document.createElement('span');
   detail.className = 'detail';
   // What it is, and how long it is: the phone's own words and its own figure - see `words.mjs`.
-  detail.textContent = assetDetail(kindText(item.asset.kind, state.choices.kinds), item.asset.lengthM);
+  detail.textContent = assetDetail(kindText(item.asset.kind, state.choices.kinds), item.asset.lengthM, metresText);
 
   words.append(name, detail);
   button.append(words);
