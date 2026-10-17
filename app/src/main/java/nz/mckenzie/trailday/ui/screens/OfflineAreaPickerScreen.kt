@@ -72,6 +72,11 @@ fun OfflineAreaPickerScreen(
     val docCounting by viewModel.docCounting.collectAsStateWithLifecycle()
 
     val imagery = viewModel.mode == OfflinePickerMode.IMAGERY
+    val around = viewModel.mode == OfflinePickerMode.AROUND_TRACK
+    // What this run keeps: the imagery (a name, a zoom range, the tiles), and/or what DOC publishes in the
+    // same box. Around a track is both, which is why they are two questions rather than one flag.
+    val keepsImagery = viewModel.mode != OfflinePickerMode.DOC_DATA
+    val keepsDocData = viewModel.mode != OfflinePickerMode.IMAGERY
 
     LaunchedEffect(saved) {
         if (saved) {
@@ -85,7 +90,15 @@ fun OfflineAreaPickerScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (imagery) "Choose an offline area" else "Choose a DOC area") },
+                title = {
+                    Text(
+                        when (viewModel.mode) {
+                            OfflinePickerMode.IMAGERY -> "Choose an offline area"
+                            OfflinePickerMode.DOC_DATA -> "Choose a DOC area"
+                            OfflinePickerMode.AROUND_TRACK -> "Keep the ground around this track"
+                        }
+                    )
+                },
                 navigationIcon = { IconButton(onClick = onBack) { AppIcon(IconGlyph.BACK, contentDescription = "Back") } }
             )
         }
@@ -127,9 +140,14 @@ fun OfflineAreaPickerScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = when (draft.corners.size) {
-                            0 -> "Tap one corner of the area"
-                            1 -> "Now tap the opposite corner"
+                        text = when {
+                            // The box is already drawn around the track, so the question is not about
+                            // corners but about whether this is the ground the walker wants kept.
+                            around -> "This is the ground ${draft.name} needs. Tap the map to draw a " +
+                                "different box, or drag it to check this one."
+
+                            draft.corners.size == 0 -> "Tap one corner of the area"
+                            draft.corners.size == 1 -> "Now tap the opposite corner"
                             else -> "Tap again to start a new box, or drag the map to check it"
                         },
                         style = MaterialTheme.typography.titleSmall
@@ -137,7 +155,7 @@ fun OfflineAreaPickerScreen(
 
                     // A name and a zoom range are an imagery area's own questions. A DOC area is the
                     // box and nothing else, so the picker asks nothing else of it.
-                    if (imagery) {
+                    if (keepsImagery) {
                         OutlinedTextField(
                             value = draft.name,
                             onValueChange = viewModel::setName,
@@ -200,7 +218,11 @@ fun OfflineAreaPickerScreen(
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
-                    } else {
+                    }
+
+                    // What DOC publishes in the same box: the whole download for a DOC area, and the half
+                    // that goes on top of the map for a track's ground.
+                    if (keepsDocData) {
                         // What the box would take on, asked before the button is tapped: the size of the
                         // download is the one thing a phone in the hills cannot change its mind about.
                         // DOC's own counts, and the app's own rough arithmetic for the bytes.
@@ -224,9 +246,15 @@ fun OfflineAreaPickerScreen(
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
-                            text = "Everything DOC publishes inside the box is downloaded and drawn on " +
-                                "the map as DOC's own layer. Nothing else is fetched, and no LINZ key " +
-                                "is needed.",
+                            text = if (around) {
+                                "Everything DOC publishes here is kept too - the tracks around the " +
+                                    "walk, the huts and campsites to stop at - and drawn on the map as " +
+                                    "DOC's own layer."
+                            } else {
+                                "Everything DOC publishes inside the box is downloaded and drawn on " +
+                                    "the map as DOC's own layer. Nothing else is fetched, and no LINZ " +
+                                    "key is needed."
+                            },
                             style = MaterialTheme.typography.bodySmall
                         )
                         docMessage?.let {
@@ -241,14 +269,17 @@ fun OfflineAreaPickerScreen(
                         ) { Text("Start over") }
                         Button(
                             onClick = viewModel::download,
-                            enabled = if (imagery) {
-                                apiKey.isNotBlank() && draft.isComplete && !draft.isTooBig && !working
+                            enabled = if (keepsImagery) {
+                                apiKey.isNotBlank() && draft.isComplete && !draft.isTooBig &&
+                                    !working && !docWorking
                             } else {
                                 draft.isComplete && !docWorking
                             }
                         ) {
                             Text(
                                 when {
+                                    around && working -> "Keeping the ground…"
+                                    around -> "Keep the ground"
                                     !imagery && docWorking -> "Downloading DOC data…"
                                     !imagery -> "Download DOC data"
                                     else -> "Download area"

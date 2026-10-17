@@ -57,6 +57,7 @@ fun AssetDetailScreen(
     onBack: () -> Unit,
     // Editing happens on a screen of its own, so this screen only has to say where to go.
     onEdit: () -> Unit,
+    onKeepGround: () -> Unit = {},
     onOpenRecording: (Long) -> Unit = {}
 ) {
     val track by viewModel.track.collectAsStateWithLifecycle()
@@ -273,6 +274,22 @@ fun AssetDetailScreen(
                     },
                     leadingContent = { AppIcon(IconGlyph.EXPORT) }
                 )
+
+                // Only a line has ground around it: a spot is a spot, and a box drawn around one is a
+                // different thing from a walk (which is the offline picker's own job).
+                if (shape == AssetShape.LINE) {
+                    ListItem(
+                        modifier = Modifier.clickable {
+                            actionsOpen = false
+                            onKeepGround()
+                        },
+                        headlineContent = { Text("Keep the ground around it") },
+                        supportingContent = {
+                            Text("The map, and DOC's tracks and huts around the line, for no reception")
+                        },
+                        leadingContent = { AppIcon(IconGlyph.OFFLINE) }
+                    )
+                }
                 ListItem(
                     modifier = Modifier.clickable {
                         actionsOpen = false
