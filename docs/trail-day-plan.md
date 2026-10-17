@@ -467,3 +467,25 @@ both passed when re-run. The tests that wait on a stored preference are the ones
 hardening them - waiting on the thing rather than on a clock - is worth a change of its own.
 
 **Next: Settings**, the last screen of step 10.
+
+**Step 10: Settings is dressed, and step 10 is done.** Settings is the largest screen and the least about the
+trail, and the one screen the mock screens do not draw - so its pass is the design system applied rather than a
+picture followed. Two things changed and nothing was re-arranged: a **small spaced capital label begins each
+group** (THE MAP, THIS PHONE, BACKUPS, THE APP, as the mock screens write ELEVATION and TRIPS), and **every
+supporting line is the muted grey-green** it is everywhere else - seventeen of them were full-strength text, which
+is what made the screen read heavier than the ones behind it.
+
+**Step 10 is complete.** Nine screens, nine changes, each with a screenshot: the map, the places list, a place's
+page, the DOC browser, the recorder, the trips list, a trip's page, the offline screen, and Settings. The design
+system did the bulk of it - every screen changed clothes at once - and each pass since has been what the mock
+screens ask of that one screen.
+
+**The flaky tests, and the one that was mine.** Three CI runs in this stage failed on a timing assumption rather
+than on the change: two waited on a stored preference and timed out, and one - in the nearest-thing card's own
+test - waited for DOC's hut and then asserted about the walker's camp as well, which the card fills in from three
+sources at different moments. All three passed on a re-run; that one is now fixed to wait for the state it is
+about rather than for the first thing that arrives, and the preference ones are worth the same treatment in a
+change of their own.
+
+**Next is step 11, the last of the plan**: the laptop page, reassessed - the same look, or gone. The plan says it
+is decided with the page in front of us, so that is the next thing to do together.
