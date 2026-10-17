@@ -439,3 +439,13 @@ like), and its **hike-and-ride tiles** need a mode on a trip, which the app does
 the recorded line's green.
 
 **Next screens, in the plan's order**: a trip's page, Offline, Settings.
+
+**Step 10: a trip's page is dressed.** The trip's own line is the top of the page - on the map, green with its
+gold edge - with a round white back button over its corner, and a white sheet lifted over the foot of the map
+carrying the name, when and for how long, the **elevation card** with its chart, and the **figures in the mock
+screens' six divided cells**: distance, total time, moving, average, climb and descent. **Moving time is the
+total less the pauses**, and the average is over the moving time - a long lunch is not a slow walk. A pause that
+never ended runs to the end of the recording, and a pass with no heights says nothing about climb or descent
+rather than saying zero. The delete sits at the foot of the page.
+
+**Next screens, in the plan's order**: Offline, Settings.
