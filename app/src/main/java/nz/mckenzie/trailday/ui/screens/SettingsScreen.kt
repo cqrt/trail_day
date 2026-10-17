@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -218,6 +219,9 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+
+                    SettingsGroupLabel("THE MAP")
+
                     Text("Basemap", style = MaterialTheme.typography.titleMedium)
 
                     ChoiceRow(
@@ -236,7 +240,8 @@ fun SettingsScreen(
                         Text(
                             text = "Offline areas always download aerial imagery, whichever " +
                                 "basemap you read your maps on.",
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -284,6 +289,9 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+
+                    SettingsGroupLabel("THIS PHONE")
+
                     Text("Draw from a computer", style = MaterialTheme.typography.titleMedium)
 
                     Row(
@@ -304,7 +312,8 @@ fun SettingsScreen(
 
                     Text(
                         "Your computer must be on the same Wi-Fi.",
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     // The default said out loud, because a phone serving without the walker
@@ -313,7 +322,8 @@ fun SettingsScreen(
                     Text(
                         text = "This is on as soon as the app is opened, so the address is ready " +
                             "when you sit down at the computer. Turn it off and it stays off.",
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     val address = webEditorUrl
@@ -354,7 +364,8 @@ fun SettingsScreen(
                                 "delete them, without needing the address above. That is fine on " +
                                 "your own home network and not on anyone else's."
                         },
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     // The phone staying awake. On the card because it costs something the walker
@@ -387,7 +398,8 @@ fun SettingsScreen(
                                 "up blank until you wake it. Downloading an area first, under " +
                                 "Offline areas, needs no network at all and no awake phone."
                         },
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -411,7 +423,8 @@ fun SettingsScreen(
                             "and is blank somewhere new \u2014 so if the map ever looks wrong, " +
                             "press Check. OpenStreetMap needs no key, so a map with no key at " +
                             "all is still a map.",
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     OutlinedTextField(
@@ -510,7 +523,8 @@ fun SettingsScreen(
                         UpdateState.Idle -> Unit
                         UpdateState.Checking -> Text(
                             text = "Asking GitHub\u2026",
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
                         is UpdateState.NothingToInstall -> Text(
@@ -535,7 +549,8 @@ fun SettingsScreen(
                             )
                             Text(
                                 text = "Downloading\u2026 ${(state.progress * 100).toInt()}%",
-                                style = MaterialTheme.typography.bodySmall
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
@@ -587,11 +602,15 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+
+                    SettingsGroupLabel("BACKUPS")
+
                     Text("Your data", style = MaterialTheme.typography.titleMedium)
                     Text(
                         text = "Everything the app holds: the places and their lines, and " +
                             "every GPS trip.",
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -614,7 +633,8 @@ fun SettingsScreen(
                     Text(
                         text = "Downloaded offline imagery is not in the backup: it describes " +
                             "tiles on this phone and can be downloaded again.",
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -629,7 +649,8 @@ fun SettingsScreen(
                         text = "The backup above is a file you keep. This is the same backup, " +
                             "written by the app itself, so there is a copy somewhere else if " +
                             "this phone is lost, wiped, or dropped in the creek.",
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     ChoiceRow(
@@ -644,7 +665,8 @@ fun SettingsScreen(
                         BackupDestination.OFF -> Text(
                             text = "Nothing is written anywhere on its own. Backing up is the " +
                                 "button on the card above, which writes a file you choose.",
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
                         BackupDestination.FILE -> {
@@ -677,7 +699,8 @@ fun SettingsScreen(
                                 text = "A private repository keeps the copy off the property " +
                                     "and keeps its history: every backup is a commit, so an " +
                                     "older copy is still there if the newest one is wrong.",
-                                style = MaterialTheme.typography.bodySmall
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             OutlinedTextField(
                                 value = repoText,
@@ -752,7 +775,8 @@ fun SettingsScreen(
                                     "read and write on this one repository. It is kept on this " +
                                     "phone and never written into a backup \u2014 the copy " +
                                     "lives in the very repository the token can write to.",
-                                style = MaterialTheme.typography.bodySmall
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -793,7 +817,8 @@ fun SettingsScreen(
                         text = "An empty database is never written over the copy: if this phone " +
                             "holds nothing \u2014 after a wipe, say \u2014 the copy is left " +
                             "alone, so it is still there to restore from.",
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -803,6 +828,9 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+
+                    SettingsGroupLabel("THE APP")
+
                     Text("This device", style = MaterialTheme.typography.titleMedium)
                     Text(viewModel.versionLabel, style = MaterialTheme.typography.bodyMedium)
                     Text(
@@ -812,7 +840,8 @@ fun SettingsScreen(
                     Text(
                         text = "Downloaded areas, their progress and clearing them are on the " +
                             "Offline areas screen.",
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -820,6 +849,23 @@ fun SettingsScreen(
     }
 }
 
+/**
+ * A heading over a group of settings: a small spaced capital label, as the pages of the mock screens write the
+ * name of a thing - ELEVATION, TRIPS - rather than a heading in the size of a card's own title.
+ *
+ * This is the largest screen in the app and the least about the trail, so the labels are what make it scannable:
+ * the map's settings, the phone's, the backups', and the app's own.
+ */
+@Composable
+private fun SettingsGroupLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        letterSpacing = 1.1.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+    )
+}
 /**
  * Android's own per-app notification settings, which is where a prompt that will not
  * appear again gets undone.
