@@ -341,3 +341,22 @@ Two gaps are recorded rather than forgotten:
   own page does not exist yet, and it is the mock's hut record screen of the look stage.
 
 **Next is stage 3**, the look: the design system first, then one screen per change from the mock screens.
+
+**Step 9 is done.** The design system is the Material theme itself, so every screen changed clothes without
+being touched: the mock screens' pale sage page with white cards on it, the eighteen-point card, the 44-point
+kind tile in a pale tint of the kind's own colour, the figure tile with its own label, the pill chip, and the
+five kind colours moved - huts orange, waypoints slate, tracks and bike tracks darkened, the campsite
+unchanged - which also settles the DOC layer, whose huts had been slate while the mock screens drew them
+orange.
+
+The dark set is **derived**: the same roles and the same sage family taken dark, with the five kind colours'
+own hues at a lighter tone. That is not decoration - the new deep purple vanishes on a dark card exactly as
+the old brown did - so the contrast test now holds the light set against the white card and the dark set
+against the dark one.
+
+Everything else the mock screens change is a screen's own business and belongs to step 10: the button corners
+(Material's buttons are pills, the mock screens' are rounded rectangles), the list row's red Delete and its
+rules, the search field, the recorder's gold edge, and the layouts themselves.
+
+**Step 10 is next**, one screen per change with a screenshot, in this order: Map, Places, a place's page, the
+DOC browser, Record, Trips, a trip's page, Offline, Settings.
