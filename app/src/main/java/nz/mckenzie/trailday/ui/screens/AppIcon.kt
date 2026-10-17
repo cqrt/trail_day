@@ -40,7 +40,8 @@ enum class IconGlyph {
     TRASH,
     CHEVRON,
     LOCATE,
-    LAYERS
+    LAYERS,
+    SEARCH
 }
 
 /**
@@ -191,6 +192,12 @@ internal fun AppIcon(
                 bobble(0.50f, 0.24f)
                 bobble(0.50f, 0.50f)
                 bobble(0.50f, 0.76f)
+            }
+
+            // A magnifier: the ring, and the handle out of its lower right.
+            IconGlyph.SEARCH -> {
+                ring(0.44f, 0.44f, 0.27f)
+                line(0.64f, 0.64f, 0.84f, 0.84f)
             }
 
             // A pencil: the shaft, and the nib it comes to a point with.

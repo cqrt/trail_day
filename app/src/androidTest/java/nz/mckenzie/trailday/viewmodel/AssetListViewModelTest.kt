@@ -110,8 +110,35 @@ class AssetListViewModelTest {
         assertEquals("and not under a word it never had", 0, namesShown(viewModel, 0).size)
     }
 
-    private suspend fun givenAHut(name: String) {
-        repository.createAsset(
+    @Test
+    fun aSearchNarrowsTheListToTheNamesItHolds() = runBlocking {
+        givenAHut("Tin Hut")
+        givenABikeTrack("Estuary ride")
+        val viewModel = viewModel()
+        namesShown(viewModel, 2)
+
+        viewModel.search("tin")
+        assertEquals(
+            "part of a name is enough, and its case does not matter",
+            listOf("Tin Hut"),
+            namesShown(viewModel, 1)
+        )
+
+        viewModel.search("  ")
+        assertEquals("a search of spaces is no search", 2, namesShown(viewModel, 2).size)
+
+        viewModel.search("glory")
+        assertEquals("nothing matching is nothing shown", 0, namesShown(viewModel, 0).size)
+
+        // And the name and the kind narrow together, rather than one undoing the other.
+        viewModel.search("estuary")
+        viewModel.showOnly(AssetKind.HUT)
+        assertEquals("a hut search does not find a bike track", 0, namesShown(viewModel, 0).size)
+        viewModel.showOnly(AssetKind.BIKE_TRACK)
+        assertEquals(listOf("Estuary ride"), namesShown(viewModel, 1))
+    }
+
+    private suspend fun givenAHut(name: String) {        repository.createAsset(
             name = name,
             geometry = listOf(GeoPoint(-41.5, 173.8)),
             kind = AssetKind.HUT,

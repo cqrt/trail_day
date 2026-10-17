@@ -50,13 +50,32 @@ class AssetListViewModel(
     val filter: StateFlow<AssetKindFilter> = _filter
 
     /**
-     * The rows the list is built from: the whole list, or one kind of it.
+     * What the walker has typed into the list's search: the list narrows to the places whose name holds it.
+     *
+     * **Local and instant**, unlike the browser's search of DOC: this is the walker's own list, which is on
+     * the phone already, so a keystroke is a filter rather than a question sent anywhere. The one grouped
+     * search over these places and DOC's material is still to come - see the plan - because a DOC result
+     * with no page to open would be a name with nowhere to go.
+     */
+    private val _query = MutableStateFlow("")
+    val query: StateFlow<String> = _query
+
+    fun search(text: String) {
+        _query.value = text
+    }
+
+    /**
+     * The rows the list is built from: the whole list, one kind of it, or what the search leaves.
      *
      * Filtered here rather than in the screen so the rows and the "nothing of that kind" line are
      * both reading the same list - and so the rule can be tested without a screen.
      */
-    val shown: StateFlow<List<AssetEntity>> = combine(assets, _filter) { all, filter ->
-        all.filter { asset -> filter.keeps(asset.kind) }
+    val shown: StateFlow<List<AssetEntity>> = combine(assets, _filter, _query) { all, filter, query ->
+        val typed = query.trim()
+        all.filter { asset ->
+            filter.keeps(asset.kind) &&
+                (typed.isEmpty() || asset.name.contains(typed, ignoreCase = true))
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     /**
@@ -97,13 +116,6 @@ class AssetListViewModel(
 
     fun clearMessage() {
         _message.value = null
-    }
-
-    fun delete(assetId: Long) {
-        viewModelScope.launch {
-            runCatching { assetRepository.deleteAsset(assetId) }
-                .onFailure { _message.value = it.message ?: "Could not delete the track" }
-        }
     }
 
     /**

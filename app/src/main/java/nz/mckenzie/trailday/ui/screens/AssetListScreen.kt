@@ -2,28 +2,28 @@ package nz.mckenzie.trailday.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -41,9 +41,12 @@ import nz.mckenzie.trailday.viewmodel.AssetListViewModel
 /**
  * The place library: what places you keep, and how long the lines among them are.
  *
- * A place arrives one of two ways - a spot dropped on the map, or a file brought in - and both are
- * offered above the list. [onOpenDoc] is not a third: what DOC publishes is read here rather than kept,
- * because it is not the walker's to change.
+ * **The list is the screen.** A search field at the top narrows it to the name typed; the two ways to make a
+ * place and the door to what DOC publishes sit under it while nothing is being searched for; and the places
+ * themselves are cards - the kind's tile, the name, how long the line is - with nothing destructive on them.
+ * A place is removed from its own page, which is where the walker can also see what goes with it.
+ *
+ * [onOpenDoc] is not a third way to make a place: what DOC publishes is read here rather than kept.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -58,12 +61,15 @@ fun AssetListScreen(
     val assets by viewModel.assets.collectAsStateWithLifecycle()
     val shown by viewModel.shown.collectAsStateWithLifecycle()
     val filter by viewModel.filter.collectAsStateWithLifecycle()
+    val query by viewModel.query.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
 
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri -> uri?.let(viewModel::importTrackFile) }
+
+    val searching = query.isNotBlank()
 
     Scaffold(
         topBar = {
@@ -82,56 +88,67 @@ fun AssetListScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp),
+                .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Two ways to make a place, and only two: recording, the recordings list and settings used
-            // to be buttons here, and are now the tabs in the bar below and the icon in the bar above.
-            // Dropping a spot gets the filled treatment because it is what happens standing on the
-            // track, which is the commoner case.
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(onClick = onAddSpot) { Text("Add a spot") }
-                OutlinedButton(
-                    onClick = { importLauncher.launch(TRACK_MIME_TYPES) },
-                    enabled = !busy
-                ) {
-                    Text("Import GPX, KML, KMZ or GeoJSON")
-                }
-            }
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // And one thing to *read* rather than to make: what DOC publishes, which is the map's own
-            // layer rather than a place of the walker's. Its own row, because it is not a way to add
-            // anything - see the plan.
-            OutlinedButton(
-                onClick = onOpenDoc,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("From DOC")
-            }
-
-            // What the list is showing. One line that scrolls sideways rather than a block of
-            // chips: five of them wrapped is a row of screen before the first place, and the
-            // rarer kinds are a swipe away. All leads, so the way back is always at the left - and
-            // tapping the chip already showing is the same way back, from wherever the walker is.
+            // The search, where the mock screens put it: the first thing on the screen, because half the
+            // visits to a list of places are looking for one of them.
             if (assets.isNotEmpty()) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item(key = "all") {
-                        ChoiceChip(
-                            selected = filter.kind == null,
-                            label = "All",
-                            onClick = { viewModel.showOnly(null) }
-                        )
+                SearchField(
+                    value = query,
+                    onValueChange = viewModel::search,
+                    placeholder = "Search your places"
+                )
+            }
+
+            // While nothing is being searched for, the ways a place arrives, and the door to what DOC
+            // publishes. Both step aside when the walker is looking for something, so the answer has the
+            // screen rather than the tools.
+            if (!searching) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(onClick = onAddSpot, modifier = Modifier.weight(1f)) {
+                        Text("Add a spot")
                     }
-                    items(AssetPhrase.kinds, key = { kind -> kind.name }) { kind ->
-                        ChoiceChip(
-                            selected = filter.kind == kind,
-                            label = AssetPhrase.kind(kind),
-                            onClick = { viewModel.showOnly(kind) }
-                        )
+                    OutlinedButton(
+                        onClick = { importLauncher.launch(TRACK_MIME_TYPES) },
+                        enabled = !busy,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(if (busy) "Importing…" else "Import a file")
+                    }
+                }
+
+                // Not a way to add: what DOC publishes is read, not kept - see the plan. A text button
+                // because it is a way out of the list rather than an action on it.
+                TextButton(onClick = onOpenDoc, modifier = Modifier.fillMaxWidth()) {
+                    Text("What DOC publishes")
+                }
+
+                // What the list is showing. One line that scrolls sideways rather than a block of chips:
+                // five of them wrapped is a row of screen before the first place, and the rarer kinds are a
+                // swipe away. All leads, so the way back is always at the left - and tapping the chip
+                // already showing is the same way back, from wherever the walker is.
+                if (assets.isNotEmpty()) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item(key = "all") {
+                            ChoiceChip(
+                                selected = filter.kind == null,
+                                label = "All",
+                                onClick = { viewModel.showOnly(null) }
+                            )
+                        }
+                        items(AssetPhrase.kinds, key = { kind -> kind.name }) { kind ->
+                            ChoiceChip(
+                                selected = filter.kind == kind,
+                                label = AssetPhrase.kind(kind),
+                                onClick = { viewModel.showOnly(kind) }
+                            )
+                        }
                     }
                 }
             }
@@ -140,33 +157,34 @@ fun AssetListScreen(
                 Text(text = it, style = MaterialTheme.typography.bodySmall)
             }
 
-            if (assets.isEmpty()) {
-                EmptyState(
+            when {
+                assets.isEmpty() -> EmptyState(
                     glyph = IconGlyph.ASSETS,
                     title = "No places yet",
                     body = "Drop a spot on the map, or bring in a GPX, KML, KMZ or GeoJSON file.",
                     actionLabel = "Add a spot",
                     onAction = onAddSpot
                 )
-            } else if (shown.isEmpty()) {
-                // Nothing of the kind asked about is worth one line rather than an empty list: the
-                // chips are still above, so the way out is in sight, and the line says which of the
-                // two questions came up empty - the work, or the kind.
-                Text(
-                    text = "Nothing of that kind on the phone yet.",
+
+                // Nothing shown is worth one line rather than an empty list: the search field and the
+                // chips are still above, so the way out is in sight, and the line says which question
+                // came up empty - the name, or the kind.
+                shown.isEmpty() -> Text(
+                    text = if (searching) {
+                        "No place of yours has \"${query.trim()}\" in its name."
+                    } else {
+                        "Nothing of that kind on the phone yet."
+                    },
                     style = MaterialTheme.typography.bodyMedium
                 )
-            } else {
-                // Rows rather than a card each: a list of places is a list, and a card per
-                // row made five paddocks look like five unrelated things.
-                LazyColumn {
-                    itemsIndexed(shown, key = { _, item -> item.id }) { index, item ->
-                        if (index > 0) HorizontalDivider()
-                        AssetRow(
-                            item = item,
-                            onOpen = { onOpenAsset(item.id) },
-                            onDelete = { viewModel.delete(item.id) }
-                        )
+
+                else -> LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp)
+                ) {
+                    items(shown, key = { item -> item.id }) { item ->
+                        PlaceCard(item = item, onOpen = { onOpenAsset(item.id) })
                     }
                 }
             }
@@ -186,24 +204,41 @@ private val TRACK_MIME_TYPES = arrayOf(
     "*/*"
 )
 
+/**
+ * One place, as a card: **the kind's tile, the name, and how long the line is** - and a chevron saying it
+ * opens.
+ *
+ * Nothing destructive: the mock screens put no Remove on a row, and a list is a bad place to be offered a
+ * delete for something the walker was looking for. The place's own page is where it is removed, with what
+ * goes with it named there.
+ */
 @Composable
-private fun AssetRow(
-    item: AssetEntity,
-    onOpen: () -> Unit,
-    onDelete: () -> Unit
-) {
-    ListItem(
-        modifier = Modifier.clickable(onClick = onOpen),
-        headlineContent = {
-            Text(item.name, style = MaterialTheme.typography.titleSmall)
-        },
-        supportingContent = { Text(assetRowDetail(item)) },
-        // What it is, by its own icon: the kind is the first thing read about a place.
-        leadingContent = {
-            KindTile(kind = AssetKind.fromStorage(item.kind))
-        },
-        trailingContent = { DestructiveTextButton(text = "Delete", onClick = onDelete) }
-    )
+private fun PlaceCard(item: AssetEntity, onOpen: () -> Unit) {
+    val kind = AssetKind.fromStorage(item.kind)
+    val detail = assetRowDetail(item).ifEmpty { AssetPhrase.kind(kind) }
+
+    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            KindTile(kind = kind)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = item.name, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            AppIcon(
+                glyph = IconGlyph.CHEVRON,
+                dimension = 18.dp,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }
 
 /**
