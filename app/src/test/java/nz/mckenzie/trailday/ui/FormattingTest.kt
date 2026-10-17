@@ -72,4 +72,16 @@ class FormattingTest {
         assertEquals("51.5074\u00b0N, 0.1278\u00b0W", formatCoordinates(51.5074, -0.1278))
         assertEquals("0.0000\u00b0N, 0.0000\u00b0E", formatCoordinates(0.0, 0.0))
     }
+
+    @Test
+    fun `an estimate is said in minutes and hours, never in seconds`() {
+        // A stopwatch's answer has seconds in it because it is what happened. An estimate's arithmetic is
+        // a rule of thumb about a hill, so seconds would claim a precision nobody has.
+        assertEquals("1m", formatEstimate(60))
+        assertEquals("18m", formatEstimate(18 * 60L))
+        assertEquals("1h", formatEstimate(60 * 60L))
+        assertEquals("1h 5m", formatEstimate(65 * 60L))
+        assertEquals("2h 45m", formatEstimate(165 * 60L))
+        assertEquals("0m", formatEstimate(0))
+    }
 }

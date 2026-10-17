@@ -37,6 +37,8 @@ import nz.mckenzie.trailday.domain.asset.AssetPhrase
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.ElevationPhrase
 import nz.mckenzie.trailday.domain.geo.ElevationProfile
+import nz.mckenzie.trailday.domain.geo.TravelMode
+import nz.mckenzie.trailday.domain.geo.TravelTime
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.map.AssetColors
@@ -44,6 +46,7 @@ import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.ui.formatDate
 import nz.mckenzie.trailday.ui.formatDistance
+import nz.mckenzie.trailday.ui.formatEstimate
 import nz.mckenzie.trailday.ui.formatLengthOf
 import nz.mckenzie.trailday.viewmodel.AssetDetailViewModel
 
@@ -169,6 +172,26 @@ fun AssetDetailScreen(
                     ElevationPhrase.range(elevation)?.let { range ->
                         Text(text = range, style = MaterialTheme.typography.bodyMedium)
                     }
+
+                    // How long the line takes, on foot and on a bike, from the one piece of arithmetic
+                    // every screen that estimates time uses. Both, because a place does not know which
+                    // the walker will do - and the same climb the line's heights gave is what the time
+                    // is made of, rather than a second reading of the ground that could disagree.
+                    if (shape == AssetShape.LINE) {
+                        val lengthM = track?.lengthM ?: 0.0
+                        val climbM = elevation?.climbM ?: 0.0
+                        if (lengthM > 0.0) {
+                            val onFoot = TravelTime.seconds(lengthM, climbM, TravelMode.WALKING)
+                            val riding = TravelTime.seconds(lengthM, climbM, TravelMode.RIDING)
+                            Text(
+                                text = "About " + formatEstimate(onFoot) + " " +
+                                    TravelMode.WALKING.phrase + " \u00b7 " + formatEstimate(riding) + " " +
+                                    TravelMode.RIDING.phrase,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+
                     elevation?.let { profile ->
                         ElevationChart(
                             profile = profile,

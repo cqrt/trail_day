@@ -8,6 +8,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /** "850 m" / "2.35 km" - walker-facing distances. */
@@ -93,6 +94,25 @@ fun formatDuration(millis: Long): String {
         hours > 0 -> String.format(Locale.US, "%dh %02dm", hours, minutes)
         minutes > 0 -> String.format(Locale.US, "%dm %02ds", minutes, seconds)
         else -> "${seconds}s"
+    }
+}
+
+/**
+ * How long an estimate says: "18m", "2h 45m", "3h".
+ *
+ * Deliberately not [formatDuration]. That one is a stopwatch's answer, to the second, because it is what
+ * happened; an estimate in seconds would claim a precision nobody has, since the arithmetic under it is a
+ * rule of thumb about a hill. So this counts in minutes, and a whole number of hours is "3h" rather than
+ * "3h 00m".
+ */
+fun formatEstimate(seconds: Long): String {
+    val minutes = ceil(seconds / 60.0).toLong()
+    val hours = minutes / 60
+    val rest = minutes % 60
+    return when {
+        hours > 0 && rest > 0 -> "${hours}h ${rest}m"
+        hours > 0 -> "${hours}h"
+        else -> "${minutes}m"
     }
 }
 
