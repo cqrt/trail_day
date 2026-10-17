@@ -89,6 +89,9 @@ class MainActivity : ComponentActivity() {
                 var destination by rememberSaveable { mutableStateOf(Destination.MAP) }
                 var selectedAssetId by rememberSaveable { mutableStateOf<Long?>(null) }
                 var selectedSessionId by rememberSaveable { mutableStateOf<Long?>(null) }
+    // The place a page sent the recorder here to follow: chosen on the page, and read by the recorder's own
+    // view model for as long as it is up.
+    var recordTargetId by rememberSaveable { mutableStateOf<Long?>(null) }
 
                 // Bumped on every visit to the add-a-spot screen so it gets its own view
                 // model: a shared one would carry the previous visit's draft (and
@@ -182,6 +185,10 @@ class MainActivity : ComponentActivity() {
                                 onBack = { destination = Destination.ASSETS },
                                 onEdit = { destination = Destination.ASSET_EDIT },
                                 onKeepGround = { destination = Destination.OFFLINE_PICKER_AROUND },
+                                onRecord = {
+                                    recordTargetId = assetId
+                                    destination = Destination.RECORD
+                                },
                                 onOpenRecording = { sessionId ->
                                     selectedSessionId = sessionId
                                     destination = Destination.RECORDING_DETAIL
@@ -211,7 +218,11 @@ class MainActivity : ComponentActivity() {
 
                     Destination.RECORD -> {
                         val recordingViewModel: RecordingViewModel = viewModel(
-                            factory = RecordingViewModel.factory(applicationContext)
+                            key = "record-$recordTargetId",
+                            factory = RecordingViewModel.factory(
+                                applicationContext,
+                                initialTargetId = recordTargetId
+                            )
                         )
                         RecordScreen(
                             viewModel = recordingViewModel,

@@ -2,27 +2,31 @@ package nz.mckenzie.trailday.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,20 +34,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlin.math.roundToInt
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetPhrase
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.ElevationPhrase
 import nz.mckenzie.trailday.domain.geo.ElevationProfile
+import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.TravelMode
 import nz.mckenzie.trailday.domain.geo.TravelTime
 import nz.mckenzie.trailday.domain.tiles.Basemap
-import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
+import nz.mckenzie.trailday.map.BasemapView
+import nz.mckenzie.trailday.ui.formatCoordinates
 import nz.mckenzie.trailday.ui.formatDate
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.formatEstimate
@@ -51,7 +60,15 @@ import nz.mckenzie.trailday.ui.formatLengthOf
 import nz.mckenzie.trailday.viewmodel.AssetDetailViewModel
 
 /**
- * One track or place: where it is, what shape it is, and the trips recorded on it.
+ * One place: **the place on its own ground, and a sheet of what it is.**
+ *
+ * The shape is the mock screens': the map is the top of the screen with the place on it and two round buttons
+ * over it - back, and everything else this page can do - and a white sheet with rounded top corners carries the
+ * name, the figures, the height chart, the notes and the trips recorded on it.
+ *
+ * The figures are the mock screens' own: a card divided into cells, each a small capital label with its value,
+ * rather than one line of facts. The time to walk and ride comes from the same arithmetic the map's nearest
+ * card and the recorder's target use.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +78,8 @@ fun AssetDetailScreen(
     // Editing happens on a screen of its own, so this screen only has to say where to go.
     onEdit: () -> Unit,
     onKeepGround: () -> Unit = {},
+    /** Record while following this place - or, for a spot, head for it. */
+    onRecord: () -> Unit = {},
     onOpenRecording: (Long) -> Unit = {}
 ) {
     val track by viewModel.track.collectAsStateWithLifecycle()
@@ -100,136 +119,164 @@ fun AssetDetailScreen(
     var confirmingDelete by remember { mutableStateOf(false) }
     var actionsOpen by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(track?.name ?: "Place") },
-                navigationIcon = { IconButton(onClick = onBack) { AppIcon(IconGlyph.BACK, contentDescription = "Back") } },
-                actions = {
-                    // Everything that is not the line itself lives behind this: editing the
-                    // place, exporting it, deleting it. Material puts those in a sheet rather
-                    // than as three buttons competing for the top bar.
-                    IconButton(onClick = { actionsOpen = true }) {
-                        AppIcon(IconGlyph.MORE, contentDescription = "More actions")
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
+    val lengthM = track?.lengthM ?: 0.0
+    val lengthText = formatLengthOf(shape, lengthM)
+
+    Scaffold { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Box(
+            // The place on its own ground, the whole width of the screen: the map is what the page is about,
+            // so it is the top of the page rather than a picture inside a card.
+            Box {
+                BasemapView(
+                    basemap = basemap,
+                    apiKey = apiKey,
+                    assetGeoJson = geoJson,
+                    fitBounds = bounds,
+                    // How close this map is allowed to sit. Asked for in as many words: the page was
+                    // landing at the deepest zoom the map has, where the imagery runs out, and 15 is the
+                    // view the walker asked for - a paddock with the place in it. A place too big to fit at
+                    // 15 still gets its whole self on the page, because that is the fit it always had.
+                    fitBoundsMaxZoom = ASSET_PAGE_MAX_ZOOM,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(220.dp)
-                ) {
-                    BasemapView(
-                        basemap = basemap,
-                        apiKey = apiKey,
-                        assetGeoJson = geoJson,
-                        fitBounds = bounds,
-                        // How close this little map is allowed to sit. Asked for in as many words:
-                        // the page was landing at the deepest zoom the map has, where the imagery
-                        // runs out, and 15 is the view the walker asked for - a paddock with the
-                        // place in it. A place too big to fit at 15 still gets its whole self on
-                        // the card, because that is the fit it always had.
-                        fitBoundsMaxZoom = ASSET_PAGE_MAX_ZOOM,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    AttributionStrip(
-                        basemap = basemap,
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(bottom = 4.dp)
-                    )
-                }
-            }
+                        .height(MAP_HEIGHT)
+                )
 
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(AssetPhrase.kind(kind), style = MaterialTheme.typography.titleMedium)
-                    // How long the line is, and nothing at all when there is no line: a spot is
-                    // somewhere you stop, and "Length 0 m" is a measurement nobody took. The list's
-                    // rows say it the same way, through the same one rule.
-                    formatLengthOf(shape, track?.lengthM ?: 0.0).takeIf { it.isNotEmpty() }?.let { length ->
-                        Text(
-                            text = AssetPhrase.lengthLabel() + " " + length,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                    // How high the line goes, when the file it came from said. One line, in the
-                    // words the domain gives; a track drawn here has no heights and says nothing.
-                    ElevationPhrase.range(elevation)?.let { range ->
-                        Text(text = range, style = MaterialTheme.typography.bodyMedium)
-                    }
+                RoundIconButton(
+                    glyph = IconGlyph.BACK,
+                    description = "Back",
+                    onClick = onBack,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(12.dp)
+                )
+                RoundIconButton(
+                    glyph = IconGlyph.MORE,
+                    description = "More actions",
+                    onClick = { actionsOpen = true },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp)
+                )
 
-                    // How long the line takes, on foot and on a bike, from the one piece of arithmetic
-                    // every screen that estimates time uses. Both, because a place does not know which
-                    // the walker will do - and the same climb the line's heights gave is what the time
-                    // is made of, rather than a second reading of the ground that could disagree.
-                    if (shape == AssetShape.LINE) {
-                        val lengthM = track?.lengthM ?: 0.0
-                        val climbM = elevation?.climbM ?: 0.0
-                        if (lengthM > 0.0) {
-                            val onFoot = TravelTime.seconds(lengthM, climbM, TravelMode.WALKING)
-                            val riding = TravelTime.seconds(lengthM, climbM, TravelMode.RIDING)
-                            Text(
-                                text = "About " + formatEstimate(onFoot) + " " +
-                                    TravelMode.WALKING.phrase + " \u00b7 " + formatEstimate(riding) + " " +
-                                    TravelMode.RIDING.phrase,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
-
-                    elevation?.let { profile ->
-                        ElevationChart(
-                            profile = profile,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(96.dp)
-                        )
-                    }
-                    track?.notes?.takeIf { it.isNotBlank() }?.let {
-                        Text(text = it, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
-
-            message?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
-
-            Text("Trips", style = MaterialTheme.typography.titleSmall)
-            if (recordings.isEmpty()) {
-                EmptyState(
-                    glyph = IconGlyph.RECORDINGS,
-                    title = "No trip for this place",
-                    body = "Recording while walking or riding this line leaves the evidence " +
-                        "of what was actually followed."
+                AttributionStrip(
+                    basemap = basemap,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(bottom = 40.dp, start = 4.dp)
                 )
             }
-            recordings.forEach { session ->
-                Card(modifier = Modifier.fillMaxWidth(), onClick = { onOpenRecording(session.id) }) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+
+            // The sheet: white, its top corners round, lifted over the foot of the map so the two read as one
+            // screen rather than a picture above a list.
+            Column(
+                modifier = Modifier
+                    .offset(y = -SHEET_LIFT)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 20.dp, bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = track?.name ?: "Place",
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Text(
+                        text = listOfNotNull(
+                            AssetPhrase.kind(kind),
+                            lengthText.takeIf { it.isNotEmpty() }
+                        ).joinToString(" \u00b7 "),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                figures(shape = shape, lengthM = lengthM, lengthText = lengthText, elevation = elevation, point = geometry.line.firstOrNull())
+
+                // The height of the line, in the words the domain gives and, under them, its shape. A line
+                // with no heights says nothing at all.
+                ElevationPhrase.range(elevation)?.let { range ->
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(text = range, style = MaterialTheme.typography.bodyMedium)
+                            elevation?.let { profile ->
+                                ElevationChart(
+                                    profile = profile,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(96.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                track?.notes?.takeIf { it.isNotBlank() }?.let {
+                    Text(text = it, style = MaterialTheme.typography.bodyMedium)
+                }
+
+                message?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
+
+                // What this page is *for*: recording a pass against the place, which the recorder then reads
+                // back against as the walker moves. Everything else is behind the button at the top.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(onClick = onRecord, modifier = Modifier.weight(1f)) {
+                        Text(if (shape == AssetShape.LINE) "Record this" else "Head for this")
+                    }
+                    OutlinedButton(
+                        onClick = { actionsOpen = true },
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Text(session.name, style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            text = "${formatDate(session.startedAtEpochMs)} \u00b7 " +
-                                "${formatDistance(session.distanceM)} \u00b7 " +
-                                "${session.pointCount} point${if (session.pointCount == 1) "" else "s"}",
-                            style = MaterialTheme.typography.bodySmall
+                        Text("More")
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "TRIPS",
+                        style = MaterialTheme.typography.labelSmall,
+                        letterSpacing = 1.1.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (recordings.isEmpty()) {
+                        EmptyState(
+                            glyph = IconGlyph.RECORDINGS,
+                            title = "No trip for this place",
+                            body = "Recording while walking or riding this line leaves the evidence " +
+                                "of what was actually followed."
                         )
+                    }
+                    recordings.forEach { session ->
+                        Card(modifier = Modifier.fillMaxWidth(), onClick = { onOpenRecording(session.id) }) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(session.name, style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    text = "${formatDate(session.startedAtEpochMs)} \u00b7 " +
+                                        "${formatDistance(session.distanceM)} \u00b7 " +
+                                        "${session.pointCount} point" +
+                                        (if (session.pointCount == 1) "" else "s"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -334,6 +381,46 @@ fun AssetDetailScreen(
 }
 
 /**
+ * The page's figures: how long, how much up, and how long that takes both ways.
+ *
+ * A spot has none of those and says where it is instead, which is the one fact worth having about a spot.
+ */
+@Composable
+private fun figures(
+    shape: AssetShape,
+    lengthM: Double,
+    lengthText: String,
+    elevation: ElevationProfile?,
+    point: GeoPoint?
+) {
+    val rows = if (shape != AssetShape.LINE || lengthM <= 0.0) {
+        listOfNotNull(
+            point?.let { listOf(Figure(label = "Where", value = formatCoordinates(it.lat, it.lng))) }
+        )
+    } else {
+        val climbM = elevation?.climbM ?: 0.0
+        val onFoot = TravelTime.seconds(lengthM, climbM, TravelMode.WALKING)
+        val riding = TravelTime.seconds(lengthM, climbM, TravelMode.RIDING)
+        listOf(
+            listOf(
+                Figure(label = "Length", value = lengthText),
+                Figure(
+                    label = "Climb",
+                    value = elevation?.let { "${it.climbM.roundToInt()} m" } ?: "Not given"
+                )
+            ),
+            listOf(
+                Figure(
+                    label = "Time",
+                    value = "${formatEstimate(onFoot)} on foot \u00b7 ${formatEstimate(riding)} riding"
+                )
+            )
+        )
+    }
+    FiguresCard(rows = rows)
+}
+
+/**
  * How close this page's little map may sit on its place.
  *
  * The fit on its own is only as good as the place's box, and a place is one coordinate: the
@@ -345,3 +432,9 @@ fun AssetDetailScreen(
  * line - is shown whole rather than cut off to satisfy a number.
  */
 private const val ASSET_PAGE_MAX_ZOOM = 15.0
+
+/** How much of the screen the place's own ground gets: enough to see where it is, not the whole screen. */
+private val MAP_HEIGHT = 320.dp
+
+/** How far the sheet is lifted over the map, so the two read as one screen. */
+private val SHEET_LIFT = 28.dp

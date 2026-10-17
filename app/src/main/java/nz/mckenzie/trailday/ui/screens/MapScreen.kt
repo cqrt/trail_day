@@ -172,13 +172,13 @@ fun MapScreen(
                     .padding(end = 12.dp, top = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                MapRoundButton(glyph = IconGlyph.SETTINGS, description = "Settings", onClick = onOpenSettings)
-                MapRoundButton(
+                RoundIconButton(glyph = IconGlyph.SETTINGS, description = "Settings", onClick = onOpenSettings)
+                RoundIconButton(
                     glyph = IconGlyph.LAYERS,
                     description = "What the map draws",
                     onClick = { layersOpen = true }
                 )
-                MapRoundButton(glyph = IconGlyph.LOCATE, description = "Show where I am", onClick = locate)
+                RoundIconButton(glyph = IconGlyph.LOCATE, description = "Show where I am", onClick = locate)
             }
 
             // Only when the chosen basemap needs a key and none is set. OpenStreetMap needs none,
@@ -392,29 +392,6 @@ internal fun AttributionStrip(
     )
 }
 
-/**
- * A round button over the map: a white circle with a shadow, as the mock screens draw the map's own controls.
- *
- * White rather than tinted because it sits over imagery: a tinted circle has to argue with whatever colour
- * the ground happens to be, and a white one reads on all of them.
- */
-@Composable
-private fun MapRoundButton(
-    glyph: IconGlyph,
-    description: String,
-    onClick: () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 3.dp
-    ) {
-        Box(modifier = Modifier.size(52.dp), contentAlignment = Alignment.Center) {
-            AppIcon(glyph = glyph, contentDescription = description, dimension = 24.dp)
-        }
-    }
-}
 
 /**
  * What is nearest, and what else is around: the map's own answer to "am I where I think I am".

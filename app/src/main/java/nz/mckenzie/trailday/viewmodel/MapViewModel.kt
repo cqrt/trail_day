@@ -159,7 +159,11 @@ class MapViewModel(
         } else {
             Nearby.of(around(places, geometry, docs, position))
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+    }
+        // Off the main thread: every fix measures the walker against every place and every thing DOC has
+        // downloaded, which with a few hundred tracks is real arithmetic rather than a comparison.
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     /**
      * Everything within reach of the walker, as distances: the walker's places first, then DOC's.

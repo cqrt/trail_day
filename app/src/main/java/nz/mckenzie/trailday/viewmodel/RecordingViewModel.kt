@@ -68,7 +68,12 @@ class RecordingViewModel(
      * Where the phone is, for the first frame. Recording is driving a thing you are
      * standing next to, so opening on a neutral view of the country is no use.
      */
-    private val locationSource: LocationSource
+    private val locationSource: LocationSource,
+    /**
+     * The place the page that opened the recorder is about, if any: a track's own page offers "Record this",
+     * and arriving at the recorder with the target already chosen is the whole point of that button.
+     */
+    private val initialTargetId: Long? = null
 ) : ViewModel() {
 
     val apiKey: StateFlow<String> = settingsRepository.linzApiKey
@@ -636,11 +641,17 @@ class RecordingViewModel(
     /** Suggests a track name: "Track 14 Sep" beats an empty box to type into. */
     private fun defaultTrackName(): String = "Track " + formatShortDate(System.currentTimeMillis())
 
+    init {
+        // Applied here rather than beside the other initialiser: choosing a target reads the properties above
+        // it, and a property declared below an init block is not there yet when the block runs.
+        initialTargetId?.let { selectTrack(it) }
+    }
+
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L
         private const val RECORDING_ID = -2L
 
-        fun factory(context: Context): ViewModelProvider.Factory {
+        fun factory(context: Context, initialTargetId: Long? = null): ViewModelProvider.Factory {
             val appContext = context.applicationContext
             return viewModelFactory {
                 initializer {
@@ -650,7 +661,8 @@ class RecordingViewModel(
                         assetRepository = AssetRepository(database),
                         settingsRepository = SettingsRepository(appContext),
                         context = appContext,
-                        locationSource = FusedLocationSource(appContext)
+                        locationSource = FusedLocationSource(appContext),
+                        initialTargetId = initialTargetId
                     )
                 }
             }
