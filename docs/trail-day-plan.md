@@ -541,6 +541,9 @@ It was looked at on the emulator against a downloaded area of Arthur's Pass: the
 the map opened, changed to "Coral Track - Tramping Track - 1.09 km - 404 m away - about 5 min on foot" when that
 line was tapped, and went back to the nearest track when the map was tapped away from any line.
 
+**It shipped as 0.3.1**, and the file people download was tried the same way: a fresh area of six tracks, the
+nearest card on the map, and "Cons Track" on the card after a tap on its line.
+
 **The plan is complete**: eleven steps, each landed and each looked at on a screen. What is left in the plan's own
 words is nothing; what is left in the project is the pair of tests that wait on a stored preference with a clock,
 which is worth its own small change, and the question of DOC's duplicate hut records.
