@@ -426,3 +426,16 @@ cell** on a live pass, which the card shows once the pass is finished, along wit
 the pass stored. Time and pace are what a live pass can honestly say about itself.
 
 **Next screens, in the plan's order**: Trips, a trip's page, Offline, Settings.
+
+**Step 10: the trips list is dressed.** A search pill, a line under it saying what the list holds ("1 trip - 873
+m", "4 trips - 46.5 km between them"), and the trips as **cards**: the recorded line's own tile, the name, when
+and how far and for how long, the place the trip was for, and a chevron. Nothing destructive is on a row - the
+red Delete and the rules are gone, and a trip is removed from its own page, which already offered it. The search
+narrows by name as it is typed, and the summary counts what is shown.
+
+Three things the mock has are deliberately not here: its **climb total** and the **sparkline** on each row need
+every trip's stored heights read and summed (a change to what the list holds rather than to what it looks
+like), and its **hike-and-ride tiles** need a mode on a trip, which the app does not store - so every trip wears
+the recorded line's green.
+
+**Next screens, in the plan's order**: a trip's page, Offline, Settings.
