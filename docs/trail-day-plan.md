@@ -449,3 +449,21 @@ never ended runs to the end of the recording, and a pass with no heights says no
 rather than saying zero. The delete sits at the foot of the page.
 
 **Next screens, in the plan's order**: Offline, Settings.
+
+**Step 10: the offline screen is dressed.** The two tabs are one list, as the mock screens draw it: a card per
+cache - **Imagery**, **DOC data** - each saying what it holds in one line and carrying its own progress while it
+downloads, one **Download an area** button that asks which kind of area, a sentence about what is kept as you
+browse, and a **My trips** row saying the trips are always here, which opens them. Each card keeps its own
+clearing, saying the numbers first. The imagery card also stopped contradicting itself: tiles kept by browsing
+are "No areas yet - 60 tiles from browsing" rather than "Nothing downloaded yet" beside a Clear button.
+
+Two things the mock has are not here: its progress caption on a DOC download ("274 of 380 tiles") has no honest
+figure to count, because DOC's data arrives as a few reads that finish in seconds rather than a queue; and its
+area name has nowhere to come from, because the DOC cache is held once as the walker's own rather than per area.
+
+**A note on the tests' flakiness.** Two of this stage's CI runs failed on a twenty-second timeout inside a test
+about stored preferences - once in the DOC tidy's test and once in the settings' - not on the change itself, and
+both passed when re-run. The tests that wait on a stored preference are the ones that trip on a loaded emulator;
+hardening them - waiting on the thing rather than on a clock - is worth a change of its own.
+
+**Next: Settings**, the last screen of step 10.
