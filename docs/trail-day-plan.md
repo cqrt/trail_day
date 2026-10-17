@@ -411,3 +411,18 @@ under it ("Tramping Track - One way - 3.98 km"), and how far away it is in the a
 foot beside it. With no fix there is no distance rather than a made-up one.
 
 **Next screens, in the plan's order**: Record, Trips, a trip's page, Offline, Settings.
+
+**Step 10: the recorder is dressed.** The card sits at the top of the map and is the mock screens' own: the
+pass's state as a small spaced label, **the distance as one big figure** with its unit beside it, a rule, then
+the time and the pace divided into cells - "RECORDING / 63 m / TIME 20s / PACE 5.4 min/km". Following the phone
+is a white pill at the top right, "Following" while it is on and "Follow me" while it is off; the actions float
+over the map as pills - Pause big, Finish smaller - and the place the pass is for is a pill of its own. **The
+recorded line wears the mock screens' gold edge**, as a casing filtered on the line's own colour, so every screen
+that draws one gets it.
+
+Two things the mock has are deliberately not here: its **Hike/Ride switch**, which would change what a trip *is*
+rather than what it looks like - the app records a line, a time and a distance, not a mode - and its **ascent
+cell** on a live pass, which the card shows once the pass is finished, along with the chart, from the heights
+the pass stored. Time and pace are what a live pass can honestly say about itself.
+
+**Next screens, in the plan's order**: Trips, a trip's page, Offline, Settings.
