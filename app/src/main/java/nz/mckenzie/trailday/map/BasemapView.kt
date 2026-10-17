@@ -63,6 +63,16 @@ internal const val DOC_SOURCE = "trailday-doc"
 // find them: the layer that is created and the layer a switch hides are the same name by
 // construction, rather than two strings that have to be kept in step.
 
+/**
+ * The line being followed, in its own source and layer so it can be drawn wider than the work it is
+ * among. Empty whenever no pass is following anything, which is what most maps are.
+ */
+internal const val TARGET_SOURCE = "trailday-target"
+internal const val TARGET_LAYER = "trailday-target-line"
+
+/** How wide the followed line is: nearly twice a track of the walker's, so it is the thing in view. */
+private const val TARGET_WIDTH = 9f
+
 internal const val POSITION_SOURCE = "trailday-position"
 internal const val POSITION_ACCURACY_LAYER = "trailday-position-accuracy"
 internal const val POSITION_DOT_LAYER = "trailday-position-dot"
@@ -125,6 +135,13 @@ fun BasemapView(
      * exactly where reception does not. See [DocGeoJson].
      */
     docGeoJson: String = AssetGeoJson.build(emptyList()),
+    /**
+     * The line being followed, drawn wide over everything else - see [TARGET_SOURCE].
+     *
+     * Empty when nothing is being followed, which is every map except the recorder's while a pass is
+     * running against a chosen place.
+     */
+    targetGeoJson: String = AssetGeoJson.build(emptyList()),
     modifier: Modifier = Modifier,
     /**
      * Whether the camera should keep the phone in the middle of the screen.
@@ -311,6 +328,7 @@ fun BasemapView(
                         tileUrlTemplate = tileUrlTemplate,
                         assetGeoJson = assetGeoJson,
                         docGeoJson = docGeoJson,
+                        targetGeoJson = targetGeoJson,
                         positionGeoJson = positionGeoJson,
                         density = density,
                         hiddenLayers = hiddenLayers,
@@ -342,6 +360,7 @@ fun BasemapView(
                 tileUrlTemplate = tileUrlTemplate,
                 assetGeoJson = assetGeoJson,
                 docGeoJson = docGeoJson,
+                targetGeoJson = targetGeoJson,
                 positionGeoJson = positionGeoJson,
                 density = density,
                 hiddenLayers = hiddenLayers,
@@ -358,6 +377,12 @@ fun BasemapView(
 
     LaunchedEffect(docGeoJson, styleState.value) {
         styleState.value?.getSourceAs<GeoJsonSource>(DOC_SOURCE)?.setGeoJson(docGeoJson)
+    }
+
+    // The line being followed, handed over the same way: a new target while the map is up is a new
+    // document, not a reload of the style, so the camera and the tiles stay where the walker left them.
+    LaunchedEffect(targetGeoJson, styleState.value) {
+        styleState.value?.getSourceAs<GeoJsonSource>(TARGET_SOURCE)?.setGeoJson(targetGeoJson)
     }
 
     // A layer the walker has switched off, applied to the style that is already loaded. This is a
@@ -456,6 +481,7 @@ internal fun MapLibreMap.loadTrailDayStyle(
      * exactly where reception does not. See [DocGeoJson].
      */
     docGeoJson: String = AssetGeoJson.build(emptyList()),
+    targetGeoJson: String = AssetGeoJson.build(emptyList()),
     positionGeoJson: String,
     density: Float,
     hiddenLayers: Set<AssetLayer>,
@@ -499,6 +525,25 @@ internal fun MapLibreMap.loadTrailDayStyle(
 
         if (style.getSource(ASSETS_SOURCE) == null) {
             style.addSource(GeoJsonSource(ASSETS_SOURCE, assetGeoJson))
+        }
+        // The line being followed, drawn **over** the walker's own work and wider than any of it: while a
+        // walk is being followed, that line is the thing the screen is about, and a track the same weight as
+        // every other track is not. Under the position marker, which is where the walker is against it.
+        if (style.getSource(TARGET_SOURCE) == null) {
+            style.addSource(GeoJsonSource(TARGET_SOURCE, targetGeoJson))
+        }
+        if (style.getLayer(TARGET_LAYER) == null) {
+            style.addLayer(
+                LineLayer(TARGET_LAYER, TARGET_SOURCE)
+                    .withProperties(
+                        // Its own kind's colour, like every other line of the walker's: what makes it bold
+                        // is the width, because a followed bike track should still look like a bike track.
+                        PropertyFactory.lineColor(Expression.get("stroke")),
+                        PropertyFactory.lineWidth(Expression.literal(TARGET_WIDTH)),
+                        PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                        PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
+                    )
+            )
         }
         // One line layer per kind, because line-dasharray is a constant in MapLibre
         // rather than something a feature can carry. So a track is solid and a bike track

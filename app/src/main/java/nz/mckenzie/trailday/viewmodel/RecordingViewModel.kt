@@ -26,6 +26,11 @@ import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
+import nz.mckenzie.trailday.domain.asset.AssetKind
+import nz.mckenzie.trailday.domain.asset.AssetShape
+import nz.mckenzie.trailday.domain.geo.DriftWord
+import nz.mckenzie.trailday.domain.geo.FollowPoint
+import nz.mckenzie.trailday.domain.geo.FollowProgress
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.RecordingBreak
 import nz.mckenzie.trailday.domain.geo.splitAtBreaks
@@ -36,6 +41,7 @@ import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.AssetStretch
+import nz.mckenzie.trailday.tracking.DevicePosition
 import nz.mckenzie.trailday.tracking.FusedLocationSource
 import nz.mckenzie.trailday.tracking.LocationSource
 import nz.mckenzie.trailday.tracking.TrackingService
@@ -98,6 +104,80 @@ class RecordingViewModel(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     /**
+     * The line of the place being followed, or nothing when none is chosen.
+     *
+     * A line and not the whole place: following is about the ground, and a spot has none. Read from the
+     * database once per choice rather than per fix, because a track's geometry does not move while the
+     * walker does.
+     */
+    private val targetLine: StateFlow<List<GeoPoint>> = _selectedAssetId
+        .map { id -> id?.let { runCatching { assetRepository.getAssetGeometry(it) }.getOrNull()?.line } }
+        .map { line -> line.orEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
+    /**
+     * Where the phone is, as one state the readouts share: one subscriber to the fixes, and one answer to
+     * "where am I" for both kinds of target.
+     */
+    private val here: StateFlow<GeoPoint?> = DevicePosition.updates(viewModelScope)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    /**
+     * Where the walker is against that line: how far off it, how far along, and how much is left.
+     *
+     * Null when there is no line to follow or the phone has not said where it is - both of which are
+     * ordinary at the start of a walk rather than errors, and neither of which has a readout.
+     */
+    val follow: StateFlow<FollowProgress?> = combine(targetLine, here) { line, position ->
+        if (line.size >= 2 && position != null) FollowProgress.of(line, position) else null
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    /**
+     * Heading for a point instead: where the chosen place is, when it is a place rather than a line.
+     *
+     * Null while a line is being followed, or when nothing is chosen. A spot has no line to be off, so the
+     * two readouts cannot both be on: each kind of target answers the questions that make sense of it.
+     */
+    val heading: StateFlow<FollowPoint?> = combine(targetLine, assets, here) { line, places, position ->
+        val place = places.firstOrNull { it.id == _selectedAssetId.value }
+        val isPlace = place != null && AssetShape.fromStorage(place.shape) == AssetShape.POINT
+        if (!isPlace || line.isEmpty() || position == null) {
+            null
+        } else {
+            FollowPoint.of(position, line.first())
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    private val driftWord = DriftWord()
+
+    private val _drift = MutableStateFlow<Double?>(null)
+
+    /**
+     * How far off the line the walker is, while they are properly off it: the quiet word, as a state.
+     *
+     * Null while they are on the line. The distance is the live one rather than the one it first spoke at,
+     * because the walker is reading where they are now; what [DriftWord] decides is whether they are off at
+     * all, with the gap that stops it flickering.
+     */
+    val drift: StateFlow<Double?> = _drift
+
+    init {
+        // The drift word, said as the fixes arrive - and **after** `follow` and the state above it are
+        // built, because a property declared below an initialiser block is not there yet when it runs.
+        // Collected here rather than in the screen so the rule is one rule whatever the screen does with
+        // it, and so leaving the screen does not leave a half-said drift behind.
+        viewModelScope.launch {
+            follow.collect { progress ->
+                _drift.value = when {
+                    progress == null -> null
+                    driftWord.isOff(progress.offM) -> progress.offM
+                    else -> null
+                }
+            }
+        }
+    }
+
+    /**
      * The pass that has just been saved.
      *
      * Held here so the screen a moment after the save still shows what was recorded,
@@ -141,6 +221,38 @@ class RecordingViewModel(
             else -> live.summary()
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), PassSummary.EMPTY)
+
+    /**
+     * The line being followed, drawn wide over the work while a pass is running against a chosen place.
+     *
+     * Its own kind's colour, as it has on every other map - what makes it bold is the width, because a
+     * followed bike track should still look like a bike track - and nothing at all when no place is
+     * chosen, which is most recordings.
+     */
+    val targetGeoJson: StateFlow<String> = combine(targetLine, assets) { line, places ->
+        val place = places.firstOrNull { it.id == _selectedAssetId.value }
+        val isLine = place != null && AssetShape.fromStorage(place.shape) == AssetShape.LINE
+        if (!isLine || line.size < 2) {
+            AssetGeoJson.build(emptyList())
+        } else {
+            AssetGeoJson.build(
+                listOf(
+                    AssetLine(
+                        assetId = 0L,
+                        name = place.name,
+                        colorHex = AssetColors.forKind(AssetKind.fromStorage(place.kind)),
+                        points = line,
+                        kind = AssetKind.fromStorage(place.kind),
+                        shape = AssetShape.LINE
+                    )
+                )
+            )
+        }
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+        AssetGeoJson.build(emptyList())
+    )
 
     /** One pass as the card reads it, whether it is still being driven or has just been saved. */
     data class PassSummary(
@@ -324,6 +436,10 @@ class RecordingViewModel(
      */
     fun selectTrack(assetId: Long?) {
         _selectedAssetId.value = assetId
+        // A new line to follow is a new set of distances and a new drift: the word said about the last
+        // one is not about this one.
+        driftWord.reset()
+        _drift.value = null
         // Choosing a place is the start of a new job, so the pass that was on the screen gives
         // way to the one being set up. Cancelling the choice - assetId null - is not: that is
         // the walker backing out of the picker, with the finished pass still the last thing
@@ -347,6 +463,8 @@ class RecordingViewModel(
         // A new pass, so the last one leaves the screen. Following is turned on by the session
         // itself beginning - see the initialiser - rather than twice over here.
         _finished.value = null
+        driftWord.reset()
+        _drift.value = null
         viewModelScope.launch {
             _message.value = null
             val sessionId = recordings.startRecording(

@@ -77,11 +77,11 @@ class FormattingTest {
     fun `an estimate is said in minutes and hours, never in seconds`() {
         // A stopwatch's answer has seconds in it because it is what happened. An estimate's arithmetic is
         // a rule of thumb about a hill, so seconds would claim a precision nobody has.
-        assertEquals("1m", formatEstimate(60))
-        assertEquals("18m", formatEstimate(18 * 60L))
+        assertEquals("1 min", formatEstimate(60))
+        assertEquals("18 min", formatEstimate(18 * 60L))
         assertEquals("1h", formatEstimate(60 * 60L))
-        assertEquals("1h 5m", formatEstimate(65 * 60L))
-        assertEquals("2h 45m", formatEstimate(165 * 60L))
-        assertEquals("0m", formatEstimate(0))
+        assertEquals("1h 5 min", formatEstimate(65 * 60L))
+        assertEquals("2h 45 min", formatEstimate(165 * 60L))
+        assertEquals("0 min", formatEstimate(0))
     }
 }

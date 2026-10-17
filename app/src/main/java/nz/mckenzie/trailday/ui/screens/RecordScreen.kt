@@ -50,11 +50,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import nz.mckenzie.trailday.domain.geo.ElevationPhrase
 import nz.mckenzie.trailday.domain.geo.ElevationProfile
+import nz.mckenzie.trailday.domain.geo.TravelMode
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.formatDuration
+import nz.mckenzie.trailday.ui.formatEstimate
 import nz.mckenzie.trailday.viewmodel.RecordingViewModel
 
 /**
@@ -72,6 +74,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
     val apiKey by viewModel.apiKey.collectAsStateWithLifecycle()
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
     val geoJson by viewModel.recordedGeoJson.collectAsStateWithLifecycle()
+    val targetGeoJson by viewModel.targetGeoJson.collectAsStateWithLifecycle()
     val initialFrame by viewModel.initialFrame.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val summary by viewModel.summary.collectAsStateWithLifecycle()
@@ -83,6 +86,9 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
     }
     val following by viewModel.following.collectAsStateWithLifecycle()
     val followPhone by viewModel.followPhone.collectAsStateWithLifecycle()
+    val follow by viewModel.follow.collectAsStateWithLifecycle()
+    val heading by viewModel.heading.collectAsStateWithLifecycle()
+    val drift by viewModel.drift.collectAsStateWithLifecycle()
     val assetName by viewModel.selectedTrackName.collectAsStateWithLifecycle()
     val assets by viewModel.assets.collectAsStateWithLifecycle()
     val pendingTrackName by viewModel.pendingTrackName.collectAsStateWithLifecycle()
@@ -144,6 +150,9 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                 basemap = basemap,
                 apiKey = apiKey,
                 assetGeoJson = geoJson,
+                // The line being followed, drawn wide over the work: while a walk is being followed it is
+                // the line the screen is about, and the position marker sits on it rather than under it.
+                targetGeoJson = targetGeoJson,
                 // Recording starts where the walker is, not on a view of the country.
                 fitBounds = initialFrame,
                 // While a pass is being driven the map keeps the phone in the middle, so the
@@ -231,6 +240,48 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                                     ""
                                 },
                             style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+
+                    // The quiet word, above the figures, in the app's own voice: a sentence rather than a
+                    // column of numbers to notice. Shown while the walker is off the line, not fired once -
+                    // see `DriftWord` for the two distances that stop it flickering.
+                    drift?.let { offM ->
+                        Text(
+                            text = "You are ${formatDistance(offM)} off the line.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+
+                    // Where the walker is against the line they are following. How far off it is said
+                    // once: by the quiet word when they have properly drifted, and by this row when they
+                    // are only a little off it - never by both, because a card that says "553 m off the
+                    // line" twice in two lines reads like a fault rather than a fact.
+                    follow?.let { progress ->
+                        val offPart = when {
+                            drift != null -> ""
+                            progress.offM <= ALONGSIDE_M -> "On the line \u00b7 "
+                            else -> "${formatDistance(progress.offM)} off the line \u00b7 "
+                        }
+                        Text(
+                            text = offPart + buildString {
+                                append("${formatDistance(progress.alongM)} of ")
+                                append(formatDistance(progress.totalM))
+                                val toGo = progress.toGoSeconds(TravelMode.WALKING)
+                                if (toGo >= ONE_MINUTE_S) append(" \u00b7 about ${formatEstimate(toGo)} to go")
+                            },
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+
+                    // Heading for a point is the other half of following, and a different question: there
+                    // is no "how far along" to a spot, only which way it is and how far - and how long that
+                    // takes on foot, over the straight line the app knows and no climb it does not.
+                    heading?.let { point ->
+                        Text(
+                            text = "${formatDistance(point.distanceM)} to the ${point.compass} \u00b7 " +
+                                "about ${formatEstimate(point.toGoSeconds())} on foot",
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     }
 
@@ -392,3 +443,9 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
  * stay outside it, because those are the two things that must not need finding.
  */
 private val PICKER_LIST_MAX_HEIGHT = 400.dp
+
+/** Within this of the line is on it, as far as a phone's own accuracy can say. */
+private const val ALONGSIDE_M = 30.0
+
+/** Under a minute is not worth a "to go" on a card. In seconds, because that is what the estimate is in. */
+private const val ONE_MINUTE_S = 60L

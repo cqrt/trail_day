@@ -98,21 +98,24 @@ fun formatDuration(millis: Long): String {
 }
 
 /**
- * How long an estimate says: "18m", "2h 45m", "3h".
+ * How long an estimate says: "18 min", "2h 45 min", "3h".
  *
  * Deliberately not [formatDuration]. That one is a stopwatch's answer, to the second, because it is what
  * happened; an estimate in seconds would claim a precision nobody has, since the arithmetic under it is a
  * rule of thumb about a hill. So this counts in minutes, and a whole number of hours is "3h" rather than
  * "3h 00m".
+ *
+ * **Minutes are "min", not "m"**, and that is not fussiness: this app writes distances as "40 m", so an
+ * estimate of "40m to go" reads as forty metres - which is a different thing to plan a walk around.
  */
 fun formatEstimate(seconds: Long): String {
     val minutes = ceil(seconds / 60.0).toLong()
     val hours = minutes / 60
     val rest = minutes % 60
     return when {
-        hours > 0 && rest > 0 -> "${hours}h ${rest}m"
+        hours > 0 && rest > 0 -> "${hours}h ${rest} min"
         hours > 0 -> "${hours}h"
-        else -> "${minutes}m"
+        else -> "${minutes} min"
     }
 }
 
