@@ -507,7 +507,15 @@ decision made with it on screen: it earns its keep, so it is dressed rather than
 
 Two things were put right on the way: the page's theme switch was redrawing the list before the page had its data
 (which stopped the whole page dead at launch), and the dialog's result rows stacked their tile above their words
-instead of beside them.
+instead of beside them. A third came from looking again at the page's own rules: the row's length had borrowed the
+page's figure formatter by importing it from another file, and a file that fetches another from inside itself asks
+for it without the address token - so the phone's gate would have refused it for anyone who turns the token on. The
+formatter is now handed to the row's words instead.
+
+**It shipped as 0.3.0, and the file people download was tried before the change was called finished.** The
+published app was installed fresh on the emulator, the map opened on the phone's own imagery with the new bar under
+it, and the laptop page that app serves was opened in a browser: the app's look, the new empty sentence, and a
+kind's tile asked for on its own and answered.
 
 **The plan is complete**: eleven steps, each landed and each looked at on a screen. What is left in the plan's own
 words is nothing; what is left in the project is the pair of tests that wait on a stored preference with a clock,
