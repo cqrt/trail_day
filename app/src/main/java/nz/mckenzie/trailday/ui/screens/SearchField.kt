@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.ui.screens
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,7 +24,9 @@ internal fun SearchField(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Asked when the keyboard's search key is pressed, for a field whose answer is not immediate. */
+    onSearch: () -> Unit = {}
 ) {
     TextField(
         value = value,
@@ -40,6 +43,7 @@ internal fun SearchField(
             unfocusedIndicatorColor = Color.Transparent
         ),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { onSearch() }),
         modifier = modifier.fillMaxWidth()
     )
 }

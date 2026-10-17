@@ -9,18 +9,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -44,21 +43,24 @@ import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSort
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.distanceM
+import nz.mckenzie.trailday.map.drawingKind
+import nz.mckenzie.trailday.ui.formatDistance
+import nz.mckenzie.trailday.ui.formatEstimate
 import nz.mckenzie.trailday.ui.docRowDetail
 import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
+import nz.mckenzie.trailday.domain.geo.TravelMode
+import nz.mckenzie.trailday.domain.geo.TravelTime
 
 /**
- * Reading what DOC publishes: its tracks, huts, campsites and bike locations.
+ * What DOC publishes, read through the phone: one of its four services at a time, searched and narrowed.
  *
- * DOC publishes these as hosted services rather than files - thousands of them, four services carrying
- * four different sets of facts - so this screen asks one of them for a page, by name, by where the phone
- * is, or both. **It reads and nothing more.** A DOC thing is not one of the walker's places and does not
- * become one here: what is out there is drawn on the map as DOC's own layer, and this screen is how the
- * walker finds out what it is, what DOC says about it, and how far away it is before going.
+ * **The phone does the asking, and nothing here is written.** A search is a question put to DOC on the
+ * walker's behalf, and a filter narrows the page already here rather than asking again.
  *
- * The chrome is deliberately thin - a search, a place, the four sources, a Filter and a Sort - because
- * the list is what the walker is here for and it takes the rest of the screen. The filters are labelled
- * menus rather than rows of chips, which said nothing about what they filtered and scrolled the list away.
+ * The shape is the mock screens': a search field with a magnifier, a pill for "near me" with the radius beside
+ * it when it is on, the sources as chips, the filter and the order as pills, and each thing DOC published as a
+ * **card** - the kind's tile, the name, DOC's own facts about it, and how far away it is in the app's own
+ * colour.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,6 +83,11 @@ fun DocBrowserScreen(
     val searched by viewModel.searched.collectAsStateWithLifecycle()
     val focus = LocalFocusManager.current
 
+    val search = {
+        focus.clearFocus()
+        viewModel.search()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -98,39 +105,33 @@ fun DocBrowserScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            // The search, as the mock screens draw it: a magnifier in a pill, and the keyboard's own search
+            // key to ask it - the field is the button, so there is no second one beside it.
+            SearchField(
+                value = name,
+                onValueChange = viewModel::onNameChange,
+                placeholder = "Search ${source.displayName.lowercase()}",
+                onSearch = search
+            )
+
             Row(
-                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = viewModel::onNameChange,
-                    label = { Text("Name contains") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = {
-                        focus.clearFocus()
-                        viewModel.search()
-                    }),
-                    modifier = Modifier.weight(1f)
-                )
-                Button(
-                    onClick = {
-                        focus.clearFocus()
-                        viewModel.search()
+                // "Near me", as the mock screens draw it: a green pill that says how far around the phone it
+                // is looking. Off, it says only what it would do.
+                FilterChip(
+                    selected = nearMe,
+                    onClick = { viewModel.onNearMeChange(!nearMe) },
+                    label = {
+                        Text(
+                            if (nearMe) "Near me \u00b7 ${radiusKm.ifBlank { "25" }} km" else "Near me"
+                        )
                     },
-                    enabled = !busy
-                ) {
-                    Text("Search")
-                }
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = nearMe, onCheckedChange = viewModel::onNearMeChange)
-                Text("Near me")
+                    shape = androidx.compose.foundation.shape.CircleShape
+                )
                 if (nearMe) {
                     OutlinedTextField(
                         value = radiusKm,
@@ -141,19 +142,14 @@ fun DocBrowserScreen(
                             keyboardType = KeyboardType.Number,
                             imeAction = ImeAction.Search
                         ),
-                        keyboardActions = KeyboardActions(onSearch = {
-                            focus.clearFocus()
-                            viewModel.search()
-                        }),
-                        modifier = Modifier
-                            .width(110.dp)
-                            .padding(start = 8.dp)
+                        keyboardActions = KeyboardActions(onSearch = { search() }),
+                        modifier = Modifier.width(104.dp)
                     )
                 }
             }
 
-            // Which of DOC's services is being read. Asked here rather than with the search, because it
-            // is not part of the question - it is which of four datasets the question is put to.
+            // Which of DOC's services is being read. Asked here rather than with the search, because it is
+            // not part of the question - it is which of four datasets the question is put to.
             ChoiceRow(
                 label = "What DOC publishes",
                 choices = DocSource.entries,
@@ -199,10 +195,13 @@ fun DocBrowserScreen(
                     style = MaterialTheme.typography.bodyMedium
                 )
 
-                else -> LazyColumn(modifier = Modifier.weight(1f)) {
-                    itemsIndexed(visible, key = { _, item -> item.objectId }) { index, item ->
-                        if (index > 0) HorizontalDivider()
-                        DocItemRow(
+                else -> LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)
+                ) {
+                    items(visible, key = { item -> item.objectId }) { item ->
+                        DocItemCard(
                             item = item,
                             distanceM = phoneFix?.let { position -> item.distanceM(position) }
                         )
@@ -212,6 +211,7 @@ fun DocBrowserScreen(
         }
     }
 }
+
 
 /**
  * The **Filter** control: a labelled menu of what this service's page can be narrowed by, each value
@@ -316,11 +316,38 @@ private fun MenuChoice(label: String, chosen: Boolean, onChoose: () -> Unit) {
     )
 }
 
+/**
+ * One thing DOC published, as a card: **the kind's tile, the name, DOC's own facts about it, and how far away
+ * it is** - the last in the app's own colour, because "how far" is the question the list is answering.
+ *
+ * The facts under the name are the phone's own words for the row (`docRowDetail`), the same ones the phone's
+ * list shows - the desk reads them from the same rule.
+ */
 @Composable
-private fun DocItemRow(item: DocItem, distanceM: Double?) {
-    ListItem(
-        headlineContent = { Text(item.name, style = MaterialTheme.typography.titleSmall) },
-        // What the row says under the name is one rule for both surfaces - see [docRowDetail].
-        supportingContent = { Text(docRowDetail(item, distanceM)) }
-    )
+private fun DocItemCard(item: DocItem, distanceM: Double?) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            KindTile(kind = item.source.drawingKind())
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(text = item.name, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = docRowDetail(item, distanceM = null),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                distanceM?.let { metres ->
+                    Text(
+                        text = "${formatDistance(metres)} away \u00b7 about " +
+                            "${formatEstimate(TravelTime.seconds(metres, 0.0, TravelMode.WALKING))}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+    }
 }
