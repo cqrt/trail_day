@@ -11,6 +11,8 @@
  * falls behind in one of them.
  */
 
+import { metresText } from './stats.mjs';
+
 /**
  * The phone's own word for a kind - "Track", "Bike track", "Hut", "Campsite", "Waypoint".
  *
@@ -27,4 +29,17 @@ export function kindText(kind, kinds = []) {
 /** A code said the way a person would say it: not shouted, and no underscores. */
 function plainWords(code) {
   return String(code ?? '').toLowerCase().replace(/_/g, ' ');
+}
+
+/**
+ * What a row says under a place's name: what it is, and how long it is when it has a length.
+ *
+ * "Track - 2.08 km" and "Hut": a spot has no length, and a zero is not a measurement - the same rule the
+ * phone's own rows keep (`formatLengthOf`), said with the same figure formatter (`metresText`).
+ */
+export function assetDetail(kindLabel, lengthM) {
+  const label = kindLabel ?? '';
+  const metres = Number(lengthM) || 0;
+  if (metres <= 0) return label;
+  return label ? `${label} \u00b7 ${metresText(metres)}` : metresText(metres);
 }

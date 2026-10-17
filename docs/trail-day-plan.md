@@ -487,5 +487,28 @@ sources at different moments. All three passed on a re-run; that one is now fixe
 about rather than for the first thing that arrives, and the preference ones are worth the same treatment in a
 change of their own.
 
-**Next is step 11, the last of the plan**: the laptop page, reassessed - the same look, or gone. The plan says it
-is decided with the page in front of us, so that is the next thing to do together.
+**Step 11: the laptop page stays, and wears the app's own look.** The page was put up in front of us and the
+decision made with it on screen: it earns its keep, so it is dressed rather than removed. What changed:
+
+- **The app's palette and shapes**, in both themes: the pale sage page, white cards on it, the ink and the quiet
+  grey the phone uses, eighteen-point corners on a card and pills for every field and button - including the one
+  filled green, bringing a file in. Before this the page was browser-default boxes and grey labels.
+- **A row is a card**: the phone's own kind tile, the name, and what it is under it ("Track - 7.33 km",
+  "Bike track - 2.01 km"). A spot has no length, so it says only what it is.
+- **The tiles are the phone's drawings, not the page's.** The page asks the phone for a kind's picture at the size
+  a row wants, and the phone draws it with the very code its own list uses - so a hut is the same hut in both
+  places, and a second set of shapes in the page is a second hut that would one day look different. The dark page
+  asks for the dark theme's weight of the kind's colour.
+- **DOC's rows wear DOC's own kind**: a page of huts is hut tiles, a page of tracks is track tiles, with the phone's
+  words underneath - and no ticks anywhere, because nothing on that page is ever imported.
+- **The empty list no longer says "Draw one here"**, which was a sentence from before the drawing went.
+- **The results are a pale sheet with white cards on it**, as the phone's own browser draws them, and the dialog's
+  four services read as chips.
+
+Two things were put right on the way: the page's theme switch was redrawing the list before the page had its data
+(which stopped the whole page dead at launch), and the dialog's result rows stacked their tile above their words
+instead of beside them.
+
+**The plan is complete**: eleven steps, each landed and each looked at on a screen. What is left in the plan's own
+words is nothing; what is left in the project is the pair of tests that wait on a stored preference with a clock,
+which is worth its own small change, and the question of DOC's duplicate hut records.

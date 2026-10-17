@@ -51,6 +51,15 @@ class WebEditorServer(
      */
     private val markers: (String, Int) -> ByteArray? = { _, _ -> null },
     /**
+     * A kind's picture for a row: the phone's name for the kind, the size asked for, whether the page is dark,
+     * and the bytes - or null for a name that is no kind.
+     *
+     * The rows on the desk wear the very glyphs the phone's own list does, so this is drawn where the drawing
+     * lives and the routing stays free of it, exactly as the map's markers are. A kind's name is the phone's
+     * own - `TRACK`, `HUT` - which is what a choice in the state document carries.
+     */
+    private val kinds: (String, Int, Boolean) -> ByteArray? = { _, _, _ -> null },
+    /**
      * One of the letter files a track's name is written with: the path inside the app, and its bytes -
      * or null when the app has no such file.
      *
@@ -205,6 +214,14 @@ class WebEditorServer(
         // browser's screen needs. Before the page route, because a marker is not a file the editor
         // ships - see [MARKERS_PATH_PREFIX] - and after the tiles, which are bigger and commoner.
         HttpRoute(
+            claims = { it.method == GET && it.path.startsWith(KINDS_PATH_PREFIX) },
+            handler = { request ->
+                val name = request.path.removePrefix(KINDS_PATH_PREFIX)
+                val bytes = kinds(name, pxFor(request.query), request.query[DARK_PARAM] == "1")
+                if (bytes == null) HttpServer.NOT_FOUND else HttpResponse.bytes(200, PNG, bytes)
+            }
+        ),
+        HttpRoute(
             claims = { it.method == GET && markerName(it.path) != null },
             handler = { request ->
                 val name = markerName(request.path)
@@ -289,6 +306,18 @@ class WebEditorServer(
      * phone, rather than a second drawing of one that can drift.
      */
     const val MARKERS_PATH_PREFIX = "/api/markers/"
+
+    /**
+     * A kind's picture for a row, asked for by the kind's own name: `/api/kinds/HUT?px=44`.
+     *
+     * Apart from the markers' route because a marker is a place drawn to sit on imagery - five kinds, with a
+     * white edge - while a row's tile is any of the kinds, on paper. The picture is the same glyph code either
+     * way.
+     */
+    const val KINDS_PATH_PREFIX = "/api/kinds/"
+
+    /** `dark=1` asks for the dark theme's weight of a kind's colour. */
+    private const val DARK_PARAM = "dark"
 
     /**
      * How big the browser wants a marker, in its own pixels.

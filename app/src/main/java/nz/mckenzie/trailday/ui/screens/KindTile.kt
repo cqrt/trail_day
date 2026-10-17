@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.map.AssetColors
+import nz.mckenzie.trailday.map.KindTileLook
 import nz.mckenzie.trailday.ui.theme.TileSize
 
 /**
@@ -44,11 +45,13 @@ fun KindTile(
     Box(
         modifier = modifier
             .size(size)
-            .clip(RoundedCornerShape(size / 3.5f))
-            .background(colour.copy(alpha = if (dark) 0.22f else 0.14f)),
+            .clip(RoundedCornerShape(KindTileLook.CORNER_DP.dp))
+            .background(
+                colour.copy(alpha = if (dark) KindTileLook.TINT_ALPHA_DARK else KindTileLook.TINT_ALPHA_LIGHT)
+            ),
         contentAlignment = Alignment.Center
     ) {
-        AssetKindIcon(kind = kind, dimension = size * 0.52f)
+        AssetKindIcon(kind = kind, dimension = size * KindTileLook.GLYPH_FRACTION)
     }
 }
 

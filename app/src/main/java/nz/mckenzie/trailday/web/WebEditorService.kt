@@ -25,6 +25,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import nz.mckenzie.trailday.map.GlyphFonts
+import nz.mckenzie.trailday.domain.asset.AssetKind
+import nz.mckenzie.trailday.map.AssetColors
+import nz.mckenzie.trailday.map.GlyphStyle
 import nz.mckenzie.trailday.map.MarkerIcons
 import nz.mckenzie.trailday.map.PlaceIcons
 import nz.mckenzie.trailday.MainActivity
@@ -209,6 +212,8 @@ class WebEditorService : Service() {
             // And the app's own marker drawing, rendered here because it is the one answer the desk
             // gets that has to be drawn rather than written.
             markers = ::renderMarker,
+            // A kind's picture for a row: the list's own glyph, at a row's weight.
+            kinds = ::renderKind,
             // The letters the desk writes track names with, read out of the app - the same files the
             // app's own map is given by the tile server.
             fonts = { path -> GlyphFonts.read(this, path) },
@@ -259,6 +264,32 @@ class WebEditorService : Service() {
             colorHex = PlaceIcons.colorOf(kind),
             sizePx = size,
             outlinePx = size * (PlaceIcons.MARKER_OUTLINE_DP / PlaceIcons.MARKER_DP)
+        )
+        return try {
+            ByteArrayOutputStream().use { out ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                out.toByteArray()
+            }
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    /**
+     * A kind's picture for the desk's rows: the very glyph the list draws, at the weight of a list - no white
+     * edge, because a row's tile has no imagery behind it.
+     *
+     * The dark page is handed the dark theme's colour for the kind, so a row reads on a dark desk the way it
+     * reads on a dark phone.
+     */
+    private fun renderKind(name: String, px: Int, dark: Boolean): ByteArray? {
+        val kind = AssetKind.entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: return null
+        val bitmap = MarkerIcons.bitmap(
+            kind = kind,
+            colorHex = if (dark) AssetColors.forKindOnDark(kind) else PlaceIcons.colorOf(kind),
+            sizePx = px.coerceAtLeast(1),
+            outlinePx = 0f,
+            style = GlyphStyle.LIST
         )
         return try {
             ByteArrayOutputStream().use { out ->

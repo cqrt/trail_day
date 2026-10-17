@@ -55,6 +55,7 @@ class WebEditorServerTest {
         requestedPort: Int = 0,
         withToken: Boolean = true,
         markers: (String, Int) -> ByteArray? = { _, _ -> null },
+        kinds: (String, Int, Boolean) -> ByteArray? = { _, _, _ -> null },
         fonts: (String) -> ByteArray? = { null }
     ) {
         server = WebEditorServer(
@@ -62,11 +63,37 @@ class WebEditorServerTest {
             token = if (withToken) token else null,
             data = data,
             markers = markers,
+            kinds = kinds,
             fonts = fonts,
             tileRoute = tiles.route,
             requestedPort = requestedPort
         )
         port = server.start()
+    }
+
+    @Test
+    fun aRowAsksForAKindByThePhonesOwnName() {
+        val asked = mutableListOf<Triple<String, Int, Boolean>>()
+        start(kinds = { name, px, dark ->
+            asked += Triple(name, px, dark)
+            if (name == "HUT") "hut".toByteArray() else null
+        })
+
+        val answer = get("/api/kinds/HUT?px=44&dark=1")
+
+        assertEquals(200, answer.code)
+        assertEquals("image/png", answer.contentType)
+        assertEquals("hut", answer.body)
+        assertEquals(
+            "the kind's own name, the size the row wants and whether the page is dark",
+            Triple("HUT", 44, true),
+            asked.single()
+        )
+        assertEquals(
+            "and a name that is no kind is a path nothing serves",
+            404,
+            get("/api/kinds/HAT?px=44").code
+        )
     }
 
     @Test

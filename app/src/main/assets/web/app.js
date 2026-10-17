@@ -67,7 +67,7 @@ const { DARK, LIGHT, recallTheme, rememberTheme } = await import(
  * the phone's own word for it, and a word kept here as well as on the phone is a word that falls behind
  * - which is what made a building read as "building, a place".
  */
-const { kindText } = await import(
+const { assetDetail, kindText } = await import(
   TOKEN ? `./words.mjs?k=${encodeURIComponent(TOKEN)}` : './words.mjs'
 );
 
@@ -170,6 +170,10 @@ themeButton.addEventListener('click', () => {
   const next = recallTheme(browserStore()) === DARK ? LIGHT : DARK;
   rememberTheme(browserStore(), next);
   applyTheme(next);
+  // The tiles are pictures the phone draws per theme, so a theme change asks for them again - as
+  // does the DOC dialog's page, which is the same pictures.
+  drawList();
+  if (docRows.length) drawDocList();
 });
 
 applyTheme(recallTheme(browserStore()));
@@ -675,7 +679,7 @@ function drawList() {
     empty.className = 'empty';
     empty.textContent = state.assets.length
       ? 'No place matches that.'
-      : 'There is nothing here yet. Draw one here, or on the phone.';
+      : 'There is nothing here yet. Bring a track file in above, or add a place on the phone.';
     list.append(empty);
     return;
   }
@@ -699,19 +703,50 @@ function listRow(item) {
   button.dataset.id = item.asset.id;
   button.setAttribute('aria-current', String(item.asset.id === selectedId));
 
+  // The phone's own tile for the kind: the picture its map draws that kind with, asked for at the size a
+  // row wants. The page does not draw the five shapes - a second copy of a hut in JavaScript is the copy
+  // that will one day look like something else.
+  const choice = (state.choices.kinds ?? []).find((one) => one.value === item.asset.kind);
+  button.append(kindTile(item.asset.kind, strokeById.get(item.asset.id)));
+
+  const words = document.createElement('span');
+  words.className = 'words';
+
   const name = document.createElement('span');
   name.className = 'name';
+  name.textContent = item.asset.name;
 
-  const dot = document.createElement('span');
-  dot.className = 'dot';
-  dot.style.background = strokeById.get(item.asset.id) || '#757575';
+  const detail = document.createElement('span');
+  detail.className = 'detail';
+  // What it is, and how long it is: the phone's own words and its own figure - see `words.mjs`.
+  detail.textContent = assetDetail(kindText(item.asset.kind, state.choices.kinds), item.asset.lengthM);
 
-  name.append(dot, item.asset.name);
-  button.append(name);
+  words.append(name, detail);
+  button.append(words);
   button.addEventListener('click', () => selectAsset(item.asset.id, true));
 
   row.append(button);
   return row;
+}
+
+/**
+ * A kind's tile, as the desk draws it in a row: the phone's marker picture on a pale tint of the kind's
+ * colour - the same pair the phone's own list wears.
+ *
+ * [icon] is the name the phone gave the picture; a kind the page was not told about, or one with no picture,
+ * simply has none. [colour] is the colour the phone painted the place's feature on the map, so the tint
+ * under the picture is the kind's colour without the page keeping a palette of its own.
+ */
+function kindTile(kind, colour) {
+  if (!kind) return document.createElement('span');
+  const dark = document.documentElement.getAttribute('data-theme') === DARK;
+  const tile = document.createElement('img');
+  tile.className = 'tile';
+  tile.alt = '';
+  // The phone draws the kind, in the weight the page's own theme wants.
+  tile.src = withToken(`/api/kinds/${encodeURIComponent(kind)}?px=44${dark ? '&dark=1' : ''}`);
+  if (colour) tile.style.background = `color-mix(in srgb, ${colour} ${dark ? 22 : 14}%, transparent)`;
+  return tile;
 }
 
 /** Opens an asset: the card, the row highlighted, the track glowing on the map, and the map brought to it. */
@@ -903,6 +938,8 @@ async function importGpxFile(file) {
 let docRows = [];
 let docSource = '';
 let docFilters = [];
+let docKind = '';
+let docColour = '';
 const docChosen = new Map();
 let docSort = 'nearest';
 
@@ -976,6 +1013,10 @@ async function searchDoc() {
     );
     docRows = answer.rows || [];
     docFilters = answer.filters || [];
+    // The phone's own tile for this service, and the colour under it - one per page, because a page of
+    // DOC's material is one of its services.
+    docKind = answer.kind || '';
+    docColour = answer.colour || '';
     // A new set of results, so a filter from the last search is not carried onto it.
     docChosen.clear();
     drawDocFilters();
@@ -1121,6 +1162,13 @@ function drawDocList() {
     const line = document.createElement('div');
     line.className = 'doc-row';
 
+    // DOC's own kind for the service, from the phone: every row of a page wears the same tile, because a
+    // page is one of the four services.
+    if (docKind) line.append(kindTile(docKind, docColour));
+
+    const words = document.createElement('span');
+    words.className = 'words';
+
     const name = document.createElement('span');
     name.className = 'name';
     name.textContent = row.name;
@@ -1128,10 +1176,11 @@ function drawDocList() {
     // The phone's own line about the row - what it is, what DOC says about it, how far away it is - so
     // the desk reads exactly what the phone would read about the same thing.
     const meta = document.createElement('span');
-    meta.className = 'meta';
+    meta.className = 'detail';
     meta.textContent = row.detail;
 
-    line.append(name, meta);
+    words.append(name, meta);
+    line.append(words);
     list.append(line);
   }
 }

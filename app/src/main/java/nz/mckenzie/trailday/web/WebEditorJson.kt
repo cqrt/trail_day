@@ -17,6 +17,8 @@ import nz.mckenzie.trailday.domain.geo.ElevationProfile
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.track.TrackInterchange
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
+import nz.mckenzie.trailday.map.AssetColors
+import nz.mckenzie.trailday.map.drawingKind
 import nz.mckenzie.trailday.ui.docRowDetail
 
 /**
@@ -164,6 +166,10 @@ object WebEditorJson {
             WebEditorDocSearch.serializer(),
             WebEditorDocSearch(
                 source = source.id,
+                // DOC's material wears the kind the map draws it as: a hut's roof, a track's line, and the
+                // colour that kind is drawn in - the same pair the phone's own map uses.
+                kind = source.drawingKind().name,
+                colour = AssetColors.forKind(source.drawingKind()),
                 filters = source.filters.map { filter ->
                     WebEditorDocFilter(field = filter.field, label = filter.label)
                 },
@@ -481,6 +487,15 @@ data class WebEditorDocRow(
 data class WebEditorDocSearch(
     /** The source's own id, so the page can say which of the four it is looking at. */
     val source: String = "",
+    /**
+     * The tile every row of this page wears - DOC's own kind for that service - and the colour under it.
+     *
+     * One per page rather than one per row: a page of DOC's material is one service, and a hut's row wears the
+     * hut's tile whether the hut is bookable or not. The kind is the phone's own name for it, which is the
+     * name its picture is asked for by.
+     */
+    val kind: String = "",
+    val colour: String = "",
     val filters: List<WebEditorDocFilter> = emptyList(),
     val rows: List<WebEditorDocRow> = emptyList(),
     val message: String? = null,
@@ -520,7 +535,7 @@ data class WebEditorChoices(
             // The shape travels beside the label so the desk can draw a point as a point - see
             // [WebEditorChoice.shape] - and it is the phone's own answer rather than the page's.
             kinds = AssetPhrase.kinds.map {
-                WebEditorChoice(it.name, AssetPhrase.kind(it), shape = it.shape.name)
+                WebEditorChoice(value = it.name, label = AssetPhrase.kind(it), shape = it.shape.name)
             }
         )
     }

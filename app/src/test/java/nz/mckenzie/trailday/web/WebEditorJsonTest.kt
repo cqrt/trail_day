@@ -267,6 +267,7 @@ class WebEditorJsonTest {
         assertEquals("POINT", kinds.getValue(AssetKind.WAYPOINT.name).shape)
     }
 
+
     @Test
     fun `a new asset is offered the phone's own starting kind`() {
         val fresh = roundTrip(documentWith(everyField)).newAsset
@@ -393,6 +394,16 @@ class WebEditorJsonTest {
         val read = json.decodeFromString(WebEditorDocSearch.serializer(), text)
 
         assertEquals("the desk is told which of DOC's four services it is looking at", "huts", read.source)
+        assertEquals(
+            "and the tile every row of this page wears is the phone's own hut",
+            "HUT",
+            read.kind
+        )
+        assertEquals(
+            "on the colour the phone draws a hut in, so the desk's tint is not a palette of its own",
+            "#EF6C00",
+            read.colour
+        )
         assertEquals(
             "and what a hut can be narrowed by, which is not what a track can",
             listOf(WebEditorDocFilter(field = "bookable", label = "Bookable"), WebEditorDocFilter(field = "region", label = "Region")),

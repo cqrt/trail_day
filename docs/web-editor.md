@@ -1,11 +1,12 @@
-# Drawing tracks from a computer
+# The laptop page
 
-A web interface for drawing and editing assets — tracks, roads, fencelines, places — with a mouse
-and a keyboard, because drawing them by tapping a phone is the hardest part of operating Trail Day.
+The page a laptop opens to see the phone's places, bring a track file in, and read what the Department
+of Conservation publishes - with a mouse and a keyboard, and the phone's own rules underneath it.
 
-**This file is a plan and a handover, not a record of work done.** When the feature ships, the
-decisions below move into the README as a `## Drawing from a computer` section and this file goes
-away.
+**This file is the record of how that page was built, not a plan for it.** The drawing that it was first
+built for has gone (see the note below), and the page itself was kept and dressed in the app's own look
+in the last step of `trail-day-plan.md`. Everything below about the wire, the routes and the tests still
+describes what is there; everything about drawing, tidying, side tracks and the undo stack is history.
 
 **The drawing has since gone, and the title with it.** The desk no longer draws a line or changes one:
 a line is DOC's, or a file's, or a walk's, and the phone is the only thing that keeps one. `edit.js`
@@ -1232,12 +1233,21 @@ summarised task, or a brand-new one, can see exactly where the work stopped.
 
 ## Next action
 
-**Phase 3 is done, and so are the three jobs that were left after it.** Snapping is in (with the drawing
-itself), tracing is in (v0.6.26), side tracks reached the wire in v0.6.29 and the desk **draws them as of
-v0.6.31** (the phone's own record is `side-tracks.md`), **GPX drag-and-drop shipped as v0.6.68**, and
-**changing several assets with one form shipped as v0.6.69** — the errand that would otherwise be done six
-times, with the phone writing all of them or none. *Show-archived was dropped, not deferred*: see the
-phase 3 section above for the decision and what it leaves alone.
+**The laptop page is decided and dressed.** In the last step of the rebuild the page was put up for the
+decision with the page on screen, and it stays: its sidebar, its fields, its buttons and its DOC dialog
+now wear the app's palette, cards and pills in both themes, and every row wears the phone's own kind
+tile - served by the phone, never drawn by the page - with the phone's words under the name. The empty
+list stopped pointing at a drawing that no longer exists.
+
+What is left after that is small and named: the two tests that wait on a stored preference with a clock
+want to wait on the thing instead, and DOC's duplicate hut records want one decision about whether they
+are collapsed on DOC's own identifier.
+
+**What came before, kept as the record of the building:** phase 3 was finished and so were the three
+jobs that were left after it. Snapping went with the drawing itself; tracing is in (v0.6.26), side tracks
+reached the wire in v0.6.29 and the desk drew them as of v0.6.31, and bringing a file in by dropping it
+on the page shipped as v0.6.68. *Show-archived was dropped, not deferred*: see the phase 3 section above
+for the decision and what it leaves alone.
 
 **The three jobs that were left, and what was done about each:**
 

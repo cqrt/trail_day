@@ -32,14 +32,22 @@ internal object MarkerIcons {
      *
      * @param sizePx the width and height of the picture, in pixels of the device's own density.
      * @param outlinePx the width of the white edge, in pixels of the same density.
+     * @param style the glyph's weight and fills: a marker's, or a plain one for a row, where there is no imagery
+     *   behind it to lift the glyph off.
      */
-    fun bitmap(kind: AssetKind, colorHex: String, sizePx: Int, outlinePx: Float): Bitmap {
+    fun bitmap(
+        kind: AssetKind,
+        colorHex: String,
+        sizePx: Int,
+        outlinePx: Float,
+        style: GlyphStyle = GlyphStyle.MARKER
+    ): Bitmap {
         val size = sizePx.coerceAtLeast(1)
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
 
         // The halo is asked for as a fraction of the box because that is what the drawing works in,
         // and clamped so that a silly outline cannot swallow the glyph it is meant to make readable.
-        val style = GlyphStyle.MARKER.copy(
+        val asked = style.copy(
             haloFraction = (outlinePx.coerceAtLeast(0f) / size).coerceAtMost(0.4f)
         )
 
@@ -50,7 +58,7 @@ internal object MarkerIcons {
             canvas = Canvas(bitmap.asImageBitmap()),
             size = Size(size.toFloat(), size.toFloat())
         ) {
-            drawKindGlyph(kind, colorHex, style)
+            drawKindGlyph(kind, colorHex, asked)
         }
 
         return bitmap

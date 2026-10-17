@@ -1,9 +1,9 @@
 /*
  * The desk page's own styling.
  *
- * Plain, and with no palette of its own: the only things that carry colour are the row dots and the
- * lines themselves, and a row's dot takes the colour the phone painted that place's feature - so
- * there is one place in the world that decides what a kind looks like.
+ * **The app's palette, in the app's two themes.** The page is the same app seen on a laptop, so its ink, its
+ * quiet grey, its pale sage page and its white cards are the phone's own, and so are its radii. The only
+ * colours a row adds are the kind's own, which the phone paints - see `kindTile` in `app.js`.
  *
  * Light is the default, and there is a dark theme beside it, chosen by the button in the bar and
  * kept in the browser's own store. The two themes are the same variables with different values, so a
@@ -11,11 +11,20 @@
  */
 
 :root {
-  --ink: #1b1b1b;
-  --quiet: #5c5c5c;
-  --line: #d8d8d8;
+  --ink: #1b1d18;
+  --quiet: #45493f;
+  --line: #c6ccbc;
   --paper: #ffffff;
-  --shade: #f3f4f3;
+  --shade: #f4f7ec;
+  --accent: #2e7d32;
+  /* The ink that reads on the accent: white on the light green, near-black on the dark theme's lighter one. */
+  --on-accent: #ffffff;
+
+  /* The app's own radii: eighteen points for a card, and a tile's corner and a pill's. */
+  --radius: 18px;
+  --radius-tile: 11px;
+  --radius-pill: 999px;
+
 
   /*
    * The page's own accent and danger colours, said once so the dark theme can re-say them rather
@@ -57,11 +66,15 @@
  * would darken, so nothing else moves.
  */
 :root[data-theme="dark"] {
-  --ink: #e6e6e6;
-  --quiet: #9a9a9a;
-  --line: #3a3a3a;
-  --paper: #1b1b1b;
-  --shade: #2a2a2a;
+  /* The phone's dark scheme, role for role: a sage-black page, cards a shade above it, and the same ink
+     and quiet grey the app's own dark screens use. */
+  --ink: #e3e7da;
+  --quiet: #c3c9b9;
+  --line: #43483e;
+  --paper: #1d211a;
+  --shade: #12150f;
+  --accent: #81c784;
+  --on-accent: #102411;
 
   --danger: #e08a7e;
   --danger-soft: #2a1a18;
@@ -88,7 +101,7 @@ html, body {
   height: 100%;
   font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: var(--ink);
-  background: var(--paper);
+  background: var(--shade);
 }
 
 body { display: flex; flex-direction: column; overflow: hidden; }
@@ -230,7 +243,7 @@ main { flex: 1; display: flex; min-height: 0; position: relative; }
 #doc .doc-body { flex: 1 1 auto; min-height: 0; display: flex; gap: 14px; }
 
 #doc .doc-side {
-  flex: 0 0 22%;
+  flex: 0 0 260px;
   overflow: auto;
 }
 
@@ -839,4 +852,215 @@ main { flex: 1; display: flex; min-height: 0; position: relative; }
   background: #212121;
   border: 3px solid #ffffff;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/*
+ * The work's rows, as the mock screens draw them on a laptop: a card each, with the phone's own kind tile
+ * at the head, the name, and what it is under it.
+ *
+ * Appended rather than woven through the rules above them: those are the old table-ish list, and a rule that
+ * comes later is a rule that wins. The card's shape, the tile's radius and the pill's are the app's own
+ * numbers, read from the variables beside the palette.
+ */
+#list { padding: 0 0 16px 16px; }
+
+#list .row > button {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: calc(100% - 16px);
+  margin: 0 0 8px;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+#list .row > button[aria-current="true"] {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.tile {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-tile);
+  box-sizing: border-box;
+  padding: 5px;
+  background: var(--shade);
+}
+
+.words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.words .name { font-size: 14px; font-weight: 600; }
+.words .detail { font-size: 12px; color: var(--quiet); }
+
+/* The DOC dialog's rows wear the same card, tile and words as the work's own. */
+#doc-list .doc-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+#doc-list .doc-row .name { font-size: 14px; font-weight: 600; }
+#doc-list .doc-row .detail { font-size: 12px; color: var(--quiet); }
+
+/*
+ * The shell: the bar, the two ways in and the field above the list, wearing the app's own shapes - a card's
+ * corner, a pill's end and the one green. The list's rows are drawn further up; this is everything around them.
+ */
+#bar {
+  align-items: center;
+  padding: 14px 18px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+
+#title { color: var(--accent); font-size: 17px; font-weight: 700; }
+#subtitle { font-size: 12px; }
+
+/* Fields and buttons are pills, like the phone's chips: the flat rectangle was the old app's. */
+#theme {
+  padding: 7px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+}
+
+#theme:hover { background: var(--shade); }
+
+#side-actions { padding: 14px 16px 0; gap: 10px; }
+
+#search, #type {
+  padding: 10px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+}
+
+#search { margin: 12px 16px 8px; }
+#type { margin: 0 16px 10px; }
+
+/* The one filled button on the page: bringing a file in. */
+#import {
+  padding: 12px 18px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+#import:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }
+#import:disabled { background: var(--shade); color: var(--quiet); }
+
+#doc-open {
+  padding: 10px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--paper);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#doc-open:hover { background: var(--state-soft); }
+
+/* The dialog is a card too, and its four services read as the phone's own chips. */
+#doc { border-radius: var(--radius); }
+
+#doc .doc-choice {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--paper);
+}
+
+#doc .doc-choice:has(input:checked) {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--accent) 18%, var(--paper));
+}
+
+#doc-search {
+  padding: 10px 20px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#doc .doc-row:last-child { margin-bottom: 0; }
+
+/* Fields inside the dialog and the card wear the sidebar's pills, and so do its checkboxes. */
+#doc-name, #doc-radius, #edit-name {
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+
+#doc-radius { width: 74px; padding: 6px 12px; }
+
+#doc .doc-check, #doc .doc-radius {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--paper);
+  font-size: 13px;
+}
+
+#doc .doc-check:has(input:checked),
+#doc .doc-radius:has(input:focus) {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--accent) 18%, var(--paper));
+}
+
+/* The card for one place, and the form behind it: the same corner, and the same one green. */
+#card, #edit { border-radius: var(--radius); }
+
+#card-edit, #edit-save {
+  padding: 9px 18px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#edit-cancel {
+  padding: 9px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--paper);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* The sources' own title takes its own line, so the first chip does not sit beside it. */
+#doc .doc-choices .doc-sub { flex-basis: 100%; }
+
+/* The results are a pale sheet with white cards on it, as the phone's browser draws them. */
+#doc .doc-results {
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--shade);
+}
+
+#doc .doc-choice:has(input:checked) {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--accent) 26%, var(--paper));
 }
