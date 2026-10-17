@@ -99,10 +99,12 @@ class MapNearbyTest {
             loadGeometry = { spot }
         )
 
-        // The card fills in as the map's own flows arrive - the places from the database, then DOC's cache -
-        // so the test waits for the state it is about rather than the first one that is not empty.
+        // The card fills in as the map's own flows arrive - the walker's places and their lines from the
+        // database, DOC's cache separately, the fix separately again - so the test waits for **both things it
+        // is about**, not for the first one that turns up. Waiting for the hut alone let the assertion below
+        // run before the camp's line had been read, and a slower machine failed it.
         val nearby = withTimeout(5_000) {
-            viewModel.nearby.first { card -> card != null && card.within.any { it.what == "hut" } }
+            viewModel.nearby.first { card -> card != null && card.within.size == 2 }
         }!!
 
         assertEquals("the walker's own place is nearest", "My camp", nearby.nearest.name)
