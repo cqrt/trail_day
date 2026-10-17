@@ -294,3 +294,25 @@ Two things found along the way, neither of them a screen's:
 - **The mock's offline screen puts imagery and DOC data in one list** with a single "Download an area"
   button, where the app still has two tabs. That is the look stage's to settle, and nothing depends on it.
 
+**Step 6 is done.** One piece of arithmetic for time, and the first screen that asks it: a place's page now
+says how long its line takes both ways - "About 1h 25 min on foot - 1h 15 min riding" - from Naismith's rule
+on foot and a rider's version on a bike, rounded up to five minutes past twenty. The nearest-thing card, a
+hut's page and a target while recording will call the same thing when they arrive, rather than three ideas
+about how fast a walker walks.
+
+**Step 7 is done.** The recorder answers the walker's questions about the place they are following.
+Following a line: how far off it they are, how far along, how long the rest takes, and a quiet word when they
+drift - which is a state rather than a notification, with two distances so a track that touches a clearing
+cannot make it flicker. Following a point: which way, how far, and how long on foot. And the line being
+followed is drawn boldly on the recorder's map, nearly twice the width of anything else.
+
+Four things the running app taught, all fixed in the same change: an estimate of "40m" read as metres, so
+minutes are "min" now; the word vanished as the walker got *further* off the line; the card said the same
+distance twice; and the compass was half a sector out, so a bearing of 30 degrees read "north".
+
+**Not yet: DOC things as targets.** The plan allows a DOC track or a hut to be followed as well, and this
+change does the two kinds that are the walker's own places - the lines and spots in their list. Following
+something DOC publishes needs the browser to offer it, and a target that is not a stored place.
+
+**Next is step 8**, the nearest-thing card at the bottom of the map - which is also the natural home for
+"what is nearest" among DOC's huts and campsites.
