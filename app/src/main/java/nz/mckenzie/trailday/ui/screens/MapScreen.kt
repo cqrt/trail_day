@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
@@ -45,8 +44,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -471,6 +468,8 @@ private fun MapCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     onClose: (() -> Unit)? = null,
+    /** The cross's ink: the card's own quiet grey, or white where the cross sits over a picture. */
+    closeTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     content: @Composable () -> Unit
 ) {
     Box(modifier = modifier) {
@@ -482,20 +481,17 @@ private fun MapCard(
         }
 
         if (onClose != null) {
-            // Small, and still a target worth aiming at: a 36-point circle with the cross a little smaller
-            // again. The description is on the click, so the glyph inside it says nothing twice.
+            // Just a cross: no circle, no shadow. The target is still 40 points, which is the thumb's own
+            // size, and the description is on the click so the glyph says nothing twice.
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(6.dp)
-                    .size(36.dp)
-                    .shadow(TrailDayElevation.floating, CircleShape)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(4.dp)
+                    .size(40.dp)
                     .clickable(onClickLabel = "Close the card", onClick = onClose),
                 contentAlignment = Alignment.Center
             ) {
-                AppIcon(glyph = IconGlyph.CLOSE, dimension = 15.dp)
+                AppIcon(glyph = IconGlyph.CLOSE, dimension = 19.dp, tint = closeTint)
             }
         }
     }
@@ -567,7 +563,12 @@ private fun DocCard(pick: DocPick, onClose: () -> Unit, modifier: Modifier = Mod
         pick.onFootSeconds()?.let { "about ${formatEstimate(it)} on foot" }
     )
 
-    MapCard(modifier = modifier, onClose = onClose) {
+    MapCard(
+        modifier = modifier,
+        onClose = onClose,
+        // The cross is over the picture when there is one, so it is drawn in white there.
+        closeTint = if (picture != null) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+    ) {
         Column(modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
             picture?.let {
                 Image(
