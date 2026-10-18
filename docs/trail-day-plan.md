@@ -587,6 +587,14 @@ whose header already says whose it is, so the line at its foot saying "not one o
 sheet's "Show everything" used to appear under the switches and push them up as soon as a layer was switched off;
 it now sits in the title's row, whose height is fixed, so nothing below it moves.
 
+**Then a switch that did not do what it said.** Switching a layer off hid only the walker's own work, and DOC's
+material is most of what a layer on that map is: turning Huts off left DOC's huts standing, and turning Tracks off
+left DOC's tracks and their white casing. One set of switches now governs one map - DOC's tracks go with the
+tracks (casing and all), DOC's huts, campsites and bike locations go with the kinds they are drawn as, and a bike
+track switch has nothing of DOC's to hide because DOC publishes no bike lines. A switched-off layer is also no
+longer tappable, for the walker's own places and for DOC's: a tap where nothing is drawn does not open something
+they cannot see. It shipped as 0.3.6.
+
 **Then two more from using it: the app stopped explaining itself, and the card cleared the credit line.** Nearly every
 row had grown a supporting paragraph - what the feature was for, how it worked, why it was built that way - so the
 sheets and cards were mostly prose. Supporting lines are now one short line each, or gone where the label already
