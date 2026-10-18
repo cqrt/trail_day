@@ -544,6 +544,31 @@ line was tapped, and went back to the nearest track when the map was tapped away
 **It shipped as 0.3.1**, and the file people download was tried the same way: a fresh area of six tracks, the
 nearest card on the map, and "Cons Track" on the card after a tap on its line.
 
+## After the plan: three things the field asked for
+
+Three requests came back from using the app, and each is its own change:
+
+- **A tapped thing shows the card's whole answer.** The card now opens DOC's material out instead of repeating the
+  row: the picture the phone kept with the area, what DOC calls it and how it is walked, where it is, whether it
+  must be booked, what is at it, whether dogs are allowed, DOC's own prose, and how far away it is now. Two things
+  had to be put right for the picture to exist: DOC's thumbnail addresses end in `.aspx` and answer with a JPEG,
+  so every hut photograph was being skipped, and what comes back is now checked by its own first bytes so a page
+  can never be kept where a picture goes. A hut standing on a track also answers for the hut now, because the place
+  is what the finger is on.
+- **A line a walk has been made of is drawn as a recording.** A recorded track was saved as a place and drawn in
+  the track kind's blue - the one line on the map that is evidence of what the walker did looked like a line that
+  was only ever drawn. A place with a recorded pass now wears the recorded green with the gold edge beneath it, on
+  the map and on the place's own page, and the map finds those places from the trips themselves.
+- **Deleting a trip takes the track it made with it.** A walk that made a place left the place behind, so the
+  walker had to tidy up after the app. A trip now takes the place it made, and the confirmation says so before
+  anything goes. Never more than the trip: a place the walker made for themselves survives (a trip made for a
+  place is named after it with the date), a place more than one walk was made of stays, and a place made by a walk
+  carries a mark saying which walk, so the common case needs no guessing.
+
+All three were looked at on the emulator: the hut card with Angelus Hut's own photograph and its booking line; a
+recorded walk drawn green with the gold edge while DOC's tracks stayed blue; and that walk's trip deleted, with
+the confirmation saying "and the track it made - this is the only walk of it", leaving no place behind.
+
 **The plan is complete**: eleven steps, each landed and each looked at on a screen. What is left in the plan's own
 words is nothing; what is left in the project is the pair of tests that wait on a stored preference with a clock,
 which is worth its own small change, and the question of DOC's duplicate hut records.

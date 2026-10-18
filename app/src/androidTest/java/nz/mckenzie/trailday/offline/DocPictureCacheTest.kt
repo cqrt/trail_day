@@ -45,16 +45,27 @@ class DocPictureCacheTest {
 
     private val jpg = "https://www.doc.govt.nz/thumbs/large/link/abc.jpg"
 
+    /**
+     * Bytes that are a picture, or at least begin like one.
+     *
+     * The cache keeps what came back only if it is a picture by its own first bytes - DOC's thumbnail
+     * addresses answer with JPEGs - so the fake fetcher has to hand back something that looks like one.
+     */
+    private fun jpeg(size: Int = 3) = ByteArray(size).also {
+        if (size > 0) it[0] = 0xFF.toByte()
+        if (size > 1) it[1] = 0xD8.toByte()
+    }
+
     @Test
     fun theAddressesThatArePicturesAreKeptAndTheOthersLeftAlone() = runBlocking {
         val asked = mutableListOf<String>()
-        val cache = DocPictureCache(db.offlineDocItemDao(), fetch = { url -> asked += url; byteArrayOf(1, 2, 3) })
+        val cache = DocPictureCache(db.offlineDocItemDao(), fetch = { url -> asked += url; jpeg() })
 
         val kept = cache.keep(
             listOf(
                 jpg,
-                // DOC's own data addresses a page about some things rather than a picture of them.
-                "https://www.doc.govt.nz/thumbs/large/link/def.aspx",
+                // A page about a thing is not a picture of it, whatever its address says.
+                "https://www.doc.govt.nz/parks-and-recreation/places-to-go/def.aspx",
                 "  $jpg  ".trim() + "?width=400",
                 jpg
             )
@@ -63,14 +74,14 @@ class DocPictureCacheTest {
         assertEquals("a picture's address, once, and never the page", listOf(jpg, "$jpg?width=400"), asked)
         assertEquals(DocPictures(asked = 2, kept = 2), kept)
         assertEquals(2, cache.count())
-        assertArrayEquals("and the bytes are what DOC served", byteArrayOf(1, 2, 3), cache.read(jpg))
+        assertArrayEquals("and the bytes are what DOC served", jpeg(), cache.read(jpg))
     }
 
     @Test
     fun aPictureThatWillNotComeIsNotAFailedDownload() = runBlocking {
         val cache = DocPictureCache(
             db.offlineDocItemDao(),
-            fetch = { url -> if (url.endsWith("good.jpg")) byteArrayOf(9) else null }
+            fetch = { url -> if (url.endsWith("good.jpg")) jpeg(9) else null }
         )
 
         val kept = cache.keep(listOf("https://www.doc.govt.nz/good.jpg", "https://www.doc.govt.nz/missing.jpg"))
@@ -84,7 +95,7 @@ class DocPictureCacheTest {
     @Test
     fun keepingTheSamePictureAgainFetchesNothingNew() = runBlocking {
         var fetches = 0
-        val cache = DocPictureCache(db.offlineDocItemDao(), fetch = { fetches++; byteArrayOf(1) })
+        val cache = DocPictureCache(db.offlineDocItemDao(), fetch = { fetches++; jpeg() })
 
         cache.keep(listOf(jpg))
         val again = cache.keep(listOf(jpg))
@@ -94,8 +105,24 @@ class DocPictureCacheTest {
     }
 
     @Test
+    fun aPageThatArrivesWhereAPictureWasPromisedIsNotKept() = runBlocking {
+        // DOC's thumbnail addresses are `.aspx` and answer with a JPEG; any other `.aspx` is a page. The
+        // address cannot promise a picture by itself, so what comes back is checked - and a page is not kept.
+        val cache = DocPictureCache(
+            db.offlineDocItemDao(),
+            fetch = { "<!DOCTYPE html><html><body>Not a photograph.</body></html>".toByteArray() }
+        )
+
+        val kept = cache.keep(listOf("https://www.doc.govt.nz/thumbs/large/link/def.aspx"))
+
+        assertEquals("it was asked for", 1, kept.asked)
+        assertEquals("and refused", 0, kept.kept)
+        assertEquals(0, cache.count())
+    }
+
+    @Test
     fun aPictureFarLargerThanAThumbnailIsNotKept() = runBlocking {
-        val cache = DocPictureCache(db.offlineDocItemDao(), fetch = { ByteArray(64) }, maxBytes = 32)
+        val cache = DocPictureCache(db.offlineDocItemDao(), fetch = { jpeg(64) }, maxBytes = 32)
 
         val kept = cache.keep(listOf(jpg))
 
@@ -114,7 +141,7 @@ class DocPictureCacheTest {
     @Test
     fun clearingTheDOCsCacheTakesThePicturesWithIt() = runBlocking {
         val dao = db.offlineDocItemDao()
-        val pictures = DocPictureCache(dao, fetch = { byteArrayOf(1) })
+        val pictures = DocPictureCache(dao, fetch = { jpeg() })
         val store = OfflineDocStore(dao = dao, downloader = DocDownloader(ArcGisDoc()), pictures = pictures)
 
         pictures.keep(listOf("https://www.doc.govt.nz/a.jpg", "https://www.doc.govt.nz/b.jpg"))
@@ -131,7 +158,7 @@ class DocPictureCacheTest {
         // record at all - so a count that only moved when the records moved sat at nothing while seven
         // pictures arrived. The count is its own live question about its own table.
         val dao = db.offlineDocItemDao()
-        val pictures = DocPictureCache(dao, fetch = { byteArrayOf(1) })
+        val pictures = DocPictureCache(dao, fetch = { jpeg() })
         val store = OfflineDocStore(dao = dao, downloader = DocDownloader(ArcGisDoc()), pictures = pictures)
 
         val seen = Channel<Int>(Channel.CONFLATED)
