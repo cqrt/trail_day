@@ -53,8 +53,7 @@ enum class Basemap(
     LINZ_AERIAL(
         id = "linz-aerial",
         displayName = "Aerial imagery",
-        summary = "LINZ aerial photography - what the ground actually looks like. Needs a LINZ " +
-            "key, and can be downloaded before you go somewhere with no reception.",
+        summary = "Aerial photography. Needs a LINZ key; can be downloaded.",
         needsKey = true,
         tileSuffix = ".webp",
         contentType = "image/webp",
@@ -68,8 +67,7 @@ enum class Basemap(
     OPENSTREETMAP(
         id = "osm",
         displayName = "OpenStreetMap",
-        summary = "A drawn map of the same ground: roads, tracks, gates and names, and no key " +
-            "needed. Shown as you browse it - it cannot be downloaded for offline use.",
+        summary = "A drawn map. No key needed; cannot be downloaded.",
         needsKey = false,
         tileSuffix = ".png",
         contentType = "image/png",

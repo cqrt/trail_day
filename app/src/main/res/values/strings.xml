@@ -4,7 +4,7 @@
 
     <string name="build_title">Build</string>
     <string name="linz_key_title">LINZ Basemaps key</string>
-    <string name="linz_key_missing">Not configured. Paste your key into local.properties (LINZ_API_KEY), or set it later in Settings.</string>
+    <string name="linz_key_missing">Not configured.</string>
     <string name="linz_key_configured">Configured from local.properties.</string>
     <string name="next_steps">Next: offline LINZ aerial basemap and the track library.</string>
 

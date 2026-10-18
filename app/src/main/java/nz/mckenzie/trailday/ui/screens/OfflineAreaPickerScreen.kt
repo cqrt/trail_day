@@ -143,12 +143,11 @@ fun OfflineAreaPickerScreen(
                         text = when {
                             // The box is already drawn around the track, so the question is not about
                             // corners but about whether this is the ground the walker wants kept.
-                            around -> "This is the ground ${draft.name} needs. Tap the map to draw a " +
-                                "different box, or drag it to check this one."
+                            around -> "Tap the map to change the box."
 
                             draft.corners.size == 0 -> "Tap one corner of the area"
                             draft.corners.size == 1 -> "Now tap the opposite corner"
-                            else -> "Tap again to start a new box, or drag the map to check it"
+                            else -> "Tap again for a new box."
                         },
                         style = MaterialTheme.typography.titleSmall
                     )
@@ -185,16 +184,13 @@ fun OfflineAreaPickerScreen(
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
-                            text = "Each deeper level multiplies the download. The shallow ones are " +
-                                "nearly free, and are what let the map open on a zoomed-out view " +
-                                "with no reception.",
+                            text = "Each deeper level multiplies the download.",
                             style = MaterialTheme.typography.bodySmall
                         )
 
                         if (draft.isTooBig) {
                             Text(
-                                text = "That is too much to cache in one go. Narrow the box or the " +
-                                    "zoom range.",
+                                text = "Too much for one go. Narrow the box or the zoom range.",
                                 color = MaterialTheme.colorScheme.error,
                                 style = MaterialTheme.typography.bodySmall
                             )
@@ -247,13 +243,9 @@ fun OfflineAreaPickerScreen(
                         )
                         Text(
                             text = if (around) {
-                                "Everything DOC publishes here is kept too - the tracks around the " +
-                                    "walk, the huts and campsites to stop at - and drawn on the map as " +
-                                    "DOC's own layer."
+                                "Everything DOC publishes here is kept and drawn on the map."
                             } else {
-                                "Everything DOC publishes inside the box is downloaded and drawn on " +
-                                    "the map as DOC's own layer. Nothing else is fetched, and no LINZ " +
-                                    "key is needed."
+                                "Everything DOC publishes inside the box is downloaded and drawn on the map."
                             },
                             style = MaterialTheme.typography.bodySmall
                         )

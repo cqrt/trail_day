@@ -296,7 +296,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                 }
                 if (assets.isEmpty()) {
                     Text(
-                        text = "Nothing planned yet. You can still record a line.",
+                        text = "Nothing planned.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 24.dp)
@@ -341,9 +341,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "The line you recorded is saved as a place, so it appears on " +
-                            "the Places page. Cancelling leaves the trip still recording, so the " +
-                            "line can be named whenever you finish.",
+                        text = "Saved as a place. Cancelling keeps recording.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     OutlinedTextField(

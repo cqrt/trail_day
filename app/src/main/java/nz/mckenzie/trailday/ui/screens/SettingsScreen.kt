@@ -178,8 +178,7 @@ fun SettingsScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "There are ${copies.size} copies. The name says which phone wrote each " +
-                            "one, and the next screen says what is in it."
+                        "There are ${copies.size} copies. The name says which phone wrote each."
                     )
                     copies.forEach { copy ->
                         OutlinedButton(
@@ -238,8 +237,7 @@ fun SettingsScreen(
                     // the choice is made, not only on the offline one.
                     if (!basemap.prefetchable) {
                         Text(
-                            text = "Offline areas always download aerial imagery, whichever " +
-                                "basemap you read your maps on.",
+                            text = "Offline areas download aerial imagery, whatever the basemap.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -273,8 +271,6 @@ fun SettingsScreen(
                         onChoose = viewModel::setThemeChoice,
                         text = { it.displayName }
                     )
-
-                    Text(themeChoice.summary, style = MaterialTheme.typography.bodySmall)
                 }
             }
 
@@ -320,8 +316,7 @@ fun SettingsScreen(
                     // having thrown anything is exactly the sort of thing that must not arrive as a
                     // surprise - and because this is the switch they may well want the other way.
                     Text(
-                        text = "This is on as soon as the app is opened, so the address is ready " +
-                            "when you sit down at the computer. Turn it off and it stays off.",
+                        text = "On from launch. Turn it off and it stays off.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -355,14 +350,10 @@ fun SettingsScreen(
 
                     Text(
                         text = if (webEditorTokenRequired) {
-                            "The address ends in a secret code, made fresh every time this is " +
-                                "turned on. Without it the phone says no - which is what stops " +
-                                "someone else's device on the Wi-Fi, and a web page open on this " +
-                                "computer, from changing your tracks."
+                            "The address ends in a secret code, made fresh each time it is turned on. " +
+                                "Without it, the phone refuses."
                         } else {
-                            "Anyone on this Wi-Fi can open the editor, change your tracks and " +
-                                "delete them, without needing the address above. That is fine on " +
-                                "your own home network and not on anyone else's."
+                            "Anyone on this Wi-Fi can open the editor and change or delete your tracks."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -389,14 +380,9 @@ fun SettingsScreen(
 
                     Text(
                         text = if (webEditorKeepAwake) {
-                            "The screen stays on, dimmed, until this is turned off. New imagery " +
-                                "keeps arriving while you browse, and the phone is best left on " +
-                                "charge."
+                            "The screen stays on, dimmed, until this is turned off."
                         } else {
-                            "The phone may sleep, and the aerial imagery has to come from LINZ: " +
-                                "with the phone asleep, ground you have not looked at yet can come " +
-                                "up blank until you wake it. Downloading an area first, under " +
-                                "Offline areas, needs no network at all and no awake phone."
+                            "The phone may sleep, and new ground comes up blank until you wake it."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -417,12 +403,8 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        text = "The aerial imagery comes from LINZ and needs one of their keys. " +
-                            "Standard-access keys expire every 90 days, and an expired key " +
-                            "shows up as imagery that still works where you have already been " +
-                            "and is blank somewhere new \u2014 so if the map ever looks wrong, " +
-                            "press Check. OpenStreetMap needs no key, so a map with no key at " +
-                            "all is still a map.",
+                        text = "Standard-access keys expire every 90 days, and an expired key leaves " +
+                            "new ground blank. Press Check if the map looks wrong.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -487,9 +469,8 @@ fun SettingsScreen(
                 ) {
                     Text("Updates", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        text = "This is version ${updateViewModel.currentLabel}. Trail Day is not " +
-                            "installed from an app store, so nothing else will ever mention a new " +
-                            "version \u2014 it asks GitHub once a day instead.",
+                        text = "Version ${updateViewModel.currentLabel}. It asks GitHub once a day for " +
+                            "a newer release.",
                         style = MaterialTheme.typography.bodyMedium
                     )
 
@@ -509,8 +490,7 @@ fun SettingsScreen(
 
                     if (!canInstallUpdates) {
                         Text(
-                            text = "Android needs your permission before Trail Day can install an " +
-                                "update. Downloading works without it; installing does not.",
+                            text = "Android needs permission to install updates.",
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -555,9 +535,7 @@ fun SettingsScreen(
                         }
 
                         InstallState.HandedToInstaller -> Text(
-                            text = "Android is installing it. Confirm the update when it asks, and " +
-                                "Trail Day reopens on the new version \u2014 with everything you " +
-                                "have recorded kept.",
+                            text = "Confirm the update when Android asks.",
                             style = MaterialTheme.typography.bodyMedium
                         )
 
@@ -607,8 +585,7 @@ fun SettingsScreen(
 
                     Text("Your data", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        text = "Everything the app holds: the places and their lines, and " +
-                            "every GPS trip.",
+                        text = "Your places and every trip.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -631,8 +608,7 @@ fun SettingsScreen(
                     }
                     dataMessage?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
                     Text(
-                        text = "Downloaded offline imagery is not in the backup: it describes " +
-                            "tiles on this phone and can be downloaded again.",
+                        text = "Offline imagery is not in the backup.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -646,9 +622,7 @@ fun SettingsScreen(
                 ) {
                     Text("Off-site copy", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        text = "The backup above is a file you keep. This is the same backup, " +
-                            "written by the app itself, so there is a copy somewhere else if " +
-                            "this phone is lost, wiped, or dropped in the creek.",
+                        text = "The same backup, kept by the app.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -663,8 +637,7 @@ fun SettingsScreen(
 
                     when (backupDestination) {
                         BackupDestination.OFF -> Text(
-                            text = "Nothing is written anywhere on its own. Backing up is the " +
-                                "button on the card above, which writes a file you choose.",
+                            text = "Nothing is written on its own.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -674,9 +647,7 @@ fun SettingsScreen(
                                 text = if (backupFileName.isBlank()) {
                                     "No file chosen yet."
                                 } else {
-                                    "Copies are written to $backupFileName, replacing the last " +
-                                        "one. The file can be in any folder you can reach, " +
-                                        "including one another app syncs."
+                                    "Written to $backupFileName, replacing the last copy."
                                 },
                                 style = MaterialTheme.typography.bodyMedium
                             )
@@ -696,9 +667,7 @@ fun SettingsScreen(
 
                         BackupDestination.GITHUB -> {
                             Text(
-                                text = "A private repository keeps the copy off the property " +
-                                    "and keeps its history: every backup is a commit, so an " +
-                                    "older copy is still there if the newest one is wrong.",
+                                text = "Every backup is a commit, so older copies remain.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -771,10 +740,8 @@ fun SettingsScreen(
                             }
 
                             Text(
-                                text = "The token is a GitHub fine-grained token with Contents: " +
-                                    "read and write on this one repository. It is kept on this " +
-                                    "phone and never written into a backup \u2014 the copy " +
-                                    "lives in the very repository the token can write to.",
+                                text = "A fine-grained GitHub token with Contents: read and write on " +
+                                    "this repository.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -814,9 +781,7 @@ fun SettingsScreen(
                     offsiteMessage?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
 
                     Text(
-                        text = "An empty database is never written over the copy: if this phone " +
-                            "holds nothing \u2014 after a wipe, say \u2014 the copy is left " +
-                            "alone, so it is still there to restore from.",
+                        text = "An empty phone never overwrites the copy.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

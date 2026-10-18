@@ -366,7 +366,7 @@ private fun LayersSheet(
                 modifier = Modifier.clickable { onPlaceNames(!placeNames) },
                 headlineContent = { Text("Place names") },
                 supportingContent = {
-                    Text("Towns, lakes, peaks, bays and rivers from LINZ, drawn over the imagery.")
+                    Text("Towns, lakes, peaks and rivers from LINZ.")
                 },
                 trailingContent = {
                     Switch(

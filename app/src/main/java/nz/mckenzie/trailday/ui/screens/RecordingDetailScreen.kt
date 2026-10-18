@@ -176,8 +176,7 @@ fun RecordingDetailScreen(
 
                     if (differsFromRecorded(recording)) {
                         Text(
-                            text = "Recorded as ${formatDistance(recording.recordedDistanceM)} at the " +
-                                "time; the distance above is re-derived from the stored points.",
+                            text = "Recorded as ${formatDistance(recording.recordedDistanceM)}.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

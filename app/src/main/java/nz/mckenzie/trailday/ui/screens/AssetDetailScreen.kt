@@ -258,8 +258,7 @@ fun AssetDetailScreen(
                         EmptyState(
                             glyph = IconGlyph.RECORDINGS,
                             title = "No trip for this place",
-                            body = "Recording while walking or riding this line leaves the evidence " +
-                                "of what was actually followed."
+                            body = "Records your walk of this line."
                         )
                     }
                     recordings.forEach { session ->

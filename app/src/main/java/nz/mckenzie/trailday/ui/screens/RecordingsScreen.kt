@@ -99,8 +99,7 @@ fun RecordingsScreen(
                 sessions.isEmpty() -> EmptyState(
                     glyph = IconGlyph.RECORDINGS,
                     title = "No trips yet",
-                    body = "A trip is a walk or a ride: the line that was actually " +
-                        "followed. Start one from the Record tab and it appears here.",
+                    body = "Walks and rides you record appear here.",
                     actionLabel = "Record a line",
                     onAction = { onOpenTab(Tab.RECORD) }
                 )

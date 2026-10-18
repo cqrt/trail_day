@@ -127,8 +127,7 @@ fun OfflineScreen(
                 },
                 progress = null,
                 progressLabel = null,
-                footnote = "The map's DOC layer and the DOC browser read this with no reception. None of it " +
-                    "is yours to change, and none of it needs a LINZ key.",
+                footnote = "Read offline by the map and the DOC browser.",
                 error = null,
                 clearLabel = "Clear all DOC data".takeIf { docDataCount > 0 },
                 onClear = { confirmingClearDocData = true }
@@ -145,8 +144,7 @@ fun OfflineScreen(
             }
 
             Text(
-                text = "Place names and imagery you have looked at are kept as you browse. The map works " +
-                    "with no reception anywhere you have downloaded or visited.",
+                text = "What you look at is kept. Downloads need no reception.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -220,9 +218,8 @@ fun OfflineScreen(
             title = { Text("Delete downloaded imagery?") },
             text = {
                 Text(
-                    "This removes all ${summary.tiles} tiles (${summary.sizeLabel}) and the " +
-                        "list of areas. The map will need reception until areas are " +
-                        "downloaded again."
+                    "Removes all ${summary.tiles} tiles (${summary.sizeLabel}). The map needs " +
+                        "reception until an area is downloaded again."
                 )
             },
             confirmButton = {
@@ -248,8 +245,8 @@ fun OfflineScreen(
                 Text(
                     "This removes the ${docHeldWords(docCounts)}" +
                         (docPictures.takeIf { it > 0 }?.let { " and ${pictureCountWords(it)}" } ?: "") +
-                        " kept for offline use. The map's DOC layer and the DOC browser will need " +
-                        "reception until an area is downloaded again. Nothing of your own is touched."
+                        " kept for offline use. The map needs reception until an area is downloaded again. " +
+                        "Your own places are not touched."
                 )
             },
             confirmButton = {

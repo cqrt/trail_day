@@ -24,19 +24,19 @@ enum class ThemeChoice(
     SYSTEM(
         id = "system",
         displayName = "Follow the phone",
-        summary = "Light or dark, whichever this phone is set to."
+        summary = "Follow this phone."
     ),
 
     LIGHT(
         id = "light",
         displayName = "Light",
-        summary = "Always light - the one to read on a screen in the sun."
+        summary = "Always light."
     ),
 
     DARK(
         id = "dark",
         displayName = "Dark",
-        summary = "Always dark - easier on the eyes at night, and easier on the battery."
+        summary = "Always dark."
     );
 
     /**

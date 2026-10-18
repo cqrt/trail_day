@@ -30,14 +30,14 @@ enum class AssetLayer(
     TRACKS(
         id = "tracks",
         displayName = "Tracks",
-        summary = "The lines you walk or ride, drawn solid.",
+        summary = "The lines you walk or ride.",
         kind = AssetKind.TRACK
     ),
 
     BIKE_TRACKS(
         id = "bike-tracks",
         displayName = "Bike tracks",
-        summary = "Tracks that are ridden, drawn dashed.",
+        summary = "The lines you ride.",
         kind = AssetKind.BIKE_TRACK
     ),
 
