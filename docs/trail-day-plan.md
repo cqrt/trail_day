@@ -579,6 +579,14 @@ a loaded machine that coroutine can be the last thing to run, and a change that 
 asks the flow for its next value, which is what a screen does. Two CI runs in this sitting failed on it before the
 change and none have since.
 
+**Then two more from using it: things over the map sit above it, and the cards can be closed.** The map is
+imagery, and imagery is as pale as snow or as dark as water, so a card or a pill with no shadow melts into it. One
+height now serves everything that floats over a map - the nearest-thing card, a thing DOC publishes, the round
+controls, the follow and choose-place pills, the recorder's pass card, and the sheet on a trip's page - and the two
+cards at the foot of the map carry a small x in their corner. On the DOC card the x puts what is nearest back; on
+the nearest card it puts the card away until the walker asks where they are again. It shipped as 0.3.3 and was
+tried on the published file.
+
 **The plan is complete**: eleven steps, each landed and each looked at on a screen. What is left in the plan's own
 words is nothing; what is left in the project is the pair of tests that wait on a stored preference with a clock,
 which is worth its own small change, and the question of DOC's duplicate hut records.
