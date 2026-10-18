@@ -66,11 +66,11 @@ data class AssetLine(
 object AssetColors {
 
     /**
-     * The recorded line, on the recorder and the recording's own screen.
+     * The recorded line: the mock screens' green, with the gold edge below it.
      *
-     * The mock screens' green, with a gold edge on the recorder (that edge is a drawing detail of the
-     * recorder's own map, and is still to come). A green that is nobody's kind: the line is the evidence
-     * of what was walked or ridden, not one of the places, and it must not be read as one.
+     * A green that is nobody's kind - the line is the evidence of what was walked or ridden, not one of
+     * the places, and it must not be read as one. It is drawn wherever a line that has been walked is
+     * drawn: the recorder, a trip's page, and a place on the map that a walk has been made of.
      */
     const val RECORDED = "#2E7D32"
 
@@ -140,6 +140,16 @@ object AssetColors {
         AssetKind.CAMPSITE -> CAMPSITE_KIND
         AssetKind.WAYPOINT -> WAYPOINT_KIND
     }
+
+    /**
+     * The colour a place is drawn in: the recorded green when a walk has been made of it, its kind's own
+     * colour otherwise.
+     *
+     * **A line that has been walked says so.** A place with a recorded pass is the line the walker actually
+     * went along, and drawing it in its kind's colour would put it beside a line that was only ever drawn.
+     * The map, the place's own page and the recorder all ask this, so they cannot disagree about it.
+     */
+    fun forPlace(kind: AssetKind, recorded: Boolean): String = if (recorded) RECORDED else forKind(kind)
 
     /**
      * The same kind of thing, on a dark background: [forKind]'s hue, light enough to read there.

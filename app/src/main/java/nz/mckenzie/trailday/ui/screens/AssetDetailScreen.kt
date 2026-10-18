@@ -96,13 +96,15 @@ fun AssetDetailScreen(
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
-    val geoJson = remember(geometry, track, kind) {
+    val geoJson = remember(geometry, track, kind, recordings) {
         AssetGeoJson.build(
             listOf(
                 AssetLine(
                     assetId = track?.id ?: 0L,
                     name = track?.name.orEmpty(),
-                    colorHex = AssetColors.forKind(kind),
+                    // A line a walk has been made of wears the recorded green, with the map's own gold edge:
+                    // the place's page and the map cannot disagree about what has been walked.
+                    colorHex = AssetColors.forPlace(kind, recorded = recordings.isNotEmpty()),
                     points = geometry.line,
                     sideTracks = geometry.sideTracks,
                     kind = kind,

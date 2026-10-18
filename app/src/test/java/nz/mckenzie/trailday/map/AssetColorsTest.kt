@@ -108,6 +108,28 @@ class AssetColorsTest {
 
     private fun round(value: Double): String = String.format(java.util.Locale.US, "%.1f", value)
 
+    @Test
+    fun `a line a walk has been made of is drawn in the recorded green, whatever its kind`() {
+        // The map draws a place in its kind's colour until a walk has been made of it. From then on it is the
+        // line the walker actually went along, and it wears the recorded green - with the map's own gold
+        // casing, which filters on exactly this colour.
+        assertEquals(
+            "the recorded green",
+            AssetColors.RECORDED,
+            AssetColors.forPlace(AssetKind.TRACK, recorded = true)
+        )
+        assertEquals(
+            "a bike track a ride was made of is recorded too, not purple",
+            AssetColors.RECORDED,
+            AssetColors.forPlace(AssetKind.BIKE_TRACK, recorded = true)
+        )
+        assertEquals(
+            "and a place with no walk is still its kind's own colour",
+            AssetColors.HUT_KIND,
+            AssetColors.forPlace(AssetKind.HUT, recorded = false)
+        )
+    }
+
     private companion object {
         /** Enough for a thin outline to be read on the card behind it. */
         const val MIN_CONTRAST = 3.0

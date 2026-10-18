@@ -11,12 +11,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import nz.mckenzie.trailday.data.RecordingRepository
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.AssetEntity
@@ -75,6 +78,14 @@ class MapViewModel(
      * why it draws in the hills with no reception at all. See [DocGeoJson].
      */
     private val docStore: DocCache = EmptyDocCache,
+    /**
+     * The places a walk or ride has been recorded for, as they change.
+     *
+     * A place with a recorded pass is a line that was actually walked, and it is drawn in the recorded green
+     * with the gold edge rather than in its kind's colour - see [AssetColors.forPlace]. Fed from the trips
+     * rather than stored on the place, so a trip deleted puts the line back to what it was.
+     */
+    private val recordedFor: Flow<Set<Long>> = flowOf(emptySet()),
     /** Injected so a test can count how often a line is re-read from the database. */
     private val loadGeometry: suspend (Long) -> AssetGeometry = assetRepository::getAssetGeometry
 ) : ViewModel() {
@@ -320,8 +331,9 @@ class MapViewModel(
 
     val assetGeoJson: StateFlow<String> = combine(
         assets,
-        geometryByTrack
-    ) { tracks, geometry ->
+        geometryByTrack,
+        recordedFor
+    ) { tracks, geometry, recorded ->
         AssetGeoJson.build(
             tracks.map { asset ->
                 val assetGeometry = geometry[asset.id] ?: AssetGeometry.NONE
@@ -329,7 +341,12 @@ class MapViewModel(
                 AssetLine(
                     assetId = asset.id,
                     name = asset.name,
-                    colorHex = AssetColors.forKind(AssetKind.fromStorage(asset.kind)),
+                    // A line a walk has been made of wears the recorded green; the rest wear their kind's
+                    // colour, as they always have.
+                    colorHex = AssetColors.forPlace(
+                        kind = AssetKind.fromStorage(asset.kind),
+                        recorded = asset.id in recorded
+                    ),
                     points = assetGeometry.line,
                     sideTracks = assetGeometry.sideTracks,
                     kind = AssetKind.fromStorage(asset.kind),
@@ -434,7 +451,12 @@ class MapViewModel(
                         docStore = OfflineDocStore(
                             dao = TrailDayDatabase.get(appContext).offlineDocItemDao(),
                             downloader = DocDownloader(ArcGisDoc())
-                        )
+                        ),
+                        // The places a walk has been made of, read from the trips themselves: a trip deleted
+                        // puts its line back to what it was, with nothing to remember on the place.
+                        recordedFor = RecordingRepository(TrailDayDatabase.get(appContext))
+                            .observeSessions()
+                            .map { sessions -> sessions.mapNotNull { it.assetId }.toSet() }
                     )
                 }
             }
