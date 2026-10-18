@@ -168,6 +168,12 @@ class MapDocPickTest {
 
             settings.hideMapLayer(nz.mckenzie.trailday.domain.asset.AssetLayer.HUTS, true)
 
+            // The switch is a stored preference and the map reads it through its own flow, so the test waits
+            // for the layer to be shut rather than for the write to return: a loaded machine can take a
+            // moment between the two, and reading too early made a passing change fail in CI.
+            withTimeout(5_000) {
+                while (viewModel.assetAt(-41.6201, 172.6501, 5.0) != null) delay(50)
+            }
             assertNull("switched off, the place is not tappable", viewModel.assetAt(-41.6201, 172.6501, 5.0))
             viewModel.pickDocAt(-41.6200, 172.6500, 10.0)
             assertNull("and neither is DOC's hut", viewModel.pickedDoc.value)
