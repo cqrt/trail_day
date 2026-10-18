@@ -579,6 +579,14 @@ a loaded machine that coroutine can be the last thing to run, and a change that 
 asks the flow for its next value, which is what a screen does. Two CI runs in this sitting failed on it before the
 change and none have since.
 
+**Then three more from using it: the card is about what was tapped, the layer list stays still, and the DOC
+card stopped explaining itself.** The nearest-thing card is gone - it answered a question nobody asked, and the
+map's card is now about something tapped: a place of the walker's, headed "RECORDED TRACK" when a walk has been
+made of it and its kind otherwise, with a tap on the card opening the place's own page; or a thing DOC publishes,
+whose header already says whose it is, so the line at its foot saying "not one of your places" went. The layer
+sheet's "Show everything" used to appear under the switches and push them up as soon as a layer was switched off;
+it now sits in the title's row, whose height is fixed, so nothing below it moves.
+
 **Then two more from using it: things over the map sit above it, and the cards can be closed.** The map is
 imagery, and imagery is as pale as snow or as dark as water, so a card or a pill with no shadow melts into it. One
 height now serves everything that floats over a map - the nearest-thing card, a thing DOC publishes, the round
