@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
@@ -44,6 +45,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -62,6 +65,7 @@ import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.ui.formatDistance
+import nz.mckenzie.trailday.ui.theme.TrailDayElevation
 import nz.mckenzie.trailday.ui.docCardFacts
 import nz.mckenzie.trailday.ui.docCardProse
 import nz.mckenzie.trailday.ui.formatEstimate
@@ -92,6 +96,10 @@ fun MapScreen(
     var layersOpen by remember { mutableStateOf(false) }
     val mapScope = rememberCoroutineScope()
 
+    // The card at the foot of the map can be put away - it is a glance, not a fixture - and asking where
+    // you are is also asking what is around you, so that brings it back.
+    var nearbyDismissed by remember { mutableStateOf(false) }
+
     val context = LocalContext.current
 
     // Where the app asks for the permission the marker needs, and asked on a tap rather than on
@@ -104,6 +112,7 @@ fun MapScreen(
     }
 
     val locate = {
+        nearbyDismissed = false
         val allowed =
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
                 PackageManager.PERMISSION_GRANTED
@@ -241,10 +250,19 @@ fun MapScreen(
             if (picked != null) {
                 // A tapped thing has more to say than a glance: a picture, what DOC says about it, and its
                 // prose - so its card is a little wider and scrolls, rather than pushing the map off the screen.
-                DocCard(pick = picked, modifier = cardPlacement.widthIn(max = 300.dp))
-            } else {
+                DocCard(
+                    pick = picked,
+                    onClose = viewModel::clearPickedDoc,
+                    modifier = cardPlacement.widthIn(max = 300.dp)
+                )
+            } else if (!nearbyDismissed) {
                 nearby?.let { card ->
-                    NearbyCard(nearby = card, onOpenAsset = onOpenAsset, modifier = cardPlacement.widthIn(max = 250.dp))
+                    NearbyCard(
+                        nearby = card,
+                        onOpenAsset = onOpenAsset,
+                        onClose = { nearbyDismissed = true },
+                        modifier = cardPlacement.widthIn(max = 250.dp)
+                    )
                 }
             }
         }
@@ -354,7 +372,10 @@ private fun LayersSheet(
  */
 @Composable
 private fun LocationNoticeCard(message: String, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
-    Card(modifier = modifier.fillMaxWidth()) {
+    Card(
+        elevation = CardDefaults.cardElevation(defaultElevation = TrailDayElevation.floating),
+        modifier = modifier.fillMaxWidth()
+    ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -367,7 +388,10 @@ private fun LocationNoticeCard(message: String, onDismiss: () -> Unit, modifier:
 
 @Composable
 private fun MissingKeyCard(onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
-    Card(modifier = modifier.fillMaxWidth()) {
+    Card(
+        elevation = CardDefaults.cardElevation(defaultElevation = TrailDayElevation.floating),
+        modifier = modifier.fillMaxWidth()
+    ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -424,6 +448,52 @@ internal fun AttributionStrip(
 
 
 /**
+ * A card floating over the map: the app's corner, a shadow that lifts it off the imagery, and a small close
+ * in its top-right corner when the card can be put away.
+ *
+ * **One height for every card on the map** - a thing that is nearest, a thing DOC publishes, a word about the
+ * phone's location - because a map is imagery and imagery is as pale as snow or as dark as water: a card with
+ * no shadow melts into it. See [TrailDayElevation].
+ *
+ * The close sits on a white circle of its own over the card's corner, because a card that opens with a
+ * photograph would otherwise hide a plain cross behind the picture.
+ */
+@Composable
+private fun MapCard(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    onClose: (() -> Unit)? = null,
+    content: @Composable () -> Unit
+) {
+    Box(modifier = modifier) {
+        val elevation = CardDefaults.cardElevation(defaultElevation = TrailDayElevation.floating)
+        if (onClick != null) {
+            Card(onClick = onClick, elevation = elevation, modifier = Modifier.fillMaxWidth()) { content() }
+        } else {
+            Card(elevation = elevation, modifier = Modifier.fillMaxWidth()) { content() }
+        }
+
+        if (onClose != null) {
+            // Small, and still a target worth aiming at: a 36-point circle with the cross a little smaller
+            // again. The description is on the click, so the glyph inside it says nothing twice.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .size(36.dp)
+                    .shadow(TrailDayElevation.floating, CircleShape)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .clickable(onClickLabel = "Close the card", onClick = onClose),
+                contentAlignment = Alignment.Center
+            ) {
+                AppIcon(glyph = IconGlyph.CLOSE, dimension = 15.dp)
+            }
+        }
+    }
+}
+
+/**
  * What is nearest, and what else is around: the map's own answer to "am I where I think I am".
  *
  * The shape is the mock screens': what kind of thing it is, its name, how far and how long on foot, then a
@@ -434,12 +504,14 @@ internal fun AttributionStrip(
 private fun NearbyCard(
     nearby: Nearby,
     onOpenAsset: (Long) -> Unit,
+    onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val nearest = nearby.nearest
     val content: @Composable () -> Unit = {
         Column(
-            modifier = Modifier.padding(12.dp),
+            // Room at the end for the close in the corner, so a long name does not run under it.
+            modifier = Modifier.padding(start = 12.dp, top = 12.dp, end = 40.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Text(
@@ -466,10 +538,13 @@ private fun NearbyCard(
         }
     }
 
-    if (nearest.assetId != null) {
-        Card(onClick = { onOpenAsset(nearest.assetId) }, modifier = modifier) { content() }
-    } else {
-        Card(modifier = modifier) { content() }
+    MapCard(
+        modifier = modifier,
+        // A place of the walker's opens; a thing DOC publishes is a card and no more.
+        onClick = nearest.assetId?.let { id -> { onOpenAsset(id) } },
+        onClose = onClose
+    ) {
+        content()
     }
 }
 
@@ -483,7 +558,7 @@ private fun NearbyCard(
  * Tapping the map anywhere else puts what is nearest back.
  */
 @Composable
-private fun DocCard(pick: DocPick, modifier: Modifier = Modifier) {
+private fun DocCard(pick: DocPick, onClose: () -> Unit, modifier: Modifier = Modifier) {
     val item = pick.item
     val facts = remember(item) { docCardFacts(item) }
     val prose = remember(item) { docCardProse(item) }
@@ -499,7 +574,7 @@ private fun DocCard(pick: DocPick, modifier: Modifier = Modifier) {
         pick.onFootSeconds()?.let { "about ${formatEstimate(it)} on foot" }
     )
 
-    Card(modifier = modifier) {
+    MapCard(modifier = modifier, onClose = onClose) {
         Column(modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
             picture?.let {
                 Image(
@@ -510,7 +585,8 @@ private fun DocCard(pick: DocPick, modifier: Modifier = Modifier) {
                 )
             }
             Column(
-                modifier = Modifier.padding(12.dp),
+                // Room at the end for the close in the corner, which sits over the picture when there is one.
+                modifier = Modifier.padding(start = 12.dp, top = 12.dp, end = 40.dp, bottom = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 Text(

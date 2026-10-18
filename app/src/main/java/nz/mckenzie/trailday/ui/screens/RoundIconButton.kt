@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import nz.mckenzie.trailday.ui.theme.TrailDayElevation
 
 /**
  * A round button that floats over a map: a white circle with a shadow, as the mock screens draw the controls
@@ -31,7 +32,7 @@ internal fun RoundIconButton(
         onClick = onClick,
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 3.dp,
+        shadowElevation = TrailDayElevation.floating,
         modifier = modifier
     ) {
         Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {

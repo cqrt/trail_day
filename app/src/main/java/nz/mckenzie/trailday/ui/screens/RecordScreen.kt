@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
@@ -47,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import nz.mckenzie.trailday.ui.theme.TrailDayElevation
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -390,7 +392,11 @@ private fun PassCard(
     heading: FollowPoint?,
     passElevation: ElevationProfile?
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    // The one card over the recording map, lifted off the imagery like the map's other floating things.
+    Card(
+        elevation = CardDefaults.cardElevation(defaultElevation = TrailDayElevation.floating),
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Column(modifier = Modifier.padding(vertical = 14.dp)) {
             Text(
                 text = when (summary.status) {
@@ -529,7 +535,7 @@ private fun FollowPhonePill(following: Boolean, onToggle: () -> Unit, modifier: 
         onClick = onToggle,
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 3.dp,
+        shadowElevation = TrailDayElevation.floating,
         modifier = modifier
     ) {
         Row(
@@ -566,7 +572,7 @@ private fun TargetPill(name: String?, onClick: () -> Unit, modifier: Modifier = 
         onClick = onClick,
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 3.dp,
+        shadowElevation = TrailDayElevation.floating,
         modifier = modifier
     ) {
         Row(
@@ -590,7 +596,7 @@ private fun MapPill(label: String, onClick: () -> Unit, modifier: Modifier = Mod
         onClick = onClick,
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 3.dp,
+        shadowElevation = TrailDayElevation.floating,
         modifier = modifier
     ) {
         Box(

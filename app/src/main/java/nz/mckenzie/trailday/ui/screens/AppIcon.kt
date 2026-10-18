@@ -41,7 +41,8 @@ enum class IconGlyph {
     CHEVRON,
     LOCATE,
     LAYERS,
-    SEARCH
+    SEARCH,
+    CLOSE
 }
 
 /**
@@ -94,6 +95,12 @@ internal fun AppIcon(
         )
 
         when (glyph) {
+            // A cross: the small "put this away" in the corner of a card, and nothing else.
+            IconGlyph.CLOSE -> {
+                line(0.30f, 0.30f, 0.70f, 0.70f)
+                line(0.70f, 0.30f, 0.30f, 0.70f)
+            }
+
             IconGlyph.BACK -> {
                 line(0.22f, 0.50f, 0.80f, 0.50f)
                 line(0.44f, 0.26f, 0.20f, 0.50f)
