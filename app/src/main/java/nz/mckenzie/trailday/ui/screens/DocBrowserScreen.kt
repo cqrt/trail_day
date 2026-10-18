@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -107,14 +108,30 @@ fun DocBrowserScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // The search, as the mock screens draw it: a magnifier in a pill, and the keyboard's own search
-            // key to ask it - the field is the button, so there is no second one beside it.
-            SearchField(
-                value = name,
-                onValueChange = viewModel::onNameChange,
-                placeholder = "Search ${source.displayName.lowercase()}",
-                onSearch = search
-            )
+            // The search, and the button that asks it. The keyboard's own search key works too, but a field
+            // with nothing beside it reads as a field that does not do anything.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SearchField(
+                    value = name,
+                    onValueChange = viewModel::onNameChange,
+                    placeholder = "Search ${source.displayName.lowercase()}",
+                    onSearch = search,
+                    modifier = Modifier.weight(1f)
+                )
+                Button(
+                    onClick = {
+                        // The keyboard goes with the question: the answer arrives below it.
+                        focus.clearFocus()
+                        search()
+                    }
+                ) {
+                    Text("Search")
+                }
+            }
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
