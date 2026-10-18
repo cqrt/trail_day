@@ -587,6 +587,10 @@ whose header already says whose it is, so the line at its foot saying "not one o
 sheet's "Show everything" used to appear under the switches and push them up as soon as a layer was switched off;
 it now sits in the title's row, whose height is fixed, so nothing below it moves.
 
+**Then two small ones.** The close on a card is a plain cross instead of a cross in a white circle - one less thing
+on a card whose subject is the ground - and the DOC browser has a Search button beside its field, where before the
+only way to ask was the keyboard's own search key. It shipped as 0.3.7.
+
 **Then a switch that did not do what it said.** Switching a layer off hid only the walker's own work, and DOC's
 material is most of what a layer on that map is: turning Huts off left DOC's huts standing, and turning Tracks off
 left DOC's tracks and their white casing. One set of switches now governs one map - DOC's tracks go with the
