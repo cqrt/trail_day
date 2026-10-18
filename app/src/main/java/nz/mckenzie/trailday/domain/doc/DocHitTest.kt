@@ -25,6 +25,16 @@ object DocHitTest {
     const val DEFAULT_TOLERANCE_M = 40.0
 
     /**
+     * How close a place and a line have to be for the place to answer for both, in metres.
+     *
+     * A hut stands *on* the track that reaches it, and its marker is what the walker's finger is on. A line
+     * that is a centimetre nearer would answer a different question from the one asked, so a place wins a
+     * tie within this distance - and a tap well up a track is still a tap on the track, whatever hut is a
+     * few metres off it.
+     */
+    private const val TIE_M = 5.0
+
+    /**
      * The nearest of [items] whose line or place is within [radiusM] of the tapped point, or null when the tap
      * landed on nothing.
      *
@@ -39,13 +49,20 @@ object DocHitTest {
         radiusM: Double = DEFAULT_TOLERANCE_M
     ): DocItem? {
         val at = GeoPoint(lat = lat, lng = lng)
-        return items
-            .mapNotNull { item ->
-                val distance = distanceTo(item, at) ?: return@mapNotNull null
-                if (distance <= radiusM) item to distance else null
-            }
+        val candidates = items.mapNotNull { item ->
+            val distance = distanceTo(item, at) ?: return@mapNotNull null
+            if (distance <= radiusM) item to distance else null
+        }
+        val nearest = candidates.minByOrNull { it.second } ?: return null
+        if (!nearest.first.source.isLine) return nearest.first
+
+        // A line won on distance. If a place is drawn at the same spot, that place is what the finger is
+        // on - see [TIE_M].
+        return candidates
+            .filter { (item, distance) -> !item.source.isLine && distance <= nearest.second + TIE_M }
             .minByOrNull { it.second }
             ?.first
+            ?: nearest.first
     }
 
     /**

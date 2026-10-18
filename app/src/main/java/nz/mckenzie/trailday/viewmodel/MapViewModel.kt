@@ -178,14 +178,17 @@ class MapViewModel(
     private val _pickedDoc = MutableStateFlow<DocItem?>(null)
     val pickedDoc: StateFlow<DocItem?> = _pickedDoc
 
+    /** The picture of the picked thing, when the phone kept one: read once, when the thing is picked. */
+    private val _pickedPicture = MutableStateFlow<ByteArray?>(null)
+
     /**
      * The picked thing with how far the phone is from it, measured again on every fix - the card says where
      * the thing is now, not where it was when it was tapped.
      *
      * Declared after [here], which it reads in its initialiser.
      */
-    val docPick: StateFlow<DocPick?> = combine(_pickedDoc, here) { item, position ->
-        item?.let { DocPick(it, position?.let { at -> DocHitTest.distanceTo(it, at) }) }
+    val docPick: StateFlow<DocPick?> = combine(_pickedDoc, _pickedPicture, here) { item, picture, position ->
+        item?.let { DocPick(it, position?.let { at -> DocHitTest.distanceTo(it, at) }, picture) }
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
@@ -200,11 +203,17 @@ class MapViewModel(
      */
     suspend fun pickDocAt(lat: Double, lng: Double, radiusM: Double) {
         val held = withContext(Dispatchers.Default) { cached() }
-        _pickedDoc.value = withContext(Dispatchers.Default) { DocHitTest.nearest(held, lat, lng, radiusM) }
+        val item = withContext(Dispatchers.Default) { DocHitTest.nearest(held, lat, lng, radiusM) }
+        // The picture is part of the answer, so it is read here rather than by the card: the card draws
+        // what it is given, and a phone without pictures answers null without failing the pick.
+        val picture = item?.pictureUrl?.let { url -> runCatching { docStore.picture(url) }.getOrNull() }
+        _pickedPicture.value = picture
+        _pickedDoc.value = item
     }
 
     /** Lets go of a picked thing, so the card is about what is nearest again. */
     fun clearPickedDoc() {
+        _pickedPicture.value = null
         _pickedDoc.value = null
     }
 

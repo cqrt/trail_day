@@ -23,6 +23,14 @@ interface DocCache {
     suspend fun count(): Int
 
     /**
+     * The picture at one of DOC's own addresses, or null when the phone does not hold it.
+     *
+     * A picture arrives with the area it belongs to and is of no use without it, so it is read here
+     * rather than from a store of its own - and a phone that has kept no pictures simply says so.
+     */
+    suspend fun picture(url: String): ByteArray? = null
+
+    /**
      * The same number, as it changes.
      *
      * For the offline screen's count and for a map that has to draw material downloaded while it is

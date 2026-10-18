@@ -83,6 +83,18 @@ class DocHitTestTest {
     }
 
     @Test
+    fun `a hut standing on a track answers for the hut`() {
+        // The hut sits exactly where the track reaches it, so the line is as near as the place: the place is
+        // what the walker's finger is on, and it is what the card should say.
+        val track = track("Speargrass-Angelus Route", lat = -41.8882, lng = 172.7487, lengthM = 2_000.0)
+        val hut = hut("Angelus Hut", lat = -41.8882, lng = 172.7487)
+
+        val picked = DocHitTest.nearest(listOf(track, hut), -41.8882, 172.7487, radiusM = 40.0)
+
+        assertEquals("Angelus Hut", picked?.name)
+    }
+
+    @Test
     fun `a place is found by its own dot, and its distance is the distance to it`() {
         val item = hut("Angelus Hut", lat = -41.6200, lng = 172.6500)
         val at = GeoPoint(lat = -41.6200, lng = 172.6500 + 9.0 / 84_000.0)

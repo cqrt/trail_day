@@ -83,6 +83,59 @@ private fun campsiteSites(item: DocItem): String? {
     }
 }
 
+/**
+ * What the map's card says about something DOC publishes once it has been tapped: the facts worth
+ * knowing while standing where the thing is, one line each, in the app's words.
+ *
+ * The row's summary ([docRowDetail]) is a glance; this is the same material opened out - how a track
+ * is walked and how long it is, where a hut is and whether it must be booked, what is at a campsite
+ * and whether the dog can come, how hard a ride is - with DOC's own prose left to the card to show
+ * below. One rule for four services, and it is here, because the map's card and a row are two views
+ * of one answer and a second copy is the copy that falls behind.
+ */
+fun docCardFacts(item: DocItem): List<String> {
+    val what = when (item.source) {
+        DocSource.TRACKS -> listOfNotNull(
+            item.kind,
+            item.trackType,
+            item.lengthM.takeIf { it > 0.0 }?.let { formatDistance(it) }
+        )
+
+        DocSource.HUTS -> listOfNotNull(item.kind)
+        DocSource.CAMPSITES -> listOfNotNull(
+            item.kind,
+            campsiteSites(item)
+        )
+
+        DocSource.BIKES -> listOfNotNull(item.difficulty, item.bikingTime)
+    }
+
+    val where = listOfNotNull(item.place, item.region).distinct()
+
+    return listOfNotNull(
+        what.joinToString(" \u00b7 ").takeIf { it.isNotBlank() },
+        where.joinToString(" \u00b7 ").takeIf { it.isNotBlank() },
+        // DOC's own word, said as a sentence rather than as a flag: "No" and "nobody said" are different
+        // answers about a hut, and a card that dropped the "No" would make a hut look bookable.
+        item.bookable?.let { "Bookable: $it" },
+        item.free?.let { "Free: $it" },
+        item.facilities?.takeIf { it.isNotBlank() },
+        item.dogsAllowed?.takeIf { it.isNotBlank() }?.let { "Dogs: $it" }
+    ).distinct()
+}
+
+/**
+ * What DOC says about the place in prose, ready for the card, or null when it says nothing.
+ *
+ * Trimmed to a readable length: the card is a glance at a line under the walker's thumb, not the
+ * page DOC publishes, and the last thing it should do is push the line off the screen.
+ */
+fun docCardProse(item: DocItem): String? {
+    val prose = item.introduction?.takeIf { it.isNotBlank() } ?: return null
+    val limit = 600
+    return if (prose.length <= limit) prose else prose.take(limit).trimEnd() + "\u2026"
+}
+
 /** "45s" / "12m 30s" / "1h 05m" - elapsed recording time. */
 fun formatDuration(millis: Long): String {
     if (millis <= 0L) return "0s"

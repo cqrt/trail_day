@@ -1,9 +1,11 @@
 package nz.mckenzie.trailday.ui.screens
 
 import android.Manifest
+import android.graphics.BitmapFactory
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -12,6 +14,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -41,7 +45,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -56,7 +62,8 @@ import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.ui.formatDistance
-import nz.mckenzie.trailday.ui.docRowDetail
+import nz.mckenzie.trailday.ui.docCardFacts
+import nz.mckenzie.trailday.ui.docCardProse
 import nz.mckenzie.trailday.ui.formatEstimate
 import nz.mckenzie.trailday.viewmodel.MapViewModel
 import kotlinx.coroutines.launch
@@ -224,19 +231,20 @@ fun MapScreen(
             // there is to "am I where I think I am". Above the attribution line, and clear of the locate
             // button so neither is in the other's way.
             // The card's subject: the thing DOC publishes that was tapped, or failing that what is nearest.
-            val cardModifier = Modifier
+            val cardPlacement = Modifier
                 .align(Alignment.BottomStart)
                 // The mock screens' card does not cross the whole screen: the map is the subject and the card
                 // sits in its corner. Clear of the licence line below, which is not the app's to hide.
                 .padding(start = 12.dp, bottom = 44.dp)
-                .widthIn(max = 250.dp)
 
             val picked = docPick
             if (picked != null) {
-                DocCard(pick = picked, modifier = cardModifier)
+                // A tapped thing has more to say than a glance: a picture, what DOC says about it, and its
+                // prose - so its card is a little wider and scrolls, rather than pushing the map off the screen.
+                DocCard(pick = picked, modifier = cardPlacement.widthIn(max = 300.dp))
             } else {
                 nearby?.let { card ->
-                    NearbyCard(nearby = card, onOpenAsset = onOpenAsset, modifier = cardModifier)
+                    NearbyCard(nearby = card, onOpenAsset = onOpenAsset, modifier = cardPlacement.widthIn(max = 250.dp))
                 }
             }
         }
@@ -477,34 +485,56 @@ private fun NearbyCard(
 @Composable
 private fun DocCard(pick: DocPick, modifier: Modifier = Modifier) {
     val item = pick.item
-    val facts = docRowDetail(item, distanceM = null)
+    val facts = remember(item) { docCardFacts(item) }
+    val prose = remember(item) { docCardProse(item) }
+    // Decoded here rather than in the view model: it is a thumbnail from DOC, and what the card needs to
+    // draw is a picture. A picture the phone cannot read is a card without one, not a card that fails.
+    val picture = remember(pick.picture) {
+        pick.picture?.let { bytes ->
+            runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }.getOrNull()
+        }
+    }
     val away = listOfNotNull(
         pick.distanceM?.let { formatDistance(it) + " away" },
         pick.onFootSeconds()?.let { "about ${formatEstimate(it)} on foot" }
     )
 
     Card(modifier = modifier) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(
-                text = "DOC ${item.source.singular}".uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                letterSpacing = 1.2.sp
-            )
-            Text(text = item.name, style = MaterialTheme.typography.titleLarge)
-            if (facts.isNotBlank()) {
-                Text(text = facts, style = MaterialTheme.typography.bodySmall)
+        Column(modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+            picture?.let {
+                Image(
+                    bitmap = it,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxWidth().height(130.dp)
+                )
             }
-            if (away.isNotEmpty()) {
-                Text(text = away.joinToString(" \u00b7 "), style = MaterialTheme.typography.bodySmall)
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = "DOC ${item.source.singular}".uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    letterSpacing = 1.2.sp
+                )
+                Text(text = item.name, style = MaterialTheme.typography.titleLarge)
+                facts.forEach { fact ->
+                    Text(text = fact, style = MaterialTheme.typography.bodySmall)
+                }
+                if (away.isNotEmpty()) {
+                    Text(text = away.joinToString(" \u00b7 "), style = MaterialTheme.typography.bodySmall)
+                }
+                prose?.let {
+                    HorizontalDivider(modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
+                    Text(text = it, style = MaterialTheme.typography.bodySmall)
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+                Text(
+                    text = "From DOC - not one of your places",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
-            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
-            Text(
-                text = "From DOC - not one of your places",
-                style = MaterialTheme.typography.bodySmall
-            )
         }
     }
 }

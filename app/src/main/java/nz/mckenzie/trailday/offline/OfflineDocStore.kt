@@ -81,7 +81,7 @@ class OfflineDocStore(
      * How a hut's or a campsite's page shows what it looks like with no reception, and the only door onto
      * the cache's pictures: nothing else reads them.
      */
-    suspend fun picture(url: String): ByteArray? = pictures.read(url)
+    override suspend fun picture(url: String): ByteArray? = pictures.read(url)
 
     /**
      * The ground the held material covers, for the offline screen's map, or null when there is nothing

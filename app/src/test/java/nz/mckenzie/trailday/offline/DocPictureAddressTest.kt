@@ -29,14 +29,33 @@ class DocPictureAddressTest {
     }
 
     @Test
+    fun `DOC thumbnails are pictures, aspx and all`() {
+        // DOC's thumbnail addresses end in `.aspx` and answer with a JPEG - fetched and checked in the
+        // workshop: Angelus Hut's own photograph arrives this way (image/jpeg, 7.6 KB).
+        assertTrue(isPictureAddress("https://www.doc.govt.nz/thumbs/large/link/dbbb6bf203984c08a69cbf1f21a8554b.aspx"))
+        assertTrue(isPictureAddress("https://www.doc.govt.nz/thumbs/large/link/abc.ASPX?width=400"))
+    }
+
+    @Test
     fun `a page about a thing is not a picture of it`() {
-        assertFalse(isPictureAddress("https://www.doc.govt.nz/thumbs/large/link/dbbb6bf203984c08a69cbf1f21a8554b.aspx"))
         assertFalse(isPictureAddress("https://www.doc.govt.nz/parks-and-recreation/places-to-go/nelson-tasman/"))
+        assertFalse(isPictureAddress("https://www.doc.govt.nz/our-work/place.aspx"))
     }
 
     @Test
     fun `nothing is nothing rather than a surprise`() {
         assertFalse(isPictureAddress(""))
         assertFalse(isPictureAddress("jpg"))
+    }
+
+    @Test
+    fun `the bytes have to be a picture, whatever the address promised`() {
+        // A page that slipped through the address rule must not be kept where a picture goes.
+        assertTrue(looksLikeImage(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte())))
+        assertTrue(looksLikeImage(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)))
+        assertTrue(looksLikeImage("GIF89a".toByteArray()))
+        assertTrue(looksLikeImage("RIFF\u0000\u0000\u0000\u0000WEBPVP8 ".toByteArray()))
+        assertFalse("a page is not a picture", looksLikeImage("<!DOCTYPE html><html>".toByteArray()))
+        assertFalse("and neither is nothing", looksLikeImage(ByteArray(0)))
     }
 }

@@ -13,14 +13,39 @@ import java.net.URL
 /**
  * Whether DOC's address for a picture is one to fetch.
  *
- * DOC publishes a picture's address as `introductionThumbnail`, and for some things that field holds the
- * address of a **page about them** rather than a picture - `.aspx`, which answers with HTML. Fetching
- * those would keep a page as though it were a picture, so what is fetched is what has a picture's
- * suffix; the rest is DOC's own data being what it is, and the thing it is of is still kept whole.
+ * DOC publishes a picture's address as `introductionThumbnail`, and that field does not always hold a
+ * picture's suffix:
+ *
+ * - **Its thumbnail handler ends in `.aspx`** - `/thumbs/large/link/<hash>.aspx` - and answers with a
+ *   JPEG. That is a picture, and the hut's own photograph arrives that way.
+ * - **Other `.aspx` addresses are pages about the thing** and answer with HTML. Fetching those would keep
+ *   a page where a picture goes, so they are left alone and the thing they are about is still kept whole.
+ *
+ * The address cannot promise a picture either way, which is why what comes back is checked too - see
+ * [looksLikeImage].
  */
 fun isPictureAddress(url: String): Boolean {
     val path = url.substringBefore('?').substringBefore('#').lowercase()
-    return PICTURE_SUFFIXES.any { path.endsWith(it) }
+    if (PICTURE_SUFFIXES.any { path.endsWith(it) }) return true
+    return path.endsWith(".aspx") && path.contains("/thumbs/")
+}
+
+/**
+ * Whether what came back from an address is a picture at all, by its own first bytes.
+ *
+ * DOC's thumbnail handler is an `.aspx` that answers with a JPEG, and a page that slipped through would
+ * otherwise sit in the cache as a picture: a row counted on the offline screen and a broken image behind
+ * a hut. The formats DOC serves are recognised here, and anything else is not kept.
+ */
+internal fun looksLikeImage(bytes: ByteArray): Boolean {
+    fun begins(vararg prefix: Int): Boolean =
+        bytes.size >= prefix.size && prefix.indices.all { (bytes[it].toInt() and 0xFF) == prefix[it] }
+
+    return begins(0xFF, 0xD8) || // JPEG
+        begins(0x89, 0x50, 0x4E, 0x47) || // PNG
+        begins(0x47, 0x49, 0x46) || // GIF
+        (begins(0x52, 0x49, 0x46, 0x46) && bytes.size >= 12 &&
+            bytes.copyOfRange(8, 12).toString(Charsets.US_ASCII) == "WEBP")
 }
 
 /**
@@ -75,7 +100,7 @@ class DocPictureCache(
                 continue
             }
             val bytes = runCatching { fetch(url) }.getOrNull() ?: continue
-            if (bytes.isEmpty() || bytes.size > maxBytes) continue
+            if (bytes.isEmpty() || bytes.size > maxBytes || !looksLikeImage(bytes)) continue
             dao.insertPicture(OfflineDocPictureEntity(url = url, bytes = bytes, fetchedAtEpochMs = now()))
             kept++
         }

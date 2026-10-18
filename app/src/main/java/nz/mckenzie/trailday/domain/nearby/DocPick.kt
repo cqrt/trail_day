@@ -15,7 +15,14 @@ import nz.mckenzie.trailday.domain.geo.TravelTime
 data class DocPick(
     val item: DocItem,
     /** How far the phone is from it, in metres on the ground; null when the phone does not know where it is. */
-    val distanceM: Double?
+    val distanceM: Double?,
+    /**
+     * The picture DOC published for it, when the phone kept one with the area.
+     *
+     * A picture is a copy of something DOC publishes and arrives with the material around it; a phone
+     * that has kept none has none, and the card is still a card without it.
+     */
+    val picture: ByteArray? = null
 ) {
 
     /**

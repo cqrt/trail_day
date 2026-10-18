@@ -52,7 +52,11 @@ val PICTURE_SUFFIXES = listOf(".jpg", ".jpeg", ".png", ".webp", ".gif")
 /** The `where` that finds the records DOC publishes a picture for, or null when it publishes none. */
 fun DocSource.pictureWhere(): String? {
     val field = pictureField ?: return null
-    val isPicture = PICTURE_SUFFIXES.joinToString(" OR ") { suffix -> "LOWER($field) LIKE '%$suffix'" }
+    val isPicture = PICTURE_SUFFIXES.joinToString(" OR ") { suffix -> "LOWER($field) LIKE '%$suffix'" } +
+        // DOC's thumbnail handler ends in `.aspx` and answers with a picture; other `.aspx` addresses are
+        // pages about the thing. The same rule as `isPictureAddress`, because a picker that promised
+        // pictures the download would not keep would be lying to the walker counting them afterwards.
+        " OR LOWER($field) LIKE '%/thumbs/%.aspx'"
     return "$field IS NOT NULL AND $field <> '' AND ($isPicture)"
 }
 
