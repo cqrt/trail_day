@@ -587,6 +587,15 @@ whose header already says whose it is, so the line at its foot saying "not one o
 sheet's "Show everything" used to appear under the switches and push them up as soon as a layer was switched off;
 it now sits in the title's row, whose height is fixed, so nothing below it moves.
 
+**Then two more from using it: the app stopped explaining itself, and the card cleared the credit line.** Nearly every
+row had grown a supporting paragraph - what the feature was for, how it worked, why it was built that way - so the
+sheets and cards were mostly prose. Supporting lines are now one short line each, or gone where the label already
+says it: the layers sheet, Offline, Settings, the recorder's naming dialog, a place's trips, and the basemaps,
+themes and layers' own summaries. What stayed is what changes a decision or a number - delete warnings and their
+counts, the editor's warning when its code check is off, an expired key, an empty phone never overwriting a backup.
+The card at the foot of the map also stopped sitting on the basemap's credit line: the card and the credit now share
+a column at the bottom of the map, so the card is above the line whatever the line's height is. It shipped as 0.3.5.
+
 **Then two more from using it: things over the map sit above it, and the cards can be closed.** The map is
 imagery, and imagery is as pale as snow or as dark as water, so a card or a pill with no shadow melts into it. One
 height now serves everything that floats over a map - the nearest-thing card, a thing DOC publishes, the round
