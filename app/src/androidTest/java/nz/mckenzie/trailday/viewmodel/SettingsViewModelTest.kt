@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -426,29 +427,39 @@ class SettingsViewModelTest {
      * Collected here as a screen collects it, and that is the point rather than a detail: the
      * published flow reads the preference **while something is watching** and not otherwise, which
      * is what keeps a settings screen from holding a preference open when it is not on screen. A
-     * subscription is therefore what makes the flow answer at all, and a test that read it with
-     * nothing watching would be testing its seed value.
+     * subscription is therefore what makes the flow answer at all - so the test subscribes by asking
+     * the flow for its next value, rather than reading the last one and hoping something was watching.
      */
     @Test
     fun theLightSettingIsWrittenAndPublishedToTheScreens(): Unit = runBlocking {
         val settings = SettingsRepository(context)
         val viewModel = SettingsViewModel(settings, store, checkKey = { KeyCheck.Works })
-        val watching = launch { viewModel.themeChoice.collect { } }
 
-        try {
-            viewModel.setThemeChoice(ThemeChoice.DARK)
+        viewModel.setThemeChoice(ThemeChoice.DARK)
 
-            awaitValue("the choice written", ThemeChoice.DARK) { settings.themeChoice.first() }
-            awaitValue("the choice published", ThemeChoice.DARK) { viewModel.themeChoice.value }
+        awaitValue("the choice written", ThemeChoice.DARK) { settings.themeChoice.first() }
+        awaitPublished("the choice published", ThemeChoice.DARK, viewModel.themeChoice)
 
-            viewModel.setThemeChoice(ThemeChoice.DEFAULT)
+        viewModel.setThemeChoice(ThemeChoice.DEFAULT)
 
-            awaitValue("the choice written back", ThemeChoice.DEFAULT) { settings.themeChoice.first() }
-            awaitValue("the choice published back", ThemeChoice.DEFAULT) { viewModel.themeChoice.value }
-        } finally {
-            watching.cancel()
-        }
+        awaitValue("the choice written back", ThemeChoice.DEFAULT) { settings.themeChoice.first() }
+        awaitPublished("the choice published back", ThemeChoice.DEFAULT, viewModel.themeChoice)
     }
+
+    /**
+     * Waits for [flow] to say [expected], **by collecting it** - the very act a screen performs.
+     *
+     * Reading the flow's last value instead depends on another coroutine having started collecting first,
+     * and on a loaded machine that coroutine can be the last thing to run: the flow then sits at its seed
+     * value while the preference has long been written, and a passing change reads as a failure. Asking the
+     * flow itself is both the honest test and the reliable one.
+     */
+    private suspend fun <T> awaitPublished(what: String, expected: T, flow: Flow<T>): T =
+        withTimeout(TIMEOUT_MS) {
+            val seen = flow.first { it == expected }
+            assertEquals(what, expected, seen)
+            seen
+        }
 
     private companion object {
         /** DataStore round trips on a CI emulator are not instant. */
