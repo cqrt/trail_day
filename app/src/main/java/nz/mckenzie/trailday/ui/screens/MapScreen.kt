@@ -231,42 +231,36 @@ fun MapScreen(
                 )
             }
 
-            AttributionStrip(
-                basemap = basemap,
-                placeNames = placeNames,
+            // The card and the licence line share one column at the foot of the map, so the card sits *above*
+            // the line rather than on top of it - whatever the line's height is, with place names and without.
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(bottom = 6.dp)
-            )
+                    .padding(start = 12.dp, bottom = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val picked = docPick
+                val place = pickedPlaceId?.let { id -> places.firstOrNull { it.id == id } }
+                if (picked != null) {
+                    // A tapped thing has more to say than a glance: a picture, what DOC says about it, and its
+                    // prose - so its card is a little wider and scrolls, rather than pushing the map off the
+                    // screen.
+                    DocCard(
+                        pick = picked,
+                        onClose = viewModel::clearPickedDoc,
+                        modifier = Modifier.widthIn(max = 300.dp)
+                    )
+                } else if (place != null) {
+                    PlaceCard(
+                        place = place,
+                        recorded = place.id in recordedPlaces,
+                        onOpen = { onOpenAsset(place.id) },
+                        onClose = { pickedPlaceId = null },
+                        modifier = Modifier.widthIn(max = 250.dp)
+                    )
+                }
 
-            // What is nearest, at the bottom of the map where the mock screens put it: the quickest answer
-            // there is to "am I where I think I am". Above the attribution line, and clear of the locate
-            // button so neither is in the other's way.
-            // The card's subject: the thing DOC publishes that was tapped, or failing that what is nearest.
-            val cardPlacement = Modifier
-                .align(Alignment.BottomStart)
-                // The mock screens' card does not cross the whole screen: the map is the subject and the card
-                // sits in its corner. Clear of the licence line below, which is not the app's to hide.
-                .padding(start = 12.dp, bottom = 44.dp)
-
-            val picked = docPick
-            val place = pickedPlaceId?.let { id -> places.firstOrNull { it.id == id } }
-            if (picked != null) {
-                // A tapped thing has more to say than a glance: a picture, what DOC says about it, and its
-                // prose - so its card is a little wider and scrolls, rather than pushing the map off the screen.
-                DocCard(
-                    pick = picked,
-                    onClose = viewModel::clearPickedDoc,
-                    modifier = cardPlacement.widthIn(max = 300.dp)
-                )
-            } else if (place != null) {
-                PlaceCard(
-                    place = place,
-                    recorded = place.id in recordedPlaces,
-                    onOpen = { onOpenAsset(place.id) },
-                    onClose = { pickedPlaceId = null },
-                    modifier = cardPlacement.widthIn(max = 250.dp)
-                )
+                AttributionStrip(basemap = basemap, placeNames = placeNames)
             }
         }
     }
@@ -338,8 +332,7 @@ private fun LayersSheet(
                 }
             }
             Text(
-                text = "Switch off what you do not need to see. The map remembers, and it is " +
-                    "only this map: a spot being drawn, or a place's own page, still draws it.",
+                text = "Switch off what you do not need.",
                 style = MaterialTheme.typography.bodySmall
             )
             AssetLayer.ALL.forEach { layer ->
