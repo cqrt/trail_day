@@ -633,7 +633,9 @@ private fun applyLayerVisibility(style: Style, hidden: Set<AssetLayer>) {
     AssetLayer.ALL.forEach { layer ->
         // Every layer that switch is: a track is two, because its name goes with it, and leaving
         // the name behind would be a label on nothing.
-        AssetLayerIds.idsOf(layer).forEach inner@{ id ->
+        // The walker's own layers, and DOC's material of the same kind: one switch, one map. See
+        // [DocLayerIds.idsOf] for which of DOC's layers each switch hides.
+        (AssetLayerIds.idsOf(layer) + DocLayerIds.idsOf(layer)).forEach inner@{ id ->
             val target = style.getLayer(id) ?: return@inner
             target.setProperties(
                 PropertyFactory.visibility(if (layer in hidden) Property.NONE else Property.VISIBLE)

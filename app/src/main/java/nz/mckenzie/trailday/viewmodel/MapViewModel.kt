@@ -42,6 +42,7 @@ import nz.mckenzie.trailday.domain.doc.EmptyDocCache
 import nz.mckenzie.trailday.domain.doc.DocPick
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.DocGeoJson
+import nz.mckenzie.trailday.map.drawingKind
 import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.map.AssetHitTest
 import nz.mckenzie.trailday.map.AssetLine
@@ -189,7 +190,11 @@ class MapViewModel(
      * DOC's cache can hold thousands of things and a tap must not stop the map drawing.
      */
     suspend fun pickDocAt(lat: Double, lng: Double, radiusM: Double) {
-        val held = withContext(Dispatchers.Default) { cached() }
+        // What is switched off is not tappable either: DOC's huts go with the huts.
+        val hidden = hiddenLayers.value
+        val held = withContext(Dispatchers.Default) {
+            cached().filter { item -> layerOf(item.source.drawingKind()) !in hidden }
+        }
         val item = withContext(Dispatchers.Default) { DocHitTest.nearest(held, lat, lng, radiusM) }
         // The picture is part of the answer, so it is read here rather than by the card: the card draws
         // what it is given, and a phone without pictures answers null without failing the pick.
@@ -334,9 +339,24 @@ class MapViewModel(
         val lengthM: Double
     )
 
-    /** The track under a tap on the map, or null when the tap was not on one. */
-    fun assetAt(lat: Double, lng: Double, radiusM: Double = AssetHitTest.DEFAULT_TOLERANCE_M): Long? =
-        AssetHitTest.nearest(geometryByTrack.value, lat, lng, radiusM)
+    /**
+     * The place under a tap on the map, or null when the tap was not on one.
+     *
+     * **A layer the walker has switched off is not tappable.** A tap where nothing is drawn must not open
+     * something they cannot see - the same rule the card follows when it says nothing is there.
+     */
+    fun assetAt(lat: Double, lng: Double, radiusM: Double = AssetHitTest.DEFAULT_TOLERANCE_M): Long? {
+        val hidden = hiddenLayers.value
+        val drawn = assets.value
+            .filter { place -> layerOf(AssetKind.fromStorage(place.kind)) !in hidden }
+            .mapNotNull { place -> geometryByTrack.value[place.id]?.let { place.id to it } }
+            .toMap()
+        return AssetHitTest.nearest(drawn, lat, lng, radiusM)
+    }
+
+    /** The switch that governs [kind]: one layer of the work per kind. */
+    private fun layerOf(kind: AssetKind): AssetLayer? =
+        AssetLayer.ALL.firstOrNull { it.kind == kind }
 
     /**
      * Hides or shows one layer of the work, leaving the others as they are.

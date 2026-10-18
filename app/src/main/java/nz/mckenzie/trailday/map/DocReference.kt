@@ -1,6 +1,7 @@
 package nz.mckenzie.trailday.map
 
 import nz.mckenzie.trailday.domain.asset.AssetKind
+import nz.mckenzie.trailday.domain.asset.AssetLayer
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
@@ -96,6 +97,23 @@ object DocLayerIds {
 
     /** Every layer DOC's material is drawn by, in the order the style builds them. */
     val ALL: List<String> = listOf(CASING, TRACKS) + REACHABLE_MARKER_KINDS.map { pointOf(it) }
+
+    /**
+     * The style layers [layer] hides of DOC's own material, when the walker switches that layer off.
+     *
+     * **One set of switches for one map.** A switch called "Huts" that left DOC's huts on the ground would
+     * be a switch that did not do what it says: DOC's material is the ground the walker's own work is read
+     * against, and it is drawn in the same kinds. A DOC track is a track, so it goes with the tracks - and
+     * with its white casing, or the casing would be a line along nothing. A DOC bike location is drawn as a
+     * place ([nz.mckenzie.trailday.map.drawingKind]), so it goes with the waypoints, which is where it is
+     * drawn - a bike track switch has no DOC lines to hide because DOC publishes none.
+     */
+    fun idsOf(layer: AssetLayer): List<String> = when (layer) {
+        // The casing is under the lines it edges, so it is hidden with them.
+        AssetLayer.TRACKS -> listOf(CASING, TRACKS)
+        AssetLayer.BIKE_TRACKS -> emptyList()
+        else -> listOf(pointOf(layer.kind))
+    }
 
     private const val POINT_PREFIX = "trailday-doc-point-"
 }
