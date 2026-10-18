@@ -1,6 +1,5 @@
-package nz.mckenzie.trailday.domain.nearby
+package nz.mckenzie.trailday.domain.doc
 
-import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.geo.TravelMode
 import nz.mckenzie.trailday.domain.geo.TravelTime
 

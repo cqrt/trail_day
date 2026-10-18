@@ -58,9 +58,12 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.R
+import nz.mckenzie.trailday.data.db.AssetEntity
+import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetLayer
-import nz.mckenzie.trailday.domain.nearby.DocPick
-import nz.mckenzie.trailday.domain.nearby.Nearby
+import nz.mckenzie.trailday.domain.asset.AssetPhrase
+import nz.mckenzie.trailday.domain.asset.AssetShape
+import nz.mckenzie.trailday.domain.doc.DocPick
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.map.BasemapView
@@ -69,9 +72,9 @@ import nz.mckenzie.trailday.ui.theme.TrailDayElevation
 import nz.mckenzie.trailday.ui.docCardFacts
 import nz.mckenzie.trailday.ui.docCardProse
 import nz.mckenzie.trailday.ui.formatEstimate
+import nz.mckenzie.trailday.ui.formatLengthOf
 import nz.mckenzie.trailday.viewmodel.MapViewModel
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,15 +93,16 @@ fun MapScreen(
     val locationNotice by viewModel.locationNotice.collectAsStateWithLifecycle()
     val hiddenLayers by viewModel.hiddenLayers.collectAsStateWithLifecycle()
     val placeNames by viewModel.placeNames.collectAsStateWithLifecycle()
-    val nearby by viewModel.nearby.collectAsStateWithLifecycle()
     val docPick by viewModel.docPick.collectAsStateWithLifecycle()
+    val places by viewModel.assets.collectAsStateWithLifecycle()
+    val recordedPlaces by viewModel.recordedPlaces.collectAsStateWithLifecycle()
 
     var layersOpen by remember { mutableStateOf(false) }
     val mapScope = rememberCoroutineScope()
 
-    // The card at the foot of the map can be put away - it is a glance, not a fixture - and asking where
-    // you are is also asking what is around you, so that brings it back.
-    var nearbyDismissed by remember { mutableStateOf(false) }
+    // What the card at the foot of the map is about: the place the walker last tapped, or the thing DOC
+    // publishes that was under their finger. Nothing tapped is no card - the map is the subject.
+    var pickedPlaceId by remember { mutableStateOf<Long?>(null) }
 
     val context = LocalContext.current
 
@@ -112,7 +116,6 @@ fun MapScreen(
     }
 
     val locate = {
-        nearbyDismissed = false
         val allowed =
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
                 PackageManager.PERMISSION_GRANTED
@@ -159,20 +162,20 @@ fun MapScreen(
                 // does not follow the phone, because it is also for reading the work.
                 recentreBounds = recentre?.bounds,
                 recentreCount = recentre?.count ?: 0,
-                // Tapping a track opens it: the map is where they are looking when they
-                // wonder about a block. The radius comes from the map's zoom, so the tap
-                // works at country scale as well as at paddock height.
-                //
-                // A tap that lands on nothing of the walker's but on something DOC publishes
-                // asks the card below about it, and one that lands on nothing at all puts what
-                // is nearest back. The question is worked out away from the drawing, because
-                // DOC's cache is far bigger than the walker's own list.
+                // A tap lands on something: a line of the walker's own or a thing DOC publishes. Either
+                // way the card below says what it is, and the card's own tap opens the place. The radius
+                // comes from the map's zoom, so the tap works at country scale as well as at paddock
+                // height, and the DOC question is worked out away from the drawing, because DOC's cache
+                // is far bigger than the walker's own list.
                 onMapClick = { lat, lng, radiusM ->
                     val asset = viewModel.assetAt(lat, lng, radiusM)
                     if (asset != null) {
                         viewModel.clearPickedDoc()
-                        onOpenAsset(asset)
+                        pickedPlaceId = asset
                     } else {
+                        // The map says so itself when DOC has nothing there: the card goes away rather
+                        // than growing a nearest-thing answer nobody asked for.
+                        pickedPlaceId = null
                         mapScope.launch { viewModel.pickDocAt(lat, lng, radiusM) }
                     }
                 },
@@ -247,6 +250,7 @@ fun MapScreen(
                 .padding(start = 12.dp, bottom = 44.dp)
 
             val picked = docPick
+            val place = pickedPlaceId?.let { id -> places.firstOrNull { it.id == id } }
             if (picked != null) {
                 // A tapped thing has more to say than a glance: a picture, what DOC says about it, and its
                 // prose - so its card is a little wider and scrolls, rather than pushing the map off the screen.
@@ -255,15 +259,14 @@ fun MapScreen(
                     onClose = viewModel::clearPickedDoc,
                     modifier = cardPlacement.widthIn(max = 300.dp)
                 )
-            } else if (!nearbyDismissed) {
-                nearby?.let { card ->
-                    NearbyCard(
-                        nearby = card,
-                        onOpenAsset = onOpenAsset,
-                        onClose = { nearbyDismissed = true },
-                        modifier = cardPlacement.widthIn(max = 250.dp)
-                    )
-                }
+            } else if (place != null) {
+                PlaceCard(
+                    place = place,
+                    recorded = place.id in recordedPlaces,
+                    onOpen = { onOpenAsset(place.id) },
+                    onClose = { pickedPlaceId = null },
+                    modifier = cardPlacement.widthIn(max = 250.dp)
+                )
             }
         }
     }
@@ -318,7 +321,22 @@ private fun LayersSheet(
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Text("What the map draws", style = MaterialTheme.typography.titleMedium)
+            // The title's row keeps its height whether or not the button is there, and the button is
+            // *above* the switches: a link that appeared under them moved the whole list up the moment a
+            // layer was switched off, which is the one moment the list must stay still.
+            Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "What the map draws",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                if (hidden.isNotEmpty()) {
+                    TextButton(onClick = onShowAll) { Text("Show everything") }
+                }
+            }
             Text(
                 text = "Switch off what you do not need to see. The map remembers, and it is " +
                     "only this map: a spot being drawn, or a place's own page, still draws it.",
@@ -337,9 +355,6 @@ private fun LayersSheet(
                         Switch(checked = shown, onCheckedChange = { checked -> onHide(layer, !checked) })
                     }
                 )
-            }
-            if (hidden.isNotEmpty()) {
-                TextButton(onClick = onShowAll) { Text("Show everything") }
             }
 
             // The place names, which are the one thing here that starts *off*: everything else in
@@ -494,57 +509,42 @@ private fun MapCard(
 }
 
 /**
- * What is nearest, and what else is around: the map's own answer to "am I where I think I am".
+ * One of the walker's own places, as they tapped it on the map: what it is, its name, and how long it is.
  *
- * The shape is the mock screens': what kind of thing it is, its name, how far and how long on foot, then a
- * rule and a count of what else is inside a few kilometres. A place of the walker's opens when it is
- * tapped; a thing DOC publishes has no page to open yet, so its card is a card and no more.
+ * **A line a walk has been made of says so.** "RECORDED TRACK" rather than "TRACK", because that is the
+ * difference between a line that was drawn and a line that was actually walked - the same difference the
+ * map's green and gold make. The card is a glance; the whole of it is a way into the place's own page,
+ * which has the figures, the heights and the trips.
  */
 @Composable
-private fun NearbyCard(
-    nearby: Nearby,
-    onOpenAsset: (Long) -> Unit,
+private fun PlaceCard(
+    place: AssetEntity,
+    recorded: Boolean,
+    onOpen: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val nearest = nearby.nearest
-    val content: @Composable () -> Unit = {
+    val kind = AssetKind.fromStorage(place.kind)
+    val what = AssetPhrase.kind(kind).uppercase()
+    val length = formatLengthOf(AssetShape.fromStorage(place.shape), place.lengthM)
+
+    MapCard(modifier = modifier, onClick = onOpen, onClose = onClose) {
         Column(
             // Room at the end for the close in the corner, so a long name does not run under it.
             modifier = Modifier.padding(start = 12.dp, top = 12.dp, end = 40.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Text(
-                text = "Nearest ${nearest.what}".uppercase(),
+                text = if (recorded) "RECORDED $what" else what,
                 style = MaterialTheme.typography.labelSmall,
                 // Spaced out, as the mock screens write that line: it is a label, not a sentence.
                 letterSpacing = 1.2.sp
             )
-            Text(text = nearest.name, style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = listOfNotNull(
-                    formatDistance(nearest.distanceM),
-                    "about ${formatEstimate(nearest.onFootSeconds())} on foot",
-                    nearest.place
-                ).joinToString(" \u00b7 "),
-                style = MaterialTheme.typography.bodySmall
-            )
-            HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
-            Text(
-                text = nearby.counted.joinToString(" \u00b7 ") +
-                    " within ${(nearby.radiusM / 1000.0).roundToInt()} km",
-                style = MaterialTheme.typography.bodySmall
-            )
+            Text(text = place.name, style = MaterialTheme.typography.titleLarge)
+            if (length.isNotEmpty()) {
+                Text(text = length, style = MaterialTheme.typography.bodySmall)
+            }
         }
-    }
-
-    MapCard(
-        modifier = modifier,
-        // A place of the walker's opens; a thing DOC publishes is a card and no more.
-        onClick = nearest.assetId?.let { id -> { onOpenAsset(id) } },
-        onClose = onClose
-    ) {
-        content()
     }
 }
 
@@ -552,10 +552,10 @@ private fun NearbyCard(
  * What DOC publishes, as the walker tapped it: the kind of thing, its name, DOC's own facts about it, and how
  * far the phone is from it now.
  *
- * **A card and no more, deliberately.** This material is not the walker's to change and has no page of its
- * own, so the card says so rather than looking like a door that opens onto nothing. The facts are the phone's
- * own words for the row - the same line the browser puts under a name - so the two surfaces cannot drift.
- * Tapping the map anywhere else puts what is nearest back.
+ * **A card and no more.** This material is not the walker's to change and has no page of its own; the header
+ * says whose it is, and nothing else on the card needs to. The facts are the phone's own words for the row -
+ * the same line the browser puts under a name - so the two surfaces cannot drift. Tapping the map anywhere
+ * else puts the card away.
  */
 @Composable
 private fun DocCard(pick: DocPick, onClose: () -> Unit, modifier: Modifier = Modifier) {
@@ -605,11 +605,7 @@ private fun DocCard(pick: DocPick, onClose: () -> Unit, modifier: Modifier = Mod
                     HorizontalDivider(modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
                     Text(text = it, style = MaterialTheme.typography.bodySmall)
                 }
-                HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
-                Text(
-                    text = "From DOC - not one of your places",
-                    style = MaterialTheme.typography.bodySmall
-                )
+
             }
         }
     }
