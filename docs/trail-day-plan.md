@@ -569,6 +569,16 @@ All three were looked at on the emulator: the hut card with Angelus Hut's own ph
 recorded walk drawn green with the gold edge while DOC's tracks stayed blue; and that walk's trip deleted, with
 the confirmation saying "and the track it made - this is the only walk of it", leaving no place behind.
 
+**They shipped as 0.3.2**, and the file people download was tried the same way: a short walk recorded at Lake
+Angelus, drawn green with the gold edge on the published app, then its trip deleted - the confirmation naming the
+track that would go with it - leaving "No places yet" behind.
+
+**One piece of the flaky-test debt was paid with them.** The light setting's test read the last value of a flow
+that only answers while something collects it, and relied on another coroutine having started collecting first; on
+a loaded machine that coroutine can be the last thing to run, and a change that worked reads as a failure. It now
+asks the flow for its next value, which is what a screen does. Two CI runs in this sitting failed on it before the
+change and none have since.
+
 **The plan is complete**: eleven steps, each landed and each looked at on a screen. What is left in the plan's own
 words is nothing; what is left in the project is the pair of tests that wait on a stored preference with a clock,
 which is worth its own small change, and the question of DOC's duplicate hut records.
