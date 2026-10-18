@@ -21,6 +21,7 @@ import nz.mckenzie.trailday.domain.geo.RecordingBreak
 import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
 import nz.mckenzie.trailday.domain.geo.splitAtBreaks
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
+import nz.mckenzie.trailday.domain.recording.placeMadeByWalk
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.AssetGeoJson
@@ -101,6 +102,16 @@ class RecordingDetailViewModel(
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
 
+    /**
+     * Whether the place this trip was made for goes with it: true only when the walk made the place and no
+     * other walk has been made of it - see [placeMadeByWalk].
+     */
+    private val _placeGoesToo = MutableStateFlow(false)
+    val placeGoesToo: StateFlow<Boolean> = _placeGoesToo
+
+    /** The place that would go with the trip, kept so the delete does not have to work it out twice. */
+    private var placeMadeByThisWalk: Long? = null
+
     private val _deleted = MutableStateFlow(false)
 
     /**
@@ -132,6 +143,12 @@ class RecordingDetailViewModel(
                 runCatching { assetRepository.getAsset(assetId)?.name }.getOrNull()
             }
 
+            // Whether deleting this trip would take a place with it, decided once, when the trip is read:
+            // the confirmation has to say what goes before the walker presses anything.
+            placeMadeByThisWalk = runCatching { placeMadeBy(session.id, session.name, session.assetId) }
+                .getOrNull()
+            _placeGoesToo.value = placeMadeByThisWalk != null
+
             _detail.value = RecordingDetail(
                 id = session.id,
                 name = session.name,
@@ -151,11 +168,37 @@ class RecordingDetailViewModel(
 
     fun delete() {
         viewModelScope.launch {
-            runCatching { recordings.deleteRecording(sessionId) }
+            runCatching {
+                // The place a walk made goes with the walk. Both or neither: a failure on either leaves the
+                // trip, so a second press still knows what it is deleting.
+                val place = placeMadeByThisWalk
+                if (place != null) assetRepository.deleteAsset(place)
+                recordings.deleteRecording(sessionId)
+            }
                 .onSuccess { _deleted.value = true }
                 .onFailure { failure ->
                     _message.value = failure.message ?: "Could not delete the trip"
                 }
+        }
+    }
+
+    /**
+     * The place this trip made, or null when the place was the walker's before the walk.
+     *
+     * Read from the place itself - its name, its mark and how many walks have been made of it - rather than
+     * remembered at the time: a place recorded for, or a place walked twice, is not one walk's to delete.
+     */
+    private suspend fun placeMadeBy(sessionId: Long, sessionName: String, placeId: Long?): Long? {
+        val id = placeId ?: return null
+        val place = runCatching { assetRepository.getAsset(id) }.getOrNull() ?: return null
+        val walks = runCatching { recordings.countForAsset(id) }.getOrDefault(0)
+        return id.takeIf {
+            placeMadeByWalk(
+                placeName = place.name,
+                sessionName = sessionName,
+                placeSourceRef = place.sourceRef,
+                walksOfPlace = walks
+            )
         }
     }
 

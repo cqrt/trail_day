@@ -68,6 +68,7 @@ fun RecordingDetailScreen(
     val geoJson by viewModel.geoJson.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val deleted by viewModel.deleted.collectAsStateWithLifecycle()
+    val placeGoesToo by viewModel.placeGoesToo.collectAsStateWithLifecycle()
 
     var confirmingDelete by remember { mutableStateOf(false) }
 
@@ -187,7 +188,18 @@ fun RecordingDetailScreen(
         AlertDialog(
             onDismissRequest = { confirmingDelete = false },
             title = { Text("Delete this trip?") },
-            text = { Text("Its points go with it. This cannot be undone.") },
+            // What goes, in words, before anything does: a trip that made a place takes the place with it,
+            // and one that was made for a place leaves the place standing.
+            text = {
+                Text(
+                    if (placeGoesToo) {
+                        "Its points go with it, and the track it made - this is the only walk of it. " +
+                            "This cannot be undone."
+                    } else {
+                        "Its points go with it. This cannot be undone."
+                    }
+                )
+            },
             confirmButton = {
                 DestructiveTextButton(
                     text = "Delete",

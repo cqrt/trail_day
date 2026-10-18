@@ -35,6 +35,7 @@ import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.RecordingBreak
 import nz.mckenzie.trailday.domain.geo.splitAtBreaks
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
+import nz.mckenzie.trailday.domain.recording.recordingSourceRef
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.map.AssetColors
@@ -584,7 +585,15 @@ class RecordingViewModel(
                 existingAssetId != null -> existingAssetId
                 newTrackName == null -> null
                 geometry.size < 2 -> null
-                else -> runCatching { assetRepository.createAsset(name = newTrackName, geometry = geometry) }
+                else -> runCatching {
+                    assetRepository.createAsset(
+                        name = newTrackName,
+                        geometry = geometry,
+                        // The mark that says a walk made this place, so deleting the trip can take the place
+                        // with it without guessing which places came from walks.
+                        sourceRef = recordingSourceRef(sessionId)
+                    )
+                }
                     .onFailure { trackError = it.message ?: "could not save the track" }
                     .getOrNull()
             }

@@ -166,6 +166,9 @@ class RecordingRepository(private val db: TrailDayDatabase) {
     suspend fun recordingProgress(sessionId: Long): RecordingProgress =
         RecordingProgress.of(getPoints(sessionId))
 
+    /** How many walks or rides were made of one place: 0 for a place no walk has been made of. */
+    suspend fun countForAsset(assetId: Long): Int = recordingDao.countForAsset(assetId)
+
     suspend fun deleteRecording(sessionId: Long) = db.withTransaction {
         recordingDao.deleteSession(sessionId)
     }
