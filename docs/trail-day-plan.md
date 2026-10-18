@@ -587,6 +587,14 @@ whose header already says whose it is, so the line at its foot saying "not one o
 sheet's "Show everything" used to appear under the switches and push them up as soon as a layer was switched off;
 it now sits in the title's row, whose height is fixed, so nothing below it moves.
 
+**Then a third basemap: topographic.** The map under the work was a photograph or a drawn road map; a walker
+planning a route wants contours. Settings now offers a Topographic map as well - OpenTopoMap's, built from
+OpenStreetMap data and SRTM heights - served through the phone's own tile server like the drawn map, so the
+picture is cached as it is looked at and never fetched ahead, which is what that service's terms and
+OpenStreetMap's both ask. Its credit names both sources, and the desk's page draws it too when it is chosen,
+because the desk asks the phone for the same tiles. Offline areas still download aerial imagery only. It shipped
+as 0.3.8.
+
 **Then two small ones.** The close on a card is a plain cross instead of a cross in a white circle - one less thing
 on a card whose subject is the ground - and the DOC browser has a Search button beside its field, where before the
 only way to ask was the keyboard's own search key. It shipped as 0.3.7.
