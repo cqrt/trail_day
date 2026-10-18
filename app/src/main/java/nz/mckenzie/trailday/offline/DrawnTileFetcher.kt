@@ -19,24 +19,24 @@ internal fun sprayDayUserAgent(appVersion: String = BuildConfig.VERSION_NAME): S
     "TrailDay/$appVersion (+https://github.com/cqrt/trail_day)"
 
 /**
- * Fetches OpenStreetMap's standard tiles, for the drawn basemap.
+ * Fetches the tiles of a drawn basemap - OpenStreetMap's standard layer and the topographic map.
  *
  * Two rules from their tile usage policy are built into this being the app's own fetcher at all,
  * rather than the map library talking to them directly:
  *
  *  - **A real user agent is sent** ([sprayDayUserAgent]); a library's default is what their policy
  *    names as not enough.
- *  - **Tiles are only ever fetched because the map asked for them.** Nothing in this app walks a
- *    bounding box or a zoom range over these tiles: offline areas are imagery only, and
- *    [Basemap.OPENSTREETMAP] is marked as not prefetchable so that the rule is in the data rather
- *    than in someone's memory. Bulk downloading and offline packs are prohibited by that policy,
- *    and anyone who wants offline tiles from this data is pointed at self-hosted ones instead.
+ Nothing in this app walks a
+ *    bounding box or a zoom range over these tiles: offline areas are imagery only, and every drawn
+ *    basemap is marked as not prefetchable so that the rule is in the data rather than in someone's
+ *    memory. Bulk downloading and offline packs are prohibited by both services' policies, and anyone
+ *    who wants offline tiles from this data is pointed at self-hosted ones instead.
  *
  * Status codes are mapped the way the LINZ fetcher maps them, with the two answers that mean
  * something different here: `429` (and OpenStreetMap's older `418`) are their rate limiter and
  * block, and both are worth naming rather than reporting as a generic failure.
  */
-class OsmTileFetcher(
+class DrawnTileFetcher(
     private val appVersion: String = BuildConfig.VERSION_NAME,
     /** Overridden in tests, so the mapping can be asserted without the live service. */
     private val urlFor: (zoom: Int, x: Int, y: Int) -> String =

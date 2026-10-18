@@ -85,7 +85,9 @@ object TileServerHolder {
                         Basemap.LINZ_AERIAL ->
                             currentKey.takeIf { it.isNotBlank() }?.let { key -> LinzTileFetcher(key) }
 
-                        Basemap.OPENSTREETMAP -> OsmTileFetcher()
+                        Basemap.OPENSTREETMAP, Basemap.TOPOGRAPHIC -> DrawnTileFetcher(
+                            urlFor = { zoom, x, y -> basemap.tileUrl("", zoom, x, y) }
+                        )
                     }
                 }
             )
@@ -146,7 +148,9 @@ object TileServerHolder {
         val appContext = context.applicationContext
         val root = when (basemap) {
             Basemap.LINZ_AERIAL -> File(appContext.filesDir, TILES_DIR)
-            Basemap.OPENSTREETMAP -> File(appContext.cacheDir, "$CACHE_DIR_PREFIX${basemap.id}")
+            // Every drawn map is a cache of what has been looked at: see the comment above.
+            Basemap.OPENSTREETMAP, Basemap.TOPOGRAPHIC ->
+                File(appContext.cacheDir, "$CACHE_DIR_PREFIX${basemap.id}")
         }
         return OfflineTileStore(root, basemap.tileSuffix)
     }

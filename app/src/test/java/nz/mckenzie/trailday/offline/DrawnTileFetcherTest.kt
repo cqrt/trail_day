@@ -18,7 +18,7 @@ import java.net.ServerSocket
  * request headers, so this one does - the request is the thing worth asserting, and a stubbed
  * fetcher could not show it.
  */
-class OsmTileFetcherTest {
+class DrawnTileFetcherTest {
 
     /** What the server was told, so a test can assert the request rather than only the result. */
     private val userAgents = mutableListOf<String>()
@@ -38,7 +38,7 @@ class OsmTileFetcherTest {
         server = RecordingTileServer(status, body, userAgents, paths)
     }
 
-    private fun fetcher() = OsmTileFetcher(
+    private fun fetcher() = DrawnTileFetcher(
         appVersion = "0.6.16",
         urlFor = { zoom, x, y -> "http://127.0.0.1:${server!!.port}/$zoom/$x/$y.png" }
     )
@@ -120,7 +120,7 @@ class OsmTileFetcherTest {
     @Test
     fun `an unreachable host is a failure rather than an exception`() = runBlocking {
         // Port 1 on loopback: nothing is listening, so the connection is refused.
-        val offline = OsmTileFetcher(
+        val offline = DrawnTileFetcher(
             urlFor = { _, _, _ -> "http://127.0.0.1:1/14/1017/660.png" },
             connectTimeoutMs = 1_000,
             readTimeoutMs = 1_000

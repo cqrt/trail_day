@@ -22,6 +22,29 @@ class BasemapTest {
 
     private val osm = Basemap.OPENSTREETMAP
 
+    private val topo = Basemap.TOPOGRAPHIC
+
+    @Test
+    fun `the topographic map is fetched from their host over https and needs no key`() {
+        assertEquals("https://tile.opentopomap.org/{z}/{x}/{y}.png", topo.tileTemplate(""))
+        assertEquals("https://tile.opentopomap.org/14/1017/660.png", topo.tileUrl("", 14, 1017, 660))
+        assertFalse(
+            "a key must not be smuggled into a source that needs none",
+            topo.tileTemplate(key).contains(key)
+        )
+    }
+
+    @Test
+    fun `the topographic map carries the credit its licence requires`() {
+        // Their map is built from OpenStreetMap data and SRTM heights, and the licence asks for both
+        // and for the map's own name - CC BY-SA.
+        assertTrue(topo.attribution.contains("OpenStreetMap contributors"))
+        assertTrue(topo.attribution.contains("SRTM"))
+        assertTrue(topo.attribution.contains("OpenTopoMap"))
+        assertTrue(topo.attribution.contains("CC BY-SA"))
+        assertEquals("https://opentopomap.org/about", topo.attributionLink)
+    }
+
     @Test
     fun `aerial tile template uses the linz xyz path and api parameter`() {
         assertEquals(
@@ -108,6 +131,10 @@ class BasemapTest {
             "OpenStreetMap's tile policy prohibits bulk downloading and offline packs",
             osm.prefetchable
         )
+        assertFalse(
+            "and the topographic map's is the same shape: looked at, never fetched ahead",
+            topo.prefetchable
+        )
     }
 
     @Test
@@ -120,15 +147,20 @@ class BasemapTest {
         assertEquals("image/png", osm.contentType)
         assertEquals(19, osm.maxZoom)
 
+        assertEquals(".png", topo.tileSuffix)
+        assertEquals("image/png", topo.contentType)
+        assertEquals(17, topo.maxZoom)
+
         // The tile server builds paths out of the id, so two sources cannot collide unless their
         // ids do.
-        assertEquals(2, Basemap.entries.map { it.id }.toSet().size)
+        assertEquals(Basemap.entries.size, Basemap.entries.map { it.id }.toSet().size)
     }
 
     @Test
     fun `only the imagery needs a key`() {
         assertTrue(aerial.needsKey)
         assertFalse(osm.needsKey)
+        assertFalse(topo.needsKey)
     }
 
     @Test

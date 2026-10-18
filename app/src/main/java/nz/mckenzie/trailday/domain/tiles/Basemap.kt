@@ -75,6 +75,20 @@ enum class Basemap(
         prefetchable = false,
         attribution = "\u00a9 OpenStreetMap contributors",
         attributionLink = "https://www.openstreetmap.org/copyright"
+    ),
+
+    TOPOGRAPHIC(
+        id = "topo",
+        displayName = "Topographic",
+        summary = "A drawn map with contours. No key needed; cannot be downloaded.",
+        needsKey = false,
+        tileSuffix = ".png",
+        contentType = "image/png",
+        maxZoom = 17,
+        // Their tile policy is the same shape as OpenStreetMap's: looked at as you go, never fetched ahead.
+        prefetchable = false,
+        attribution = "\u00a9 OpenStreetMap contributors, SRTM | \u00a9 OpenTopoMap (CC BY-SA)",
+        attributionLink = "https://opentopomap.org/about"
     );
 
     /**
@@ -83,7 +97,7 @@ enum class Basemap(
      * OpenStreetMap's URL is the one their policy names, over https: `http://` is refused, and a
      * library's default user agent is not enough - which is why their tiles are fetched by the
      * app's own tile server rather than by the map itself. See
-     * [nz.mckenzie.trailday.offline.OsmTileFetcher].
+     * [nz.mckenzie.trailday.offline.DrawnTileFetcher].
      */
     fun tileTemplate(apiKey: String): String = when (this) {
         LINZ_AERIAL ->
@@ -91,6 +105,9 @@ enum class Basemap(
 
         OPENSTREETMAP ->
             "$OSM_HOST/{z}/{x}/{y}.png"
+
+        TOPOGRAPHIC ->
+            "$TOPO_HOST/{z}/{x}/{y}.png"
     }
 
     /** One specific tile, as the fetchers need it. */
@@ -100,6 +117,9 @@ enum class Basemap(
 
         OPENSTREETMAP ->
             "$OSM_HOST/$zoom/$x/$y.png"
+
+        TOPOGRAPHIC ->
+            "$TOPO_HOST/$zoom/$x/$y.png"
     }
 
     /** The credit as HTML, single-quoted so it drops into a style document without escaping. */
@@ -110,6 +130,13 @@ enum class Basemap(
         val DEFAULT: Basemap = LINZ_AERIAL
 
         const val LINZ_HOST = "https://basemaps.linz.govt.nz"
+
+        /**
+         * OpenTopoMap's tile host: a drawn topographic map of the whole world - contours, tracks,
+         * streams and names - under the same look-at-it-as-you-go terms as OpenStreetMap's layer.
+         * Their tiles are built from OpenStreetMap data and SRTM heights, so their credit names both.
+         */
+        const val TOPO_HOST = "https://tile.opentopomap.org"
         const val LINZ_TILE_MATRIX = "WebMercatorQuad"
 
         /**
