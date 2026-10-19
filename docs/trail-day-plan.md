@@ -587,6 +587,13 @@ whose header already says whose it is, so the line at its foot saying "not one o
 sheet's "Show everything" used to appear under the switches and push them up as soon as a layer was switched off;
 it now sits in the title's row, whose height is fixed, so nothing below it moves.
 
+**Then Settings got quieter.** The group labels THE MAP, THIS PHONE, BACKUPS and THE APP went - every card
+already has its own title, and a heading over a heading is noise on the screen furthest from the trail. So did
+"What to draw under your tracks" and the note about offline areas downloading imagery, which the Offline screen
+says where it belongs. The two drawn basemaps now say what happens to their tiles - no key needed, cannot be
+downloaded, cached as you browse - and the appearance choice reads System rather than Follow the phone. It
+shipped as 0.3.9.
+
 **Then a third basemap: topographic.** The map under the work was a photograph or a drawn road map; a walker
 planning a route wants contours. Settings now offers a Topographic map as well - OpenTopoMap's, built from
 OpenStreetMap data and SRTM heights - served through the phone's own tile server like the drawn map, so the
