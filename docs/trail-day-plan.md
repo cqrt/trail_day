@@ -596,6 +596,18 @@ wrong way round. The rows are white on the sheet's pale sage again, the divider 
 is gone, and the button that opens the drawer is described as "Layers" for a screen reader rather than by the
 title it used to have. It shipped as 0.3.10 and 0.3.11, with the button's name as 0.3.12.
 
+**Then a recording could follow one of DOC's tracks.** The recorder asks which kind of recording it is - following
+a line, or a new line of the walker's own - and following opens a chooser with the walker's places first and, under
+them, DOC's tracks kept on the phone, nearest first and marked DOC. A walk that follows one of DOC's lines makes no
+place, asks for no name, and takes the line's name and the day as its own; the trip carries DOC's own reference for
+the line, so both the trips list and the trip's page say "Following a DOC track". The schema gained one nullable
+column for that reference, with a migration that leaves every existing trip saying nothing about DOC rather than
+guessing - proven by upgrading a database written by the previous build, in place. It shipped as 0.3.13.
+
+**Still to come from that discussion:** DOC's nearest tracks as a small group in Places, and a "Follow this" action
+on the map's card for one of DOC's tracks. Both use what is now in place - the chooser reads the same cache, and a
+trip already remembers DOC's line - so they are the next change rather than new ground.
+
 **Then Settings got quieter.** The group labels THE MAP, THIS PHONE, BACKUPS and THE APP went - every card
 already has its own title, and a heading over a heading is noise on the screen furthest from the trail. So did
 "What to draw under your tracks" and the note about offline areas downloading imagery, which the Offline screen
