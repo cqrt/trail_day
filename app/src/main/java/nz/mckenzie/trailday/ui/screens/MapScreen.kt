@@ -283,12 +283,9 @@ fun MapScreen(
  * still draws that place, whatever is switched off here - a switch that left one of those blank
  * would have gone too far.
  *
- * **The content scrolls, and it has to.** Ten layers with a line under each is already taller than
- * a phone's screen minus the bars, so the last row was being cut off at the bottom of the sheet -
- * and when the place names were added below them, that cut-off row was the one the walker was
- * looking for. Opened at its full height (`skipPartiallyExpanded`) *and* scrollable is what makes
- * every switch reachable: the height is so that the sheet does not open halfway up the screen with
- * a scroll nobody has been told about, and the scroll is so that a sheet taller than the screen is
+ * **The content scrolls.** Opened at its full height (`skipPartiallyExpanded`) *and* scrollable is what
+ * makes every switch reachable on a short screen: the height is so that the sheet does not open halfway up
+ * with a scroll nobody has been told about, and the scroll is so that a sheet taller than the screen is
  * still a sheet you can read to the end of.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -320,7 +317,7 @@ private fun LayersSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "What the map draws",
+                    text = "Layers",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f)
                 )
@@ -328,44 +325,44 @@ private fun LayersSheet(
                     TextButton(onClick = onShowAll) { Text("Show everything") }
                 }
             }
-            Text(
-                text = "Switch off what you do not need.",
-                style = MaterialTheme.typography.bodySmall
-            )
             AssetLayer.ALL.forEach { layer ->
                 val shown = layer !in hidden
-                ListItem(
-                    // The whole row switches, rather than only the switch: this is a screen used
-                    // with gloves on, and a switch is a small target. Tapping a layer that is on
-                    // turns it off, which is what "hide" means here.
-                    modifier = Modifier.clickable { onHide(layer, shown) },
-                    headlineContent = { Text(layer.displayName) },
-                    supportingContent = { Text(layer.summary) },
-                    trailingContent = {
-                        Switch(checked = shown, onCheckedChange = { checked -> onHide(layer, !checked) })
-                    }
+                LayerSwitchRow(
+                    label = layer.displayName,
+                    checked = shown,
+                    onToggle = { onHide(layer, shown) }
                 )
             }
 
-            // The place names, which are the one thing here that starts *off*: everything else in
-            // this sheet is the work, which is why the walker opened the app. A town name is
-            // furniture over their own ground, so it is asked for rather than arrived - and the row
-            // says where it comes from, because it is the one switch here that fetches anything new.
-            HorizontalDivider()
-            ListItem(
-                modifier = Modifier.clickable { onPlaceNames(!placeNames) },
-                headlineContent = { Text("Place names") },
-                supportingContent = {
-                    Text("Towns, lakes, peaks and rivers from LINZ.")
-                },
-                trailingContent = {
-                    Switch(
-                        checked = placeNames,
-                        onCheckedChange = { checked -> onPlaceNames(checked) }
-                    )
-                }
+            // The place names, which are the one thing here that starts *off*: everything else in this
+            // sheet is the work, which is why the walker opened the app.
+            HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
+            LayerSwitchRow(
+                label = "Place names",
+                checked = placeNames,
+                onToggle = { onPlaceNames(!placeNames) }
             )
         }
+    }
+}
+
+/**
+ * One switch in the layers sheet: its name, and the switch.
+ *
+ * **The whole row switches**, not only the switch: this is a screen used with gloves on, and the switch is a
+ * small target. No second line: a layer called Huts does not need telling what a hut is.
+ */
+@Composable
+private fun LayerSwitchRow(label: String, checked: Boolean, onToggle: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = { onToggle() })
     }
 }
 

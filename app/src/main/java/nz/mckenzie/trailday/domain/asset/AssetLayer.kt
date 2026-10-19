@@ -22,43 +22,36 @@ enum class AssetLayer(
     val id: String,
     /** What the switch calls it. */
     val displayName: String,
-    /** One line under it, in the walker's terms rather than the map's. */
-    val summary: String,
     /** What the layer draws. */
     val kind: AssetKind
 ) {
     TRACKS(
         id = "tracks",
         displayName = "Tracks",
-        summary = "The lines you walk or ride.",
         kind = AssetKind.TRACK
     ),
 
     BIKE_TRACKS(
         id = "bike-tracks",
         displayName = "Bike tracks",
-        summary = "The lines you ride.",
         kind = AssetKind.BIKE_TRACK
     ),
 
     HUTS(
         id = "huts",
         displayName = "Huts",
-        summary = "A roof over walls.",
         kind = AssetKind.HUT
     ),
 
     CAMPSITES(
         id = "campsites",
         displayName = "Campsites",
-        summary = "A tent beside the track.",
         kind = AssetKind.CAMPSITE
     ),
 
     WAYPOINTS(
         id = "waypoints",
         displayName = "Waypoints",
-        summary = "A dot in a ring: a spot of your own.",
         kind = AssetKind.WAYPOINT
     );
 

@@ -72,10 +72,15 @@ class AssetLayerTest {
     }
 
     @Test
-    fun `every switch says what it is and what it does`() {
+    fun `every switch has a name of its own`() {
+        // The rows in the layers sheet are the walker's own words for the work, and nothing else: a layer
+        // called Huts does not need a line under it saying what a hut is.
+        assertEquals(
+            AssetLayer.ALL.size,
+            AssetLayer.ALL.map { it.displayName }.toSet().size
+        )
         AssetLayer.ALL.forEach { layer ->
             assertTrue("${layer.name} has nothing to show on the switch", layer.displayName.isNotBlank())
-            assertTrue("${layer.name} has no line to explain it", layer.summary.isNotBlank())
         }
     }
 }
