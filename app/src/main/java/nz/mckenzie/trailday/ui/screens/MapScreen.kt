@@ -210,7 +210,7 @@ fun MapScreen(
                 RoundIconButton(glyph = IconGlyph.SETTINGS, description = "Settings", onClick = onOpenSettings)
                 RoundIconButton(
                     glyph = IconGlyph.LAYERS,
-                    description = "What the map draws",
+                    description = "Layers",
                     onClick = { layersOpen = true }
                 )
                 RoundIconButton(glyph = IconGlyph.LOCATE, description = "Show where I am", onClick = locate)
