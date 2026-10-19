@@ -300,12 +300,17 @@ private fun LayersSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scrollState = rememberScrollState()
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    // The sheet is the page's own pale sage, and each row is a white strip on it: the app's cards on the
+    // app's page, the same pairing as every other list.
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(scrollState)
-                .padding(horizontal = 16.dp)
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -313,7 +318,10 @@ private fun LayersSheet(
             // *above* the switches: a link that appeared under them moved the whole list up the moment a
             // layer was switched off, which is the one moment the list must stay still.
             Row(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -336,7 +344,6 @@ private fun LayersSheet(
 
             // The place names, which are the one thing here that starts *off*: everything else in this
             // sheet is the work, which is why the walker opened the app.
-            HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
             LayerSwitchRow(
                 label = "Place names",
                 checked = placeNames,
@@ -357,8 +364,10 @@ private fun LayerSwitchRow(label: String, checked: Boolean, onToggle: () -> Unit
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            // A white strip on the sheet's pale sage, as every row in this app is a card on the page.
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .clickable(onClick = onToggle)
-            .padding(vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(text = label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
