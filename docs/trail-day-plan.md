@@ -587,6 +587,11 @@ whose header already says whose it is, so the line at its foot saying "not one o
 sheet's "Show everything" used to appear under the switches and push them up as soon as a layer was switched off;
 it now sits in the title's row, whose height is fixed, so nothing below it moves.
 
+**Then the layers sheet got quieter.** It is titled "Layers", the sentence under the title is gone, and each
+switch is a name and a switch - no line under any of them, Place names included. A layer called Huts does not
+need telling what a hut is, and the sheet is opened to flick something, not to read. With no descriptions left,
+the layer table no longer carries summaries. It shipped as 0.3.10.
+
 **Then Settings got quieter.** The group labels THE MAP, THIS PHONE, BACKUPS and THE APP went - every card
 already has its own title, and a heading over a heading is noise on the screen furthest from the trail. So did
 "What to draw under your tracks" and the note about offline areas downloading imagery, which the Offline screen
