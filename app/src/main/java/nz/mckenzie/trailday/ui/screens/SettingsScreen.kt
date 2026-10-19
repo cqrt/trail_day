@@ -219,12 +219,9 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
 
-                    SettingsGroupLabel("THE MAP")
-
                     Text("Basemap", style = MaterialTheme.typography.titleMedium)
 
                     ChoiceRow(
-                        label = "What to draw under your tracks",
                         choices = Basemap.entries,
                         selected = basemap,
                         onChoose = viewModel::setBasemap,
@@ -233,15 +230,6 @@ fun SettingsScreen(
 
                     Text(basemap.summary, style = MaterialTheme.typography.bodySmall)
 
-                    // Only imagery can be downloaded, so it is worth saying on the screen where
-                    // the choice is made, not only on the offline one.
-                    if (!basemap.prefetchable) {
-                        Text(
-                            text = "Offline areas download aerial imagery, whatever the basemap.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
 
                     // Their tile usage policy asks for a way to report a problem, and a gate that
                     // is not on the map is exactly the sort of thing the walker would know about.
@@ -285,8 +273,6 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-
-                    SettingsGroupLabel("THIS PHONE")
 
                     Text("Draw from a computer", style = MaterialTheme.typography.titleMedium)
 
@@ -581,8 +567,6 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
 
-                    SettingsGroupLabel("BACKUPS")
-
                     Text("Your data", style = MaterialTheme.typography.titleMedium)
                     Text(
                         text = "Your places and every trip.",
@@ -794,8 +778,6 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
 
-                    SettingsGroupLabel("THE APP")
-
                     Text("This device", style = MaterialTheme.typography.titleMedium)
                     Text(viewModel.versionLabel, style = MaterialTheme.typography.bodyMedium)
                     Text(
@@ -814,23 +796,7 @@ fun SettingsScreen(
     }
 }
 
-/**
- * A heading over a group of settings: a small spaced capital label, as the pages of the mock screens write the
- * name of a thing - ELEVATION, TRIPS - rather than a heading in the size of a card's own title.
- *
- * This is the largest screen in the app and the least about the trail, so the labels are what make it scannable:
- * the map's settings, the phone's, the backups', and the app's own.
- */
-@Composable
-private fun SettingsGroupLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelSmall,
-        letterSpacing = 1.1.sp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 4.dp, top = 8.dp)
-    )
-}
+
 /**
  * Android's own per-app notification settings, which is where a prompt that will not
  * appear again gets undone.

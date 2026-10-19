@@ -47,14 +47,15 @@ internal fun ChoiceChip(selected: Boolean, label: String, onClick: () -> Unit) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun <T> ChoiceRow(
-    label: String,
+    /** The question above the chips, or null where the card's own title has already asked it. */
+    label: String? = null,
     choices: List<T>,
     selected: T,
     onChoose: (T) -> Unit,
     text: (T) -> String
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, style = MaterialTheme.typography.labelLarge)
+        label?.let { Text(it, style = MaterialTheme.typography.labelLarge) }
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)

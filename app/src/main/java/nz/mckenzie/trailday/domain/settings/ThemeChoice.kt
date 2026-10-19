@@ -23,7 +23,7 @@ enum class ThemeChoice(
 ) {
     SYSTEM(
         id = "system",
-        displayName = "Follow the phone",
+        displayName = "System",
         summary = "Follow this phone."
     ),
 

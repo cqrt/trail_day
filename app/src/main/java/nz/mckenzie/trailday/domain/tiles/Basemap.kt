@@ -67,7 +67,7 @@ enum class Basemap(
     OPENSTREETMAP(
         id = "osm",
         displayName = "OpenStreetMap",
-        summary = "A drawn map. No key needed; cannot be downloaded.",
+        summary = "No key needed; cannot be downloaded but tiles are cached when browsing.",
         needsKey = false,
         tileSuffix = ".png",
         contentType = "image/png",
@@ -80,7 +80,7 @@ enum class Basemap(
     TOPOGRAPHIC(
         id = "topo",
         displayName = "Topographic",
-        summary = "A drawn map with contours. No key needed; cannot be downloaded.",
+        summary = "No key needed; cannot be downloaded but tiles are cached when browsing.",
         needsKey = false,
         tileSuffix = ".png",
         contentType = "image/png",
