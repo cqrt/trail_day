@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -43,6 +44,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +55,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
+import nz.mckenzie.trailday.domain.asset.AssetKind
+import nz.mckenzie.trailday.domain.asset.AssetPhrase
+import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.ElevationPhrase
 import nz.mckenzie.trailday.domain.geo.ElevationProfile
 import nz.mckenzie.trailday.domain.geo.TravelMode
@@ -63,7 +68,9 @@ import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.formatDuration
+import nz.mckenzie.trailday.ui.docRowDetail
 import nz.mckenzie.trailday.ui.formatEstimate
+import nz.mckenzie.trailday.ui.formatLengthOf
 import nz.mckenzie.trailday.viewmodel.RecordingViewModel
 
 /**
@@ -103,6 +110,18 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
     var permissionGranted by remember { mutableStateOf(viewModel.hasLocationPermission()) }
     var pickingTrack by remember { mutableStateOf(false) }
     var assetNameDraft by remember { mutableStateOf("") }
+
+    // The kind of recording being set up: following a line, or a new line of the walker's own. Not held
+    // while a pass is being driven - by then it is a fact, not a choice.
+    var followingMode by rememberSaveable { mutableStateOf(false) }
+    var docQuery by rememberSaveable { mutableStateOf("") }
+    val docChoices by viewModel.docChoices.collectAsStateWithLifecycle()
+    val docTracksHeld by viewModel.docTracksHeld.collectAsStateWithLifecycle()
+
+    // DOC's lines are read when the chooser opens, not on every visit to the screen.
+    LaunchedEffect(pickingTrack) {
+        if (pickingTrack) viewModel.refreshDocTracks()
+    }
 
     // The picker opens fully rather than at half height. Half a sheet is a third of the
     // places hidden below the fold, and the row that matters - the one just recorded, or
@@ -199,7 +218,16 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                     follow = follow,
                     drift = drift,
                     heading = heading,
-                    passElevation = passElevation
+                    passElevation = passElevation,
+                    followMode = followingMode,
+                    targetName = assetName,
+                    onFollowMode = { following ->
+                        followingMode = following
+                        // A new line is a line of the walker's own: whatever was chosen before is let go,
+                        // so what is recorded is not quietly linked to a track nobody is following.
+                        if (!following) viewModel.selectTrack(null) else if (assetName == null) pickingTrack = true
+                    },
+                    onChooseTarget = { pickingTrack = true }
                 )
 
                 message?.let {
@@ -213,13 +241,15 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
 
             // Which place this pass is for, and the way to change it: a pill rather than a line inside the
             // card, because it is a choice rather than a figure.
-            TargetPill(
-                name = assetName,
-                onClick = { pickingTrack = true },
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 12.dp, bottom = 104.dp)
-            )
+            if (state.status != null) {
+                TargetPill(
+                    name = assetName,
+                    onClick = { pickingTrack = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 12.dp, bottom = 104.dp)
+                )
+            }
 
             AttributionStrip(
                 basemap = basemap,
@@ -265,7 +295,10 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
 
                         else -> MapPill(
                             label = "Start recording",
-                            onClick = viewModel::start,
+                            onClick = {
+                                if (followingMode && assetName == null) pickingTrack = true else viewModel.start()
+                            },
+                            enabled = !followingMode || assetName != null,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -288,33 +321,82 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Which place are you following?",
+                        text = "Choose a line to follow",
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.weight(1f)
                     )
                     TextButton(onClick = { pickingTrack = false }) { Text("Cancel") }
                 }
-                if (assets.isEmpty()) {
-                    Text(
-                        text = "Nothing planned.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 24.dp)
-                    )
-                }
-                // The rows scroll inside a window of their own rather than running off the
-                // bottom of the sheet: a season is dozens of places, and the sheet's content
-                // does not scroll by itself, so everything past the screen edge - a track
-                // recorded this morning included - could not be reached at all.
+
+                SearchField(
+                    value = docQuery,
+                    onValueChange = {
+                        docQuery = it
+                        viewModel.setDocQuery(it)
+                    },
+                    placeholder = "Find a track",
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+
+                // The rows scroll inside a window of their own rather than running off the bottom of the
+                // sheet: a season is dozens of places, and the sheet's content does not scroll by itself.
+                // Your places first, then DOC's, because the walker's own work comes first.
                 LazyColumn(modifier = Modifier.heightIn(max = PICKER_LIST_MAX_HEIGHT)) {
-                    itemsIndexed(assets, key = { _, item -> item.id }) { index, item ->
-                        if (index > 0) HorizontalDivider()
+                    item { GroupLabel("Your places") }
+                    if (assets.isEmpty()) {
+                        item {
+                            Text(
+                                text = "None yet",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+                    itemsIndexed(assets, key = { _, item -> item.id }) { _, item ->
                         ListItem(
                             modifier = Modifier.clickable {
                                 viewModel.selectTrack(item.id)
+                                followingMode = true
                                 pickingTrack = false
                             },
-                            headlineContent = { Text(item.name) }
+                            headlineContent = { Text(item.name) },
+                            supportingContent = {
+                                Text(
+                                    listOfNotNull(
+                                        AssetPhrase.kind(AssetKind.fromStorage(item.kind)),
+                                        formatLengthOf(AssetShape.fromStorage(item.shape), item.lengthM)
+                                            .takeIf { it.isNotEmpty() }
+                                    ).joinToString(" \u00b7 ")
+                                )
+                            }
+                        )
+                    }
+
+                    item { GroupLabel("DOC's tracks near you") }
+                    if (docChoices.isEmpty()) {
+                        item {
+                            Text(
+                                text = if (docTracksHeld) "Nothing nearby" else "Nothing from DOC kept yet",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+                    items(docChoices, key = { it.item.sourceRef }) { choice ->
+                        ListItem(
+                            modifier = Modifier.clickable {
+                                viewModel.selectDoc(choice.item)
+                                followingMode = true
+                                pickingTrack = false
+                            },
+                            headlineContent = { Text(choice.item.name) },
+                            supportingContent = { Text(docRowDetail(choice.item, choice.distanceM)) },
+                            // Whose line it is, in one word: nothing here is renamed or deleted.
+                            trailingContent = {
+                                Text("DOC", style = MaterialTheme.typography.labelSmall)
+                            }
                         )
                     }
                 }
@@ -324,6 +406,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                 ListItem(
                     modifier = Modifier.clickable {
                         viewModel.selectTrack(null)
+                        followingMode = false
                         pickingTrack = false
                     },
                     headlineContent = { Text("Just record, no place") },
@@ -362,6 +445,18 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
     }
 }
 
+/** A heading over a group of rows in the chooser: your places, DOC's tracks. */
+@Composable
+private fun GroupLabel(text: String) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        letterSpacing = 1.1.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 2.dp)
+    )
+}
+
 /**
  * How tall the picker's rows may get before they scroll.
  *
@@ -388,7 +483,11 @@ private fun PassCard(
     follow: FollowProgress?,
     drift: Double?,
     heading: FollowPoint?,
-    passElevation: ElevationProfile?
+    passElevation: ElevationProfile?,
+    followMode: Boolean,
+    targetName: String?,
+    onFollowMode: (Boolean) -> Unit,
+    onChooseTarget: () -> Unit
 ) {
     // The one card over the recording map, lifted off the imagery like the map's other floating things.
     Card(
@@ -408,6 +507,40 @@ private fun PassCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
+
+            // Nothing being recorded yet: what kind of recording is about to start, then - if it is a
+            // line to follow - which line. Two words rather than a paragraph, as everywhere in the app.
+            if (summary.status == null) {
+                Row(
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ChoiceChip(
+                        selected = followMode,
+                        label = "Follow a line",
+                        onClick = { onFollowMode(true) }
+                    )
+                    ChoiceChip(
+                        selected = !followMode,
+                        label = "New line",
+                        onClick = { onFollowMode(false) }
+                    )
+                }
+                if (followMode) {
+                    Text(
+                        text = targetName ?: "Choose a track",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (targetName == null) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                        modifier = Modifier
+                            .padding(start = 16.dp, end = 16.dp, top = 12.dp)
+                            .clickable(onClick = onChooseTarget)
+                    )
+                }
+            }
 
             // The distance as the one big figure, with its unit beside it rather than inside the number.
             val distance = formatDistance(summary.distanceM).split(" ", limit = 2)
@@ -589,9 +722,15 @@ private fun TargetPill(name: String?, onClick: () -> Unit, modifier: Modifier = 
 
 /** One action over the map: a white pill, as the mock screens float Pause and Finish. */
 @Composable
-private fun MapPill(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun MapPill(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
     Surface(
         onClick = onClick,
+        enabled = enabled,
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = TrailDayElevation.floating,
@@ -601,7 +740,15 @@ private fun MapPill(label: String, onClick: () -> Unit, modifier: Modifier = Mod
             modifier = Modifier.padding(vertical = 16.dp),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = label, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleMedium,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
         }
     }
 }

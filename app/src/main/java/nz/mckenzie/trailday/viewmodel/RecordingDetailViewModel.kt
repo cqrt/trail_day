@@ -43,7 +43,9 @@ data class RecordingDetail(
     /** The stretches of the pass that were paused for. */
     val breaks: List<RecordingBreak> = emptyList(),
     val assetId: Long?,
-    val assetName: String?
+    val assetName: String?,
+    /** DOC's own reference for the line this pass followed, or null when it followed none of DOC's. */
+    val docRef: String? = null
 ) {
     val durationMs: Long get() = endedAtEpochMs?.let { (it - startedAtEpochMs).coerceAtLeast(0L) } ?: 0L
 
@@ -161,7 +163,8 @@ class RecordingDetailViewModel(
                 points = points,
                 breaks = breaks,
                 assetId = session.assetId,
-                assetName = assetName
+                assetName = assetName,
+                docRef = session.docRef
             )
         }
     }

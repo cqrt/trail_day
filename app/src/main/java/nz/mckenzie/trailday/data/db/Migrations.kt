@@ -97,3 +97,16 @@ internal val MIGRATION_2_3 = object : Migration(2, 3) {
         )
     }
 }
+
+/**
+ * Where a trip remembers following one of DOC's lines.
+ *
+ * The column is nullable and nothing is guessed for the trips already on the phone: a pass that was made
+ * before this could have followed DOC, and saying so now would be the app inventing a fact about somebody's
+ * walk. A pass with no value is a pass that followed nothing of DOC's.
+ */
+internal val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE recorded_sessions ADD COLUMN docRef TEXT")
+    }
+}

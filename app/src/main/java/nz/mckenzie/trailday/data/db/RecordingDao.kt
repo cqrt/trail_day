@@ -60,6 +60,9 @@ abstract class RecordingDao {
      * Renames a session. Used when a recording is saved as a named asset, so the
      * recordings list and the asset list agree on what the line is called.
      */
+    @Query("UPDATE recorded_sessions SET docRef = :docRef WHERE id = :sessionId")
+    abstract suspend fun setSessionDocRef(sessionId: Long, docRef: String?)
+
     @Query("UPDATE recorded_sessions SET name = :name WHERE id = :sessionId")
     abstract suspend fun renameSession(sessionId: Long, name: String)
 

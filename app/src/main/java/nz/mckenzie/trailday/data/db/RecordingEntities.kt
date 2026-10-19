@@ -20,6 +20,13 @@ data class RecordedSessionEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
     val name: String,
     val assetId: Long? = null,
+    /**
+     * DOC's own record this pass followed, when the line was DOC's rather than the walker's -
+     * `doc-tracks:35237557`, the same reference the walker's places carry for DOC's material.
+     *
+     * A DOC line never becomes a place, so this is how the trip itself remembers what was followed.
+     */
+    val docRef: String? = null,
     val startedAtEpochMs: Long,
     val endedAtEpochMs: Long? = null,
     /** [nz.mckenzie.trailday.domain.recording.RecordingStatus] name. */

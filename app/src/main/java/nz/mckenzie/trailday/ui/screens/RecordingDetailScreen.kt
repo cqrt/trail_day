@@ -228,8 +228,10 @@ private fun subtitleOf(recording: RecordingDetail): String = listOfNotNull(
     if (recording.isFinished) formatDuration(recording.durationMs) else "never finished",
     when {
         recording.assetName != null -> "For ${recording.assetName}"
+        // A line of DOC's never becomes a place, so a trip that followed one says whose line it was.
+        recording.docRef != null -> "Following a DOC track"
         recording.assetId != null -> "Its place has since been deleted"
-        else -> "Not linked to a place"
+        else -> "A new line"
     }
 ).joinToString(" \u00b7 ")
 

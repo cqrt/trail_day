@@ -35,7 +35,9 @@ data class RecordingRow(
     val pointCount: Int,
     val status: RecordingStatus,
     val assetId: Long?,
-    val assetName: String?
+    val assetName: String?,
+    /** DOC's own reference for the line this trip followed, or null when it followed none of DOC's. */
+    val docRef: String? = null
 ) {
     val isFinished: Boolean get() = status == RecordingStatus.FINISHED
 
@@ -110,5 +112,6 @@ internal fun RecordedSessionEntity.toRow(assetNames: Map<Long, String>) = Record
     pointCount = pointCount,
     status = runCatching { RecordingStatus.valueOf(status) }.getOrDefault(RecordingStatus.FINISHED),
     assetId = assetId,
-    assetName = assetId?.let { assetNames[it] }
+    assetName = assetId?.let { assetNames[it] },
+    docRef = docRef
 )

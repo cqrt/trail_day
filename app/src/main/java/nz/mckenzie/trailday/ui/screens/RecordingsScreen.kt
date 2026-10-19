@@ -220,6 +220,8 @@ internal fun recordingDetail(row: RecordingRow): String =
 /** Which place a trip was made for, or that the link to it is gone. */
 internal fun recordingAsset(row: RecordingRow): String = when {
     row.assetName != null -> "For ${row.assetName}"
+    // A line of DOC's never becomes a place, so a trip that followed one says whose line it was.
+    row.docRef != null -> "Following a DOC track"
     row.assetWasDeleted -> "Its place has since been deleted"
-    else -> "Not linked to a place"
+    else -> "A new line"
 }

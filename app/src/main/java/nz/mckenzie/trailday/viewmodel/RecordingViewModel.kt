@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -26,13 +28,21 @@ import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
+import nz.mckenzie.trailday.doc.ArcGisDoc
+import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
+import nz.mckenzie.trailday.domain.doc.DocCache
+import nz.mckenzie.trailday.domain.doc.DocHitTest
+import nz.mckenzie.trailday.domain.doc.DocItem
+import nz.mckenzie.trailday.domain.doc.DocSource
+import nz.mckenzie.trailday.domain.doc.EmptyDocCache
 import nz.mckenzie.trailday.domain.geo.DriftWord
 import nz.mckenzie.trailday.domain.geo.FollowPoint
 import nz.mckenzie.trailday.domain.geo.FollowProgress
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.RecordingBreak
+import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
 import nz.mckenzie.trailday.domain.geo.splitAtBreaks
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.domain.recording.recordingSourceRef
@@ -42,6 +52,7 @@ import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.AssetStretch
+import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.tracking.DevicePosition
 import nz.mckenzie.trailday.tracking.FusedLocationSource
 import nz.mckenzie.trailday.tracking.LocationSource
@@ -51,6 +62,15 @@ import nz.mckenzie.trailday.tracking.frameOnDevice
 import nz.mckenzie.trailday.ui.formatShortDate
 
 /**
+ * A line of DOC's being followed: what it is called, DOC's own reference for it, and its line.
+ *
+ * The points are held here rather than fetched on every fix, for the reason a place's line is: the ground
+ * does not move while the walker does. The reference is what lets the trip remember what it followed,
+ * without DOC's material ever becoming one of the walker's places.
+ */
+data class DocTarget(val ref: String, val name: String, val points: List<GeoPoint>)
+
+/**
  * Drives the recorder screen.
  *
  * The service owns the recording loop; this only starts/stops it and mirrors
@@ -58,7 +78,8 @@ import nz.mckenzie.trailday.ui.formatShortDate
  * re-entering the screen (or restarting the app) loses nothing.
  *
  * A recording is a walk or a ride: the line, the distance, the time, the fixes, and
- * the pauses. It may be followed for a place, which is kept as a soft link.
+ * the pauses. It may be followed for a place, which is kept as a soft link, or for one of DOC's lines,
+ * which is remembered by its own reference.
  */
 class RecordingViewModel(
     private val recordings: RecordingRepository,
@@ -70,6 +91,11 @@ class RecordingViewModel(
      * standing next to, so opening on a neutral view of the country is no use.
      */
     private val locationSource: LocationSource,
+    /**
+     * What DOC publishes, kept on the phone: the chooser's "DOC's tracks near you" reads it, so a walker
+     * can follow a line of DOC's as readily as one of their own - and with no reception.
+     */
+    private val docStore: DocCache = EmptyDocCache,
     /**
      * The place the page that opened the recorder is about, if any: a track's own page offers "Record this",
      * and arriving at the recorder with the target already chosen is the whole point of that button.
@@ -104,22 +130,27 @@ class RecordingViewModel(
     private val _selectedAssetId = MutableStateFlow<Long?>(null)
     val selectedAssetId: StateFlow<Long?> = _selectedAssetId
 
+    /** The line of DOC's being followed, when the target is DOC's rather than the walker's own. */
+    private val _selectedDoc = MutableStateFlow<DocTarget?>(null)
+    val selectedDoc: StateFlow<DocTarget?> = _selectedDoc
+
     val selectedTrackName: StateFlow<String?> =
-        combine(_selectedAssetId, assets) { id, list ->
-            list.firstOrNull { it.id == id }?.name
+        combine(_selectedAssetId, assets, _selectedDoc) { id, list, doc ->
+            doc?.name ?: list.firstOrNull { it.id == id }?.name
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     /**
-     * The line of the place being followed, or nothing when none is chosen.
+     * The line being followed, or nothing when none is chosen.
      *
      * A line and not the whole place: following is about the ground, and a spot has none. Read from the
      * database once per choice rather than per fix, because a track's geometry does not move while the
-     * walker does.
+     * walker does - and DOC's line arrives with the choice itself.
      */
-    private val targetLine: StateFlow<List<GeoPoint>> = _selectedAssetId
-        .map { id -> id?.let { runCatching { assetRepository.getAssetGeometry(it) }.getOrNull()?.line } }
-        .map { line -> line.orEmpty() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+    private val targetLine: StateFlow<List<GeoPoint>> = combine(_selectedAssetId, _selectedDoc) { id, doc ->
+        doc?.points
+            ?: id?.let { runCatching { assetRepository.getAssetGeometry(it) }.getOrNull()?.line }
+            ?: emptyList()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     /**
      * Where the phone is, as one state the readouts share: one subscriber to the fixes, and one answer to
@@ -442,6 +473,8 @@ class RecordingViewModel(
      */
     fun selectTrack(assetId: Long?) {
         _selectedAssetId.value = assetId
+        // One target at a time: a place chosen is DOC's line let go.
+        _selectedDoc.value = null
         // A new line to follow is a new set of distances and a new drift: the word said about the last
         // one is not about this one.
         driftWord.reset()
@@ -461,6 +494,99 @@ class RecordingViewModel(
         }
     }
 
+    /**
+     * Follows one of DOC's lines, as the chooser offers them.
+     *
+     * DOC's material stays DOC's: no place is made and nothing is copied. The trip that follows it carries
+     * the reference, so the walk is remembered against the line without the line changing hands.
+     */
+    fun selectDoc(item: DocItem) {
+        // The line to follow is the longest of DOC's paths, not whichever came first: a route with a short
+        // spur in front of its own line would otherwise be followed along the spur.
+        val line = item.paths
+            .filter { it.size >= 2 }
+            .maxByOrNull { path -> polylineLengthMeters(path) }
+            .orEmpty()
+        if (line.size < 2) return
+        _selectedDoc.value = DocTarget(ref = item.sourceRef, name = item.name, points = line)
+        _selectedAssetId.value = null
+        driftWord.reset()
+        _drift.value = null
+        _finished.value = null
+        viewModelScope.launch {
+            TrackingState.current.sessionId?.let { sessionId ->
+                runCatching { recordings.setSessionDocRef(sessionId, item.sourceRef) }
+            }
+        }
+    }
+
+    /** Lets go of DOC's line: the walk is a new line of the walker's own again. */
+    fun clearDoc() {
+        _selectedDoc.value = null
+    }
+
+    /**
+     * The tracks DOC publishes that are kept on the phone, read once for the chooser.
+     *
+     * Read rather than fetched: the chooser is for a walk that may start where there is no reception, and
+     * what DOC has published for this area is what the phone holds.
+     */
+    fun refreshDocTracks() {
+        viewModelScope.launch {
+            val kept = runCatching { docStore.cached(DocSource.TRACKS) }.getOrDefault(emptyList())
+            _docTracks.value = kept
+            // The last fix the phone knows about, if no new one has arrived: a chooser that offered nothing
+            // because the phone happens to be standing still would look like a phone that had kept nothing.
+            if (_lastKnown.value == null) {
+                _lastKnown.value = runCatching { locationSource.currentLocation() }.getOrNull()
+            }
+        }
+    }
+
+    /** The last position asked for rather than waited for: see [refreshDocTracks]. */
+    private val _lastKnown = MutableStateFlow<GeoPoint?>(null)
+
+    /** Where the phone is, for the chooser's distances: the live fix, or the last one asked for. */
+    private val fix: StateFlow<GeoPoint?> = combine(here, _lastKnown) { live, last -> live ?: last }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    private val _docTracks = MutableStateFlow<List<DocItem>>(emptyList())
+
+    private val _docQuery = MutableStateFlow("")
+
+    /** What the walker is typing into the chooser's search, or blank for what is nearby. */
+    fun setDocQuery(value: String) {
+        _docQuery.value = value
+    }
+
+    /**
+     * What the chooser offers of DOC's: the nearest few tracks when nothing is typed, and name matches when
+     * something is. Distance is measured from the phone to the line, and left out when the phone does not
+     * know where it is rather than said as zero.
+     */
+    val docChoices: StateFlow<List<DocChoice>> = combine(_docTracks, _docQuery, fix) { tracks, query, position ->
+        val words = query.trim()
+        tracks
+            .mapNotNull { item ->
+                val distance = position?.let { DocHitTest.distanceTo(item, it) }
+                val named = words.isEmpty() || item.name.contains(words, ignoreCase = true)
+                val near = distance != null && distance <= DOC_NEARBY_M
+                if (named && (words.isNotEmpty() || near)) DocChoice(item, distance) else null
+            }
+            .sortedBy { it.distanceM ?: Double.MAX_VALUE }
+            .take(DOC_CHOICES)
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
+    /** One row of the chooser for one of DOC's lines. */
+    data class DocChoice(val item: DocItem, val distanceM: Double?)
+
+    /** Whether any of DOC's tracks are kept at all, so the chooser can say which kind of nothing it is. */
+    val docTracksHeld: StateFlow<Boolean> = _docTracks
+        .map { it.isNotEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
+
     fun start() {
         if (!hasLocationPermission()) {
             onPermissionDenied()
@@ -475,7 +601,8 @@ class RecordingViewModel(
             _message.value = null
             val sessionId = recordings.startRecording(
                 name = defaultName(),
-                assetId = _selectedAssetId.value
+                assetId = _selectedAssetId.value,
+                docRef = _selectedDoc.value?.ref
             )
             TrackingState.begin(sessionId, System.currentTimeMillis())
             TrackingService.start(context, sessionId)
@@ -533,8 +660,10 @@ class RecordingViewModel(
      * "make a track".
      */
     fun finish() {
+        // A line that is DOC's needs no name and makes no place: the walk is the record, and the line
+        // already has a name of DOC's. A brand new line asks what to call it first.
         val assetId = _selectedAssetId.value
-        if (assetId == null) {
+        if (assetId == null && _selectedDoc.value == null) {
             _pendingTrackName.value = defaultTrackName()
             return
         }
@@ -613,6 +742,9 @@ class RecordingViewModel(
             // common path is friction for an answer the app already has.
             val sessionName = when {
                 newTrackName != null -> newTrackName
+                // A line of DOC's already has a name; the trip takes it and the day, and makes no place.
+                _selectedDoc.value != null ->
+                    "${_selectedDoc.value!!.name} \u2013 ${formatShortDate(sessionStart)}"
                 recordingName != null -> "$recordingName · ${formatShortDate(sessionStart)}"
                 else -> null
             }
@@ -640,6 +772,7 @@ class RecordingViewModel(
                 summary = numbersNow
             )
             _selectedAssetId.value = null
+            _selectedDoc.value = null
         }
     }
 
@@ -658,6 +791,12 @@ class RecordingViewModel(
 
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L
+
+        /** How far around the phone the chooser looks for DOC's tracks: ten kilometres, five of them. */
+        private const val DOC_NEARBY_M = 10_000.0
+
+        /** How many of DOC's lines the chooser offers at once. */
+        private const val DOC_CHOICES = 5
         private const val RECORDING_ID = -2L
 
         fun factory(context: Context, initialTargetId: Long? = null): ViewModelProvider.Factory {
@@ -671,6 +810,11 @@ class RecordingViewModel(
                         settingsRepository = SettingsRepository(appContext),
                         context = appContext,
                         locationSource = FusedLocationSource(appContext),
+                        // What DOC has published for this area, so the chooser can offer its tracks.
+                        docStore = OfflineDocStore(
+                            dao = database.offlineDocItemDao(),
+                            downloader = DocDownloader(ArcGisDoc())
+                        ),
                         initialTargetId = initialTargetId
                     )
                 }

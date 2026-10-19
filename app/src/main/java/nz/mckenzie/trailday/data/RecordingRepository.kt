@@ -48,11 +48,14 @@ class RecordingRepository(private val db: TrailDayDatabase) {
     suspend fun startRecording(
         name: String,
         assetId: Long? = null,
+        /** DOC's own record this pass followed, when it followed one: see [RecordedSessionEntity.docRef]. */
+        docRef: String? = null,
         startedAtEpochMs: Long = System.currentTimeMillis()
     ): Long = recordingDao.insertSession(
         RecordedSessionEntity(
             name = name,
             assetId = assetId,
+            docRef = docRef,
             startedAtEpochMs = startedAtEpochMs,
             status = RecordingStatus.RECORDING.name
         )
@@ -82,6 +85,10 @@ class RecordingRepository(private val db: TrailDayDatabase) {
     /** Records which planned track a session is for, if chosen after starting. */
     suspend fun setSessionAsset(sessionId: Long, assetId: Long) =
         recordingDao.setSessionAsset(sessionId, assetId)
+
+    /** Remembers that a pass followed one of DOC's lines - or, with null, that it followed none. */
+    suspend fun setSessionDocRef(sessionId: Long, docRef: String?) =
+        recordingDao.setSessionDocRef(sessionId, docRef)
 
     /** Renames a session, so the recordings list matches the track it became. */
     suspend fun renameSession(sessionId: Long, name: String) =

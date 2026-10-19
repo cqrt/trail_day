@@ -21,6 +21,7 @@ class RecordingsRowTest {
         status: RecordingStatus = RecordingStatus.FINISHED,
         assetId: Long? = 7L,
         assetName: String? = "Home block",
+        docRef: String? = null,
         distanceM: Double = 2350.0
     ) = RecordingRow(
         id = 1L,
@@ -31,7 +32,8 @@ class RecordingsRowTest {
         pointCount = 412,
         status = status,
         assetId = assetId,
-        assetName = assetName
+        assetName = assetName,
+        docRef = docRef
     )
 
     @Test
@@ -65,8 +67,17 @@ class RecordingsRowTest {
     @Test
     fun `a trip made without a place does not claim its place was deleted`() {
         assertEquals(
-            "Not linked to a place",
+            "A new line",
             recordingAsset(row(assetId = null, assetName = null))
+        )
+    }
+
+    @Test
+    fun `a trip that followed one of DOC's lines says so`() {
+        // DOC's material never becomes a place, so the row cannot say "For ..." - it says whose line it was.
+        assertEquals(
+            "Following a DOC track",
+            recordingAsset(row(assetId = null, assetName = null, docRef = "doc-tracks:35237557"))
         )
     }
 
