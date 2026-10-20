@@ -617,6 +617,12 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
+**Then DOC's browser led to the map for everything it lists.** A row is a name and a distance now, without the
+walking time that said how long the walk to the start would take - the distance is the question the list answers,
+and the walk itself is what the app is for. A tap on any row - a track, a hut, a camp or a bike trail - changes to
+the map, frames the line or the place, and raises DOC's card for it. The campsites service reads as **Camps** on the
+tab, its search and its page. It shipped as 0.3.18.
+
 **Then the switches were put with the material they own.** "Tracks" was hiding both DOC's tracks and the
 walker's, and a recorded line lost its green core to that switch while its gold edge stayed behind. The switch is
 now **DOC Tracks** and hides only DOC's; **DOC Huts** and **DOC Campsites** say whose they are. Everything of the

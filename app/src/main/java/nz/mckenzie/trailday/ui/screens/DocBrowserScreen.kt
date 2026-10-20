@@ -46,11 +46,8 @@ import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.distanceM
 import nz.mckenzie.trailday.map.drawingKind
 import nz.mckenzie.trailday.ui.formatDistance
-import nz.mckenzie.trailday.ui.formatEstimate
 import nz.mckenzie.trailday.ui.docRowDetail
 import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
-import nz.mckenzie.trailday.domain.geo.TravelMode
-import nz.mckenzie.trailday.domain.geo.TravelTime
 
 /**
  * What DOC publishes, read through the phone: one of its four services at a time, searched and narrowed.
@@ -222,13 +219,9 @@ fun DocBrowserScreen(
                         DocItemCard(
                             item = item,
                             distanceM = phoneFix?.let { position -> item.distanceM(position) },
-                            // A track is a line, and a line is read on the map. The huts, campsites and
-                            // bike trails are places whose row is the whole of what DOC says about them.
-                            onOpen = if (item.source.isLine) {
-                                { onShowOnMap(item) }
-                            } else {
-                                null
-                            }
+                            // Every one of these is read best where it is: the map frames the line or
+                            // the place and raises the card that says what DOC says about it.
+                            onOpen = { onShowOnMap(item) }
                         )
                     }
                 }
@@ -349,16 +342,13 @@ private fun MenuChoice(label: String, chosen: Boolean, onChoose: () -> Unit) {
  * list shows - the desk reads them from the same rule.
  */
 @Composable
-private fun DocItemCard(item: DocItem, distanceM: Double?, onOpen: (() -> Unit)? = null) {
-    val modifier = Modifier.fillMaxWidth()
-    if (onOpen != null) {
-        Card(onClick = onOpen, modifier = modifier) { DocItemRow(item, distanceM) }
-    } else {
-        Card(modifier = modifier) { DocItemRow(item, distanceM) }
+private fun DocItemCard(item: DocItem, distanceM: Double?, onOpen: () -> Unit) {
+    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+        DocItemRow(item, distanceM)
     }
 }
 
-/** The row itself, so a card that opens and one that does not are the same card. */
+/** The row itself: the kind's tile, the name, DOC's facts and how far away it is. */
 @Composable
 private fun DocItemRow(item: DocItem, distanceM: Double?) {
     Row(
@@ -376,8 +366,7 @@ private fun DocItemRow(item: DocItem, distanceM: Double?) {
             )
             distanceM?.let { metres ->
                 Text(
-                    text = "${formatDistance(metres)} away \u00b7 about " +
-                        "${formatEstimate(TravelTime.seconds(metres, 0.0, TravelMode.WALKING))}",
+                    text = "${formatDistance(metres)} away",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )

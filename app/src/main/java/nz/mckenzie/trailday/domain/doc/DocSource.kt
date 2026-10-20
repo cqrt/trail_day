@@ -183,7 +183,7 @@ enum class DocSource(
      */
     CAMPSITES(
         id = "campsites",
-        displayName = "Campsites",
+        displayName = "Camps",
         singular = "Campsite",
         service = "DOC_Campsites",
         shape = DocShape.POINT,

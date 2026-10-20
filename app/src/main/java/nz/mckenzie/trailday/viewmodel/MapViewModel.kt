@@ -302,9 +302,10 @@ class MapViewModel(
     }
 
     /**
-     * Frames one of DOC's tracks and brings its card up, as a tap on the map itself would.
+     * Frames one of DOC's things and brings its card up, as a tap on the map itself would.
      *
-     * The row in DOC's browser is a name and a length; the map is where the line is read.
+     * The row in DOC's browser is a name and a length; the map is where the line is read, and where a
+     * hut or a camp is seen against the ground around it.
      */
     fun focusDoc(item: DocItem) {
         viewModelScope.launch {
@@ -318,7 +319,9 @@ class MapViewModel(
                     settingsRepository.hideMapLayer(layer, false)
                 }
             }
-            item.paths.flatten().takeIf { points -> points.size >= 2 }?.let { points -> frame(points) }
+            // A place is a path of one point, and [frame] gives it the smallest frame a map can open
+            // on; a line is framed by its own extent.
+            item.paths.flatten().takeIf { points -> points.isNotEmpty() }?.let { points -> frame(points) }
         }
     }
 

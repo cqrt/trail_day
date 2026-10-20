@@ -34,7 +34,7 @@ class DocWordsTest {
             )
         )
 
-        assertEquals("Kept 412 tracks, 38 huts, 6 campsites, 93 bike trails.", said)
+        assertEquals("Kept 412 tracks, 38 huts, 6 camps, 93 bike trails.", said)
     }
 
     @Test
@@ -70,7 +70,7 @@ class DocWordsTest {
         )
 
         assertEquals(
-            "Kept 1 track, 1 hut, 1 campsite, 1 bike trail. The campsites could not be read.",
+            "Kept 1 track, 1 hut, 1 campsite, 1 bike trail. The camps could not be read.",
             said
         )
     }
@@ -78,7 +78,7 @@ class DocWordsTest {
     @Test
     fun `the tab's own line is the same words, and nothing when nothing is held`() {
         assertEquals(
-            "412 tracks, 38 huts, 6 campsites, 93 bike trails",
+            "412 tracks, 38 huts, 6 camps, 93 bike trails",
             docHeldWords(
                 mapOf(
                     DocSource.BIKES to 93,

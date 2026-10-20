@@ -36,7 +36,7 @@ class DocInventoryTest {
             )
         )
 
-        assertEquals("412 tracks, 38 huts, 6 campsites, 93 bike trails and 62 pictures", said)
+        assertEquals("412 tracks, 38 huts, 6 camps, 93 bike trails and 62 pictures", said)
     }
 
     @Test
