@@ -49,15 +49,22 @@ fun AssetEditScreen(
     onDone: () -> Unit
 ) {
     val asset by viewModel.editDraft.collectAsStateWithLifecycle()
+    val photo by viewModel.photo.collectAsStateWithLifecycle()
 
     // Nothing until the place is here: a form that opened with a blank name would save
     // that name over a real one.
     val current = asset ?: return
+    val shape = AssetShape.fromStorage(current.shape)
 
     var name by remember { mutableStateOf(current.name) }
     var kind by remember { mutableStateOf(AssetKind.fromStorage(current.kind)) }
     var notes by remember { mutableStateOf(current.notes.orEmpty()) }
     var problem by remember { mutableStateOf<String?>(null) }
+    // A picture can be replaced or removed without touching either until Save. The flag is what
+    // distinguishes "never had one" from "the walker took this one away".
+    var photoEdited by remember(current.id) { mutableStateOf(false) }
+    var draftPhoto by remember(current.id) { mutableStateOf<ByteArray?>(null) }
+    val shownPhoto = if (photoEdited) draftPhoto else photo
 
     Scaffold(
         topBar = {
@@ -77,7 +84,11 @@ fun AssetEditScreen(
                             )
                         ) {
                             is AssetEditResult.Ok -> {
-                                viewModel.save(result.asset)
+                                viewModel.save(
+                                    asset = result.asset,
+                                    photo = draftPhoto,
+                                    photoChanged = photoEdited
+                                )
                                 onDone()
                             }
 
@@ -108,7 +119,7 @@ fun AssetEditScreen(
                 // Only the kinds that agree with the shape this place already has: how it was made
                 // decided that, and a hut asked to be a track would be a line with one coordinate
                 // on it. See [AssetPhrase.kindsFor].
-                choices = AssetPhrase.kindsFor(AssetShape.fromStorage(current.shape)),
+                choices = AssetPhrase.kindsFor(shape),
                 selected = kind,
                 // The shape follows the kind and is not asked about: a hut is a point because a hut
                 // is somewhere you stop, and a question that could answer otherwise is a waypoint
@@ -119,10 +130,22 @@ fun AssetEditScreen(
             OutlinedTextField(
                 value = notes,
                 onValueChange = { notes = it; problem = null },
-                label = { Text("Notes") },
+                label = { Text(if (shape == AssetShape.POINT) "Description" else "Notes") },
                 minLines = 3,
                 modifier = Modifier.fillMaxWidth()
             )
+
+            if (shape == AssetShape.POINT) {
+                Text("Photo", style = MaterialTheme.typography.labelLarge)
+                WaypointPhotoField(
+                    photo = shownPhoto,
+                    onPhoto = {
+                        photoEdited = true
+                        draftPhoto = it
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             problem?.let {
                 Text(

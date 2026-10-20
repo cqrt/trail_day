@@ -720,10 +720,11 @@ private fun applyLayerVisibility(
     yourTracksHidden: Boolean = false
 ) {
     AssetLayer.ALL.forEach { layer ->
-        // DOC Tracks is DOC's alone: the walker's tracks have their own switch, so this one must not
-        // hide them or take a recorded line's green core away with its gold edge. Everything else is
-        // the walker's layer and DOC's material of the same kind under one switch. See
-        // [DocLayerIds.idsOf] for which of DOC's layers each switch hides.
+        // DOC Tracks and Bike tracks are two halves of DOC's lines rather than one above the other:
+        // the first hides the walking-only tracks, the second the rideable ones and their badges.
+        // The walker's tracks have their own switch, so DOC Tracks must not hide them or take a
+        // recorded line's green core away with its gold edge. See [DocLayerIds.idsOf] for which of
+        // DOC's layers each switch hides.
         val ids = if (layer == AssetLayer.TRACKS) {
             DocLayerIds.idsOf(layer)
         } else {
@@ -735,17 +736,6 @@ private fun applyLayerVisibility(
                 PropertyFactory.visibility(if (layer in hidden) Property.NONE else Property.VISIBLE)
             )
         }
-    }
-    // DOC Tracks is above Bike tracks for the lines: with DOC's tracks off, the rideable ones go too,
-    // even if the Bike tracks switch is still on. The bike badges are bike trails in their own right,
-    // though - including the orphan points with no track - so they stay under Bike tracks alone.
-    if (AssetLayer.TRACKS in hidden) {
-        listOf(DocLayerIds.BIKE_CASING, DocLayerIds.BIKE_TRACKS)
-            .forEach { id ->
-                style.getLayer(id)?.setProperties(
-                    PropertyFactory.visibility(Property.NONE)
-                )
-            }
     }
     // The walker's tracks are one switch: every line of theirs, every name beside one, the gold edge
     // under a recorded line, and the recordings themselves. A track that was recorded is one line

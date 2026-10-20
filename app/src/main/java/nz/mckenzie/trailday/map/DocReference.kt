@@ -118,10 +118,11 @@ object DocLayerIds {
     /**
      * The style layers [layer] hides of DOC's own material, when the walker switches that layer off.
      *
-     * **DOC Tracks hides every DOC track; Bike tracks hides the ones that can be ridden.** The two
-     * sets are kept apart here, and the map view hides the bike layers as well when DOC Tracks goes
-     * off, so the two switches cannot leave half a track behind. A bike point is a bike trail now, so
-     * its badge goes with the Bike tracks switch, not with a waypoint switch that no longer exists.
+     * **DOC Tracks hides the walking-only tracks; Bike tracks hides the rideable ones.** The two
+     * sets are independent halves of DOC's lines, so switching DOC Tracks off leaves a rideable
+     * track and its badge standing when Bike tracks is on - which is what the walker asked for by
+     * choosing only bike tracks. A bike point is a bike trail now, so its badge goes with the Bike
+     * tracks switch, not with a waypoint switch that no longer exists.
      */
     fun idsOf(layer: AssetLayer): List<String> = when (layer) {
         // The casing is under the line it edges, so it is hidden with it.

@@ -9,6 +9,7 @@ import androidx.room.RoomDatabase
     entities = [
         AssetEntity::class,
         AssetPointEntity::class,
+        AssetPhotoEntity::class,
         RecordedSessionEntity::class,
         RecordedPointEntity::class,
         RecordedBreakEntity::class,
@@ -16,7 +17,7 @@ import androidx.room.RoomDatabase
         OfflineDocItemEntity::class,
         OfflineDocPictureEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class TrailDayDatabase : RoomDatabase() {
@@ -52,7 +53,7 @@ abstract class TrailDayDatabase : RoomDatabase() {
                     TrailDayDatabase::class.java,
                     NAME
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build().also { instance = it }
             }
     }

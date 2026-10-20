@@ -16,6 +16,10 @@ import nz.mckenzie.trailday.domain.asset.AssetShape
  * Deliberately absent: the downloaded offline areas. They describe tiles on one
  * device, the tiles themselves are re-downloadable, and a restore that claimed to
  * bring imagery back would be lying.
+ *
+ * Also absent for now: the photographs attached to the walker's own places. They
+ * stay on the phone that took them, which keeps the backup file small enough for the
+ * off-site copy; a place restored elsewhere arrives with its words and not its picture.
  */
 @Serializable
 data class BackupDocument(

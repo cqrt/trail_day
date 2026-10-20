@@ -110,3 +110,27 @@ internal val MIGRATION_3_4 = object : Migration(3, 4) {
         db.execSQL("ALTER TABLE recorded_sessions ADD COLUMN docRef TEXT")
     }
 }
+
+/**
+ * Where a place gains the photograph the walker attached to it.
+ *
+ * A new table rather than a column on `assets`: the place list reads every asset on every map
+ * refresh, and a photograph has no business being carried by a row that is not being looked at.
+ * Nothing is guessed for places already on the phone - a place with no row here is a place with no
+ * photograph, which is what it had before.
+ */
+internal val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `asset_photos` (
+                `assetId` INTEGER NOT NULL,
+                `jpeg` BLOB NOT NULL,
+                `addedAtEpochMs` INTEGER NOT NULL,
+                PRIMARY KEY(`assetId`),
+                FOREIGN KEY(`assetId`) REFERENCES `assets`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+            """.trimIndent()
+        )
+    }
+}

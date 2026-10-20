@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- The camera's original, held only until the scaled copy is stored. -->
+    <cache-path name="waypoint_photos" path="waypoint-photos/" />
+</paths>

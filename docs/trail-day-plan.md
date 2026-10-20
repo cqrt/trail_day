@@ -617,6 +617,23 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
+**Then the bike switch stood on its own.** DOC Tracks and Bike tracks are now two independent halves of DOC's
+lines: the first hides walking-only tracks, the second the tracks that can be ridden, their casing and their
+badges. Choosing only Bike tracks shows the rideable line as well as its bicycle, and tapping that line or badge
+opens the track card. Before this, DOC Tracks was above Bike tracks and took the rideable line away while leaving
+its badge on the map with nothing to answer the finger. It shipped as 0.3.26.
+
+**Then a recording could become a walking track or a bike track.** The name dialog's new type row decides the
+kind of the place the pass is saved as, so a ride is drawn, listed and filtered as a bike track rather than being
+an unclassified track with a bicycle-shaped hole where its kind should be. Finishing against an existing place or
+a DOC line asks for no type: no place is being made.
+
+**Then "Add a spot" became "Add a waypoint".** The app's own huts and campsites are DOC's reference material now,
+so the walker's form no longer asks them to choose a kind before they have said what is there. A waypoint carries
+a name, a short description and an optional photograph. The description is the place's existing notes field; the
+photograph is scaled, compressed and kept with the place, and can be replaced or removed from the editor. It is
+local to the phone and is not carried in the JSON backup, which stays small. It shipped as 0.3.26.
+
 **Then the map kept the track the walker was reading.** A card used to belong to the map screen, so changing to
 Record or Places and coming back rebuilt the screen as an empty map framed on the phone. The picked place and the
 frame around it now live with the map itself: the card, its line and the camera stay until the card is closed. It
@@ -624,10 +641,10 @@ shipped as 0.3.25.
 
 **Then the layer switches were split between DOC's tracks and the walker's own spots.** The map now draws DOC's
 walking-only tracks and its rideable ones as two layers, so **Bike tracks** actually hides the tracks DOC says may be
-ridden - with their casing and their bicycle badges - while **DOC Tracks** still hides every DOC track. A bike point
-with no track is no longer a waypoint: it is a bike trail, drawn with the bicycle under the Bike tracks switch.
+ridden - with their casing and their bicycle badges - while **DOC Tracks** hid every DOC track at that point. A bike
+point with no track is no longer a waypoint: it is a bike trail, drawn with the bicycle under the Bike tracks switch.
 **Waypoints** is back, but it is only the walker's own dropped spots; it shows nothing until they drop one. It shipped
-as 0.3.24.
+as 0.3.24; 0.3.26 made the two track switches independent.
 
 **Then the bicycle badge got wheels you can see through.** The bike's wheels were drawn with the same heavy stroke as
 the other markers, so at badge size the holes closed and the shape read as two purple plums. The wheels are now

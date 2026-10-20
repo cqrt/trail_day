@@ -681,9 +681,17 @@ class RecordingViewModel(
         completeFinish(newTrackName = null)
     }
 
-    /** From the naming dialog: saves the recorded line as a new, named track. */
-    fun confirmFinish(name: String) {
-        completeFinish(newTrackName = name.trim().ifBlank { defaultTrackName() })
+    /**
+     * From the naming dialog: saves the recorded line as a new, named track of [kind].
+     *
+     * The type is the place's, not the recording's: the pass is the same evidence either way, and
+     * the line's kind is what decides its colour, its glyph and where it appears in the list.
+     */
+    fun confirmFinish(name: String, kind: AssetKind = AssetKind.TRACK) {
+        completeFinish(
+            newTrackName = name.trim().ifBlank { defaultTrackName() },
+            newTrackKind = kind
+        )
     }
 
     /** Dismisses the naming dialog without ending the recording. */
@@ -691,7 +699,10 @@ class RecordingViewModel(
         _pendingTrackName.value = null
     }
 
-    private fun completeFinish(newTrackName: String?) {
+    private fun completeFinish(
+        newTrackName: String?,
+        newTrackKind: AssetKind = AssetKind.TRACK
+    ) {
         val sessionId = sessionIdOrNull() ?: return
         viewModelScope.launch {
             _pendingTrackName.value = null
@@ -729,6 +740,7 @@ class RecordingViewModel(
                     assetRepository.createAsset(
                         name = newTrackName,
                         geometry = geometry,
+                        kind = newTrackKind,
                         // The mark that says a walk made this place, so deleting the trip can take the place
                         // with it without guessing which places came from walks.
                         sourceRef = recordingSourceRef(sessionId)

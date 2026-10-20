@@ -16,11 +16,12 @@ package nz.mckenzie.trailday.domain.asset
  * marker's shape and colour are read from. It is the same enum the picker, the list and the record
  * screens use: a layer per kind, a chip per kind, one vocabulary.
  *
- * **DOC Tracks hides only DOC's tracks**, because the walker's own tracks - planned, imported and
- * recorded - are the sheet's "Your Tracks", which is not an [AssetLayer] because a recording is
- * evidence rather than a place. DOC Huts and DOC Campsites are named for the reference material,
- * which is the only hut and campsite the app draws. The walker's own bike tracks and waypoints keep
- * a switch per kind.
+ * **DOC Tracks and Bike tracks are separate halves of DOC's lines.** DOC Tracks hides the
+ * walking-only tracks, and Bike tracks hides the rideable ones and their badges; switching one off
+ * does not switch the other off. The walker's own tracks - planned, imported and recorded - are the
+ * sheet's "Your Tracks", which is not an [AssetLayer] because a recording is evidence rather than a
+ * place. DOC Huts and DOC Campsites are named for the reference material, which is the only hut and
+ * campsite the app draws. The walker's own bike tracks and waypoints keep a switch per kind.
  *
  * **What a preference stores is what is hidden, not what is shown.** Everything is drawn until
  * somebody says otherwise, so the map is what it always was for anyone who never opens this, and a

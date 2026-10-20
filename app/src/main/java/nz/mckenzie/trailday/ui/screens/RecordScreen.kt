@@ -113,6 +113,13 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
     var permissionGranted by remember { mutableStateOf(viewModel.hasLocationPermission()) }
     var pickingTrack by remember { mutableStateOf(false) }
     var assetNameDraft by remember { mutableStateOf("") }
+    var assetKindDraft by remember { mutableStateOf(AssetKind.TRACK) }
+
+    // A new dialog starts on the common case: a walk. The last saved track's type must not leak into
+    // the next one, which is a different place.
+    LaunchedEffect(pendingTrackName) {
+        if (pendingTrackName != null) assetKindDraft = AssetKind.TRACK
+    }
 
     // The kind of recording being set up: following a line, or a new line of the walker's own. Not held
     // while a pass is being driven - by then it is a fact, not a choice.
@@ -464,10 +471,19 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                         label = { Text("Name") },
                         singleLine = true
                     )
+                    ChoiceRow(
+                        label = "What kind of track",
+                        choices = listOf(AssetKind.TRACK, AssetKind.BIKE_TRACK),
+                        selected = assetKindDraft,
+                        onChoose = { assetKindDraft = it },
+                        text = AssetPhrase::kind
+                    )
                 }
             },
             confirmButton = {
-                TextButton(onClick = { viewModel.confirmFinish(assetNameDraft) }) { Text("Save") }
+                TextButton(
+                    onClick = { viewModel.confirmFinish(assetNameDraft, assetKindDraft) }
+                ) { Text("Save") }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.cancelFinish() }) { Text("Cancel") }

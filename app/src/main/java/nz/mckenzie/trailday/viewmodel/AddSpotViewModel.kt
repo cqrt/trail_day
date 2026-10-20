@@ -9,7 +9,6 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -31,12 +30,11 @@ import nz.mckenzie.trailday.tracking.LocationSource
 import nz.mckenzie.trailday.tracking.frameOnDevice
 
 /**
- * Adds a place by tapping the map once.
+ * Adds a waypoint by tapping the map once.
  *
- * A place is somewhere you stop - a hut, a campsite, the water, the lunch spot - so it is one
- * coordinate and one tap. Every kind that can be dropped here is a point (see [AssetKind.shape]),
- * which is why there is no shape to ask about and no line to tap out: a line comes from DOC, from a
- * file, or from walking it.
+ * A waypoint is somewhere you stop - the water, the lunch spot, a campsite - so it is one
+ * coordinate and one tap. The app's own huts and campsites are DOC's reference material now, so
+ * this screen makes the walker's plain spot and lets the description say what it is.
  *
  * The draft is held in memory only - nothing is written until Save, so a tap that landed in the
  * wrong place leaves no trace in the database.
@@ -64,11 +62,6 @@ class AddSpotViewModel(
     /** The frame for the camera when the map opens: around the phone, if it knows. */
     val initialFrame: StateFlow<LatLngBounds?> = _initialFrame
 
-    private val _kind = MutableStateFlow(AssetKind.WAYPOINT)
-
-    /** What the spot is. A waypoint, which is the plainest of the three, until told otherwise. */
-    val kind: StateFlow<AssetKind> = _kind
-
     /**
      * Where the spot is, or null before the map has been tapped.
      *
@@ -78,28 +71,30 @@ class AddSpotViewModel(
     private val _spot = MutableStateFlow<GeoPoint?>(null)
 
     /**
-     * The spot as the map draws it, in its kind's own colour and glyph.
+     * The spot as the map draws it, in the waypoint's own colour and glyph.
      *
-     * The kind's colours rather than the draft amber the drawing screen used: what is being placed
-     * is the thing itself, so the walker sees the marker they are about to keep while they place it.
+     * What is being placed is the thing itself, so the walker sees the marker they are about to
+     * keep while they place it.
      */
-    val draftGeoJson: StateFlow<String> = combine(_spot, _kind) { spot, kind ->
-        val draft = spot?.let { point ->
-            AssetLine(
-                assetId = DRAFT_ID,
-                name = AssetPhrase.kind(kind),
-                colorHex = AssetColors.forKind(kind),
-                points = listOf(point),
-                kind = kind,
-                shape = AssetShape.POINT
-            )
+    val draftGeoJson: StateFlow<String> = _spot
+        .map { spot ->
+            val draft = spot?.let { point ->
+                AssetLine(
+                    assetId = DRAFT_ID,
+                    name = AssetPhrase.kind(AssetKind.WAYPOINT),
+                    colorHex = AssetColors.forKind(AssetKind.WAYPOINT),
+                    points = listOf(point),
+                    kind = AssetKind.WAYPOINT,
+                    shape = AssetShape.POINT
+                )
+            }
+            AssetGeoJson.build(listOfNotNull(draft))
         }
-        AssetGeoJson.build(listOfNotNull(draft))
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-        AssetGeoJson.build(emptyList())
-    )
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+            AssetGeoJson.build(emptyList())
+        )
 
     /** Whether a spot has been placed, which is also whether there is anything to save. */
     val placed: StateFlow<Boolean> = _spot
@@ -135,40 +130,38 @@ class AddSpotViewModel(
         }
     }
 
-    /**
-     * Says what the spot is.
-     *
-     * The kind decides the glyph and the colour it is drawn with, and nothing else: everything that
-     * can be dropped here is a point, so changing the answer moves no ground.
-     */
-    fun chooseKind(chosen: AssetKind) {
-        _kind.value = chosen
-        _message.value = null
-    }
-
     /** Drops the spot where the map was tapped, moving it if there was one already. */
     fun dropSpot(latitude: Double, longitude: Double) {
         _spot.value = GeoPoint(lat = latitude, lng = longitude)
         _message.value = null
     }
 
-    /** Keeps the spot under [name]. */
-    fun save(name: String) {
+    /**
+     * Keeps the spot under [name], with [description] and an optional [photo].
+     *
+     * The description is the place's existing notes field: one place for the walker's words about
+     * a spot, whether they arrived here or through the editor. The photo is stored after the place
+     * has an id; a picture that cannot be stored must not turn a saved place into a second one.
+     */
+    fun save(name: String, description: String = "", photo: ByteArray? = null) {
         val spot = _spot.value
         if (spot == null) {
             _message.value = "Tap the map where it is, then save"
             return
         }
-        val kind = _kind.value
         viewModelScope.launch {
             runCatching {
                 assetRepository.createAsset(
-                    name = name.trim().ifBlank { "New ${AssetPhrase.kind(kind)}" },
+                    name = name.trim().ifBlank { "New ${AssetPhrase.kind(AssetKind.WAYPOINT)}" },
                     geometry = AssetGeometry(listOf(listOf(spot))),
-                    kind = kind,
-                    shape = AssetShape.POINT
+                    kind = AssetKind.WAYPOINT,
+                    shape = AssetShape.POINT,
+                    notes = description.trim().ifBlank { null }
                 )
             }.onSuccess { assetId ->
+                if (photo != null) {
+                    runCatching { assetRepository.saveAssetPhoto(assetId, photo) }
+                }
                 _savedAssetId.value = assetId
             }.onFailure { failure ->
                 _message.value = failure.message ?: "Could not save it"

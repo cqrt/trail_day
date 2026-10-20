@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -66,6 +67,19 @@ abstract class AssetDao {
 
     @Query("DELETE FROM assets WHERE id = :id")
     abstract suspend fun delete(id: Long)
+
+    /** The photograph attached to a place, when one is watched by the place's own page. */
+    @Query("SELECT jpeg FROM asset_photos WHERE assetId = :assetId")
+    abstract fun observePhoto(assetId: Long): Flow<ByteArray?>
+
+    @Query("SELECT jpeg FROM asset_photos WHERE assetId = :assetId")
+    abstract suspend fun photo(assetId: Long): ByteArray?
+
+    @Upsert
+    abstract suspend fun upsertPhoto(photo: AssetPhotoEntity)
+
+    @Query("DELETE FROM asset_photos WHERE assetId = :assetId")
+    abstract suspend fun deletePhoto(assetId: Long)
 
     @Query("UPDATE assets SET lengthM = :lengthM WHERE id = :assetId")
     abstract suspend fun updateMeasures(assetId: Long, lengthM: Double)

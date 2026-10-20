@@ -57,6 +57,10 @@ class AssetDetailViewModel(
     val geometry: StateFlow<AssetGeometry> = assetRepository.observeAssetGeometry(assetId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), AssetGeometry.NONE)
 
+    /** The photograph attached to this place, when it has one. */
+    val photo: StateFlow<ByteArray?> = assetRepository.observeAssetPhoto(assetId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
     val bounds: StateFlow<LatLngBounds?> = geometry
         .map { assetGeometry ->
             val points = assetGeometry.points
@@ -111,16 +115,29 @@ class AssetDetailViewModel(
     }
 
     /**
-     * Stores edits made on this screen.
+     * Stores edits made on this screen, and the photograph when the form changed it.
      *
-     * The fields were checked by [nz.mckenzie.trailday.ui.AssetEdits] before this is
-     * called, so anything arriving here is already fit to store.
+     * [photoChanged] is what tells a place that never had a picture from one whose picture the
+     * walker removed: both arrive here with null, and only the second should delete anything.
      */
-    fun save(asset: AssetEntity) {
+    fun save(
+        asset: AssetEntity,
+        photo: ByteArray? = null,
+        photoChanged: Boolean = false
+    ) {
         viewModelScope.launch {
-            runCatching { assetRepository.saveAssetEdits(asset) }
+            runCatching {
+                assetRepository.saveAssetEdits(asset)
+                if (photoChanged) {
+                    if (photo != null) {
+                        assetRepository.saveAssetPhoto(asset.id, photo)
+                    } else {
+                        assetRepository.deleteAssetPhoto(asset.id)
+                    }
+                }
+            }
                 .onSuccess { _message.value = "Saved" }
-                .onFailure { _message.value = it.message ?: "Could not save the track" }
+                .onFailure { _message.value = it.message ?: "Could not save the place" }
         }
     }
 

@@ -121,7 +121,7 @@ fun AssetListScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(onClick = onAddSpot, modifier = Modifier.weight(1f)) {
-                        Text("Add a spot")
+                        Text("Add a waypoint")
                     }
                     OutlinedButton(
                         onClick = { importLauncher.launch(TRACK_MIME_TYPES) },
@@ -178,8 +178,8 @@ fun AssetListScreen(
                         EmptyState(
                             glyph = IconGlyph.ASSETS,
                             title = "No places yet",
-                            body = "Drop a spot on the map, or bring in a GPX, KML, KMZ or GeoJSON file.",
-                            actionLabel = "Add a spot",
+                            body = "Add a waypoint, or bring in a GPX, KML, KMZ or GeoJSON file.",
+                            actionLabel = "Add a waypoint",
                             onAction = onAddSpot
                         )
                     }

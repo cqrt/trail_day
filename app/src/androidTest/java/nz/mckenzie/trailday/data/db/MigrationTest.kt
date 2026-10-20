@@ -118,6 +118,40 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun aPlaceGainsSomewhereToKeepItsPhoto() {
+        // Version 4 held places and their geometry but nowhere for a photograph. The table is new,
+        // so nothing is guessed about places already on the phone; a new row is what proves it is
+        // usable, and the foreign key is what lets deleting the place take the picture with it.
+        helper.createDatabase(TEST_DATABASE_PHOTOS, 4).apply {
+            execSQL(
+                """
+                INSERT INTO assets
+                    (id, name, kind, shape, notes, active, createdAtEpochMs, lengthM, sourceRef)
+                VALUES
+                    (1, 'Creek camp', 'WAYPOINT', 'POINT', NULL, 1, 1790000000000, 0.0, NULL)
+                """.trimIndent()
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(
+            TEST_DATABASE_PHOTOS,
+            5,
+            true,
+            MIGRATION_4_5
+        )
+
+        migrated.execSQL(
+            "INSERT INTO asset_photos (assetId, jpeg, addedAtEpochMs) VALUES (1, X'01020304', 1790000000000)"
+        )
+        migrated.query("SELECT assetId, jpeg FROM asset_photos").use { rows ->
+            assertTrue("the photograph is there", rows.moveToFirst())
+            assertEquals(1L, rows.getLong(0))
+            assertArrayEquals(byteArrayOf(1, 2, 3, 4), rows.getBlob(1))
+        }
+    }
+
     private companion object {
         /** Names of this test's own: the real database is never opened by a test. */
         const val TEST_DATABASE = "migration-test.db"
@@ -130,5 +164,8 @@ class MigrationTest {
 
         /** And a third, for the version 2 to 3 change, so neither file is migrated twice. */
         const val TEST_DATABASE_PICTURES = "migration-test-pictures.db"
+
+        /** And a fourth, for the version 4 to 5 change. */
+        const val TEST_DATABASE_PHOTOS = "migration-test-photos.db"
     }
 }

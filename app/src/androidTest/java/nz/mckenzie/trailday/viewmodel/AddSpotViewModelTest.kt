@@ -17,6 +17,7 @@ import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.tracking.LocationSource
 import org.junit.After
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -93,10 +94,9 @@ class AddSpotViewModelTest {
     }
 
     @Test
-    fun aSpotIsOneTapAndSavesWhereItIs(): Unit = runBlocking {
+    fun aWaypointIsOneTapAndSavesWhereItIs(): Unit = runBlocking {
         val viewModel = viewModel()
 
-        viewModel.chooseKind(AssetKind.HUT)
         viewModel.dropSpot(-41.5100, 173.9600)
         assertTrue("one tap is enough for a place", placedBecomes(viewModel, true))
 
@@ -106,8 +106,8 @@ class AddSpotViewModelTest {
         val repository = AssetRepository(db)
         val asset = repository.getAsset(saved)!!
         assertEquals(
-            "the kind chosen is the kind stored",
-            AssetKind.HUT,
+            "everything added here is a waypoint",
+            AssetKind.WAYPOINT,
             AssetKind.fromStorage(asset.kind)
         )
         assertEquals(AssetShape.POINT, AssetShape.fromStorage(asset.shape))
@@ -136,18 +136,32 @@ class AddSpotViewModelTest {
     }
 
     @Test
-    fun choosingADifferentKindMovesNoGround(): Unit = runBlocking {
+    fun aWaypointKeepsItsDescriptionAndPhoto(): Unit = runBlocking {
         val viewModel = viewModel()
+        val photo = byteArrayOf(0x01, 0x02, 0x03)
 
         viewModel.dropSpot(-41.5100, 173.9600)
-        viewModel.chooseKind(AssetKind.CAMPSITE)
-
-        assertTrue("the spot is still placed", placedBecomes(viewModel, true))
-        viewModel.save("Camp")
+        assertTrue("the spot is placed", placedBecomes(viewModel, true))
+        viewModel.save(
+            name = "Creek camp",
+            description = "Flat ground by the creek, out of the wind",
+            photo = photo
+        )
 
         val saved = withTimeout(5_000) { viewModel.savedAssetId.first { it != null } }!!
         val repository = AssetRepository(db)
-        assertEquals(AssetKind.CAMPSITE, AssetKind.fromStorage(repository.getAsset(saved)!!.kind))
+        val asset = repository.getAsset(saved)!!
+        assertEquals(AssetKind.WAYPOINT, AssetKind.fromStorage(asset.kind))
+        assertEquals(
+            "the description is the place's own words",
+            "Flat ground by the creek, out of the wind",
+            asset.notes
+        )
+        assertArrayEquals(
+            "the photograph travels with the place",
+            photo,
+            repository.getAssetPhoto(saved)
+        )
         assertEquals(-41.5100, repository.getAssetGeometry(saved).points.single().lat, 1e-9)
     }
 

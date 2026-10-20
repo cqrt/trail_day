@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import nz.mckenzie.trailday.data.db.AssetEntity
+import nz.mckenzie.trailday.data.db.AssetPhotoEntity
 import nz.mckenzie.trailday.data.db.AssetPointEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.asset.AssetKind
@@ -224,6 +225,41 @@ class AssetRepository(
     }
 
     suspend fun deleteAsset(assetId: Long) = assetDao.delete(assetId)
+
+    // --- Photographs ----------------------------------------------------------------
+
+    /**
+     * The photograph attached to [assetId], when the place page is watching it.
+     *
+     * Its own query rather than part of the asset: the list reads every row, and a list has no use
+     * for a picture it is not showing.
+     */
+    fun observeAssetPhoto(assetId: Long): Flow<ByteArray?> = assetDao.observePhoto(assetId)
+
+    /** The photograph as it is stored, for a screen that will show it once. */
+    suspend fun getAssetPhoto(assetId: Long): ByteArray? = assetDao.photo(assetId)
+
+    /**
+     * Attaches a photograph to a place, replacing any it had.
+     *
+     * The bytes are expected to be a JPEG already scaled and compressed by
+     * [nz.mckenzie.trailday.photo.WaypointPhotos]; this layer stores what it is given.
+     */
+    suspend fun saveAssetPhoto(
+        assetId: Long,
+        jpeg: ByteArray,
+        addedAtEpochMs: Long = System.currentTimeMillis()
+    ) {
+        assetDao.upsertPhoto(
+            AssetPhotoEntity(
+                assetId = assetId,
+                jpeg = jpeg,
+                addedAtEpochMs = addedAtEpochMs
+            )
+        )
+    }
+
+    suspend fun deleteAssetPhoto(assetId: Long) = assetDao.deletePhoto(assetId)
 
     /**
      * Writes every path of a place's geometry and the length that goes with it.

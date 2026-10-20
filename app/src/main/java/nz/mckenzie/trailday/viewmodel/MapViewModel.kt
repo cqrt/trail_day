@@ -366,7 +366,7 @@ class MapViewModel(
                 bikes = items.filter { it.source == DocSource.BIKES }
             )
             items.filter { item ->
-                layerOf(item.source.drawingKind()) !in hidden &&
+                docLayerOf(item, links) !in hidden &&
                     !(item.source == DocSource.BIKES && item.sourceRef in links.linkedBikeRefs)
             }
         }
@@ -659,6 +659,21 @@ class MapViewModel(
     /** The switch that governs [kind]: one layer of the work per kind. */
     private fun layerOf(kind: AssetKind): AssetLayer? =
         AssetLayer.ALL.firstOrNull { it.kind == kind }
+
+    /**
+     * The switch that governs [item] on the reference layer.
+     *
+     * A DOC track is drawn as one of two layers depending on whether a bike point sits on it: the
+     * walking-only line under [AssetLayer.TRACKS], the rideable one under [AssetLayer.BIKE_TRACKS].
+     * Tapping the line or its bicycle badge must follow the same split, or a map showing only bike
+     * tracks would draw a track that can never answer a finger.
+     */
+    private fun docLayerOf(item: DocItem, links: DocBikeLinks): AssetLayer? =
+        if (item.source == DocSource.TRACKS && item.sourceRef in links.linkedTrackRefs) {
+            AssetLayer.BIKE_TRACKS
+        } else {
+            layerOf(item.source.drawingKind())
+        }
 
     /**
      * Hides or shows one layer of the work, leaving the others as they are.

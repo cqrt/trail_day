@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -52,6 +55,7 @@ import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.BasemapView
+import nz.mckenzie.trailday.photo.WaypointPhotos
 import nz.mckenzie.trailday.ui.formatCoordinates
 import nz.mckenzie.trailday.ui.formatDate
 import nz.mckenzie.trailday.ui.formatDistance
@@ -92,6 +96,8 @@ fun AssetDetailScreen(
     val elevation = remember(geometry) { ElevationProfile.of(geometry.line) }
     val bounds by viewModel.bounds.collectAsStateWithLifecycle()
     val recordings by viewModel.recordings.collectAsStateWithLifecycle()
+    val photo by viewModel.photo.collectAsStateWithLifecycle()
+    val photoImage = remember(photo) { photo?.let(WaypointPhotos::bitmap)?.asImageBitmap() }
     val apiKey by viewModel.apiKey.collectAsStateWithLifecycle()
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
@@ -224,6 +230,18 @@ fun AssetDetailScreen(
                     }
                 }
 
+                photoImage?.let { image ->
+                    Image(
+                        bitmap = image,
+                        contentDescription = "Photo of ${track?.name ?: "this place"}",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+                }
+
                 track?.notes?.takeIf { it.isNotBlank() }?.let {
                     Text(text = it, style = MaterialTheme.typography.bodyMedium)
                 }
@@ -323,7 +341,15 @@ fun AssetDetailScreen(
                         onEdit()
                     },
                     headlineContent = { Text("Edit details") },
-                    supportingContent = { Text("Name, kind and notes") },
+                    supportingContent = {
+                        Text(
+                            if (shape == AssetShape.POINT) {
+                                "Name, description and photo"
+                            } else {
+                                "Name, kind and notes"
+                            }
+                        )
+                    },
                     leadingContent = { AppIcon(IconGlyph.EDIT) }
                 )
                 ListItem(

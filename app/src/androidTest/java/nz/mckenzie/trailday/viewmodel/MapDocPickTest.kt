@@ -14,6 +14,7 @@ import kotlinx.coroutines.withTimeout
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
+import nz.mckenzie.trailday.domain.asset.AssetLayer
 import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.domain.doc.DocHitTest
@@ -185,6 +186,55 @@ class MapDocPickTest {
         } finally {
             watching.cancel()
         }
+    }
+
+    @Test
+    fun aRideableTrackIsTappableWhenOnlyBikeTracksAreShown() = runBlocking {
+        // DOC publishes a track and a bike point sitting on it under the same name. The map draws
+        // that track under the Bike tracks switch, so with DOC Tracks off it must still answer a tap.
+        val track = DocItem(
+            source = DocSource.TRACKS,
+            objectId = 70,
+            name = "Estuary ride",
+            paths = listOf(
+                listOf(
+                    GeoPoint(lat = -41.5000, lng = 173.9600),
+                    GeoPoint(lat = -41.5100, lng = 173.9700)
+                )
+            )
+        )
+        val bike = DocItem(
+            source = DocSource.BIKES,
+            objectId = 71,
+            name = "Estuary ride",
+            paths = listOf(listOf(GeoPoint(lat = -41.5000, lng = 173.9600))),
+            facts = mapOf("Difficulty" to "Intermediate")
+        )
+        val docs = OfflineDocStore(dao = db.offlineDocItemDao(), downloader = DocDownloader(ArcGisDoc()))
+        docs.store(listOf(track, bike))
+        val settings = SettingsRepository(context)
+        settings.hideMapLayer(AssetLayer.TRACKS, true)
+        DevicePosition.useForTest(FakeLocation(listOf(fix(-41.5000, 173.9600))))
+
+        val viewModel = MapViewModel(
+            assetRepository = assetRepository,
+            settingsRepository = settings,
+            locationSource = FakeLocation(emptyList()),
+            docStore = docs,
+            loadGeometry = { AssetGeometry.NONE }
+        )
+        withTimeout(5_000) {
+            viewModel.hiddenLayers.first { AssetLayer.TRACKS in it }
+        }
+
+        viewModel.pickDocAt(-41.5001, 173.9601, DocHitTest.DEFAULT_TOLERANCE_M)
+
+        val pick = withTimeout(5_000) {
+            viewModel.docPick.first { it != null && it.bike != null }
+        }!!
+        assertEquals("the rideable track answers under the bike switch", "Estuary ride", pick.item.name)
+        assertEquals(DocSource.TRACKS, pick.item.source)
+        assertNotNull("and the card knows it can be ridden", pick.bike)
     }
 
     @Test
