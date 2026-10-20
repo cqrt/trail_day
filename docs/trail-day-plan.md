@@ -604,6 +604,11 @@ the line, so both the trips list and the trip's page say "Following a DOC track"
 column for that reference, with a migration that leaves every existing trip saying nothing about DOC rather than
 guessing - proven by upgrading a database written by the previous build, in place. It shipped as 0.3.13.
 
+**Then the app's word became track.** "Line" was the code's word for the thing a walker calls a track, and it had
+leaked into the screens: follow a line, name this line, off the line, a new line, record a line. Every one of those
+is now a track, as is the wording on a place's page, the import messages and the editor's refusals. What stays a
+line is the geometry the code measures - a track has a line - and MapLibre's own style names. It shipped as 0.3.15.
+
 **Then DOC's tracks came to the places list, and to the map's card.** Under the walker's own places there is now a
 small "Nearby from DOC" group - the tracks DOC publishes that this phone has kept, nearest first, five within ten
 kilometres, each with DOC's own line about it and a DOC tag - and "See what else DOC publishes" after them. Tapping
