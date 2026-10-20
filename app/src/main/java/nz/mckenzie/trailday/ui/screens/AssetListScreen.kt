@@ -1,19 +1,10 @@
 package nz.mckenzie.trailday.ui.screens
 
 import androidx.compose.foundation.clickable
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.sp
-import nz.mckenzie.trailday.domain.doc.DocPick
-import nz.mckenzie.trailday.ui.docCardFacts
+import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.ui.docRowDetail
-import nz.mckenzie.trailday.ui.formatDistance
-import nz.mckenzie.trailday.ui.formatEstimate
-import nz.mckenzie.trailday.viewmodel.PendingFollow
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -68,6 +59,8 @@ fun AssetListScreen(
     viewModel: AssetListViewModel,
     onOpenTab: (Tab) -> Unit = {},
     onOpenAsset: (Long) -> Unit,
+    onShowOnMap: (AssetEntity) -> Unit,
+    onShowDocOnMap: (DocItem) -> Unit,
     onAddSpot: () -> Unit,
     onOpenDoc: () -> Unit,
     onOpenSettings: () -> Unit
@@ -79,9 +72,6 @@ fun AssetListScreen(
     val message by viewModel.message.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val docNearby by viewModel.docNearby.collectAsStateWithLifecycle()
-
-    // The one of DOC's tracks whose card is open: the list's own way to read a line's facts and follow it.
-    var pickedDoc by remember { mutableStateOf<AssetListViewModel.DocChoice?>(null) }
 
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -208,14 +198,25 @@ fun AssetListScreen(
                     }
 
                     else -> items(shown, key = { item -> item.id }) { item ->
-                        PlaceCard(item = item, onOpen = { onOpenAsset(item.id) })
+                        PlaceCard(
+                            item = item,
+                            onOpen = {
+                                // A track is a line on the ground, and the map is where a line is read;
+                                // a spot opens the page about it, which is where it can be changed.
+                                if (AssetShape.fromStorage(item.shape) == AssetShape.LINE) {
+                                    onShowOnMap(item)
+                                } else {
+                                    onOpenAsset(item.id)
+                                }
+                            }
+                        )
                     }
                 }
 
                 if (docNearby.isNotEmpty()) {
                     item { GroupLabel("Nearby from DOC") }
                     items(docNearby, key = { "doc-${it.item.sourceRef}" }) { choice ->
-                        DocNearbyCard(choice = choice, onOpen = { pickedDoc = choice })
+                        DocNearbyCard(choice = choice, onOpen = { onShowDocOnMap(choice.item) })
                     }
                     item {
                         Text(
@@ -232,58 +233,6 @@ fun AssetListScreen(
         }
     }
 
-    // The card for one of DOC's tracks: what DOC says about it, and the one thing to do with it.
-    val choice = pickedDoc
-    if (choice != null) {
-        ModalBottomSheet(
-            onDismissRequest = { pickedDoc = null },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = "DOC ${choice.item.source.singular}".uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    letterSpacing = 1.1.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(text = choice.item.name, style = MaterialTheme.typography.titleLarge)
-                docCardFacts(choice.item).forEach { fact ->
-                    Text(
-                        text = fact,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Text(
-                    text = buildString {
-                        append(formatDistance(choice.distanceM))
-                        append(" away")
-                        DocPick(choice.item, choice.distanceM).onFootSeconds()?.let { seconds ->
-                            append(" \u00b7 about ${formatEstimate(seconds)} on foot")
-                        }
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Button(
-                    onClick = {
-                        // The recorder takes it from here: the walk starts on the screen that asks about walking.
-                        PendingFollow.offer(choice.item)
-                        pickedDoc = null
-                        onOpenTab(Tab.RECORD)
-                    },
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
-                ) {
-                    Text("Follow this")
-                }
-            }
-        }
-    }
 }
 
 private val TRACK_MIME_TYPES = arrayOf(

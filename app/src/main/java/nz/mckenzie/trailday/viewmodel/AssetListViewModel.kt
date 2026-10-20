@@ -253,6 +253,6 @@ internal fun docPlacesMovedMessage(count: Int): String {
     val what = if (count == 1) "1 place" else "$count places"
     val verb = if (count == 1) "is" else "are"
     return "$what that came from DOC $verb no longer in your list. DOC's own tracks, huts, campsites " +
-        "and bike locations are drawn on the map as its own layer, and can be fetched again whenever " +
+        "and bike trails are drawn on the map as its own layer, and can be fetched again whenever " +
         "you like."
 }

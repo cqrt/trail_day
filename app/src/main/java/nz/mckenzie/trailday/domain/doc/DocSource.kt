@@ -209,8 +209,8 @@ enum class DocSource(
      */
     BIKES(
         id = "bikes",
-        displayName = "Bike locations",
-        singular = "Bike location",
+        displayName = "Bike Trails",
+        singular = "Bike Trail",
         service = "DOC_Mountain_Bike_Tracks",
         shape = DocShape.POINT,
         nameField = "name",

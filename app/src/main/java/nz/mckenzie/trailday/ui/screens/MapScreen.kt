@@ -38,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,7 +73,9 @@ import nz.mckenzie.trailday.ui.docCardFacts
 import nz.mckenzie.trailday.ui.docCardProse
 import nz.mckenzie.trailday.ui.formatEstimate
 import nz.mckenzie.trailday.ui.formatLengthOf
+import nz.mckenzie.trailday.viewmodel.MapFocus
 import nz.mckenzie.trailday.viewmodel.MapViewModel
+import nz.mckenzie.trailday.viewmodel.PendingMapFocus
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,6 +94,8 @@ fun MapScreen(
     val recentre by viewModel.recentre.collectAsStateWithLifecycle()
     val locationNotice by viewModel.locationNotice.collectAsStateWithLifecycle()
     val hiddenLayers by viewModel.hiddenLayers.collectAsStateWithLifecycle()
+    val yourTracksHidden by viewModel.yourTracksHidden.collectAsStateWithLifecycle()
+    val yourTracksGeoJson by viewModel.yourTracksGeoJson.collectAsStateWithLifecycle()
     val placeNames by viewModel.placeNames.collectAsStateWithLifecycle()
     val docPick by viewModel.docPick.collectAsStateWithLifecycle()
     val places by viewModel.assets.collectAsStateWithLifecycle()
@@ -104,6 +109,21 @@ fun MapScreen(
     var pickedPlaceId by remember { mutableStateOf<Long?>(null) }
 
     val context = LocalContext.current
+
+    // A track chosen from a list is asked for here, when the map is the screen in front of the walker:
+    // the request is taken once, so a later visit to the map opens on the work rather than on the last
+    // row somebody tapped in a list.
+    LaunchedEffect(Unit) {
+        when (val focus = PendingMapFocus.take()) {
+            is MapFocus.Place -> {
+                pickedPlaceId = focus.assetId
+                viewModel.focusPlace(focus.assetId)
+            }
+
+            is MapFocus.Doc -> viewModel.focusDoc(focus.item)
+            null -> Unit
+        }
+    }
 
     // Where the app asks for the permission the marker needs, and asked on a tap rather than on
     // the way in: a prompt that arrives with the map is a prompt for nothing, and one that
@@ -140,6 +160,7 @@ fun MapScreen(
                 basemap = basemap,
                 apiKey = apiKey,
                 assetGeoJson = geoJson,
+                yourTracksGeoJson = yourTracksGeoJson,
                 // DOC's material, under the walker's own work: the tracks, huts, campsites and bike
                 // locations kept on the phone for offline use. It is not the walker's to change and has
                 // no page of its own - a tap on it is answered by the card at the bottom of the map.
@@ -148,6 +169,7 @@ fun MapScreen(
                 // screen that is about one place, or about the spot being drawn, draws it
                 // whatever is hidden here.
                 hiddenLayers = hiddenLayers,
+                yourTracksHidden = yourTracksHidden,
                 // The place names, which the walker asks for in the same sheet: this is the map
                 // they read the map on, and "which town is that" is asked here rather than on a
                 // screen that is about one place.
@@ -276,6 +298,8 @@ fun MapScreen(
             hidden = hiddenLayers,
             onHide = viewModel::setLayerHidden,
             onShowAll = viewModel::showEveryLayer,
+            yourTracksHidden = yourTracksHidden,
+            onYourTracksHidden = viewModel::setYourTracksHidden,
             placeNames = placeNames,
             onPlaceNames = viewModel::setPlaceNames,
             onDismiss = { layersOpen = false }
@@ -303,6 +327,8 @@ private fun LayersSheet(
     hidden: Set<AssetLayer>,
     onHide: (layer: AssetLayer, hide: Boolean) -> Unit,
     onShowAll: () -> Unit,
+    yourTracksHidden: Boolean,
+    onYourTracksHidden: (hide: Boolean) -> Unit,
     placeNames: Boolean,
     onPlaceNames: (show: Boolean) -> Unit,
     onDismiss: () -> Unit
@@ -338,7 +364,7 @@ private fun LayersSheet(
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f)
                 )
-                if (hidden.isNotEmpty()) {
+                if (hidden.isNotEmpty() || yourTracksHidden) {
                     TextButton(onClick = onShowAll) { Text("Show everything") }
                 }
             }
@@ -350,6 +376,13 @@ private fun LayersSheet(
                     onToggle = { onHide(layer, shown) }
                 )
             }
+            // The walks and rides the walker has recorded, which are evidence rather than one of the
+            // places and so have a switch of their own.
+            LayerSwitchRow(
+                label = "Your Tracks",
+                checked = !yourTracksHidden,
+                onToggle = { onYourTracksHidden(!yourTracksHidden) }
+            )
 
             // The place names, which are the one thing here that starts *off*: everything else in this
             // sheet is the work, which is why the walker opened the app.
@@ -615,12 +648,15 @@ private fun DocCard(
                 if (away.isNotEmpty()) {
                     Text(text = away.joinToString(" \u00b7 "), style = MaterialTheme.typography.bodySmall)
                 }
-                // The one thing to do with a line of DOC's: go and walk it. Nothing is copied into your places.
-                Button(
-                    onClick = onFollow,
-                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
-                ) {
-                    Text("Follow this")
+                // The one thing to do with a line of DOC's: go and walk it. A hut or a campsite is a
+                // place to reach rather than a line to follow, so its card says what it is and stops.
+                if (item.source.isLine) {
+                    Button(
+                        onClick = onFollow,
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+                    ) {
+                        Text("Follow this")
+                    }
                 }
                 prose?.let {
                     HorizontalDivider(modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))

@@ -542,7 +542,7 @@ private fun PassCard(
                     )
                     ChoiceChip(
                         selected = !followMode,
-                        label = "New track",
+                        label = "Record New Track",
                         onClick = { onFollowMode(false) }
                     )
                 }

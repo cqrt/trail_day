@@ -39,6 +39,7 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     private val basemapPref = stringPreferencesKey("basemap")
     private val themeChoicePref = stringPreferencesKey("theme_choice")
     private val hiddenMapLayersPref = stringSetPreferencesKey("hidden_map_layers")
+    private val yourTracksHiddenPref = booleanPreferencesKey("your_tracks_hidden")
     private val placeNamesPref = booleanPreferencesKey("place_names")
     private val webEditorTokenRequiredPref = booleanPreferencesKey("web_editor_token_required")
 
@@ -158,6 +159,23 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
             val now = AssetLayer.hiddenIn(prefs[hiddenMapLayersPref])
             val ids = (if (hidden) now + layer else now - layer).mapTo(mutableSetOf()) { it.id }
             if (ids.isEmpty()) prefs.remove(hiddenMapLayersPref) else prefs[hiddenMapLayersPref] = ids
+        }
+    }
+
+    /**
+     * Whether the tracks the walker has recorded are left off the map.
+     *
+     * Stored like the other layers, and **shown when unset**: what was walked is the work, and a
+     * recorded line is the one layer that is the walker's own evidence rather than a plan or DOC's
+     * material. Its own switch rather than a kind's, because a recording is not one of the places.
+     */
+    val yourTracksHidden: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[yourTracksHiddenPref] ?: false
+    }
+
+    suspend fun setYourTracksHidden(hidden: Boolean) {
+        context.settingsDataStore.edit { prefs ->
+            if (hidden) prefs[yourTracksHiddenPref] = true else prefs.remove(yourTracksHiddenPref)
         }
     }
 

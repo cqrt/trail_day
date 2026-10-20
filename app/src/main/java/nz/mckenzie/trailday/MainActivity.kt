@@ -36,8 +36,10 @@ import nz.mckenzie.trailday.ui.screens.AssetListScreen
 import nz.mckenzie.trailday.ui.theme.TrailDayTheme
 import nz.mckenzie.trailday.viewmodel.AddSpotViewModel
 import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
+import nz.mckenzie.trailday.viewmodel.MapFocus
 import nz.mckenzie.trailday.viewmodel.MapViewModel
 import nz.mckenzie.trailday.viewmodel.OfflineAreaPickerViewModel
+import nz.mckenzie.trailday.viewmodel.PendingMapFocus
 import nz.mckenzie.trailday.viewmodel.OfflineViewModel
 import nz.mckenzie.trailday.viewmodel.RecordingDetailViewModel
 import nz.mckenzie.trailday.viewmodel.RecordingsViewModel
@@ -152,6 +154,14 @@ class MainActivity : ComponentActivity() {
                                 selectedAssetId = assetId
                                 destination = Destination.ASSET_DETAIL
                             },
+                            onShowOnMap = { place ->
+                                PendingMapFocus.offer(MapFocus.Place(place.id))
+                                destination = Destination.MAP
+                            },
+                            onShowDocOnMap = { item ->
+                                PendingMapFocus.offer(MapFocus.Doc(item))
+                                destination = Destination.MAP
+                            },
                             onAddSpot = {
                                 addSpotVisit++
                                 destination = Destination.ADD_SPOT
@@ -167,7 +177,11 @@ class MainActivity : ComponentActivity() {
                         )
                         DocBrowserScreen(
                             viewModel = docViewModel,
-                            onBack = { destination = Destination.ASSETS }
+                            onBack = { destination = Destination.ASSETS },
+                            onShowOnMap = { item ->
+                                PendingMapFocus.offer(MapFocus.Doc(item))
+                                destination = Destination.MAP
+                            }
                         )
                     }
 

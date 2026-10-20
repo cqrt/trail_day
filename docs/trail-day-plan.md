@@ -617,6 +617,15 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
+**Then a track in a list led to the map, and the map learned what was walked.** A tap on a track - in Places, in
+the DOC browser, or in Places' Nearby from DOC group - now changes to the map, frames the line, brings its card up,
+and shows the layer again if it had been switched off. A spot still opens its own page, and DOC's huts, campsites
+and bike trails are still read as rows. "Bike locations" became "Bike Trails" in DOC's tab, the offline words and
+the editor's hint; the recorder's second choice reads "Record New Track"; and a hut or campsite tapped on the map no
+longer offers "Follow this", because there is nothing to follow. The layers sheet gained **Your Tracks**: every
+finished recording, drawn in the recorded green with its gold edge and broken where the walker paused, with one
+switch of its own because a recording is not one of the places. It shipped as 0.3.16.
+
 **Then the walks and rides became activities.** The fifth tab said Trips, and so did its page, its search and the
 line under it. Everything the walker reads now says activity - that page, a place's record of itself, the delete
 warnings, what a backup reports, and the name a new recording starts with. The code still calls them recordings;

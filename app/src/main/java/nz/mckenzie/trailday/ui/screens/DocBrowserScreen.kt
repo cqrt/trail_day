@@ -67,7 +67,8 @@ import nz.mckenzie.trailday.domain.geo.TravelTime
 @Composable
 fun DocBrowserScreen(
     viewModel: DocBrowserViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onShowOnMap: (DocItem) -> Unit = {}
 ) {
     val name by viewModel.name.collectAsStateWithLifecycle()
     val nearMe by viewModel.nearMe.collectAsStateWithLifecycle()
@@ -220,7 +221,14 @@ fun DocBrowserScreen(
                     items(visible, key = { item -> item.objectId }) { item ->
                         DocItemCard(
                             item = item,
-                            distanceM = phoneFix?.let { position -> item.distanceM(position) }
+                            distanceM = phoneFix?.let { position -> item.distanceM(position) },
+                            // A track is a line, and a line is read on the map. The huts, campsites and
+                            // bike trails are places whose row is the whole of what DOC says about them.
+                            onOpen = if (item.source.isLine) {
+                                { onShowOnMap(item) }
+                            } else {
+                                null
+                            }
                         )
                     }
                 }
@@ -341,29 +349,38 @@ private fun MenuChoice(label: String, chosen: Boolean, onChoose: () -> Unit) {
  * list shows - the desk reads them from the same rule.
  */
 @Composable
-private fun DocItemCard(item: DocItem, distanceM: Double?) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            KindTile(kind = item.source.drawingKind())
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(text = item.name, style = MaterialTheme.typography.titleMedium)
+private fun DocItemCard(item: DocItem, distanceM: Double?, onOpen: (() -> Unit)? = null) {
+    val modifier = Modifier.fillMaxWidth()
+    if (onOpen != null) {
+        Card(onClick = onOpen, modifier = modifier) { DocItemRow(item, distanceM) }
+    } else {
+        Card(modifier = modifier) { DocItemRow(item, distanceM) }
+    }
+}
+
+/** The row itself, so a card that opens and one that does not are the same card. */
+@Composable
+private fun DocItemRow(item: DocItem, distanceM: Double?) {
+    Row(
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        KindTile(kind = item.source.drawingKind())
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(text = item.name, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = docRowDetail(item, distanceM = null),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            distanceM?.let { metres ->
                 Text(
-                    text = docRowDetail(item, distanceM = null),
+                    text = "${formatDistance(metres)} away \u00b7 about " +
+                        "${formatEstimate(TravelTime.seconds(metres, 0.0, TravelMode.WALKING))}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.primary
                 )
-                distanceM?.let { metres ->
-                    Text(
-                        text = "${formatDistance(metres)} away \u00b7 about " +
-                            "${formatEstimate(TravelTime.seconds(metres, 0.0, TravelMode.WALKING))}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
             }
         }
     }

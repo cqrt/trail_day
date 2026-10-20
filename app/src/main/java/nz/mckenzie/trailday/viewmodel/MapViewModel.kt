@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -29,8 +30,11 @@ import nz.mckenzie.trailday.domain.asset.AssetLayer
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.geo.splitAtBreaks
+import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
+import nz.mckenzie.trailday.domain.tiles.withMinimumSpan
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDownloader
@@ -41,6 +45,7 @@ import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.EmptyDocCache
 import nz.mckenzie.trailday.domain.doc.DocPick
 import nz.mckenzie.trailday.map.AssetGeoJson
+import nz.mckenzie.trailday.map.AssetStretch
 import nz.mckenzie.trailday.map.DocGeoJson
 import nz.mckenzie.trailday.map.drawingKind
 import nz.mckenzie.trailday.offline.OfflineDocStore
@@ -83,6 +88,13 @@ class MapViewModel(
      * rather than stored on the place, so a trip deleted puts the line back to what it was.
      */
     private val recordedFor: Flow<Set<Long>> = flowOf(emptySet()),
+    /**
+     * The walks and rides themselves, for the "Your Tracks" layer.
+     *
+     * The map's other lines are places and DOC's material. A recording is evidence of ground covered
+     * and is kept in its own table, so this is a separate read rather than an asset query.
+     */
+    private val recordingRepository: RecordingRepository? = null,
     /** Injected so a test can count how often a line is re-read from the database. */
     private val loadGeometry: suspend (Long) -> AssetGeometry = assetRepository::getAssetGeometry
 ) : ViewModel() {
@@ -104,6 +116,53 @@ class MapViewModel(
      */
     val hiddenLayers: StateFlow<Set<AssetLayer>> = settingsRepository.hiddenMapLayers
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    /** Whether the recorded walks and rides are left off the map: the "Your Tracks" switch. */
+    val yourTracksHidden: StateFlow<Boolean> = settingsRepository.yourTracksHidden
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /**
+     * The recorded walks and rides as the map draws them: the finished ones, in the recorded green
+     * with their gold edge.
+     *
+     * A recording in progress is left out rather than drawn from its last stored fix: the layer is a
+     * record of what is done, and a line that grew only when the database happened to be read would
+     * be a still photograph of a walk still happening.
+     */
+    val yourTracksGeoJson: StateFlow<String> =
+        (recordingRepository?.observeSessions() ?: flowOf(emptyList()))
+            .map { sessions ->
+                val recordings = recordingRepository
+                    ?: return@map AssetGeoJson.build(emptyList())
+                val lines = sessions
+                    .filter { it.status == RecordingStatus.FINISHED.name && it.pointCount >= 2 }
+                    .mapNotNull { session ->
+                        val points = runCatching { recordings.getPoints(session.id) }.getOrNull()
+                            ?.takeIf { points -> points.size >= 2 }
+                            ?: return@mapNotNull null
+                        // A pause is a gap in the ground covered, not a line across it: the recorded
+                        // line is broken where the walker stopped, as it is on the recording's page.
+                        val breaks = runCatching { recordings.getBreaks(session.id) }.getOrDefault(emptyList())
+                        AssetLine(
+                            assetId = 0L,
+                            name = session.name,
+                            colorHex = AssetColors.RECORDED,
+                            points = points,
+                            kind = AssetKind.TRACK,
+                            shape = AssetShape.LINE,
+                            stretches = points.splitAtBreaks(breaks).map { piece ->
+                                AssetStretch(colorHex = AssetColors.RECORDED, points = piece)
+                            }
+                        )
+                    }
+                AssetGeoJson.build(lines)
+            }
+            .flowOn(Dispatchers.IO)
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+                AssetGeoJson.build(emptyList())
+            )
 
     /**
      * DOC's material, as the map's own document.
@@ -207,6 +266,62 @@ class MapViewModel(
     fun clearPickedDoc() {
         _pickedPicture.value = null
         _pickedDoc.value = null
+    }
+
+    /**
+     * Frames one of the walker's own places and brings the card for it up.
+     *
+     * Asked for from the places list, where a track is a row rather than ground: the map is what
+     * answers "where is it". A layer the walker had switched off is switched back on for the visit,
+     * because a frame around something that is not drawn is not an answer.
+     */
+    fun focusPlace(assetId: Long) {
+        viewModelScope.launch {
+            val asset = assetRepository.getAsset(assetId) ?: return@launch
+            val geometry = runCatching { assetRepository.getAssetGeometry(assetId) }.getOrNull()
+                ?: return@launch
+            val points = geometry.paths.flatten()
+            if (points.size < 2) return@launch
+            clearPickedDoc()
+            layerOf(AssetKind.fromStorage(asset.kind))?.let { layer ->
+                if (layer in settingsRepository.hiddenMapLayers.first()) {
+                    settingsRepository.hideMapLayer(layer, false)
+                }
+            }
+            frame(points)
+        }
+    }
+
+    /**
+     * Frames one of DOC's tracks and brings its card up, as a tap on the map itself would.
+     *
+     * The row in DOC's browser is a name and a length; the map is where the line is read.
+     */
+    fun focusDoc(item: DocItem) {
+        viewModelScope.launch {
+            val picture = item.pictureUrl?.let { url ->
+                runCatching { docStore.picture(url) }.getOrNull()
+            }
+            _pickedPicture.value = picture
+            _pickedDoc.value = item
+            layerOf(item.source.drawingKind())?.let { layer ->
+                if (layer in settingsRepository.hiddenMapLayers.first()) {
+                    settingsRepository.hideMapLayer(layer, false)
+                }
+            }
+            item.paths.flatten().takeIf { points -> points.size >= 2 }?.let { points -> frame(points) }
+        }
+    }
+
+    /** Asks the camera to fit [points], with the smallest frame a map can usefully open on. */
+    private fun frame(points: List<GeoPoint>) {
+        val bounds = LatLngBounds(
+            minLat = points.minOf { it.lat },
+            minLng = points.minOf { it.lng },
+            maxLat = points.maxOf { it.lat },
+            maxLng = points.maxOf { it.lng }
+        ).withMinimumSpan()
+        _recentre.value = RecentreRequest(bounds, (_recentre.value?.count ?: 0) + 1)
     }
 
 
@@ -370,9 +485,17 @@ class MapViewModel(
         viewModelScope.launch { settingsRepository.hideMapLayer(layer, hidden) }
     }
 
+    /** Shows or hides the recorded walks and rides, written straight through like the other layers. */
+    fun setYourTracksHidden(hidden: Boolean) {
+        viewModelScope.launch { settingsRepository.setYourTracksHidden(hidden) }
+    }
+
     /** Puts every layer back on the map: one switch to undo the lot. */
     fun showEveryLayer() {
-        viewModelScope.launch { settingsRepository.setHiddenMapLayers(emptySet()) }
+        viewModelScope.launch {
+            settingsRepository.setHiddenMapLayers(emptySet())
+            settingsRepository.setYourTracksHidden(false)
+        }
     }
 
     /**
@@ -402,6 +525,7 @@ class MapViewModel(
             val appContext = context.applicationContext
             return viewModelFactory {
                 initializer {
+                    val recordings = RecordingRepository(TrailDayDatabase.get(appContext))
                     MapViewModel(
                         assetRepository = AssetRepository(TrailDayDatabase.get(appContext)),
                         settingsRepository = SettingsRepository(appContext),
@@ -412,9 +536,9 @@ class MapViewModel(
                         ),
                         // The places a walk has been made of, read from the trips themselves: a trip deleted
                         // puts its line back to what it was, with nothing to remember on the place.
-                        recordedFor = RecordingRepository(TrailDayDatabase.get(appContext))
-                            .observeSessions()
-                            .map { sessions -> sessions.mapNotNull { it.assetId }.toSet() }
+                        recordedFor = recordings.observeSessions()
+                            .map { sessions -> sessions.mapNotNull { it.assetId }.toSet() },
+                        recordingRepository = recordings
                     )
                 }
             }

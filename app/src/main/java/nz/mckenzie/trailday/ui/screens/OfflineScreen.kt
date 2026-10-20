@@ -204,7 +204,7 @@ fun OfflineScreen(
                     },
                     headlineContent = { Text("What DOC publishes") },
                     supportingContent = {
-                        Text("Its tracks, huts, campsites and bike locations, and their pictures")
+                        Text("Its tracks, huts, campsites and bike trails, and their pictures")
                     },
                     leadingContent = { AssetKindIcon(kind = AssetKind.HUT) }
                 )
