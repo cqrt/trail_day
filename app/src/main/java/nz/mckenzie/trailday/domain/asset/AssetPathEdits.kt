@@ -108,7 +108,7 @@ object AssetPathEdits {
             // must not be told about a one-point line in words no other part of the app uses.
             AssetShape.LINE -> when {
                 clean.firstOrNull().orEmpty().size < 2 -> AssetPathResult.Invalid(
-                    "A line needs at least two points"
+                    "A track needs at least two points"
                 )
                 else -> sideTrackProblem(clean)?.let { AssetPathResult.Invalid(it) }
                     ?: AssetPathResult.Ok(clean.filter { it.size >= 2 })

@@ -231,7 +231,7 @@ private fun subtitleOf(recording: RecordingDetail): String = listOfNotNull(
         // A line of DOC's never becomes a place, so a trip that followed one says whose line it was.
         recording.docRef != null -> "Following a DOC track"
         recording.assetId != null -> "Its place has since been deleted"
-        else -> "A new line"
+        else -> "A new track"
     }
 ).joinToString(" \u00b7 ")
 

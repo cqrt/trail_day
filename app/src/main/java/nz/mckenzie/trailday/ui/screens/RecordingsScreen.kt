@@ -100,7 +100,7 @@ fun RecordingsScreen(
                     glyph = IconGlyph.RECORDINGS,
                     title = "No trips yet",
                     body = "Walks and rides you record appear here.",
-                    actionLabel = "Record a line",
+                    actionLabel = "Record a track",
                     onAction = { onOpenTab(Tab.RECORD) }
                 )
 
@@ -223,5 +223,5 @@ internal fun recordingAsset(row: RecordingRow): String = when {
     // A line of DOC's never becomes a place, so a trip that followed one says whose line it was.
     row.docRef != null -> "Following a DOC track"
     row.assetWasDeleted -> "Its place has since been deleted"
-    else -> "A new line"
+    else -> "A new track"
 }

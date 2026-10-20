@@ -192,7 +192,7 @@ object TrackInterchange {
     fun reading(paths: List<List<GeoPoint>>): Outcome = readingOf(paths)
 
     /** A line of one point is not a line, in the words the repository has always thrown this in. */
-    const val TOO_SHORT = "A line needs at least two points"
+    const val TOO_SHORT = "A track needs at least two points"
 
     /**
      * A file that will not parse, or that is not a track file at all.

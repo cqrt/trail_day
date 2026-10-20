@@ -301,12 +301,12 @@ class WebEditorEditTest {
     fun `a file with no line in it is refused, because there is nothing to keep`() {
         assertTrue(
             "a file the phone read as no paths at all: ${createRefused(fileBody(paths = null)).message}",
-            createRefused(fileBody(paths = null)).message.contains("no line in that file")
+            createRefused(fileBody(paths = null)).message.contains("no track in that file")
         )
         assertTrue(
             "an empty path is the same thing said a different way: " +
                 createRefused(fileBody(paths = emptyList())).message,
-            createRefused(fileBody(paths = emptyList())).message.contains("A line needs at least two points")
+            createRefused(fileBody(paths = emptyList())).message.contains("A track needs at least two points")
         )
     }
 

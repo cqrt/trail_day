@@ -302,7 +302,7 @@ object WebEditorEdits {
         // ignored, because ignoring it would be the page believing it had moved a track it had not.
         if (edit.paths != null) {
             return Refused(
-                "That page tried to change the line, which the desk does not do. Reload the page and " +
+                "That page tried to change the track, which the desk does not do. Reload the page and " +
                     "change the details instead."
             )
         }
@@ -341,7 +341,7 @@ object WebEditorEdits {
 
             is WebEditorEditResult.Ok -> {
                 val paths = judged.paths
-                    ?: return CreateRefused("There was no line in that file to save.")
+                    ?: return CreateRefused("There was no track in that file to save.")
                 WebEditorCreateResult.Ok(
                     WebEditorDraft(
                         asset = judged.asset,

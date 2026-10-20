@@ -67,7 +67,7 @@ class RecordingsRowTest {
     @Test
     fun `a trip made without a place does not claim its place was deleted`() {
         assertEquals(
-            "A new line",
+            "A new track",
             recordingAsset(row(assetId = null, assetName = null))
         )
     }

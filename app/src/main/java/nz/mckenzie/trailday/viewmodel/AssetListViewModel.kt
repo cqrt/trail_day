@@ -188,12 +188,12 @@ class AssetListViewModel(
                     val points = track.reading.paths.sumOf { it.size }
                     when {
                         track.reading.segmentsDidNotMeet ->
-                            "Imported \"${track.name}\" with $points points as one line: the file's " +
+                            "Imported \"${track.name}\" with $points points as one track: the file's " +
                                 "own track segments do not meet, so they were joined up."
                         track.reading.sideTracks == 1 ->
-                            "Imported \"${track.name}\" with $points points: the line and 1 side track."
+                            "Imported \"${track.name}\" with $points points: the track and 1 side track."
                         track.reading.sideTracks > 1 ->
-                            "Imported \"${track.name}\" with $points points: the line and " +
+                            "Imported \"${track.name}\" with $points points: the track and " +
                                 "${track.reading.sideTracks} side tracks."
                         else -> "Imported \"${track.name}\" with $points points"
                     }

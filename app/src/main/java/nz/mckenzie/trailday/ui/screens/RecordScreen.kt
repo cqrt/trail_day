@@ -335,7 +335,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Choose a line to follow",
+                        text = "Choose a track to follow",
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.weight(1f)
                     )
@@ -440,7 +440,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
     if (pendingTrackName != null) {
         AlertDialog(
             onDismissRequest = { viewModel.cancelFinish() },
-            title = { Text("Name this line") },
+            title = { Text("Name this track") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
@@ -537,12 +537,12 @@ private fun PassCard(
                 ) {
                     ChoiceChip(
                         selected = followMode,
-                        label = "Follow a line",
+                        label = "Follow a track",
                         onClick = { onFollowMode(true) }
                     )
                     ChoiceChip(
                         selected = !followMode,
-                        label = "New line",
+                        label = "New track",
                         onClick = { onFollowMode(false) }
                     )
                 }
@@ -602,15 +602,15 @@ private fun PassCard(
                 ) {
                     drift?.let { offM ->
                         Text(
-                            text = "You are ${formatDistance(offM)} off the line.",
+                            text = "You are ${formatDistance(offM)} off the track.",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
                     follow?.let { progress ->
                         val offPart = when {
                             drift != null -> ""
-                            progress.offM <= ALONGSIDE_M -> "On the line \u00b7 "
-                            else -> "${formatDistance(progress.offM)} off the line \u00b7 "
+                            progress.offM <= ALONGSIDE_M -> "On the track \u00b7 "
+                            else -> "${formatDistance(progress.offM)} off the track \u00b7 "
                         }
                         Text(
                             text = offPart + buildString {

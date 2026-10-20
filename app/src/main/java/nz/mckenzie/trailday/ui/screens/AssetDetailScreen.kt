@@ -258,7 +258,7 @@ fun AssetDetailScreen(
                         EmptyState(
                             glyph = IconGlyph.RECORDINGS,
                             title = "No trip for this place",
-                            body = "Records your walk of this line."
+                            body = "Records your walk of this track."
                         )
                     }
                     recordings.forEach { session ->
@@ -337,7 +337,7 @@ fun AssetDetailScreen(
                         // tracks off it, or the one coordinate a place has.
                         Text(
                             if (shape == AssetShape.LINE) {
-                                "The line and its side tracks, for another device"
+                                "The track and its side tracks, for another device"
                             } else {
                                 "Where it is, for another device"
                             }
@@ -356,7 +356,7 @@ fun AssetDetailScreen(
                         },
                         headlineContent = { Text("Keep the ground around it") },
                         supportingContent = {
-                            Text("The map, and DOC's tracks and huts around the line, for no reception")
+                            Text("The map, and DOC's tracks and huts around the track, for no reception")
                         },
                         leadingContent = { AppIcon(IconGlyph.OFFLINE) }
                     )
