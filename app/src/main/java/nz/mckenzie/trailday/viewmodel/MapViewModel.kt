@@ -291,6 +291,25 @@ class MapViewModel(
     private val _pickedDoc = MutableStateFlow<DocItem?>(null)
     val pickedDoc: StateFlow<DocItem?> = _pickedDoc
 
+    /**
+     * The walker's own place the card is about, or null.
+     *
+     * Held here rather than in the screen for the same reason as [pickedDoc]: a walker who taps a track
+     * and then visits Places or Record comes back to the map with the same card, not to an empty map.
+     */
+    private val _pickedPlaceId = MutableStateFlow<Long?>(null)
+    val pickedPlaceId: StateFlow<Long?> = _pickedPlaceId
+
+    /**
+     * The frame the map should open on while a card is up.
+     *
+     * The camera is asked to move when a list sends the walker here; this is what makes it stay there
+     * when the map composition is re-created by a tab change. It is cleared with the card, not with the
+     * tab, so the last selected line is still in view when the walker comes back.
+     */
+    private val _selectionFrame = MutableStateFlow<LatLngBounds?>(null)
+    val selectionFrame: StateFlow<LatLngBounds?> = _selectionFrame
+
     /** The picture of the picked thing, when the phone kept one: read once, when the thing is picked. */
     private val _pickedPicture = MutableStateFlow<ByteArray?>(null)
 
@@ -360,7 +379,9 @@ class MapViewModel(
         _pickedBike.value = null
         _focusedDoc.value = null
         _focusedBike.value = null
+        _pickedPlaceId.value = null
         _pickedDoc.value = item
+        _selectionFrame.value = item?.let { boundsOf(it.paths.flatten()) }
     }
 
     /** Lets go of a picked thing, so the card is about what is nearest again. */
@@ -370,6 +391,31 @@ class MapViewModel(
         _pickedDoc.value = null
         _focusedDoc.value = null
         _focusedBike.value = null
+        _pickedPlaceId.value = null
+        _selectionFrame.value = null
+    }
+
+    /** Shows one of the walker's own places on the map; the camera does not move on a tap. */
+    fun pickPlace(assetId: Long) {
+        clearPickedDoc()
+        _pickedPlaceId.value = assetId
+        val points = geometryByTrack.value[assetId]?.paths?.flatten()
+        if (points != null) {
+            _selectionFrame.value = boundsOf(points)
+        } else {
+            viewModelScope.launch {
+                val geometry = runCatching { loadGeometry(assetId) }.getOrNull() ?: return@launch
+                if (_pickedPlaceId.value == assetId) {
+                    _selectionFrame.value = boundsOf(geometry.paths.flatten())
+                }
+            }
+        }
+    }
+
+    /** Closes the place card; the camera stays where it is. */
+    fun clearPickedPlace() {
+        _pickedPlaceId.value = null
+        _selectionFrame.value = null
     }
 
     /**
@@ -387,6 +433,8 @@ class MapViewModel(
             val points = geometry.paths.flatten()
             if (points.size < 2) return@launch
             clearPickedDoc()
+            _pickedPlaceId.value = assetId
+            _selectionFrame.value = boundsOf(points)
             val kind = AssetKind.fromStorage(asset.kind)
             if (kind == AssetKind.TRACK) {
                 // The walker's tracks have their own switch now; asking to see one should turn that
@@ -420,7 +468,9 @@ class MapViewModel(
             _pickedBike.value = bike
             _focusedDoc.value = item
             _focusedBike.value = bike
+            _pickedPlaceId.value = null
             _pickedDoc.value = item
+            _selectionFrame.value = boundsOf(item.paths.flatten())
             layerOf(item.source.drawingKind())?.let { layer ->
                 if (layer in settingsRepository.hiddenMapLayers.first()) {
                     settingsRepository.hideMapLayer(layer, false)
@@ -432,15 +482,24 @@ class MapViewModel(
         }
     }
 
+    /** The box around [points], with the smallest frame a map can usefully open on. */
+    private fun boundsOf(points: List<GeoPoint>): LatLngBounds? =
+        if (points.isEmpty()) {
+            null
+        } else {
+            LatLngBounds(
+                minLat = points.minOf { it.lat },
+                minLng = points.minOf { it.lng },
+                maxLat = points.maxOf { it.lat },
+                maxLng = points.maxOf { it.lng }
+            ).withMinimumSpan()
+        }
+
     /** Asks the camera to fit [points], with the smallest frame a map can usefully open on. */
     private fun frame(points: List<GeoPoint>) {
-        val bounds = LatLngBounds(
-            minLat = points.minOf { it.lat },
-            minLng = points.minOf { it.lng },
-            maxLat = points.maxOf { it.lat },
-            maxLng = points.maxOf { it.lng }
-        ).withMinimumSpan()
-        _recentre.value = RecentreRequest(bounds, (_recentre.value?.count ?: 0) + 1)
+        boundsOf(points)?.let { bounds ->
+            _recentre.value = RecentreRequest(bounds, (_recentre.value?.count ?: 0) + 1)
+        }
     }
 
 

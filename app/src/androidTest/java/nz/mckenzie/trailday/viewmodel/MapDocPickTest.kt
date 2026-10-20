@@ -118,10 +118,15 @@ class MapDocPickTest {
             (pick.distanceM ?: Double.MAX_VALUE) < 200.0
         )
         assertNotNull("and how long getting there takes on foot", pick.onFootSeconds())
+        assertNotNull(
+            "the map has a frame to return to after a tab change",
+            viewModel.selectionFrame.value
+        )
 
         // A tap on empty ground lets it go: nothing tapped is no card.
         viewModel.pickDocAt(-45.5000, 169.0000, DocHitTest.DEFAULT_TOLERANCE_M)
         assertNull(viewModel.pickedDoc.value)
+        assertNull(viewModel.selectionFrame.value)
     }
 
     @Test

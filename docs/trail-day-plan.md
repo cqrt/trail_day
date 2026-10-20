@@ -617,6 +617,11 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
+**Then the map kept the track the walker was reading.** A card used to belong to the map screen, so changing to
+Record or Places and coming back rebuilt the screen as an empty map framed on the phone. The picked place and the
+frame around it now live with the map itself: the card, its line and the camera stay until the card is closed. It
+shipped as 0.3.25.
+
 **Then the layer switches were split between DOC's tracks and the walker's own spots.** The map now draws DOC's
 walking-only tracks and its rideable ones as two layers, so **Bike tracks** actually hides the tracks DOC says may be
 ridden - with their casing and their bicycle badges - while **DOC Tracks** still hides every DOC track. A bike point

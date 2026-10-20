@@ -94,6 +94,8 @@ fun MapScreen(
     val docGeoJson by viewModel.docGeoJson.collectAsStateWithLifecycle()
     val docBikeBadgesGeoJson by viewModel.docBikeBadgesGeoJson.collectAsStateWithLifecycle()
     val initialFrame by viewModel.initialFrame.collectAsStateWithLifecycle()
+    val selectionFrame by viewModel.selectionFrame.collectAsStateWithLifecycle()
+    val pickedPlaceId by viewModel.pickedPlaceId.collectAsStateWithLifecycle()
     val recentre by viewModel.recentre.collectAsStateWithLifecycle()
     val locationNotice by viewModel.locationNotice.collectAsStateWithLifecycle()
     val hiddenLayers by viewModel.hiddenLayers.collectAsStateWithLifecycle()
@@ -107,10 +109,6 @@ fun MapScreen(
     var layersOpen by remember { mutableStateOf(false) }
     val mapScope = rememberCoroutineScope()
 
-    // What the card at the foot of the map is about: the place the walker last tapped, or the thing DOC
-    // publishes that was under their finger. Nothing tapped is no card - the map is the subject.
-    var pickedPlaceId by remember { mutableStateOf<Long?>(null) }
-
     val context = LocalContext.current
 
     // A track chosen from a list is asked for here, when the map is the screen in front of the walker:
@@ -118,10 +116,7 @@ fun MapScreen(
     // row somebody tapped in a list.
     LaunchedEffect(Unit) {
         when (val focus = PendingMapFocus.take()) {
-            is MapFocus.Place -> {
-                pickedPlaceId = focus.assetId
-                viewModel.focusPlace(focus.assetId)
-            }
+            is MapFocus.Place -> viewModel.focusPlace(focus.assetId)
 
             is MapFocus.Doc -> viewModel.focusDoc(focus.item, focus.bike)
             null -> Unit
@@ -182,7 +177,9 @@ fun MapScreen(
                 // says nothing about it: it draws where you are wherever a map is drawn.
                 // The walker's own tracks first; failing that, where the device is;
                 // failing that, the neutral country-wide default.
-                fitBounds = initialFrame,
+                // A card that is still up owns the frame when the map is rebuilt by a tab change;
+                // otherwise this is the first look at the walker's work.
+                fitBounds = selectionFrame ?: initialFrame,
                 // Where "show me" last asked the camera to be. Null until they ask: the map
                 // does not follow the phone, because it is also for reading the work.
                 recentreBounds = recentre?.bounds,
@@ -195,12 +192,11 @@ fun MapScreen(
                 onMapClick = { lat, lng, radiusM ->
                     val asset = viewModel.assetAt(lat, lng, radiusM)
                     if (asset != null) {
-                        viewModel.clearPickedDoc()
-                        pickedPlaceId = asset
+                        viewModel.pickPlace(asset)
                     } else {
                         // The map says so itself when DOC has nothing there: the card goes away rather
                         // than growing a nearest-thing answer nobody asked for.
-                        pickedPlaceId = null
+                        viewModel.clearPickedPlace()
                         mapScope.launch { viewModel.pickDocAt(lat, lng, radiusM) }
                     }
                 },
@@ -287,7 +283,7 @@ fun MapScreen(
                         place = place,
                         recorded = place.id in recordedPlaces,
                         onOpen = { onOpenAsset(place.id) },
-                        onClose = { pickedPlaceId = null },
+                        onClose = viewModel::clearPickedPlace,
                         modifier = Modifier.widthIn(max = 250.dp)
                     )
                 }

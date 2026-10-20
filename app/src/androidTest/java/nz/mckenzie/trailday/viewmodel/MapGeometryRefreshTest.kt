@@ -124,6 +124,28 @@ class MapGeometryRefreshTest {
     }
 
     @Test
+    fun aPickedPlaceKeepsItsFrameUntilTheCardIsClosed() = runBlocking {
+        val assetId = assetRepository.createAsset("Home block", homeLine)
+        val viewModel = viewModel()
+        until("the map to hold the line") {
+            viewModel.assetAt(-41.5005, 173.9550) == assetId
+        }
+
+        viewModel.pickPlace(assetId)
+
+        assertEquals("the card is still about the place", assetId, viewModel.pickedPlaceId.value)
+        assertTrue(
+            "and the map has a frame to return to after a tab change",
+            viewModel.selectionFrame.value != null
+        )
+
+        viewModel.clearPickedPlace()
+
+        assertNull("closing the card lets the place go", viewModel.pickedPlaceId.value)
+        assertNull("and clears the frame with it", viewModel.selectionFrame.value)
+    }
+
+    @Test
     fun tappingOnATrackFindsItAndEmptyPaddockDoesNot() = runBlocking {
         val assetId = assetRepository.createAsset("Home block", homeLine)
         val viewModel = viewModel()
