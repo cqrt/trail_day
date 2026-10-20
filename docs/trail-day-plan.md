@@ -604,9 +604,13 @@ the line, so both the trips list and the trip's page say "Following a DOC track"
 column for that reference, with a migration that leaves every existing trip saying nothing about DOC rather than
 guessing - proven by upgrading a database written by the previous build, in place. It shipped as 0.3.13.
 
-**Still to come from that discussion:** DOC's nearest tracks as a small group in Places, and a "Follow this" action
-on the map's card for one of DOC's tracks. Both use what is now in place - the chooser reads the same cache, and a
-trip already remembers DOC's line - so they are the next change rather than new ground.
+**Then DOC's tracks came to the places list, and to the map's card.** Under the walker's own places there is now a
+small "Nearby from DOC" group - the tracks DOC publishes that this phone has kept, nearest first, five within ten
+kilometres, each with DOC's own line about it and a DOC tag - and "See what else DOC publishes" after them. Tapping
+one shows the facts the map's card shows, with "Follow this"; the map's card for one of DOC's tracks has the same
+action, and both hand the line to the recorder and change tab, so the walk starts where the app asks about walking.
+Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
+onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
 **Then Settings got quieter.** The group labels THE MAP, THIS PHONE, BACKUPS and THE APP went - every card
 already has its own title, and a heading over a heading is noise on the screen furthest from the trail. So did
