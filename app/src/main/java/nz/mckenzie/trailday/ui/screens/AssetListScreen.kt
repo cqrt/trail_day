@@ -1,5 +1,19 @@
 package nz.mckenzie.trailday.ui.screens
 
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.unit.sp
+import nz.mckenzie.trailday.domain.doc.DocPick
+import nz.mckenzie.trailday.ui.docCardFacts
+import nz.mckenzie.trailday.ui.docRowDetail
+import nz.mckenzie.trailday.ui.formatDistance
+import nz.mckenzie.trailday.ui.formatEstimate
+import nz.mckenzie.trailday.viewmodel.PendingFollow
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -64,6 +78,10 @@ fun AssetListScreen(
     val query by viewModel.query.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val docNearby by viewModel.docNearby.collectAsStateWithLifecycle()
+
+    // The one of DOC's tracks whose card is open: the list's own way to read a line's facts and follow it.
+    var pickedDoc by remember { mutableStateOf<AssetListViewModel.DocChoice?>(null) }
 
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -157,35 +175,111 @@ fun AssetListScreen(
                 Text(text = it, style = MaterialTheme.typography.bodySmall)
             }
 
-            when {
-                assets.isEmpty() -> EmptyState(
-                    glyph = IconGlyph.ASSETS,
-                    title = "No places yet",
-                    body = "Drop a spot on the map, or bring in a GPX, KML, KMZ or GeoJSON file.",
-                    actionLabel = "Add a spot",
-                    onAction = onAddSpot
-                )
+            // One list for the page: the walker's places, and then - when any of DOC's tracks are kept near
+            // them - a small group of those, so a track at the end of the valley is a tap away.
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 16.dp)
+            ) {
+                when {
+                    assets.isEmpty() -> item {
+                        EmptyState(
+                            glyph = IconGlyph.ASSETS,
+                            title = "No places yet",
+                            body = "Drop a spot on the map, or bring in a GPX, KML, KMZ or GeoJSON file.",
+                            actionLabel = "Add a spot",
+                            onAction = onAddSpot
+                        )
+                    }
 
-                // Nothing shown is worth one line rather than an empty list: the search field and the
-                // chips are still above, so the way out is in sight, and the line says which question
-                // came up empty - the name, or the kind.
-                shown.isEmpty() -> Text(
-                    text = if (searching) {
-                        "No place of yours has \"${query.trim()}\" in its name."
-                    } else {
-                        "Nothing of that kind on the phone yet."
-                    },
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                    // Nothing shown is worth one line rather than an empty list: the search field and the
+                    // chips are still above, so the way out is in sight, and the line says which question
+                    // came up empty - the name, or the kind.
+                    shown.isEmpty() -> item {
+                        Text(
+                            text = if (searching) {
+                                "No place of yours has \"${query.trim()}\" in its name."
+                            } else {
+                                "Nothing of that kind on the phone yet."
+                            },
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
 
-                else -> LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(bottom = 16.dp)
-                ) {
-                    items(shown, key = { item -> item.id }) { item ->
+                    else -> items(shown, key = { item -> item.id }) { item ->
                         PlaceCard(item = item, onOpen = { onOpenAsset(item.id) })
                     }
+                }
+
+                if (docNearby.isNotEmpty()) {
+                    item { GroupLabel("Nearby from DOC") }
+                    items(docNearby, key = { "doc-${it.item.sourceRef}" }) { choice ->
+                        DocNearbyCard(choice = choice, onOpen = { pickedDoc = choice })
+                    }
+                    item {
+                        Text(
+                            text = "See what else DOC publishes",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clickable(onClick = onOpenDoc)
+                                .padding(vertical = 6.dp, horizontal = 4.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // The card for one of DOC's tracks: what DOC says about it, and the one thing to do with it.
+    val choice = pickedDoc
+    if (choice != null) {
+        ModalBottomSheet(
+            onDismissRequest = { pickedDoc = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "DOC ${choice.item.source.singular}".uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    letterSpacing = 1.1.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(text = choice.item.name, style = MaterialTheme.typography.titleLarge)
+                docCardFacts(choice.item).forEach { fact ->
+                    Text(
+                        text = fact,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text(
+                    text = buildString {
+                        append(formatDistance(choice.distanceM))
+                        append(" away")
+                        DocPick(choice.item, choice.distanceM).onFootSeconds()?.let { seconds ->
+                            append(" \u00b7 about ${formatEstimate(seconds)} on foot")
+                        }
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Button(
+                    onClick = {
+                        // The recorder takes it from here: the walk starts on the screen that asks about walking.
+                        PendingFollow.offer(choice.item)
+                        pickedDoc = null
+                        onOpenTab(Tab.RECORD)
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+                ) {
+                    Text("Follow this")
                 }
             }
         }
@@ -203,6 +297,54 @@ private val TRACK_MIME_TYPES = arrayOf(
     "text/plain",
     "*/*"
 )
+
+/** A heading over the small group of DOC's tracks: a spaced capital label, as the pages write a thing. */
+@Composable
+private fun GroupLabel(text: String) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        letterSpacing = 1.1.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 4.dp, top = 12.dp, bottom = 2.dp)
+    )
+}
+
+/**
+ * One of DOC's tracks near the walker, as a card: **the name, what DOC says about it, and how far away it is**
+ * - with a DOC tag where a place's kind tile would be, because it is not a place of the walker's.
+ *
+ * The tag is the whole of the difference: DOC's material is read here and nowhere else, and a row that looked
+ * like one of the walker's own would be a row they would try to rename.
+ */
+@Composable
+private fun DocNearbyCard(
+    choice: AssetListViewModel.DocChoice,
+    onOpen: () -> Unit
+) {
+    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = choice.item.name, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = docRowDetail(choice.item, choice.distanceM),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = "DOC",
+                style = MaterialTheme.typography.labelSmall,
+                letterSpacing = 1.1.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
 
 /**
  * One place, as a card: **the kind's tile, the name, and how long the line is** - and a chevron saying it

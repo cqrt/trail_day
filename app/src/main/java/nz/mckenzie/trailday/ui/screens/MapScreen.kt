@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,6 +62,7 @@ import nz.mckenzie.trailday.domain.asset.AssetLayer
 import nz.mckenzie.trailday.domain.asset.AssetPhrase
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.doc.DocPick
+import nz.mckenzie.trailday.viewmodel.PendingFollow
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.map.BasemapView
@@ -245,6 +247,13 @@ fun MapScreen(
                     DocCard(
                         pick = picked,
                         onClose = viewModel::clearPickedDoc,
+                        onFollow = {
+                            // The recorder takes it from here: the walk starts on the screen that asks about
+                            // walking, not on a card over a map.
+                            PendingFollow.offer(picked.item)
+                            viewModel.clearPickedDoc()
+                            onOpenTab(Tab.RECORD)
+                        },
                         modifier = Modifier.widthIn(max = 300.dp)
                     )
                 } else if (place != null) {
@@ -553,7 +562,12 @@ private fun PlaceCard(
  * else puts the card away.
  */
 @Composable
-private fun DocCard(pick: DocPick, onClose: () -> Unit, modifier: Modifier = Modifier) {
+private fun DocCard(
+    pick: DocPick,
+    onClose: () -> Unit,
+    onFollow: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val item = pick.item
     val facts = remember(item) { docCardFacts(item) }
     val prose = remember(item) { docCardProse(item) }
@@ -600,6 +614,13 @@ private fun DocCard(pick: DocPick, onClose: () -> Unit, modifier: Modifier = Mod
                 }
                 if (away.isNotEmpty()) {
                     Text(text = away.joinToString(" \u00b7 "), style = MaterialTheme.typography.bodySmall)
+                }
+                // The one thing to do with a line of DOC's: go and walk it. Nothing is copied into your places.
+                Button(
+                    onClick = onFollow,
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+                ) {
+                    Text("Follow this")
                 }
                 prose?.let {
                     HorizontalDivider(modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))

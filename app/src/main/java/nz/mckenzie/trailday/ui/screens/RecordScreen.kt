@@ -3,6 +3,7 @@ package nz.mckenzie.trailday.ui.screens
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -71,6 +72,7 @@ import nz.mckenzie.trailday.ui.formatDuration
 import nz.mckenzie.trailday.ui.docRowDetail
 import nz.mckenzie.trailday.ui.formatEstimate
 import nz.mckenzie.trailday.ui.formatLengthOf
+import nz.mckenzie.trailday.viewmodel.PendingFollow
 import nz.mckenzie.trailday.viewmodel.RecordingViewModel
 
 /**
@@ -121,6 +123,18 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
     // DOC's lines are read when the chooser opens, not on every visit to the screen.
     LaunchedEffect(pickingTrack) {
         if (pickingTrack) viewModel.refreshDocTracks()
+    }
+
+    // A line asked for somewhere else - the map's card, the places list: the recorder takes it as the line to
+    // follow, so the walk starts from the screen that asks about walking.
+    LaunchedEffect(Unit) {
+        PendingFollow.wanted.collect { wanted ->
+            if (wanted != null) {
+                viewModel.selectDoc(wanted)
+                followingMode = true
+                PendingFollow.take()
+            }
+        }
     }
 
     // The picker opens fully rather than at half height. Half a sheet is a third of the
@@ -403,12 +417,18 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                 if (assets.isNotEmpty()) HorizontalDivider()
                 // Recording without choosing a place stays possible: the line that was
                 // recorded is the evidence, and which place it belongs to can be settled later.
+                // The way out of the list, on a strip of its own: the same sheet, but not one more row of
+                // tracks - a row that looked like the list was a row nobody read as a choice.
+                HorizontalDivider()
                 ListItem(
-                    modifier = Modifier.clickable {
-                        viewModel.selectTrack(null)
-                        followingMode = false
-                        pickingTrack = false
-                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable {
+                            viewModel.selectTrack(null)
+                            followingMode = false
+                            pickingTrack = false
+                        },
                     headlineContent = { Text("Just record, no place") },
                     leadingContent = { AppIcon(IconGlyph.RECORD) }
                 )
