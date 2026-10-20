@@ -49,14 +49,14 @@ class DocReferenceTest {
         assertEquals(AssetKind.TRACK, DocSource.TRACKS.drawingKind())
         assertEquals(AssetKind.HUT, DocSource.HUTS.drawingKind())
         assertEquals(AssetKind.CAMPSITE, DocSource.CAMPSITES.drawingKind())
-        // A bike location is a place, so it is drawn as one: the app's bicycle is a line kind, and a
-        // marker vocabulary invented here would be a reference-layer marking in the walker's own picker.
-        assertEquals(AssetKind.WAYPOINT, DocSource.BIKES.drawingKind())
+        // A bike location is a bike trail: its row and badge wear the bicycle, even though DOC
+        // publishes it as a point rather than a line.
+        assertEquals(AssetKind.BIKE_TRACK, DocSource.BIKES.drawingKind())
         DocSource.entries.forEach { source ->
             assertEquals(
-                "$source is drawn in a place's kind only if it publishes places",
+                "$source is drawn as a line only if it publishes lines",
                 source.isLine,
-                source.drawingKind().shape == AssetShape.LINE
+                source.drawingShape() == AssetShape.LINE
             )
         }
     }
@@ -72,6 +72,21 @@ class DocReferenceTest {
         assertTrue(
             "no id: nothing on the map can act on a DOC row, so nothing may look like one of the walker's",
             json.contains("\"id\":0")
+        )
+    }
+
+    @Test
+    fun `a rideable track carries the property the bike layer filters on`() {
+        val rideable = track()
+        val json = DocGeoJson.build(listOf(rideable), setOf(rideable.sourceRef))
+
+        assertTrue(
+            "the bike switch hides the rideable tracks by this property",
+            json.contains("\"${AssetGeoJson.BIKE_FRIENDLY_PROPERTY}\":true")
+        )
+        assertFalse(
+            "a walking-only track must not claim it",
+            DocGeoJson.build(listOf(track(id = 2))).contains(AssetGeoJson.BIKE_FRIENDLY_PROPERTY)
         )
     }
 
@@ -108,13 +123,19 @@ class DocReferenceTest {
         }
         assertTrue("DOC's tracks are cased", DocLayerIds.CASING in DocLayerIds.ALL)
         assertTrue(DocLayerIds.TRACKS in DocLayerIds.ALL)
-        assertTrue("a bike point on a track has a badge layer", DocLayerIds.BIKE_BADGES in DocLayerIds.ALL)
-        PlaceIcons.KINDS.forEach { kind ->
+        assertTrue("the rideable tracks have their own casing", DocLayerIds.BIKE_CASING in DocLayerIds.ALL)
+        assertTrue(DocLayerIds.BIKE_TRACKS in DocLayerIds.ALL)
+        assertTrue("every bike point has a badge layer", DocLayerIds.BIKE_BADGES in DocLayerIds.ALL)
+        DocLayerIds.REACHABLE_MARKER_KINDS.forEach { kind ->
             assertTrue(
                 "every kind DOC publishes a place as has a layer to be drawn in",
                 DocLayerIds.pointOf(kind) in DocLayerIds.ALL
             )
         }
+        assertTrue(
+            "a waypoint is the walker's own spot; DOC has no marker layer for it",
+            DocLayerIds.pointOf(AssetKind.WAYPOINT) !in DocLayerIds.ALL
+        )
         assertEquals("and nothing is drawn twice", DocLayerIds.ALL.size, DocLayerIds.ALL.toSet().size)
     }
 }

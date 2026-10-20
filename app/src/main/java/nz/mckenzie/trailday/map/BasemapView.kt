@@ -736,6 +736,17 @@ private fun applyLayerVisibility(
             )
         }
     }
+    // DOC Tracks is above Bike tracks for the lines: with DOC's tracks off, the rideable ones go too,
+    // even if the Bike tracks switch is still on. The bike badges are bike trails in their own right,
+    // though - including the orphan points with no track - so they stay under Bike tracks alone.
+    if (AssetLayer.TRACKS in hidden) {
+        listOf(DocLayerIds.BIKE_CASING, DocLayerIds.BIKE_TRACKS)
+            .forEach { id ->
+                style.getLayer(id)?.setProperties(
+                    PropertyFactory.visibility(Property.NONE)
+                )
+            }
+    }
     // The walker's tracks are one switch: every line of theirs, every name beside one, the gold edge
     // under a recorded line, and the recordings themselves. A track that was recorded is one line
     // here rather than a green core under a Tracks switch that can strip its edge away.
@@ -851,7 +862,8 @@ private fun addLineLayer(
     style: Style,
     id: String,
     kind: AssetKind,
-    source: String = ASSETS_SOURCE
+    source: String = ASSETS_SOURCE,
+    bikeFriendly: Boolean? = null
 ) {
     if (style.getLayer(id) != null) return
 
@@ -864,20 +876,21 @@ private fun addLineLayer(
     )
     AssetLineStyles.forKind(kind)?.let { dash -> properties += PropertyFactory.lineDasharray(dash) }
 
+    val filters = mutableListOf(
+        Expression.eq(Expression.get("kind"), Expression.literal(kind.name)),
+        shapeIs(AssetShape.LINE),
+        // The one stretch of a track that carries the track's name belongs to the name layer
+        // alone. Drawn here as well it would be a second line over the track - and, on a
+        // half-walked track, one line in one colour over the two that say how far the walk has
+        // got. A feature without the property at all passes this, which is every other feature.
+        Expression.neq(Expression.get(TrackNames.CARRIES_NAME), Expression.literal(true))
+    )
+    bikeFriendly?.let { filters += bikeFriendlyFilter(it) }
+
     style.addLayer(
         LineLayer(id, source)
             .withProperties(*properties.toTypedArray())
-            .withFilter(
-                Expression.all(
-                    Expression.eq(Expression.get("kind"), Expression.literal(kind.name)),
-                    shapeIs(AssetShape.LINE),
-                    // The one stretch of a track that carries the track's name belongs to the name layer
-                    // alone. Drawn here as well it would be a second line over the track - and, on a
-                    // half-walked track, one line in one colour over the two that say how far the walk has
-                    // got. A feature without the property at all passes this, which is every other feature.
-                    Expression.neq(Expression.get(TrackNames.CARRIES_NAME), Expression.literal(true))
-                )
-            )
+            .withFilter(Expression.all(*filters.toTypedArray()))
     )
 }
 
@@ -937,8 +950,16 @@ private fun addTrackNameLayer(style: Style) {
  * see the plan for where the reference layer gets its own control, if it ever does.
  */
 private fun addDocLayers(style: Style) {
-    addDocCasing(style)
-    addLineLayer(style, DocLayerIds.TRACKS, AssetKind.TRACK, source = DOC_SOURCE)
+    addDocCasing(style, DocLayerIds.CASING, bikeFriendly = false)
+    addDocCasing(style, DocLayerIds.BIKE_CASING, bikeFriendly = true)
+    addLineLayer(style, DocLayerIds.TRACKS, AssetKind.TRACK, source = DOC_SOURCE, bikeFriendly = false)
+    addLineLayer(
+        style,
+        DocLayerIds.BIKE_TRACKS,
+        AssetKind.TRACK,
+        source = DOC_SOURCE,
+        bikeFriendly = true
+    )
     DocLayerIds.REACHABLE_MARKER_KINDS.forEach { kind ->
         addPlaceLayer(style, kind, id = DocLayerIds.pointOf(kind), source = DOC_SOURCE)
     }
@@ -973,11 +994,17 @@ private fun addDocBikeBadgeLayer(style: Style) {
  * and pale scree alike, and the walker's own lines have no casing - so the casing is also what says, at
  * a glance, which lines are DOC's. The mock screens draw their track exactly this way.
  */
-private fun addDocCasing(style: Style) {
-    if (style.getLayer(DocLayerIds.CASING) != null) return
+private fun addDocCasing(style: Style, id: String, bikeFriendly: Boolean) {
+    if (style.getLayer(id) != null) return
+
+    val filters = mutableListOf(
+        Expression.eq(Expression.get("kind"), Expression.literal(AssetKind.TRACK.name)),
+        shapeIs(AssetShape.LINE)
+    )
+    filters += bikeFriendlyFilter(bikeFriendly)
 
     style.addLayer(
-        LineLayer(DocLayerIds.CASING, DOC_SOURCE)
+        LineLayer(id, DOC_SOURCE)
             .withProperties(
                 PropertyFactory.lineColor(Expression.literal(DocLayerIds.CASING_COLOUR)),
                 PropertyFactory.lineWidth(
@@ -987,14 +1014,17 @@ private fun addDocCasing(style: Style) {
                 PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
                 PropertyFactory.lineOpacity(Expression.literal(0.75f))
             )
-            .withFilter(
-                Expression.all(
-                    Expression.eq(Expression.get("kind"), Expression.literal(AssetKind.TRACK.name)),
-                    shapeIs(AssetShape.LINE)
-                )
-            )
+            .withFilter(Expression.all(*filters.toTypedArray()))
     )
 }
+
+/** A filter for the bike property: true for rideable tracks, false for the rest. */
+private fun bikeFriendlyFilter(bikeFriendly: Boolean): Expression =
+    if (bikeFriendly) {
+        Expression.eq(Expression.get(AssetGeoJson.BIKE_FRIENDLY_PROPERTY), Expression.literal(true))
+    } else {
+        Expression.neq(Expression.get(AssetGeoJson.BIKE_FRIENDLY_PROPERTY), Expression.literal(true))
+    }
 
 private fun shapeIs(shape: AssetShape): Expression =
     Expression.eq(Expression.get("shape"), Expression.literal(shape.name))

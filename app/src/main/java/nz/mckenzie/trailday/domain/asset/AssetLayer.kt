@@ -8,6 +8,10 @@ package nz.mckenzie.trailday.domain.asset
  * noise, and a scatter of waypoints buries the one hut that is the thing being looked for. Hiding
  * "places" was not enough for the second of those, so a place kind can be hidden on its own.
  *
+ * **Waypoints are the walker's own spots only.** DOC's bike points used to be drawn as waypoints;
+ * they are bike trails now, drawn with a bicycle under the Bike tracks switch. The Waypoints switch
+ * shows nothing until the walker has dropped a spot of their own.
+ *
  * [kind] is the kind the layer draws, which is what the map's own style filters on, and what the
  * marker's shape and colour are read from. It is the same enum the picker, the list and the record
  * screens use: a layer per kind, a chip per kind, one vocabulary.
@@ -69,10 +73,10 @@ enum class AssetLayer(
         /**
          * The id an older build stored for the one switch that hid every place.
          *
-         * Before this release there were four switches and the fifth kind of thing was "places".
-         * A walker who hid them meant the huts, the campsites and their own spots alike, so the id
-         * is read back as the three place kinds rather than dropped - a hidden layer coming back is
-         * a map that has quietly changed under somebody.
+         * Before the map had a switch per kind, the fifth kind of thing was "places". A walker who hid
+         * them meant the huts, the campsites and their own spots alike, so the id is read back as the
+         * three place kinds rather than dropped - a hidden layer coming back is a map that has quietly
+         * changed under somebody.
          */
         private const val LEGACY_PLACES = "places"
 

@@ -64,6 +64,7 @@ import nz.mckenzie.trailday.domain.asset.AssetPhrase
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.doc.DocBikeLinks
 import nz.mckenzie.trailday.domain.doc.DocPick
+import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.viewmodel.PendingFollow
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
@@ -641,8 +642,9 @@ private fun DocCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    // A bicycle beside the label, so "this line can be ridden too" is read at a glance.
-                    if (bike != null) {
+                    // A bicycle beside the label, so "this line can be ridden too" is read at a glance -
+                    // and so an orphan bike trail is marked as one rather than as a spot.
+                    if (bike != null || item.source == DocSource.BIKES) {
                         AssetKindIcon(kind = AssetKind.BIKE_TRACK, dimension = 14.dp)
                     }
                     Text(

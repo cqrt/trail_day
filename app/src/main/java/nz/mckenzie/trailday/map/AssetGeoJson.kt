@@ -51,7 +51,14 @@ data class AssetLine(
      * Every one of them carries this asset's id, so a tap on any part of the line opens the
      * asset, and the map's layers filter on kind and shape exactly as they did before.
      */
-    val stretches: List<AssetStretch> = emptyList()
+    val stretches: List<AssetStretch> = emptyList(),
+    /**
+     * Set on a DOC track that has a bike trail on it.
+     *
+     * Only the reference layer reads it: it is how the map draws the rideable tracks as their own
+     * layer, so the Bike tracks switch can hide them without hiding the walking-only ones.
+     */
+    val bikeFriendly: Boolean = false
 ) {
 
     /** Every path to draw: the line first, then its side tracks. */
@@ -190,6 +197,14 @@ object AssetGeoJson {
      */
     internal const val ICON_PROPERTY = "icon"
 
+    /**
+     * The property that marks a DOC track as rideable.
+     *
+     * The map's line layers filter on it: one layer draws the bike-friendly tracks and another the
+     * walking-only ones, which is what lets the Bike tracks switch hide only the former.
+     */
+    internal const val BIKE_FRIENDLY_PROPERTY = "bikeFriendly"
+
     private const val EMPTY = "{\"type\":\"FeatureCollection\",\"features\":[]}"
 
     fun build(lines: List<AssetLine>): String {
@@ -266,6 +281,9 @@ object AssetGeoJson {
         builder.append("\"stroke\":\"").append(escape(stretch.colorHex)).append("\",")
         builder.append("\"kind\":\"").append(line.kind.name).append("\",")
         builder.append("\"shape\":\"").append(line.shape.name).append("\"")
+        if (line.bikeFriendly) {
+            builder.append(",\"").append(BIKE_FRIENDLY_PROPERTY).append("\":true")
+        }
         // The one stretch that carries the name is marked, so the line layers can leave it alone and the
         // name layer can draw nothing else.
         if (stretch.carriesName) {

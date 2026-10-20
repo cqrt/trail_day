@@ -617,6 +617,13 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
+**Then the layer switches were split between DOC's tracks and the walker's own spots.** The map now draws DOC's
+walking-only tracks and its rideable ones as two layers, so **Bike tracks** actually hides the tracks DOC says may be
+ridden - with their casing and their bicycle badges - while **DOC Tracks** still hides every DOC track. A bike point
+with no track is no longer a waypoint: it is a bike trail, drawn with the bicycle under the Bike tracks switch.
+**Waypoints** is back, but it is only the walker's own dropped spots; it shows nothing until they drop one. It shipped
+as 0.3.24.
+
 **Then the bicycle badge got wheels you can see through.** The bike's wheels were drawn with the same heavy stroke as
 the other markers, so at badge size the holes closed and the shape read as two purple plums. The wheels are now
 larger and drawn with a lighter stroke, the frame meets them at the inner rim rather than crossing the holes, and a

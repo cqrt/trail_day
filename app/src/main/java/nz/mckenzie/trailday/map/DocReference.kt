@@ -31,17 +31,16 @@ import nz.mckenzie.trailday.domain.doc.DocSource
  * and the glyph a source's rows wear on the map, and the app's kinds happen to be exactly the
  * vocabulary for that.
  *
- * **A bike location is drawn as a place**, because that is what DOC publishes - a point where riding is
- * permitted, with a difficulty and a time. The app's marker vocabulary has no bicycle for a single
- * spot (its bicycle is a line kind, because a bike track is a line), and inventing one here would put
- * a marking of the reference layer's into the walker's own kind picker. What it is - a place, and one
- * DOC says is for riding - is said in words instead, on its row and its card.
+ * **A bike location is drawn with the bicycle**, because it is a bike trail, not a waypoint: DOC
+ * publishes a point where riding is permitted, with a difficulty and a time, and the app draws every
+ * one of those with the bike badge. It does not become a place of the walker's own, and the browser's
+ * tile says what it is.
  */
 fun DocSource.drawingKind(): AssetKind = when (this) {
     DocSource.TRACKS -> AssetKind.TRACK
     DocSource.HUTS -> AssetKind.HUT
     DocSource.CAMPSITES -> AssetKind.CAMPSITE
-    DocSource.BIKES -> AssetKind.WAYPOINT
+    DocSource.BIKES -> AssetKind.BIKE_TRACK
 }
 
 /** The shape DOC published, in the app's own words: a line or a single place. */
@@ -68,12 +67,18 @@ object DocLayerIds {
     /** DOC's tracks, over their own casing. */
     const val TRACKS = "trailday-doc-line-tracks"
 
+    /** The white edge under the tracks DOC says may be ridden. */
+    const val BIKE_CASING = "trailday-doc-bike-casing"
+
+    /** DOC's tracks that can also be ridden, over their own casing. */
+    const val BIKE_TRACKS = "trailday-doc-line-bike-tracks"
+
     /**
-     * The bike badges that sit on tracks which may be ridden.
+     * The bicycle badges for every bike point DOC publishes.
      *
-     * A badge rather than a place marker: DOC publishes the bike material as points on tracks, and a
-     * pin would read as a destination of its own. It is still part of DOC's tracks, so the DOC Tracks
-     * switch hides it.
+     * A badge rather than a place marker: a bike point on a track is a note about that track, and one
+     * with no track is still a bike trail rather than a waypoint. Both are drawn with the bicycle and
+     * hidden by the Bike tracks switch - along with the bike-friendly tracks themselves.
      */
     const val BIKE_BADGES = "trailday-doc-bike-badges"
 
@@ -95,34 +100,35 @@ object DocLayerIds {
     /**
      * The kinds DOC publishes a place as, which is what the reference layer needs a marker for.
      *
-     * The app's own place kinds, because that is what DOC publishes: a hut, a campsite, and a bike
-     * location - which is a place where riding is permitted, and is drawn as the place it is. See
-     * [drawingKind].
+     * A hut and a campsite. A bike point is not a place here: it is a bike trail, drawn as a bicycle
+     * badge by [BIKE_BADGES], whether it sits on a track or stands alone. The walker's waypoint kind
+     * has no DOC layer at all now.
      *
      * Declared before [ALL] because an object's properties are built in the order they are written, and
      * [ALL] is read from this one.
      */
-    val REACHABLE_MARKER_KINDS: List<AssetKind> = PlaceIcons.KINDS
+    val REACHABLE_MARKER_KINDS: List<AssetKind> =
+        PlaceIcons.KINDS.filterNot { it == AssetKind.WAYPOINT }
 
     /** Every layer DOC's material is drawn by, in the order the style builds them. */
     val ALL: List<String> =
-        listOf(CASING, TRACKS, BIKE_BADGES) + REACHABLE_MARKER_KINDS.map { pointOf(it) }
+        listOf(CASING, TRACKS, BIKE_CASING, BIKE_TRACKS, BIKE_BADGES) +
+            REACHABLE_MARKER_KINDS.map { pointOf(it) }
 
     /**
      * The style layers [layer] hides of DOC's own material, when the walker switches that layer off.
      *
-     * **One set of switches for one map.** A switch called "Huts" that left DOC's huts on the ground would
-     * be a switch that did not do what it says: DOC's material is the ground the walker's own work is read
-     * against, and it is drawn in the same kinds. A DOC track is a track, so it goes with the tracks - and
-     * with its white casing, or the casing would be a line along nothing. A DOC bike location is drawn as a
-     * place ([nz.mckenzie.trailday.map.drawingKind]), so it goes with the waypoints, which is where it is
-     * drawn - a bike track switch has no DOC lines to hide because DOC publishes none.
+     * **DOC Tracks hides every DOC track; Bike tracks hides the ones that can be ridden.** The two
+     * sets are kept apart here, and the map view hides the bike layers as well when DOC Tracks goes
+     * off, so the two switches cannot leave half a track behind. A bike point is a bike trail now, so
+     * its badge goes with the Bike tracks switch, not with a waypoint switch that no longer exists.
      */
     fun idsOf(layer: AssetLayer): List<String> = when (layer) {
-        // The casing is under the lines it edges, and the bike badges are on them, so all three are
-        // hidden together: a badge on a track that is no longer drawn would be a mark on nothing.
-        AssetLayer.TRACKS -> listOf(CASING, TRACKS, BIKE_BADGES)
-        AssetLayer.BIKE_TRACKS -> emptyList()
+        // The casing is under the line it edges, so it is hidden with it.
+        AssetLayer.TRACKS -> listOf(CASING, TRACKS)
+        AssetLayer.BIKE_TRACKS -> listOf(BIKE_CASING, BIKE_TRACKS, BIKE_BADGES)
+        // The walker's own spots; DOC has no waypoint layer any more.
+        AssetLayer.WAYPOINTS -> emptyList()
         else -> listOf(pointOf(layer.kind))
     }
 
@@ -140,7 +146,10 @@ object DocGeoJson {
      * a dash or an icon. What this adds is only what makes a feature DOC's - which source it came from,
      * for the layer that draws it.
      */
-    fun build(items: List<DocItem>): String = AssetGeoJson.build(
+    fun build(
+        items: List<DocItem>,
+        bikeFriendlyTracks: Set<String> = emptySet()
+    ): String = AssetGeoJson.build(
         items.map { item ->
             AssetLine(
                 // No asset id: nothing on the map can act on a DOC row, and an id that matched one of
@@ -151,7 +160,9 @@ object DocGeoJson {
                 points = item.paths.firstOrNull().orEmpty(),
                 sideTracks = item.paths.drop(1),
                 kind = item.source.drawingKind(),
-                shape = item.source.drawingShape()
+                shape = item.source.drawingShape(),
+                bikeFriendly = item.source == DocSource.TRACKS &&
+                    item.sourceRef in bikeFriendlyTracks
             )
         }
     )

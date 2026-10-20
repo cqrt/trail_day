@@ -205,36 +205,49 @@ class MapViewModel(
     private val _focusedDoc = MutableStateFlow<DocItem?>(null)
     private val _focusedBike = MutableStateFlow<DocItem?>(null)
 
-    val docGeoJson: StateFlow<String> = combine(docItems, bikeLinks, _focusedDoc) { items, links, focus ->
-        // A linked bike point is no longer a place of its own: it becomes the badge on the track.
-        val drawn = items
-            .filterNot { item ->
-                item.source == DocSource.BIKES && item.sourceRef in links.linkedBikeRefs
+    val docGeoJson: StateFlow<String> =
+        combine(docItems, bikeLinks, _focusedDoc, _focusedBike) { items, links, focus, focusBike ->
+            // Every bike point is a bike trail badge now, not a waypoint marker.
+            val drawn = items.filterNot { it.source == DocSource.BIKES }.toMutableList()
+            if (focus != null && focus.source != DocSource.BIKES &&
+                drawn.none { it.sourceRef == focus.sourceRef }
+            ) {
+                // A live track the phone has not downloaded is drawn while its card is up.
+                drawn += focus
             }
-            .toMutableList()
-        if (focus != null && drawn.none { it.sourceRef == focus.sourceRef }) {
-            // A live row the phone has not downloaded is drawn for as long as its card is up.
-            drawn += focus
-        }
-        DocGeoJson.build(drawn)
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-        AssetGeoJson.build(emptyList())
-    )
+            val bikeFriendly = links.linkedTrackRefs + listOfNotNull(
+                focus?.takeIf { focusBike != null }?.sourceRef
+            )
+            DocGeoJson.build(drawn, bikeFriendly)
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+            AssetGeoJson.build(emptyList())
+        )
 
-    /** The linked bike points, as the map's badges over their tracks. */
-    val docBikeBadgesGeoJson: StateFlow<String> = combine(bikeLinks, _focusedBike) { links, focus ->
-        val bikes = links.pairs.map { it.bike }.toMutableList()
-        if (focus != null && bikes.none { it.sourceRef == focus.sourceRef }) {
-            bikes += focus
-        }
-        DocGeoJson.buildBadges(bikes)
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-        AssetGeoJson.build(emptyList())
-    )
+    /**
+     * Every bike point DOC publishes, as the map's bicycle badges.
+     *
+     * A linked point sits on its track; an orphan one is still a bike trail, not a waypoint, and is
+     * drawn with the same bicycle. Both go with the Bike tracks switch.
+     */
+    val docBikeBadgesGeoJson: StateFlow<String> =
+        combine(docItems, _focusedDoc, _focusedBike) { items, focus, focusBike ->
+            val bikes = items.filter { it.source == DocSource.BIKES }.toMutableList()
+            if (focus?.source == DocSource.BIKES &&
+                bikes.none { it.sourceRef == focus.sourceRef }
+            ) {
+                bikes += focus
+            }
+            if (focusBike != null && bikes.none { it.sourceRef == focusBike.sourceRef }) {
+                bikes += focusBike
+            }
+            DocGeoJson.buildBadges(bikes)
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+            AssetGeoJson.build(emptyList())
+        )
 
     /**
      * Everything DOC's cache holds, of every source, or nothing when it cannot be read.
