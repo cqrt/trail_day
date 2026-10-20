@@ -38,6 +38,7 @@ import nz.mckenzie.trailday.domain.tiles.withMinimumSpan
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDownloader
+import nz.mckenzie.trailday.domain.doc.DocBikeLinks
 import nz.mckenzie.trailday.domain.doc.DocCache
 import nz.mckenzie.trailday.domain.doc.DocHitTest
 import nz.mckenzie.trailday.domain.doc.DocItem
@@ -175,8 +176,41 @@ class MapViewModel(
         .map { cached() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
-    val docGeoJson: StateFlow<String> = docItems
-        .map { items -> DocGeoJson.build(items) }
+    /**
+     * DOC's bike points, paired with the tracks they sit on.
+     *
+     * Derived from the two lists on the phone rather than stored: a bike point is a note about a track,
+     * and a re-download of either service should change the pairing without a migration.
+     */
+    private val bikeLinks: StateFlow<DocBikeLinks> = docItems
+        .map { items ->
+            DocBikeLinks.of(
+                tracks = items.filter { it.source == DocSource.TRACKS },
+                bikes = items.filter { it.source == DocSource.BIKES }
+            )
+        }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+            DocBikeLinks.EMPTY
+        )
+
+    val docGeoJson: StateFlow<String> = combine(docItems, bikeLinks) { items, links ->
+        // A linked bike point is no longer a place of its own: it becomes the badge on the track.
+        DocGeoJson.build(
+            items.filterNot { item ->
+                item.source == DocSource.BIKES && item.sourceRef in links.linkedBikeRefs
+            }
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+        AssetGeoJson.build(emptyList())
+    )
+
+    /** The linked bike points, as the map's badges over their tracks. */
+    val docBikeBadgesGeoJson: StateFlow<String> = bikeLinks
+        .map { links -> DocGeoJson.buildBadges(links.pairs.map { it.bike }) }
         .stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
@@ -234,8 +268,21 @@ class MapViewModel(
      *
      * Declared after [here], which it reads in its initialiser.
      */
-    val docPick: StateFlow<DocPick?> = combine(_pickedDoc, _pickedPicture, here) { item, picture, position ->
-        item?.let { DocPick(it, position?.let { at -> DocHitTest.distanceTo(it, at) }, picture) }
+    val docPick: StateFlow<DocPick?> = combine(
+        _pickedDoc,
+        _pickedPicture,
+        here,
+        bikeLinks
+    ) { item, picture, position, links ->
+        item?.let {
+            DocPick(
+                item = it,
+                distanceM = position?.let { at -> DocHitTest.distanceTo(it, at) },
+                picture = picture,
+                // What DOC says about riding the track, when the bike point that names it is on the phone.
+                bike = links.bikeFor(it)
+            )
+        }
     }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
@@ -249,10 +296,19 @@ class MapViewModel(
      * DOC's cache can hold thousands of things and a tap must not stop the map drawing.
      */
     suspend fun pickDocAt(lat: Double, lng: Double, radiusM: Double) {
-        // What is switched off is not tappable either: DOC's huts go with the huts.
+        // What is switched off is not tappable either: DOC's huts go with the huts. A linked bike point
+        // is not a place under the finger: its track is, and the track's card carries the bike facts.
         val hidden = hiddenLayers.value
         val held = withContext(Dispatchers.Default) {
-            cached().filter { item -> layerOf(item.source.drawingKind()) !in hidden }
+            val items = cached()
+            val links = DocBikeLinks.of(
+                tracks = items.filter { it.source == DocSource.TRACKS },
+                bikes = items.filter { it.source == DocSource.BIKES }
+            )
+            items.filter { item ->
+                layerOf(item.source.drawingKind()) !in hidden &&
+                    !(item.source == DocSource.BIKES && item.sourceRef in links.linkedBikeRefs)
+            }
         }
         val item = withContext(Dispatchers.Default) { DocHitTest.nearest(held, lat, lng, radiusM) }
         // The picture is part of the answer, so it is read here rather than by the card: the card draws

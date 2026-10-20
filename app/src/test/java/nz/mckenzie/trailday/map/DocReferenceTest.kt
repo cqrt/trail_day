@@ -108,6 +108,7 @@ class DocReferenceTest {
         }
         assertTrue("DOC's tracks are cased", DocLayerIds.CASING in DocLayerIds.ALL)
         assertTrue(DocLayerIds.TRACKS in DocLayerIds.ALL)
+        assertTrue("a bike point on a track has a badge layer", DocLayerIds.BIKE_BADGES in DocLayerIds.ALL)
         PlaceIcons.KINDS.forEach { kind ->
             assertTrue(
                 "every kind DOC publishes a place as has a layer to be drawn in",

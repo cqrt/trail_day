@@ -69,6 +69,7 @@ import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.formatDuration
+import nz.mckenzie.trailday.ui.docBikeLine
 import nz.mckenzie.trailday.ui.docRowDetail
 import nz.mckenzie.trailday.ui.formatEstimate
 import nz.mckenzie.trailday.ui.formatLengthOf
@@ -406,7 +407,17 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                                 pickingTrack = false
                             },
                             headlineContent = { Text(choice.item.name) },
-                            supportingContent = { Text(docRowDetail(choice.item, choice.distanceM)) },
+                            supportingContent = {
+                                Column {
+                                    Text(docRowDetail(choice.item, choice.distanceM))
+                                    choice.bike?.let { bike ->
+                                        Text(
+                                            text = docBikeLine(bike),
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            },
                             // Whose line it is, in one word: nothing here is renamed or deleted.
                             trailingContent = {
                                 Text("DOC", style = MaterialTheme.typography.labelSmall)

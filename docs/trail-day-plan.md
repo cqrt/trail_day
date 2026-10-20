@@ -617,6 +617,13 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
+**Then DOC's bike points became notes on their tracks.** A bike point is a place where riding is permitted, not
+a second destination, so it is paired with the track of the same name it sits near - within a hundred metres of
+the line, because a name alone matched tracks kilometres away. The map draws one line with a small bicycle badge,
+and the track's card says "Bike-friendly" with DOC's difficulty and time; the linked point is no longer a waypoint
+marker of its own. A bike point with no track stays a place on its own. The same badge appears in Places' Nearby
+from DOC group and the recorder's chooser. It shipped as 0.3.20.
+
 **Then the map's DOC card lost the walking time too.** The browser row had stopped saying how long the walk to a
 thing would take, but the card on the map still said it. The card now says only how far away the thing is. It
 shipped as 0.3.19.

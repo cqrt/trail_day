@@ -37,8 +37,11 @@ class DocLayerIdsTest {
     @Test
     fun `DOC's tracks go with the tracks, casing and all`() {
         // The white casing is the line's own edge: leaving it behind would draw a white line along the
-        // ground where a track used to be.
-        assertEquals(listOf(DocLayerIds.CASING, DocLayerIds.TRACKS), DocLayerIds.idsOf(AssetLayer.TRACKS))
+        // ground where a track used to be. The bike badges sit on those lines, so they go too.
+        assertEquals(
+            listOf(DocLayerIds.CASING, DocLayerIds.TRACKS, DocLayerIds.BIKE_BADGES),
+            DocLayerIds.idsOf(AssetLayer.TRACKS)
+        )
     }
 
     @Test

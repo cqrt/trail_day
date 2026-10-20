@@ -32,6 +32,7 @@ import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
+import nz.mckenzie.trailday.domain.doc.DocBikeLinks
 import nz.mckenzie.trailday.domain.doc.DocCache
 import nz.mckenzie.trailday.domain.doc.DocHitTest
 import nz.mckenzie.trailday.domain.doc.DocItem
@@ -534,7 +535,9 @@ class RecordingViewModel(
     fun refreshDocTracks() {
         viewModelScope.launch {
             val kept = runCatching { docStore.cached(DocSource.TRACKS) }.getOrDefault(emptyList())
+            val bikes = runCatching { docStore.cached(DocSource.BIKES) }.getOrDefault(emptyList())
             _docTracks.value = kept
+            _docBikeLinks.value = DocBikeLinks.of(kept, bikes)
             // The last fix the phone knows about, if no new one has arrived: a chooser that offered nothing
             // because the phone happens to be standing still would look like a phone that had kept nothing.
             if (_lastKnown.value == null) {
@@ -552,6 +555,9 @@ class RecordingViewModel(
 
     private val _docTracks = MutableStateFlow<List<DocItem>>(emptyList())
 
+    /** The bike points DOC published on those tracks, paired for the chooser's badge. */
+    private val _docBikeLinks = MutableStateFlow(DocBikeLinks.EMPTY)
+
     private val _docQuery = MutableStateFlow("")
 
     /** What the walker is typing into the chooser's search, or blank for what is nearby. */
@@ -564,23 +570,28 @@ class RecordingViewModel(
      * something is. Distance is measured from the phone to the line, and left out when the phone does not
      * know where it is rather than said as zero.
      */
-    val docChoices: StateFlow<List<DocChoice>> = combine(_docTracks, _docQuery, fix) { tracks, query, position ->
-        val words = query.trim()
-        tracks
-            .mapNotNull { item ->
-                val distance = position?.let { DocHitTest.distanceTo(item, it) }
-                val named = words.isEmpty() || item.name.contains(words, ignoreCase = true)
-                val near = distance != null && distance <= DOC_NEARBY_M
-                if (named && (words.isNotEmpty() || near)) DocChoice(item, distance) else null
-            }
-            .sortedBy { it.distanceM ?: Double.MAX_VALUE }
-            .take(DOC_CHOICES)
-    }
-        .flowOn(Dispatchers.Default)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+    val docChoices: StateFlow<List<DocChoice>> =
+        combine(_docTracks, _docBikeLinks, _docQuery, fix) { tracks, links, query, position ->
+            val words = query.trim()
+            tracks
+                .mapNotNull { item ->
+                    val distance = position?.let { DocHitTest.distanceTo(item, it) }
+                    val named = words.isEmpty() || item.name.contains(words, ignoreCase = true)
+                    val near = distance != null && distance <= DOC_NEARBY_M
+                    if (named && (words.isNotEmpty() || near)) {
+                        DocChoice(item, distance, links.bikeFor(item))
+                    } else {
+                        null
+                    }
+                }
+                .sortedBy { it.distanceM ?: Double.MAX_VALUE }
+                .take(DOC_CHOICES)
+        }
+            .flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
-    /** One row of the chooser for one of DOC's lines. */
-    data class DocChoice(val item: DocItem, val distanceM: Double?)
+    /** One row of the chooser for one of DOC's lines, and the bike point on it when DOC has one. */
+    data class DocChoice(val item: DocItem, val distanceM: Double?, val bike: DocItem? = null)
 
     /** Whether any of DOC's tracks are kept at all, so the chooser can say which kind of nothing it is. */
     val docTracksHeld: StateFlow<Boolean> = _docTracks

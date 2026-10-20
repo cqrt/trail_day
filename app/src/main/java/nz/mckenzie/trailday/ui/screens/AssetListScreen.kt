@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.sp
 import nz.mckenzie.trailday.domain.doc.DocItem
+import nz.mckenzie.trailday.ui.docBikeLine
 import nz.mckenzie.trailday.ui.docRowDetail
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -284,6 +285,13 @@ private fun DocNearbyCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                choice.bike?.let { bike ->
+                    Text(
+                        text = docBikeLine(bike),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
             Text(
                 text = "DOC",

@@ -39,11 +39,15 @@ class MapGeometryRefreshTest {
     private val homeLine = listOf(GeoPoint(-41.5000, 173.9500), GeoPoint(-41.5010, 173.9600))
 
     @Before
-    fun setUp() {
+    fun setUp() = runBlocking {
         context = ApplicationProvider.getApplicationContext()
         db = Room.inMemoryDatabaseBuilder(context, TrailDayDatabase::class.java).build()
         assetRepository = AssetRepository(db)
         geometryReads = 0
+        // The map's switches are one DataStore for the whole device, so a walker who left
+        // Your Tracks off would otherwise make every track in these tests invisible - and
+        // untappable - before they began.
+        SettingsRepository(context).setYourTracksHidden(false)
     }
 
     @After

@@ -125,6 +125,15 @@ fun docCardFacts(item: DocItem): List<String> {
 }
 
 /**
+ * What DOC says about riding a track, in the app's words: "Bike-friendly · Intermediate · 3 hr".
+ *
+ * A bike point DOC publishes on a track is a note about the track, not a place of its own. The line
+ * says that it can be ridden, then DOC's own difficulty and time when it published them.
+ */
+fun docBikeLine(bike: DocItem): String =
+    listOfNotNull("Bike-friendly", bike.difficulty, bike.bikingTime).joinToString(" \u00b7 ")
+
+/**
  * What DOC says about the place in prose, ready for the card, or null when it says nothing.
  *
  * Trimmed to a readable length: the card is a glance at a line under the walker's thumb, not the

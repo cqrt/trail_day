@@ -21,7 +21,14 @@ data class DocPick(
      * A picture is a copy of something DOC publishes and arrives with the material around it; a phone
      * that has kept none has none, and the card is still a card without it.
      */
-    val picture: ByteArray? = null
+    val picture: ByteArray? = null,
+    /**
+     * DOC's bike point for this thing, when it is a track that may be ridden.
+     *
+     * The bike point is a note about the track rather than a place of its own: the card says what DOC
+     * says about riding it, and the map draws the point as a badge on the line.
+     */
+    val bike: DocItem? = null
 ) {
 
     /**

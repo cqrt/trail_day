@@ -68,6 +68,15 @@ object DocLayerIds {
     /** DOC's tracks, over their own casing. */
     const val TRACKS = "trailday-doc-line-tracks"
 
+    /**
+     * The bike badges that sit on tracks which may be ridden.
+     *
+     * A badge rather than a place marker: DOC publishes the bike material as points on tracks, and a
+     * pin would read as a destination of its own. It is still part of DOC's tracks, so the DOC Tracks
+     * switch hides it.
+     */
+    const val BIKE_BADGES = "trailday-doc-bike-badges"
+
     /** How much wider the casing is than the line it holds, in pixels. */
     const val CASING_WIDTH_PX = 4f
 
@@ -96,7 +105,8 @@ object DocLayerIds {
     val REACHABLE_MARKER_KINDS: List<AssetKind> = PlaceIcons.KINDS
 
     /** Every layer DOC's material is drawn by, in the order the style builds them. */
-    val ALL: List<String> = listOf(CASING, TRACKS) + REACHABLE_MARKER_KINDS.map { pointOf(it) }
+    val ALL: List<String> =
+        listOf(CASING, TRACKS, BIKE_BADGES) + REACHABLE_MARKER_KINDS.map { pointOf(it) }
 
     /**
      * The style layers [layer] hides of DOC's own material, when the walker switches that layer off.
@@ -109,8 +119,9 @@ object DocLayerIds {
      * drawn - a bike track switch has no DOC lines to hide because DOC publishes none.
      */
     fun idsOf(layer: AssetLayer): List<String> = when (layer) {
-        // The casing is under the lines it edges, so it is hidden with them.
-        AssetLayer.TRACKS -> listOf(CASING, TRACKS)
+        // The casing is under the lines it edges, and the bike badges are on them, so all three are
+        // hidden together: a badge on a track that is no longer drawn would be a mark on nothing.
+        AssetLayer.TRACKS -> listOf(CASING, TRACKS, BIKE_BADGES)
         AssetLayer.BIKE_TRACKS -> emptyList()
         else -> listOf(pointOf(layer.kind))
     }
@@ -141,6 +152,26 @@ object DocGeoJson {
                 sideTracks = item.paths.drop(1),
                 kind = item.source.drawingKind(),
                 shape = item.source.drawingShape()
+            )
+        }
+    )
+
+    /**
+     * The bike points that belong to tracks, as a document of their own.
+     *
+     * A separate source from the places because the badge layer draws a bicycle over the track, not a
+     * waypoint pin: the same point cannot be both a destination and a note about a line. The badge
+     * carries only the place it marks; the track it belongs to is the thing that is tapped.
+     */
+    fun buildBadges(bikes: List<DocItem>): String = AssetGeoJson.build(
+        bikes.map { bike ->
+            AssetLine(
+                assetId = 0L,
+                name = bike.name,
+                colorHex = AssetColors.forKind(bike.source.drawingKind()),
+                points = bike.paths.firstOrNull().orEmpty(),
+                kind = bike.source.drawingKind(),
+                shape = AssetShape.POINT
             )
         }
     )

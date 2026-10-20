@@ -27,6 +27,7 @@ import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetKindFilter
+import nz.mckenzie.trailday.domain.doc.DocBikeLinks
 import nz.mckenzie.trailday.domain.doc.DocCache
 import nz.mckenzie.trailday.domain.doc.DocHitTest
 import nz.mckenzie.trailday.domain.doc.DocItem
@@ -62,16 +63,26 @@ class AssetListViewModel(
      * group is there so the track at the end of the valley is a tap away without leaving the page. The full
      * catalogue stays in "What DOC publishes".
      */
+    private data class DocNearbySource(val tracks: List<DocItem>, val links: DocBikeLinks)
+
     val docNearby: StateFlow<List<DocChoice>> = docStore.observeCount()
-        .map { docStore.cached(DocSource.TRACKS) }
-        .combine(DevicePosition.updates(viewModelScope)) { tracks, position ->
+        .map {
+            val tracks = docStore.cached(DocSource.TRACKS)
+            val bikes = docStore.cached(DocSource.BIKES)
+            DocNearbySource(tracks, DocBikeLinks.of(tracks, bikes))
+        }
+        .combine(DevicePosition.updates(viewModelScope)) { source, position ->
             if (position == null) {
                 emptyList()
             } else {
-                tracks
+                source.tracks
                     .mapNotNull { item ->
                         val distance = DocHitTest.distanceTo(item, position) ?: return@mapNotNull null
-                        if (distance <= DOC_NEARBY_M) DocChoice(item, distance) else null
+                        if (distance <= DOC_NEARBY_M) {
+                            DocChoice(item, distance, source.links.bikeFor(item))
+                        } else {
+                            null
+                        }
                     }
                     .sortedBy { it.distanceM }
                     .take(DOC_NEARBY)
@@ -79,8 +90,11 @@ class AssetListViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
-    /** One row of the nearby group: a track of DOC's, and how far away its line is. */
-    data class DocChoice(val item: DocItem, val distanceM: Double)
+    /**
+     * One row of the nearby group: a track of DOC's, how far away its line is, and the bike point
+     * DOC published on it when there is one.
+     */
+    data class DocChoice(val item: DocItem, val distanceM: Double, val bike: DocItem? = null)
 
     /**
      * What the list is showing: everything, or the one kind the chips are asking about.

@@ -70,6 +70,20 @@ internal const val YOUR_TRACKS_LINE = "trailday-your-tracks-line"
  */
 internal const val DOC_SOURCE = "trailday-doc"
 
+/**
+ * DOC's bike points that sit on tracks, drawn as a badge rather than as a place.
+ *
+ * A separate source because the same point cannot be both a destination pin and a note on a line: the
+ * bike points that belong to a track are taken out of the place document and drawn here.
+ */
+internal const val DOC_BIKE_BADGES_SOURCE = "trailday-doc-bike-badges-source"
+
+/** The bicycle picture the badge layer asks for. */
+private const val BIKE_BADGE_IMAGE = "trailday-bike-badge"
+
+/** How big that badge is, in density-independent pixels: smaller than a place marker. */
+private const val BIKE_BADGE_DP = 18f
+
 // The layers of the work are named in [AssetLayerIds], which is also where the map's own switches
 // find them: the layer that is created and the layer a switch hides are the same name by
 // construction, rather than two strings that have to be kept in step.
@@ -148,6 +162,8 @@ fun BasemapView(
      * exactly where reception does not. See [DocGeoJson].
      */
     docGeoJson: String = AssetGeoJson.build(emptyList()),
+    /** The bike points that belong to a track, drawn as a badge over the line. */
+    docBikeBadgesGeoJson: String = AssetGeoJson.build(emptyList()),
     /**
      * The line being followed, drawn wide over everything else - see [TARGET_SOURCE].
      *
@@ -344,6 +360,7 @@ fun BasemapView(
                         assetGeoJson = assetGeoJson,
                         yourTracksGeoJson = yourTracksGeoJson,
                         docGeoJson = docGeoJson,
+                        docBikeBadgesGeoJson = docBikeBadgesGeoJson,
                         targetGeoJson = targetGeoJson,
                         positionGeoJson = positionGeoJson,
                         density = density,
@@ -378,6 +395,7 @@ fun BasemapView(
                 assetGeoJson = assetGeoJson,
                 yourTracksGeoJson = yourTracksGeoJson,
                 docGeoJson = docGeoJson,
+                docBikeBadgesGeoJson = docBikeBadgesGeoJson,
                 targetGeoJson = targetGeoJson,
                 positionGeoJson = positionGeoJson,
                 density = density,
@@ -400,6 +418,12 @@ fun BasemapView(
 
     LaunchedEffect(docGeoJson, styleState.value) {
         styleState.value?.getSourceAs<GeoJsonSource>(DOC_SOURCE)?.setGeoJson(docGeoJson)
+    }
+
+    LaunchedEffect(docBikeBadgesGeoJson, styleState.value) {
+        styleState.value
+            ?.getSourceAs<GeoJsonSource>(DOC_BIKE_BADGES_SOURCE)
+            ?.setGeoJson(docBikeBadgesGeoJson)
     }
 
     // The line being followed, handed over the same way: a new target while the map is up is a new
@@ -506,6 +530,8 @@ internal fun MapLibreMap.loadTrailDayStyle(
      * exactly where reception does not. See [DocGeoJson].
      */
     docGeoJson: String = AssetGeoJson.build(emptyList()),
+    /** The bike points that belong to a track, drawn as a badge over the line. */
+    docBikeBadgesGeoJson: String = AssetGeoJson.build(emptyList()),
     targetGeoJson: String = AssetGeoJson.build(emptyList()),
     positionGeoJson: String,
     density: Float,
@@ -543,6 +569,9 @@ internal fun MapLibreMap.loadTrailDayStyle(
         // are reading, and the reference is the ground it sits on.
         if (style.getSource(DOC_SOURCE) == null) {
             style.addSource(GeoJsonSource(DOC_SOURCE, docGeoJson))
+        }
+        if (style.getSource(DOC_BIKE_BADGES_SOURCE) == null) {
+            style.addSource(GeoJsonSource(DOC_BIKE_BADGES_SOURCE, docBikeBadgesGeoJson))
         }
         // The pictures both sets of marker layers draw, handed over once for both: DOC's places wear the
         // same glyphs the walker's do, because a hut is a hut wherever it was published.
@@ -737,7 +766,17 @@ private fun addPlaceMarkerImages(style: Style, density: Float) {
     val sizePx = (PlaceIcons.MARKER_DP * density).roundToInt()
     if (sizePx <= 0) return
     val outlinePx = PlaceIcons.MARKER_OUTLINE_DP * density
-    val missing = HashMap<String, Bitmap>(PlaceIcons.IMAGE_NAMES.size)
+    val missing = HashMap<String, Bitmap>(PlaceIcons.IMAGE_NAMES.size + 1)
+    // The bike badge: the bicycle the bike-track kind already draws, smaller than a place marker and
+    // with the same white rim, so a point on a line reads as a note about the line.
+    if (style.getImage(BIKE_BADGE_IMAGE) == null) {
+        missing[BIKE_BADGE_IMAGE] = MarkerIcons.bitmap(
+            kind = AssetKind.BIKE_TRACK,
+            colorHex = AssetColors.BIKE_TRACK_KIND,
+            sizePx = (BIKE_BADGE_DP * density).roundToInt().coerceAtLeast(1),
+            outlinePx = outlinePx
+        )
+    }
     PlaceIcons.KINDS.forEach { kind ->
         val name = PlaceIcons.imageName(kind)
         // An image belongs to the style it was added to, and a style can be loaded again -
@@ -903,6 +942,28 @@ private fun addDocLayers(style: Style) {
     DocLayerIds.REACHABLE_MARKER_KINDS.forEach { kind ->
         addPlaceLayer(style, kind, id = DocLayerIds.pointOf(kind), source = DOC_SOURCE)
     }
+    addDocBikeBadgeLayer(style)
+}
+
+/**
+ * Adds the bicycle badge that marks a track DOC says may be ridden.
+ *
+ * A symbol rather than a marker layer: the bike point is a note on the line, not a place to stop at.
+ * It is drawn after the tracks and places so it sits over the line it belongs to, and its own image
+ * carries the white rim that lifts it off the ground.
+ */
+private fun addDocBikeBadgeLayer(style: Style) {
+    if (style.getLayer(DocLayerIds.BIKE_BADGES) != null) return
+
+    style.addLayer(
+        SymbolLayer(DocLayerIds.BIKE_BADGES, DOC_BIKE_BADGES_SOURCE)
+            .withProperties(
+                PropertyFactory.iconImage(BIKE_BADGE_IMAGE),
+                PropertyFactory.iconAnchor(Property.ICON_ANCHOR_CENTER),
+                PropertyFactory.iconAllowOverlap(Expression.literal(true)),
+                PropertyFactory.iconIgnorePlacement(Expression.literal(true))
+            )
+    )
 }
 
 /**

@@ -69,6 +69,7 @@ import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.theme.TrailDayElevation
+import nz.mckenzie.trailday.ui.docBikeLine
 import nz.mckenzie.trailday.ui.docCardFacts
 import nz.mckenzie.trailday.ui.docCardProse
 import nz.mckenzie.trailday.ui.formatLengthOf
@@ -89,6 +90,7 @@ fun MapScreen(
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
     val geoJson by viewModel.assetGeoJson.collectAsStateWithLifecycle()
     val docGeoJson by viewModel.docGeoJson.collectAsStateWithLifecycle()
+    val docBikeBadgesGeoJson by viewModel.docBikeBadgesGeoJson.collectAsStateWithLifecycle()
     val initialFrame by viewModel.initialFrame.collectAsStateWithLifecycle()
     val recentre by viewModel.recentre.collectAsStateWithLifecycle()
     val locationNotice by viewModel.locationNotice.collectAsStateWithLifecycle()
@@ -164,6 +166,7 @@ fun MapScreen(
                 // locations kept on the phone for offline use. It is not the walker's to change and has
                 // no page of its own - a tap on it is answered by the card at the bottom of the map.
                 docGeoJson = docGeoJson,
+                docBikeBadgesGeoJson = docBikeBadgesGeoJson,
                 // What the walker has switched off. The home map is the one these apply to: a
                 // screen that is about one place, or about the spot being drawn, draws it
                 // whatever is hidden here.
@@ -640,6 +643,13 @@ private fun DocCard(
                 Text(text = item.name, style = MaterialTheme.typography.titleLarge)
                 facts.forEach { fact ->
                     Text(text = fact, style = MaterialTheme.typography.bodySmall)
+                }
+                pick.bike?.let { bike ->
+                    Text(
+                        text = docBikeLine(bike),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
                 away?.let {
                     Text(text = it, style = MaterialTheme.typography.bodySmall)
