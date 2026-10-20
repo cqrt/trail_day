@@ -45,6 +45,7 @@ import nz.mckenzie.trailday.domain.doc.DocSort
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.distanceM
 import nz.mckenzie.trailday.map.drawingKind
+import nz.mckenzie.trailday.ui.docBikeLine
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.docRowDetail
 import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
@@ -65,7 +66,7 @@ import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
 fun DocBrowserScreen(
     viewModel: DocBrowserViewModel,
     onBack: () -> Unit,
-    onShowOnMap: (DocItem) -> Unit = {}
+    onShowOnMap: (DocItem, DocItem?) -> Unit = { _, _ -> }
 ) {
     val name by viewModel.name.collectAsStateWithLifecycle()
     val nearMe by viewModel.nearMe.collectAsStateWithLifecycle()
@@ -80,6 +81,8 @@ fun DocBrowserScreen(
     val sort by viewModel.sort.collectAsStateWithLifecycle()
     val phoneFix by viewModel.phoneFix.collectAsStateWithLifecycle()
     val searched by viewModel.searched.collectAsStateWithLifecycle()
+    val companions by viewModel.companions.collectAsStateWithLifecycle()
+    val bikeOnly by viewModel.bikeOnly.collectAsStateWithLifecycle()
     val focus = LocalFocusManager.current
 
     val search = {
@@ -191,6 +194,18 @@ fun DocBrowserScreen(
                         onClear = viewModel::clearFilters
                     )
                     SortMenu(sort = sort, onSort = viewModel::setSort)
+                    // The Tracks page can be narrowed to the ones DOC says may be ridden. It is not
+                    // one of DOC's own fields, so it is a chip of its own rather than a filter value.
+                    if (source == DocSource.TRACKS &&
+                        (companions.bikeForTrack.isNotEmpty() || bikeOnly)
+                    ) {
+                        FilterChip(
+                            selected = bikeOnly,
+                            onClick = { viewModel.setBikeOnly(!bikeOnly) },
+                            label = { Text("Bike-friendly") },
+                            shape = androidx.compose.foundation.shape.CircleShape
+                        )
+                    }
                 }
             }
 
@@ -216,12 +231,25 @@ fun DocBrowserScreen(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)
                 ) {
                     items(visible, key = { item -> item.objectId }) { item ->
+                        // Bike Trails lists the track a bike point belongs to: a rider wants the
+                        // track, not the pin. An unmatched bike point is still its own row.
+                        val linkedTrack =
+                            if (source == DocSource.BIKES) companions.trackForBike[item.sourceRef] else null
+                        val shown = linkedTrack ?: item
+                        val bike = when {
+                            source == DocSource.BIKES && linkedTrack != null -> item
+                            source == DocSource.TRACKS -> companions.bikeForTrack[item.sourceRef]
+                            else -> null
+                        }
                         DocItemCard(
-                            item = item,
-                            distanceM = phoneFix?.let { position -> item.distanceM(position) },
+                            item = shown,
+                            bike = bike,
+                            // Measured to what the row is about: the track's line when the bike point
+                            // led us to a track, the bike point when it stands alone.
+                            distanceM = phoneFix?.let { position -> shown.distanceM(position) },
                             // Every one of these is read best where it is: the map frames the line or
                             // the place and raises the card that says what DOC says about it.
-                            onOpen = { onShowOnMap(item) }
+                            onOpen = { onShowOnMap(shown, bike) }
                         )
                     }
                 }
@@ -342,15 +370,23 @@ private fun MenuChoice(label: String, chosen: Boolean, onChoose: () -> Unit) {
  * list shows - the desk reads them from the same rule.
  */
 @Composable
-private fun DocItemCard(item: DocItem, distanceM: Double?, onOpen: () -> Unit) {
+private fun DocItemCard(
+    item: DocItem,
+    bike: DocItem?,
+    distanceM: Double?,
+    onOpen: () -> Unit
+) {
     Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
-        DocItemRow(item, distanceM)
+        DocItemRow(item, bike, distanceM)
     }
 }
 
-/** The row itself: the kind's tile, the name, DOC's facts and how far away it is. */
+/**
+ * The row itself: the kind's tile, the name, DOC's facts and how far away it is - plus the bike
+ * facts when this row is a track DOC says may be ridden.
+ */
 @Composable
-private fun DocItemRow(item: DocItem, distanceM: Double?) {
+private fun DocItemRow(item: DocItem, bike: DocItem?, distanceM: Double?) {
     Row(
         modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -364,6 +400,13 @@ private fun DocItemRow(item: DocItem, distanceM: Double?) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            bike?.let { linked ->
+                Text(
+                    text = docBikeLine(linked),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
             distanceM?.let { metres ->
                 Text(
                     text = "${formatDistance(metres)} away",

@@ -195,13 +195,28 @@ class MapViewModel(
             DocBikeLinks.EMPTY
         )
 
-    val docGeoJson: StateFlow<String> = combine(docItems, bikeLinks) { items, links ->
+    /**
+     * A live DOC row the browser asked to see, which may not be in the downloaded cache.
+     *
+     * The map is normally the cache drawn; a browser result can be somewhere the phone has not kept.
+     * While its card is up, the thing itself is added to the reference drawing and taken away when
+     * the card is, so the walker sees the line they asked for without it becoming a kept place.
+     */
+    private val _focusedDoc = MutableStateFlow<DocItem?>(null)
+    private val _focusedBike = MutableStateFlow<DocItem?>(null)
+
+    val docGeoJson: StateFlow<String> = combine(docItems, bikeLinks, _focusedDoc) { items, links, focus ->
         // A linked bike point is no longer a place of its own: it becomes the badge on the track.
-        DocGeoJson.build(
-            items.filterNot { item ->
+        val drawn = items
+            .filterNot { item ->
                 item.source == DocSource.BIKES && item.sourceRef in links.linkedBikeRefs
             }
-        )
+            .toMutableList()
+        if (focus != null && drawn.none { it.sourceRef == focus.sourceRef }) {
+            // A live row the phone has not downloaded is drawn for as long as its card is up.
+            drawn += focus
+        }
+        DocGeoJson.build(drawn)
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
@@ -209,13 +224,17 @@ class MapViewModel(
     )
 
     /** The linked bike points, as the map's badges over their tracks. */
-    val docBikeBadgesGeoJson: StateFlow<String> = bikeLinks
-        .map { links -> DocGeoJson.buildBadges(links.pairs.map { it.bike }) }
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-            AssetGeoJson.build(emptyList())
-        )
+    val docBikeBadgesGeoJson: StateFlow<String> = combine(bikeLinks, _focusedBike) { links, focus ->
+        val bikes = links.pairs.map { it.bike }.toMutableList()
+        if (focus != null && bikes.none { it.sourceRef == focus.sourceRef }) {
+            bikes += focus
+        }
+        DocGeoJson.buildBadges(bikes)
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+        AssetGeoJson.build(emptyList())
+    )
 
     /**
      * Everything DOC's cache holds, of every source, or nothing when it cannot be read.
@@ -263,6 +282,14 @@ class MapViewModel(
     private val _pickedPicture = MutableStateFlow<ByteArray?>(null)
 
     /**
+     * A bike point handed over by the browser for a live track, before that track is downloaded.
+     *
+     * A map tap has only the cache to go on; a row the browser has just read has the live pair, so
+     * the card can say "Bike-friendly" without waiting for a download.
+     */
+    private val _pickedBike = MutableStateFlow<DocItem?>(null)
+
+    /**
      * The picked thing with how far the phone is from it, measured again on every fix - the card says where
      * the thing is now, not where it was when it was tapped.
      *
@@ -272,15 +299,16 @@ class MapViewModel(
         _pickedDoc,
         _pickedPicture,
         here,
-        bikeLinks
-    ) { item, picture, position, links ->
+        bikeLinks,
+        _pickedBike
+    ) { item, picture, position, links, handedOver ->
         item?.let {
             DocPick(
                 item = it,
                 distanceM = position?.let { at -> DocHitTest.distanceTo(it, at) },
                 picture = picture,
-                // What DOC says about riding the track, when the bike point that names it is on the phone.
-                bike = links.bikeFor(it)
+                // A live pair the browser handed over wins; otherwise the cache's own pair.
+                bike = handedOver ?: links.bikeFor(it)
             )
         }
     }
@@ -315,13 +343,20 @@ class MapViewModel(
         // what it is given, and a phone without pictures answers null without failing the pick.
         val picture = item?.pictureUrl?.let { url -> runCatching { docStore.picture(url) }.getOrNull() }
         _pickedPicture.value = picture
+        // A tap answers from the cache: no handed-over pair or live line from a list survives it.
+        _pickedBike.value = null
+        _focusedDoc.value = null
+        _focusedBike.value = null
         _pickedDoc.value = item
     }
 
     /** Lets go of a picked thing, so the card is about what is nearest again. */
     fun clearPickedDoc() {
         _pickedPicture.value = null
+        _pickedBike.value = null
         _pickedDoc.value = null
+        _focusedDoc.value = null
+        _focusedBike.value = null
     }
 
     /**
@@ -363,12 +398,15 @@ class MapViewModel(
      * The row in DOC's browser is a name and a length; the map is where the line is read, and where a
      * hut or a camp is seen against the ground around it.
      */
-    fun focusDoc(item: DocItem) {
+    fun focusDoc(item: DocItem, bike: DocItem? = null) {
         viewModelScope.launch {
             val picture = item.pictureUrl?.let { url ->
                 runCatching { docStore.picture(url) }.getOrNull()
             }
             _pickedPicture.value = picture
+            _pickedBike.value = bike
+            _focusedDoc.value = item
+            _focusedBike.value = bike
             _pickedDoc.value = item
             layerOf(item.source.drawingKind())?.let { layer ->
                 if (layer in settingsRepository.hiddenMapLayers.first()) {

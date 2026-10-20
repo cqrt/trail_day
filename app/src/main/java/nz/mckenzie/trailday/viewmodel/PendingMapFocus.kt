@@ -17,8 +17,12 @@ sealed interface MapFocus {
     /** One of the walker's own places, by the id the list knows it by. */
     data class Place(val assetId: Long) : MapFocus
 
-    /** One of DOC's tracks, as the browser read it. */
-    data class Doc(val item: DocItem) : MapFocus
+    /**
+     * One of DOC's things, as the browser read it - and the bike point that belongs to it, when the
+     * browser found one. The bike point travels with the track so a live result can say it is
+     * bike-friendly before anything has been downloaded.
+     */
+    data class Doc(val item: DocItem, val bike: DocItem? = null) : MapFocus
 }
 
 object PendingMapFocus {

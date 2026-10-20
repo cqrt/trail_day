@@ -617,6 +617,15 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
+**Then the bike tab became a ride guide, and the tracks could be narrowed to the rideable ones.** A Tracks search
+asks DOC's bike service as well, so a row can say Bike-friendly with DOC's difficulty and time, and a
+Bike-friendly chip narrows the page to those tracks. A Bike Trails search asks the tracks service as well, so a
+matched row is the track itself - its length and walking facts, the bike facts, and a tap that opens the track on
+the map - while an unmatched bike point stays a point of its own. Both halves are worked out from the live answers
+or from the cache when DOC cannot be reached. A live track the phone has not downloaded is drawn while its card is
+up, with its bike badge, and taken away when the card is closed, so the map shows the line that was asked for
+without keeping it. It shipped as 0.3.21.
+
 **Then DOC's bike points became notes on their tracks.** A bike point is a place where riding is permitted, not
 a second destination, so it is paired with the track of the same name it sits near - within a hundred metres of
 the line, because a name alone matched tracks kilometres away. The map draws one line with a small bicycle badge,

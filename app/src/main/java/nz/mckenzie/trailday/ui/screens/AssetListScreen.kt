@@ -61,7 +61,7 @@ fun AssetListScreen(
     onOpenTab: (Tab) -> Unit = {},
     onOpenAsset: (Long) -> Unit,
     onShowOnMap: (AssetEntity) -> Unit,
-    onShowDocOnMap: (DocItem) -> Unit,
+    onShowDocOnMap: (DocItem, DocItem?) -> Unit,
     onAddSpot: () -> Unit,
     onOpenDoc: () -> Unit,
     onOpenSettings: () -> Unit
@@ -217,7 +217,10 @@ fun AssetListScreen(
                 if (docNearby.isNotEmpty()) {
                     item { GroupLabel("Nearby from DOC") }
                     items(docNearby, key = { "doc-${it.item.sourceRef}" }) { choice ->
-                        DocNearbyCard(choice = choice, onOpen = { onShowDocOnMap(choice.item) })
+                        DocNearbyCard(
+                            choice = choice,
+                            onOpen = { onShowDocOnMap(choice.item, choice.bike) }
+                        )
                     }
                     item {
                         Text(

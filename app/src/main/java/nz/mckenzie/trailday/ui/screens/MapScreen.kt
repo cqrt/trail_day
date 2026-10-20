@@ -121,7 +121,7 @@ fun MapScreen(
                 viewModel.focusPlace(focus.assetId)
             }
 
-            is MapFocus.Doc -> viewModel.focusDoc(focus.item)
+            is MapFocus.Doc -> viewModel.focusDoc(focus.item, focus.bike)
             null -> Unit
         }
     }

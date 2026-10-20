@@ -6,6 +6,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +21,7 @@ import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.doc.DocReadResult
 import nz.mckenzie.trailday.doc.DocReader
+import nz.mckenzie.trailday.domain.doc.DocBikeLinks
 import nz.mckenzie.trailday.domain.doc.DocCache
 import nz.mckenzie.trailday.domain.doc.DocFilter
 import nz.mckenzie.trailday.domain.doc.DocItem
@@ -101,6 +105,25 @@ class DocBrowserViewModel(
     val sort: StateFlow<DocSort> = _sort
 
     /**
+     * DOC's bike points and tracks, paired: which track each bike point belongs to, and which bike
+     * point belongs to each track.
+     *
+     * The browser asks both services when it is reading Tracks or Bike Trails, so a live result can
+     * carry the other half even when nothing has been downloaded for offline use.
+     */
+    data class DocCompanions(
+        val bikeForTrack: Map<String, DocItem> = emptyMap(),
+        val trackForBike: Map<String, DocItem> = emptyMap()
+    )
+
+    private val _companions = MutableStateFlow(DocCompanions())
+    val companions: StateFlow<DocCompanions> = _companions
+
+    /** Whether the Tracks page is narrowed to the tracks DOC says may be ridden. */
+    private val _bikeOnly = MutableStateFlow(false)
+    val bikeOnly: StateFlow<Boolean> = _bikeOnly
+
+    /**
      * What each of this source's filters should offer, and what is ticked, from the page that came back.
      *
      * Built from the results rather than from DOC, so every chip is a fact about something on the screen
@@ -117,9 +140,18 @@ class DocBrowserViewModel(
      * Derived rather than stored, because the fix moves: standing still and turning "Nearest" on
      * re-orders the page without asking DOC again.
      */
-    val visible: StateFlow<List<DocItem>> =
+    private val narrowed: Flow<List<DocItem>> =
         combine(_results, _filters, _sort, fix) { results, filters, sort, position ->
             results.showing(filters, sort, position)
+        }
+
+    val visible: StateFlow<List<DocItem>> =
+        combine(narrowed, _companions, _bikeOnly, _source) { items, companions, bikeOnly, source ->
+            if (source == DocSource.TRACKS && bikeOnly) {
+                items.filter { companions.bikeForTrack.containsKey(it.sourceRef) }
+            } else {
+                items
+            }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     init {
@@ -152,6 +184,13 @@ class DocBrowserViewModel(
         _filters.value = emptyMap()
         _searched.value = false
         _message.value = null
+        _bikeOnly.value = false
+        _companions.value = DocCompanions()
+    }
+
+    /** Narrows the Tracks page to the tracks DOC says may be ridden. */
+    fun setBikeOnly(value: Boolean) {
+        _bikeOnly.value = value
     }
 
     /** Tick or untick one value of one filter; a filter with nothing ticked shows everything. */
@@ -192,15 +231,40 @@ class DocBrowserViewModel(
         viewModelScope.launch {
             _busy.value = true
             _message.value = null
-            when (
-                val result = reader.search(
-                    DocQuery(source = wanted, nameContains = name, near = position, radiusKm = radius)
-                )
-            ) {
+            val query = DocQuery(source = wanted, nameContains = name, near = position, radiusKm = radius)
+
+            // Tracks and bike trails are two services describing one thing. Both are asked when either
+            // is being read, so the page can say which tracks may be ridden - and the Bike Trails page
+            // can offer the track itself rather than a pin. A failure on the second question leaves the
+            // first page as it was, with no badge and no complaint.
+            val companionSource = when (wanted) {
+                DocSource.TRACKS -> DocSource.BIKES
+                DocSource.BIKES -> DocSource.TRACKS
+                else -> null
+            }
+            val (result, companion) = coroutineScope {
+                val primary = async { reader.search(query) }
+                val secondary = companionSource?.let { source ->
+                    async { reader.search(query.copy(source = source)) }
+                }
+                primary.await() to secondary?.await()
+            }
+            val companionItems = (companion as? DocReadResult.Found)
+                ?.items
+                ?.within(radius * 1000.0, position)
+                .orEmpty()
+
+            when (result) {
                 is DocReadResult.Found -> {
                     // The service filters by a box, whose corners reach about 1.4x the radius and which
                     // anything clipping it passes through; keep only what is truly within it.
-                    _results.value = result.items.within(radius * 1000.0, position)
+                    val primaryItems = result.items.within(radius * 1000.0, position)
+                    _results.value = primaryItems
+                    _companions.value = when (wanted) {
+                        DocSource.TRACKS -> companionsOf(primaryItems, companionItems)
+                        DocSource.BIKES -> companionsOf(companionItems, primaryItems)
+                        else -> DocCompanions()
+                    }
                     // A new set of results, so a filter from the last search is not carried onto it.
                     _filters.value = emptyMap()
                     _searched.value = true
@@ -223,6 +287,14 @@ class DocBrowserViewModel(
                         .matching(name)
                         .within(radius * 1000.0, position)
                     _results.value = held
+                    // The companion is read whole: only the primary rows can be paired with it, and
+                    // matching on the name here as well would miss a track whose DOC name differs by
+                    // a punctuation mark from the bike point's. The pairing rule does the narrowing.
+                    _companions.value = when (wanted) {
+                        DocSource.TRACKS -> companionsOf(held, cache.cached(DocSource.BIKES))
+                        DocSource.BIKES -> companionsOf(cache.cached(DocSource.TRACKS), held)
+                        else -> DocCompanions()
+                    }
                     _filters.value = emptyMap()
                     _searched.value = true
                     _message.value = when {
@@ -236,6 +308,15 @@ class DocBrowserViewModel(
             }
             _busy.value = false
         }
+    }
+
+    /** Pairs tracks and bike points for the rows, keeping only the two directions the page asks for. */
+    private fun companionsOf(tracks: List<DocItem>, bikes: List<DocItem>): DocCompanions {
+        val links = DocBikeLinks.of(tracks, bikes)
+        return DocCompanions(
+            bikeForTrack = links.pairs.associate { it.track.sourceRef to it.bike },
+            trackForBike = links.pairs.associate { it.bike.sourceRef to it.track }
+        )
     }
 
     companion object {

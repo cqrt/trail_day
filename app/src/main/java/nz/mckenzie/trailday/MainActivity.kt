@@ -158,8 +158,8 @@ class MainActivity : ComponentActivity() {
                                 PendingMapFocus.offer(MapFocus.Place(place.id))
                                 destination = Destination.MAP
                             },
-                            onShowDocOnMap = { item ->
-                                PendingMapFocus.offer(MapFocus.Doc(item))
+                            onShowDocOnMap = { item, bike ->
+                                PendingMapFocus.offer(MapFocus.Doc(item, bike))
                                 destination = Destination.MAP
                             },
                             onAddSpot = {
@@ -178,8 +178,8 @@ class MainActivity : ComponentActivity() {
                         DocBrowserScreen(
                             viewModel = docViewModel,
                             onBack = { destination = Destination.ASSETS },
-                            onShowOnMap = { item ->
-                                PendingMapFocus.offer(MapFocus.Doc(item))
+                            onShowOnMap = { item, bike ->
+                                PendingMapFocus.offer(MapFocus.Doc(item, bike))
                                 destination = Destination.MAP
                             }
                         )
