@@ -617,6 +617,10 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
+**Then the map's DOC card lost the walking time too.** The browser row had stopped saying how long the walk to a
+thing would take, but the card on the map still said it. The card now says only how far away the thing is. It
+shipped as 0.3.19.
+
 **Then DOC's browser led to the map for everything it lists.** A row is a name and a distance now, without the
 walking time that said how long the walk to the start would take - the distance is the question the list answers,
 and the walk itself is what the app is for. A tap on any row - a track, a hut, a camp or a bike trail - changes to

@@ -71,7 +71,6 @@ import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.theme.TrailDayElevation
 import nz.mckenzie.trailday.ui.docCardFacts
 import nz.mckenzie.trailday.ui.docCardProse
-import nz.mckenzie.trailday.ui.formatEstimate
 import nz.mckenzie.trailday.ui.formatLengthOf
 import nz.mckenzie.trailday.viewmodel.MapFocus
 import nz.mckenzie.trailday.viewmodel.MapViewModel
@@ -611,10 +610,7 @@ private fun DocCard(
             runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }.getOrNull()
         }
     }
-    val away = listOfNotNull(
-        pick.distanceM?.let { formatDistance(it) + " away" },
-        pick.onFootSeconds()?.let { "about ${formatEstimate(it)} on foot" }
-    )
+    val away = pick.distanceM?.let { formatDistance(it) + " away" }
 
     MapCard(
         modifier = modifier,
@@ -645,8 +641,8 @@ private fun DocCard(
                 facts.forEach { fact ->
                     Text(text = fact, style = MaterialTheme.typography.bodySmall)
                 }
-                if (away.isNotEmpty()) {
-                    Text(text = away.joinToString(" \u00b7 "), style = MaterialTheme.typography.bodySmall)
+                away?.let {
+                    Text(text = it, style = MaterialTheme.typography.bodySmall)
                 }
                 // The one thing to do with a line of DOC's: go and walk it. A hut or a campsite is a
                 // place to reach rather than a line to follow, so its card says what it is and stops.
