@@ -278,7 +278,7 @@ class WebEditorSaveTest {
     fun aNewTrackWithNothingDrawnIsRefusedAndNothingIsStored() = runBlocking {
         val answer = refused(documents.create(fileBody(paths = emptyList())), WebEditorRefusal.INVALID)
 
-        assertEquals("A line needs at least two points", answer.message)
+        assertEquals("A track needs at least two points", answer.message)
         assertTrue(
             "nothing was created by a drawing with no line",
             assets.observeActiveAssets().first().isEmpty()
