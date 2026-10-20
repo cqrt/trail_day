@@ -62,6 +62,7 @@ import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetLayer
 import nz.mckenzie.trailday.domain.asset.AssetPhrase
 import nz.mckenzie.trailday.domain.asset.AssetShape
+import nz.mckenzie.trailday.domain.doc.DocBikeLinks
 import nz.mckenzie.trailday.domain.doc.DocPick
 import nz.mckenzie.trailday.viewmodel.PendingFollow
 import nz.mckenzie.trailday.domain.tiles.Basemap
@@ -69,7 +70,7 @@ import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.theme.TrailDayElevation
-import nz.mckenzie.trailday.ui.docBikeLine
+import nz.mckenzie.trailday.ui.docBikeFacts
 import nz.mckenzie.trailday.ui.docCardFacts
 import nz.mckenzie.trailday.ui.docCardProse
 import nz.mckenzie.trailday.ui.formatLengthOf
@@ -604,6 +605,7 @@ private fun DocCard(
     modifier: Modifier = Modifier
 ) {
     val item = pick.item
+    val bike = pick.bike
     val facts = remember(item) { docCardFacts(item) }
     val prose = remember(item) { docCardProse(item) }
     // Decoded here rather than in the view model: it is a thumbnail from DOC, and what the card needs to
@@ -635,21 +637,45 @@ private fun DocCard(
                 modifier = Modifier.padding(start = 12.dp, top = 12.dp, end = 40.dp, bottom = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                Text(
-                    text = "DOC ${item.source.singular}".uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    letterSpacing = 1.2.sp
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // A bicycle beside the label, so "this line can be ridden too" is read at a glance.
+                    if (bike != null) {
+                        AssetKindIcon(kind = AssetKind.BIKE_TRACK, dimension = 14.dp)
+                    }
+                    Text(
+                        text = if (bike != null) {
+                            "DOC ${item.source.singular} \u00b7 BIKE TRACK".uppercase()
+                        } else {
+                            "DOC ${item.source.singular}".uppercase()
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        letterSpacing = 1.2.sp
+                    )
+                }
                 Text(text = item.name, style = MaterialTheme.typography.titleLarge)
                 facts.forEach { fact ->
                     Text(text = fact, style = MaterialTheme.typography.bodySmall)
                 }
-                pick.bike?.let { bike ->
-                    Text(
-                        text = docBikeLine(bike),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                bike?.let { linked ->
+                    // A fallback pair can have a very different name, and then DOC's own trail name
+                    // is the useful half of the answer.
+                    if (!DocBikeLinks.sameName(item, linked)) {
+                        Text(
+                            text = "Bike trail: ${linked.name}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    docBikeFacts(linked)?.let { ride ->
+                        Text(
+                            text = ride,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
                 away?.let {
                     Text(text = it, style = MaterialTheme.typography.bodySmall)

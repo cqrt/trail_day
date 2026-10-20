@@ -39,6 +39,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import nz.mckenzie.trailday.domain.doc.DocBikeLinks
 import nz.mckenzie.trailday.domain.doc.DocFilter
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSort
@@ -401,6 +402,13 @@ private fun DocItemRow(item: DocItem, bike: DocItem?, distanceM: Double?) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             bike?.let { linked ->
+                if (!DocBikeLinks.sameName(item, linked)) {
+                    Text(
+                        text = "Bike trail: ${linked.name}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Text(
                     text = docBikeLine(linked),
                     style = MaterialTheme.typography.bodySmall,

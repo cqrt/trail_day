@@ -131,7 +131,11 @@ fun docCardFacts(item: DocItem): List<String> {
  * says that it can be ridden, then DOC's own difficulty and time when it published them.
  */
 fun docBikeLine(bike: DocItem): String =
-    listOfNotNull("Bike-friendly", bike.difficulty, bike.bikingTime).joinToString(" \u00b7 ")
+    listOfNotNull("Bike track", bike.difficulty, bike.bikingTime).joinToString(" \u00b7 ")
+
+/** DOC's difficulty and ride time alone, for a card whose header already says Bike track. */
+fun docBikeFacts(bike: DocItem): String? =
+    listOfNotNull(bike.difficulty, bike.bikingTime).joinToString(" \u00b7 ").takeIf { it.isNotBlank() }
 
 /**
  * What DOC says about the place in prose, ready for the card, or null when it says nothing.

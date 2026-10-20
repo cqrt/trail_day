@@ -617,6 +617,12 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
+**Then a bike point on a track became that track's bike trail.** The name rule left 124 of DOC's 198 bike points
+unmatched; 122 of those sit within ten metres of a track. A bike point within twenty-five metres of any track now
+belongs to the nearest one, name or no name, and a point at the edge of one track still wins over a same-name track
+a little farther away. The track's card reads **DOC TRACK · BIKE TRACK**, with a bicycle beside the label, DOC's
+ride facts, and - when the two names are different - the bike trail's own name. It shipped as 0.3.22.
+
 **Then the bike tab became a ride guide, and the tracks could be narrowed to the rideable ones.** A Tracks search
 asks DOC's bike service as well, so a row can say Bike-friendly with DOC's difficulty and time, and a
 Bike-friendly chip narrows the page to those tracks. A Bike Trails search asks the tracks service as well, so a

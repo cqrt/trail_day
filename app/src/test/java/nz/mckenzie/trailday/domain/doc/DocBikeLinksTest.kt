@@ -50,6 +50,70 @@ class DocBikeLinksTest {
     }
 
     @Test
+    fun `a bike point directly on a track belongs to it whatever it is called`() {
+        // The live services had this in abundance: a cycle trail sitting on the tramping track it
+        // shares, with a name that has nothing to do with the track's.
+        val track = track("Mcarthur Track", line)
+        val point = bike("St James Cycle Trail", at(-41.0000, 173.0040))
+
+        val links = DocBikeLinks.of(listOf(track), listOf(point))
+
+        assertEquals(1, links.pairs.size)
+        assertEquals(track.sourceRef, links.pairs.single().track.sourceRef)
+        assertEquals(point.sourceRef, links.bikeFor(track)?.sourceRef)
+    }
+
+    @Test
+    fun `a differently named point well off the line is not on top of it`() {
+        val track = track("Mcarthur Track", line)
+        // About 55 metres north: near, but not on the line. Only a name match would reach this far.
+        val point = bike("St James Cycle Trail", at(-40.9995, 173.0040))
+
+        assertTrue(DocBikeLinks.of(listOf(track), listOf(point)).isEmpty)
+    }
+
+    @Test
+    fun `the track the point sits on wins over a same-name track a little farther away`() {
+        val namedButOffset = track(
+            "Seed cycle trail",
+            listOf(at(-40.9995, 173.0000), at(-40.9995, 173.0100)),
+            id = 40
+        )
+        val onTop = track("Other Track", line, id = 41)
+        val point = bike("Seed cycle trail", at(-41.0000, 173.0040))
+
+        val links = DocBikeLinks.of(listOf(namedButOffset, onTop), listOf(point))
+
+        assertEquals(1, links.pairs.size)
+        assertEquals(onTop.sourceRef, links.pairs.single().track.sourceRef)
+    }
+
+    @Test
+    fun `a same-name track far away does not steal a point from the track it sits on`() {
+        val far = track(
+            "Mcarthur Track",
+            listOf(at(-41.0200, 173.0000), at(-41.0200, 173.0100)),
+            id = 30
+        )
+        val onTop = track("St James Cycle Trail", line, id = 31)
+        val point = bike("Mcarthur Track", at(-41.0000, 173.0040))
+
+        val links = DocBikeLinks.of(listOf(far, onTop), listOf(point))
+
+        assertEquals(1, links.pairs.size)
+        assertEquals(onTop.sourceRef, links.pairs.single().track.sourceRef)
+    }
+
+    @Test
+    fun `same name is decided without case, spacing or punctuation`() {
+        val track = track("Fowlers Pass Track", line)
+        val point = bike("fowlers-pass track ", at(-41.0000, 173.0040))
+
+        assertTrue(DocBikeLinks.sameName(track, point))
+        assertTrue(!DocBikeLinks.sameName(track, bike("St James Cycle Trail", at(-41.0, 173.0))))
+    }
+
+    @Test
     fun `a point well off the line is not a link even when the name matches`() {
         // The private check that matters: DOC has two different tracks with the same name in places
         // kilometres apart. A name alone would put the bike badge on the wrong one.
