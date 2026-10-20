@@ -52,6 +52,28 @@ class MarkerIconsTest {
     }
 
     @Test
+    fun theBikeWheelsAreHollow() {
+        // The bike is not one of the place kinds, but it is the map's badge for a bike trail. At
+        // marker size a heavy ring closed the hole and the bicycle read as two purple plums; the
+        // wheel's centre has to be see-through for it to read as a wheel.
+        val bitmap = MarkerIcons.bitmap(
+            kind = AssetKind.BIKE_TRACK,
+            colorHex = AssetColors.BIKE_TRACK_KIND,
+            sizePx = 64,
+            outlinePx = 2f
+        )
+        listOf(0.26, 0.74).forEach { wheel ->
+            val x = (bitmap.width * wheel).toInt()
+            val y = (bitmap.height * 0.72).toInt()
+            assertEquals(
+                "the wheel centred at $x,$y is filled in, so the bicycle reads as a blob",
+                0,
+                Color.alpha(bitmap.getPixel(x, y))
+            )
+        }
+    }
+
+    @Test
     fun noTwoKindsOfPlaceAreTheSamePicture() {
         val pictures = PlaceIcons.KINDS.map { it to marker(it) }
 

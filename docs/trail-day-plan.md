@@ -617,6 +617,12 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
+**Then the bicycle badge got wheels you can see through.** The bike's wheels were drawn with the same heavy stroke as
+the other markers, so at badge size the holes closed and the shape read as two purple plums. The wheels are now
+larger and drawn with a lighter stroke, the frame meets them at the inner rim rather than crossing the holes, and a
+short seat and handlebar make the shape read as a bicycle. A test now checks that the centre of each wheel is
+see-through. It shipped as 0.3.23.
+
 **Then a bike point on a track became that track's bike trail.** The name rule left 124 of DOC's 198 bike points
 unmatched; 122 of those sit within ten metres of a track. A bike point within twenty-five metres of any track now
 belongs to the nearest one, name or no name, and a point at the edge of one track still wins over a same-name track

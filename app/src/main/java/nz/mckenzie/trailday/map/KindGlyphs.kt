@@ -121,20 +121,30 @@ private fun DrawScope.drawKindShapes(
             drawPath(path, color, style = Stroke(width = drawnStroke, cap = StrokeCap.Round))
         }
 
-        // A bike track: two wheels joined by a frame, so the kind that is ridden is told from the
-        // kind that is walked even where both are a line on the map.
+        // A bike track: two hollow wheels joined by a lighter frame, so the kind that is ridden is
+        // told from the kind that is walked even where both are a line on the map. The wheels are
+        // drawn with a thinner stroke than the other kinds: at marker size a heavy ring closes the
+        // hole and reads as two filled circles rather than a bicycle.
         AssetKind.BIKE_TRACK -> {
-            listOf(0.28f, 0.72f).forEach { wheel ->
+            val bikeStroke = stroke * 0.55f
+            val wheelStroke = bikeStroke + grow * 2f
+            listOf(0.26f, 0.74f).forEach { wheel ->
                 drawCircle(
                     color = color,
-                    radius = size.minDimension * 0.15f + grow,
+                    radius = size.minDimension * 0.17f + grow,
                     center = Offset(x(wheel), y(0.72f)),
-                    style = Stroke(width = drawnStroke)
+                    style = Stroke(width = wheelStroke)
                 )
             }
-            line(0.28f, 0.72f, 0.50f, 0.40f)
-            line(0.50f, 0.40f, 0.72f, 0.72f)
-            line(0.50f, 0.40f, 0.36f, 0.30f)
+            // The frame meets each wheel at its inner rim, not its centre: a tube drawn through
+            // the middle would put a line across the hole and the wheel would read as filled again.
+            line(0.43f, 0.72f, 0.50f, 0.40f, widthOf = bikeStroke)
+            line(0.57f, 0.72f, 0.50f, 0.40f, widthOf = bikeStroke)
+            line(0.43f, 0.72f, 0.57f, 0.72f, widthOf = bikeStroke)
+            // The seat and the handlebars: the two short marks that make the frame read as a bike
+            // rather than as a triangle between two rings.
+            line(0.50f, 0.40f, 0.38f, 0.32f, widthOf = bikeStroke)
+            line(0.50f, 0.40f, 0.62f, 0.32f, widthOf = bikeStroke)
         }
 
         // A roof over walls: what a hut looks like from the air, and from the ground.
