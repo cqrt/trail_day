@@ -333,7 +333,7 @@ class WebEditorSaveTest {
 
         val refusal = refused(documents.remove(id, version), WebEditorRefusal.IN_USE)
 
-        assertTrue("names the trip: ${refusal.message}", refusal.message.contains("1 trip"))
+        assertTrue("names the trip: ${refusal.message}", refusal.message.contains("1 activity"))
         assertEquals(
             "and the recording still points at the track it was made against",
             id,

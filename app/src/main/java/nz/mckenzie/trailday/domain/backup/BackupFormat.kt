@@ -69,11 +69,12 @@ data class BackupSummary(
 ) {
     val isEmpty: Boolean get() = assets == 0 && recordings == 0
 
-    /** "2 places, 1 trip" - for a person to check against. */
+    /** "2 places, 1 activity" - for a person to check against. */
     fun describe(): String = listOf(
-        count(assets, "place"),
-        count(recordings, "trip")
+        count(assets, "place", "places"),
+        count(recordings, "activity", "activities")
     ).joinToString(", ")
 
-    private fun count(value: Int, noun: String): String = "$value $noun" + if (value == 1) "" else "s"
+    private fun count(value: Int, singular: String, plural: String): String =
+        "$value " + if (value == 1) singular else plural
 }

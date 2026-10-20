@@ -85,7 +85,7 @@ class RecordingDetailViewModel(
                 listOf(
                     AssetLine(
                         assetId = RECORDED_ID,
-                        name = detail?.name ?: "Trip",
+                        name = detail?.name ?: "Activity",
                         colorHex = AssetColors.RECORDED,
                         points = points,
                         stretches = points.splitAtBreaks(breaks).map { piece ->
@@ -135,7 +135,7 @@ class RecordingDetailViewModel(
         viewModelScope.launch {
             val session = recordings.getSession(sessionId)
             if (session == null) {
-                _message.value = "That trip is no longer on the device"
+                _message.value = "That activity is no longer on the device"
                 return@launch
             }
 
@@ -180,7 +180,7 @@ class RecordingDetailViewModel(
             }
                 .onSuccess { _deleted.value = true }
                 .onFailure { failure ->
-                    _message.value = failure.message ?: "Could not delete the trip"
+                    _message.value = failure.message ?: "Could not delete the activity"
                 }
         }
     }

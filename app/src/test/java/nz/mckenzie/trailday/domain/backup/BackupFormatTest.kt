@@ -219,7 +219,7 @@ class BackupFormatTest {
 
         assertEquals(1, summary.assets)
         assertEquals(1, summary.recordings)
-        assertEquals("1 place, 1 trip", summary.describe())
+        assertEquals("1 place, 1 activity", summary.describe())
     }
 
     @Test

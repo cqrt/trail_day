@@ -232,7 +232,7 @@ class WebEditorJsonTest {
         assertFalse(recorded.removal.allowed)
         assertTrue(
             "counts the trip: ${recorded.removal.sentence}",
-            recorded.removal.sentence.contains("1 trip")
+            recorded.removal.sentence.contains("1 activity")
         )
         assertTrue(
             "and sends the walker to the phone: ${recorded.removal.sentence}",

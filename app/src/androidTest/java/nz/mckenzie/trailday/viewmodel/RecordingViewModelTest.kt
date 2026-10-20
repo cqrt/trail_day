@@ -201,9 +201,9 @@ class RecordingViewModelTest {
         viewModel.confirmFinish("One point")
 
         val message = withTimeout(5_000) {
-            viewModel.message.first { it?.contains("Trips only") == true }
+            viewModel.message.first { it?.contains("Activities only") == true }
         }
-        assertTrue("the message should be honest about the shortfall: $message", message!!.contains("Trips only"))
+        assertTrue("the message should be honest about the shortfall: $message", message!!.contains("Activities only"))
         assertEquals(RecordingStatus.FINISHED.name, recordings.getSession(sessionId)!!.status)
         assertTrue(
             "no track should have been created",

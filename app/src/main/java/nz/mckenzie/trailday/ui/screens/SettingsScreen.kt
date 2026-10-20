@@ -569,7 +569,7 @@ fun SettingsScreen(
 
                     Text("Your data", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        text = "Your places and every trip.",
+                        text = "Your places and every activity.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

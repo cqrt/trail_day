@@ -20,7 +20,7 @@ enum class Tab(val label: String, val glyph: IconGlyph) {
     MAP("Map", IconGlyph.MAP),
     ASSETS("Places", IconGlyph.ASSETS),
     RECORD("Record", IconGlyph.RECORD),
-    RECORDINGS("Trips", IconGlyph.RECORDINGS),
+    RECORDINGS("Activities", IconGlyph.RECORDINGS),
     OFFLINE("Offline", IconGlyph.OFFLINE)
 }
 

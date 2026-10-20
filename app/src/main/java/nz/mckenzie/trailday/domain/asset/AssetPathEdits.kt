@@ -88,7 +88,7 @@ object AssetPathEdits {
         if (total > MAX_POINTS) {
             return AssetPathResult.Invalid(
                 "That is $total points, and the phone keeps up to $MAX_POINTS on one " +
-                    "track. A track that came off a trip is filtered on the phone instead."
+                    "track. A track that came off an activity is filtered on the phone instead."
             )
         }
 

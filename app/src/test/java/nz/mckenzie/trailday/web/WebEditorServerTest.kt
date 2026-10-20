@@ -249,7 +249,7 @@ class WebEditorServerTest {
             return when (id) {
                 IN_USE_ID -> WebEditorWrite.Refused(
                     WebEditorRefusal.IN_USE,
-                    "\"Estuary road\" has 3 trips on the phone, so it is not deleted from here."
+                    "\"Estuary road\" has 3 activities on the phone, so it is not deleted from here."
                 )
                 MISSING_ID -> WebEditorWrite.Refused(WebEditorRefusal.MISSING, "no such track")
                 else -> WebEditorWrite.Removed("Estuary road is gone from the phone.")
@@ -695,7 +695,7 @@ class WebEditorServerTest {
         // a refusal that says nothing has moved.
         assertEquals(409, inUse.code)
         assertTrue("the reason is the delete's own: ${inUse.body}", inUse.body.contains("\"reason\":\"in-use\""))
-        assertTrue("and the count is in the words: ${inUse.body}", inUse.body.contains("3 trips"))
+        assertTrue("and the count is in the words: ${inUse.body}", inUse.body.contains("3 activities"))
     }
 
     @Test

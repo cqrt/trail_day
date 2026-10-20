@@ -761,7 +761,7 @@ class RecordingViewModel(
                 newTrackName == null -> ""
                 assetId != null -> " as \"$newTrackName\", which is on the Places page now"
                 trackError != null -> " - the track could not be saved: $trackError"
-                else -> " - too few points for a track, so it is in Trips only"
+                else -> " - too few points for a track, so it is in Activities only"
             }
 
             _message.value = message
@@ -778,7 +778,7 @@ class RecordingViewModel(
 
     private fun sessionIdOrNull(): Long? = TrackingState.current.sessionId
 
-    private fun defaultName(): String = "Trip"
+    private fun defaultName(): String = "Activity"
 
     /** Suggests a track name: "Track 14 Sep" beats an empty box to type into. */
     private fun defaultTrackName(): String = "Track " + formatShortDate(System.currentTimeMillis())

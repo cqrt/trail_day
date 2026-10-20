@@ -185,7 +185,7 @@ fun RecordingDetailScreen(
 
                 message?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
 
-                DestructiveOutlinedButton(text = "Delete trip", onClick = { confirmingDelete = true })
+                DestructiveOutlinedButton(text = "Delete activity", onClick = { confirmingDelete = true })
             }
         }
     }
@@ -193,7 +193,7 @@ fun RecordingDetailScreen(
     if (confirmingDelete) {
         AlertDialog(
             onDismissRequest = { confirmingDelete = false },
-            title = { Text("Delete this trip?") },
+            title = { Text("Delete this activity?") },
             // What goes, in words, before anything does: a trip that made a place takes the place with it,
             // and one that was made for a place leaves the place standing.
             text = {

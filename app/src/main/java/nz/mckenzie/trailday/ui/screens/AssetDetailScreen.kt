@@ -249,7 +249,7 @@ fun AssetDetailScreen(
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "TRIPS",
+                        text = "ACTIVITIES",
                         style = MaterialTheme.typography.labelSmall,
                         letterSpacing = 1.1.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -257,7 +257,7 @@ fun AssetDetailScreen(
                     if (recordings.isEmpty()) {
                         EmptyState(
                             glyph = IconGlyph.RECORDINGS,
-                            title = "No trip for this place",
+                            title = "No activity for this place",
                             body = "Records your walk of this track."
                         )
                     }
@@ -288,7 +288,7 @@ fun AssetDetailScreen(
         AlertDialog(
             onDismissRequest = { confirmingDelete = false },
             title = { Text("Delete this place?") },
-            text = { Text("Its trips stay, but lose their link to it. This cannot be undone.") },
+            text = { Text("Its activities stay, but lose their link to it. This cannot be undone.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmingDelete = false
@@ -371,7 +371,7 @@ fun AssetDetailScreen(
                         // same green as Save.
                         Text("Delete this place", color = MaterialTheme.colorScheme.error)
                     },
-                    supportingContent = { Text("Trips stay, but lose their link to it") },
+                    supportingContent = { Text("Activities stay, but lose their link to it") },
                     leadingContent = {
                         AppIcon(glyph = IconGlyph.TRASH, tint = MaterialTheme.colorScheme.error)
                     }

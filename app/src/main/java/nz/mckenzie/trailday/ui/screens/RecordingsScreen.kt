@@ -65,7 +65,7 @@ fun RecordingsScreen(
     val searching = query.isNotBlank()
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Trips") }) },
+        topBar = { TopAppBar(title = { Text("Activities") }) },
         bottomBar = { TrailDayNavBar(current = Tab.RECORDINGS, onSelect = onOpenTab) }
     ) { innerPadding ->
         Column(
@@ -81,7 +81,7 @@ fun RecordingsScreen(
                 SearchField(
                     value = query,
                     onValueChange = viewModel::search,
-                    placeholder = "Search trips"
+                    placeholder = "Search activities"
                 )
 
                 // What the list holds, in the mock screens' line under the search: how many trips and how far
@@ -98,14 +98,14 @@ fun RecordingsScreen(
             when {
                 sessions.isEmpty() -> EmptyState(
                     glyph = IconGlyph.RECORDINGS,
-                    title = "No trips yet",
+                    title = "No activities yet",
                     body = "Walks and rides you record appear here.",
                     actionLabel = "Record a track",
                     onAction = { onOpenTab(Tab.RECORD) }
                 )
 
                 shown.isEmpty() -> Text(
-                    text = "No trip of yours has \"${query.trim()}\" in its name.",
+                    text = "No activity of yours has \"${query.trim()}\" in its name.",
                     style = MaterialTheme.typography.bodyMedium
                 )
 
@@ -124,17 +124,17 @@ fun RecordingsScreen(
 }
 
 /**
- * "4 trips - 46.5 km between them", for whatever the list is showing.
+ * "4 activities - 46.5 km between them", for whatever the list is showing.
  *
- * One trip is its own sentence: "1 trip - 2.4 km between them" would be describing a crowd of one.
+ * One activity is its own sentence: "1 activity - 2.4 km between them" would be describing a crowd of one.
  */
 internal fun summaryOf(rows: List<RecordingRow>): String {
     val metres = rows.sumOf { it.distanceM }
     return when {
-        rows.isEmpty() -> "No trips"
-        rows.size == 1 -> if (metres <= 0.0) "1 trip" else "1 trip \u00b7 ${formatDistance(metres)}"
-        metres <= 0.0 -> "${rows.size} trips"
-        else -> "${rows.size} trips \u00b7 ${formatDistance(metres)} between them"
+        rows.isEmpty() -> "No activities"
+        rows.size == 1 -> if (metres <= 0.0) "1 activity" else "1 activity \u00b7 ${formatDistance(metres)}"
+        metres <= 0.0 -> "${rows.size} activities"
+        else -> "${rows.size} activities \u00b7 ${formatDistance(metres)} between them"
     }
 }
 

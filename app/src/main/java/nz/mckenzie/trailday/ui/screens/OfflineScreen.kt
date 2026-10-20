@@ -163,7 +163,7 @@ fun OfflineScreen(
                 ) {
                     AppIcon(glyph = IconGlyph.RECORDINGS, tint = MaterialTheme.colorScheme.primary)
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("My trips", style = MaterialTheme.typography.titleMedium)
+                        Text("My activities", style = MaterialTheme.typography.titleMedium)
                         Text(
                             text = "Always on this phone - nothing to download",
                             style = MaterialTheme.typography.bodySmall,

@@ -54,13 +54,14 @@ object AssetRemovalRules {
         } else {
             AssetRemoval(
                 allowed = false,
-                sentence = "\"$name\" has ${count(recordings, "trip")} on the phone, so it is " +
+                sentence = "\"$name\" has ${count(recordings, "activity", "activities")} on the phone, so it is " +
                     "not deleted from here. Delete it on the phone, where what goes with it can be " +
                     "seen first."
             )
         }
     }
 
-    /** "1 trip", "3 trips" - a number and its noun, which is how a person says it. */
-    private fun count(value: Int, noun: String) = "$value $noun" + if (value == 1) "" else "s"
+    /** "1 activity", "3 activities" - a number and its noun, which is how a person says it. */
+    private fun count(value: Int, singular: String, plural: String) =
+        "$value " + if (value == 1) singular else plural
 }

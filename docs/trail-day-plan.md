@@ -617,6 +617,11 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
+**Then the walks and rides became activities.** The fifth tab said Trips, and so did its page, its search and the
+line under it. Everything the walker reads now says activity - that page, a place's record of itself, the delete
+warnings, what a backup reports, and the name a new recording starts with. The code still calls them recordings;
+only the app's word changed.
+
 **Then Settings got quieter.** The group labels THE MAP, THIS PHONE, BACKUPS and THE APP went - every card
 already has its own title, and a heading over a heading is noise on the screen furthest from the trail. So did
 "What to draw under your tracks" and the note about offline areas downloading imagery, which the Offline screen

@@ -100,7 +100,7 @@ class OffsiteBackupRulesTest {
     fun `the comparison names both sides with numbers`() {
         val line = OffsiteBackupRules.comparison(summary(assets = 4, recordings = 9), summary(assets = 1))
 
-        assertTrue(line, line.contains("4 places, 9 trips"))
+        assertTrue(line, line.contains("4 places, 9 activities"))
         assertTrue(line, line.contains("This phone: 1 place,"))
     }
 }

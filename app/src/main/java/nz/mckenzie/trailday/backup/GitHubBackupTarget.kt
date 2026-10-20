@@ -108,7 +108,7 @@ class GitHubBackupTarget(
             throw BackupTargetException(
                 "This backup is ${bytes.size / 1_000_000} MB, and GitHub will not take more " +
                     "than ${MAX_TEXT_BYTES / 1_000_000} MB in one write. Back up to a file as " +
-                    "well, and keep the long trips there."
+                    "well, and keep the long activities there."
             )
         }
 

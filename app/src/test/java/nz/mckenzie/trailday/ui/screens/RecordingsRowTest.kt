@@ -84,15 +84,15 @@ class RecordingsRowTest {
     @Test
     fun `the list says what it holds, and one trip is its own sentence`() {
         assertEquals(
-            "2 trips \u00b7 14.35 km between them",
+            "2 activities \u00b7 14.35 km between them",
             summaryOf(listOf(row(distanceM = 10_000.0), row(distanceM = 4_350.0)))
         )
         assertEquals(
             "a crowd of one is not a crowd",
-            "1 trip \u00b7 2.35 km",
+            "1 activity \u00b7 2.35 km",
             summaryOf(listOf(row(distanceM = 2_350.0)))
         )
-        assertEquals("no distance is no distance to say", "2 trips", summaryOf(listOf(row(distanceM = 0.0), row(distanceM = 0.0))))
-        assertEquals("No trips", summaryOf(emptyList()))
+        assertEquals("no distance is no distance to say", "2 activities", summaryOf(listOf(row(distanceM = 0.0), row(distanceM = 0.0))))
+        assertEquals("No activities", summaryOf(emptyList()))
     }
 }

@@ -32,7 +32,7 @@ class AssetRemovalRulesTest {
         val removal = AssetRemovalRules.of("Old track", recordings = 1)
 
         assertFalse(removal.allowed)
-        assertTrue("says what is on it: ${removal.sentence}", removal.sentence.contains("1 trip"))
+        assertTrue("says what is on it: ${removal.sentence}", removal.sentence.contains("1 activity"))
     }
 
     @Test
@@ -40,7 +40,7 @@ class AssetRemovalRulesTest {
         val removal = AssetRemovalRules.of("Old track", recordings = 3)
 
         assertFalse(removal.allowed)
-        assertTrue("says how many: ${removal.sentence}", removal.sentence.contains("3 trips"))
+        assertTrue("says how many: ${removal.sentence}", removal.sentence.contains("3 activities"))
     }
 
     @Test

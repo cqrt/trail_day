@@ -635,7 +635,7 @@ class SettingsViewModel(
                             !answer.isPrivate -> OffsiteCheckState.Worked(
                                 note = "${answer.fullName} answered, and the token can write to it.",
                                 warning = "That repository is public, so anyone can read your " +
-                                    "tracks and trips. Make it private before " +
+                                    "tracks and activities. Make it private before " +
                                     "backing up."
                             )
 
