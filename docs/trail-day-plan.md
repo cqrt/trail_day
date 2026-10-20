@@ -617,6 +617,12 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
+**Then the switches were put with the material they own.** "Tracks" was hiding both DOC's tracks and the
+walker's, and a recorded line lost its green core to that switch while its gold edge stayed behind. The switch is
+now **DOC Tracks** and hides only DOC's; **DOC Huts** and **DOC Campsites** say whose they are. Everything of the
+walker's that is a track - planned, imported or recorded - is **Your Tracks**, with its name and its gold edge, so
+one switch hides the whole line. It shipped as 0.3.17.
+
 **Then a track in a list led to the map, and the map learned what was walked.** A tap on a track - in Places, in
 the DOC browser, or in Places' Nearby from DOC group - now changes to the map, frames the line, brings its card up,
 and shows the layer again if it had been switched off. A spot still opens its own page, and DOC's huts, campsites

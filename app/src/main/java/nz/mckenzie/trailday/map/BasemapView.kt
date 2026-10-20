@@ -691,20 +691,32 @@ private fun applyLayerVisibility(
     yourTracksHidden: Boolean = false
 ) {
     AssetLayer.ALL.forEach { layer ->
-        // Every layer that switch is: a track is two, because its name goes with it, and leaving
-        // the name behind would be a label on nothing.
-        // The walker's own layers, and DOC's material of the same kind: one switch, one map. See
+        // DOC Tracks is DOC's alone: the walker's tracks have their own switch, so this one must not
+        // hide them or take a recorded line's green core away with its gold edge. Everything else is
+        // the walker's layer and DOC's material of the same kind under one switch. See
         // [DocLayerIds.idsOf] for which of DOC's layers each switch hides.
-        (AssetLayerIds.idsOf(layer) + DocLayerIds.idsOf(layer)).forEach inner@{ id ->
+        val ids = if (layer == AssetLayer.TRACKS) {
+            DocLayerIds.idsOf(layer)
+        } else {
+            AssetLayerIds.idsOf(layer) + DocLayerIds.idsOf(layer)
+        }
+        ids.forEach inner@{ id ->
             val target = style.getLayer(id) ?: return@inner
             target.setProperties(
                 PropertyFactory.visibility(if (layer in hidden) Property.NONE else Property.VISIBLE)
             )
         }
     }
-    // The recorded tracks have a switch of their own rather than a kind's: a recording is not one
-    // of the places, so it has no AssetLayer to be hidden with.
-    listOf(YOUR_TRACKS_CASING, YOUR_TRACKS_LINE).forEach inner@{ id ->
+    // The walker's tracks are one switch: every line of theirs, every name beside one, the gold edge
+    // under a recorded line, and the recordings themselves. A track that was recorded is one line
+    // here rather than a green core under a Tracks switch that can strip its edge away.
+    listOf(
+        AssetLayerIds.TRACKS,
+        AssetLayerIds.TRACK_NAMES,
+        RECORDED_CASING,
+        YOUR_TRACKS_CASING,
+        YOUR_TRACKS_LINE
+    ).forEach inner@{ id ->
         val target = style.getLayer(id) ?: return@inner
         target.setProperties(
             PropertyFactory.visibility(if (yourTracksHidden) Property.NONE else Property.VISIBLE)

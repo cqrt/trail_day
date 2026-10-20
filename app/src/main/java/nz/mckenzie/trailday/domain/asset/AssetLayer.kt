@@ -12,6 +12,12 @@ package nz.mckenzie.trailday.domain.asset
  * marker's shape and colour are read from. It is the same enum the picker, the list and the record
  * screens use: a layer per kind, a chip per kind, one vocabulary.
  *
+ * **DOC Tracks hides only DOC's tracks**, because the walker's own tracks - planned, imported and
+ * recorded - are the sheet's "Your Tracks", which is not an [AssetLayer] because a recording is
+ * evidence rather than a place. DOC Huts and DOC Campsites are named for the reference material,
+ * which is the only hut and campsite the app draws. The walker's own bike tracks and waypoints keep
+ * a switch per kind.
+ *
  * **What a preference stores is what is hidden, not what is shown.** Everything is drawn until
  * somebody says otherwise, so the map is what it always was for anyone who never opens this, and a
  * layer added in a later build arrives visible rather than missing: a walker who has never touched
@@ -27,7 +33,7 @@ enum class AssetLayer(
 ) {
     TRACKS(
         id = "tracks",
-        displayName = "Tracks",
+        displayName = "DOC Tracks",
         kind = AssetKind.TRACK
     ),
 
@@ -39,13 +45,13 @@ enum class AssetLayer(
 
     HUTS(
         id = "huts",
-        displayName = "Huts",
+        displayName = "DOC Huts",
         kind = AssetKind.HUT
     ),
 
     CAMPSITES(
         id = "campsites",
-        displayName = "Campsites",
+        displayName = "DOC Campsites",
         kind = AssetKind.CAMPSITE
     ),
 

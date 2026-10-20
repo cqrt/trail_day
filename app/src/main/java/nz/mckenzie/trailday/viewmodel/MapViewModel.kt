@@ -283,9 +283,18 @@ class MapViewModel(
             val points = geometry.paths.flatten()
             if (points.size < 2) return@launch
             clearPickedDoc()
-            layerOf(AssetKind.fromStorage(asset.kind))?.let { layer ->
-                if (layer in settingsRepository.hiddenMapLayers.first()) {
-                    settingsRepository.hideMapLayer(layer, false)
+            val kind = AssetKind.fromStorage(asset.kind)
+            if (kind == AssetKind.TRACK) {
+                // The walker's tracks have their own switch now; asking to see one should turn that
+                // on rather than the DOC tracks it used to be hidden with.
+                if (settingsRepository.yourTracksHidden.first()) {
+                    settingsRepository.setYourTracksHidden(false)
+                }
+            } else {
+                layerOf(kind)?.let { layer ->
+                    if (layer in settingsRepository.hiddenMapLayers.first()) {
+                        settingsRepository.hideMapLayer(layer, false)
+                    }
                 }
             }
             frame(points)
@@ -462,8 +471,17 @@ class MapViewModel(
      */
     fun assetAt(lat: Double, lng: Double, radiusM: Double = AssetHitTest.DEFAULT_TOLERANCE_M): Long? {
         val hidden = hiddenLayers.value
+        val yourTracksGone = yourTracksHidden.value
         val drawn = assets.value
-            .filter { place -> layerOf(AssetKind.fromStorage(place.kind)) !in hidden }
+            .filter { place ->
+                // A track of the walker's is on the map only while Your Tracks is on; the DOC Tracks
+                // switch says nothing about it. Everything else keeps the switch of its kind.
+                if (AssetKind.fromStorage(place.kind) == AssetKind.TRACK) {
+                    !yourTracksGone
+                } else {
+                    layerOf(AssetKind.fromStorage(place.kind)) !in hidden
+                }
+            }
             .mapNotNull { place -> geometryByTrack.value[place.id]?.let { place.id to it } }
             .toMap()
         return AssetHitTest.nearest(drawn, lat, lng, radiusM)
