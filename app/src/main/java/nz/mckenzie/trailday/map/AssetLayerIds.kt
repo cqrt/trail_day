@@ -1,17 +1,14 @@
 package nz.mckenzie.trailday.map
 
 import nz.mckenzie.trailday.domain.asset.AssetKind
-import nz.mckenzie.trailday.domain.asset.AssetLayer
 
 /**
- * Which style layer each layer of the work is drawn by.
+ * The style layers the walker's own work is drawn by.
  *
  * The map is built from a layer per line kind - a track and a bike track - and a marker layer per
  * place kind, because a dash pattern is a constant in MapLibre rather than something a feature can
- * carry, and a kind can only be hidden on its own if it is drawn on its own. This is the only place
- * that says which of them a switch hides. A table rather than a `when` buried in the map view, so
- * that a switch and the layer it hides cannot drift apart without a test noticing: every layer a
- * walker can hide has a layer to hide, and no two share one.
+ * carry, and a kind can only be hidden on its own if it is drawn on its own. Which of these the
+ * Your Places tiles hide is [YourPlaceLayerIds]; which of DOC's is [DocLayerIds].
  */
 object AssetLayerIds {
 
@@ -39,28 +36,6 @@ object AssetLayerIds {
      */
     fun pointOf(kind: AssetKind): String =
         POINT_PREFIX + kind.name.lowercase().replace('_', '-')
-
-    /**
-     * The style layer [layer] is drawn by - its one layer, except for a track, whose name layer is
-     * hidden with it. See [idsOf] for what a switch hides.
-     */
-    fun of(layer: AssetLayer): String = when (layer.kind) {
-        AssetKind.TRACK -> TRACKS
-        AssetKind.BIKE_TRACK -> BIKE_TRACKS
-        else -> pointOf(layer.kind)
-    }
-
-    /**
-     * Every style layer [layer] is drawn by.
-     *
-     * One for every layer of the work but a track, which is two: a track's own line and the name
-     * written beside it are hidden together. A switch hides what this returns rather than [of]
-     * alone, so switching *Tracks* off cannot leave a name hanging on nothing.
-     */
-    fun idsOf(layer: AssetLayer): List<String> = when (layer.kind) {
-        AssetKind.TRACK -> listOf(TRACKS, TRACK_NAMES)
-        else -> listOf(of(layer))
-    }
 
     /**
      * Every layer the map draws, in the order the style builds and draws them.

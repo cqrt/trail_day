@@ -82,7 +82,7 @@ fun AssetDetailScreen(
     // Editing happens on a screen of its own, so this screen only has to say where to go.
     onEdit: () -> Unit,
     onKeepGround: () -> Unit = {},
-    /** Record while following this place - or, for a spot, head for it. */
+    /** Record while following this line, or head for this reachable place. */
     onRecord: () -> Unit = {},
     onOpenRecording: (Long) -> Unit = {}
 ) {
@@ -248,52 +248,69 @@ fun AssetDetailScreen(
 
                 message?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
 
-                // What this page is *for*: recording a pass against the place, which the recorder then reads
-                // back against as the walker moves. Everything else is behind the button at the top.
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(onClick = onRecord, modifier = Modifier.weight(1f)) {
-                        Text(if (shape == AssetShape.LINE) "Record this" else "Head for this")
-                    }
+                // What this page is *for* for a line or a place to reach: recording a pass against it,
+                // which the recorder then reads back against as the walker moves. A spot is a marker
+                // for something found, not a destination, so it has no recording action at all.
+                if (kind == AssetKind.WAYPOINT) {
                     OutlinedButton(
                         onClick = { actionsOpen = true },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("More")
                     }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(onClick = onRecord, modifier = Modifier.weight(1f)) {
+                            Text(if (shape == AssetShape.LINE) "Record this" else "Head for this")
+                        }
+                        OutlinedButton(
+                            onClick = { actionsOpen = true },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("More")
+                        }
+                    }
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "ACTIVITIES",
-                        style = MaterialTheme.typography.labelSmall,
-                        letterSpacing = 1.1.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (recordings.isEmpty()) {
-                        EmptyState(
-                            glyph = IconGlyph.RECORDINGS,
-                            title = "No activity for this place",
-                            body = "Records your walk of this track."
+                // A spot with nothing recorded says nothing about activities; a spot that already
+                // has a pass from an older build keeps the history, read-only.
+                if (kind != AssetKind.WAYPOINT || recordings.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "ACTIVITIES",
+                            style = MaterialTheme.typography.labelSmall,
+                            letterSpacing = 1.1.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
-                    recordings.forEach { session ->
-                        Card(modifier = Modifier.fillMaxWidth(), onClick = { onOpenRecording(session.id) }) {
-                            Column(
-                                modifier = Modifier.padding(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                        if (recordings.isEmpty()) {
+                            EmptyState(
+                                glyph = IconGlyph.RECORDINGS,
+                                title = "No activity for this place",
+                                body = "Records your walk of this track."
+                            )
+                        }
+                        recordings.forEach { session ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { onOpenRecording(session.id) }
                             ) {
-                                Text(session.name, style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    text = "${formatDate(session.startedAtEpochMs)} \u00b7 " +
-                                        "${formatDistance(session.distanceM)} \u00b7 " +
-                                        "${session.pointCount} point" +
-                                        (if (session.pointCount == 1) "" else "s"),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(session.name, style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        text = "${formatDate(session.startedAtEpochMs)} \u00b7 " +
+                                            "${formatDistance(session.distanceM)} \u00b7 " +
+                                            "${session.pointCount} point" +
+                                            (if (session.pointCount == 1) "" else "s"),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }

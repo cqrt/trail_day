@@ -617,11 +617,25 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
-**Then the bike switch stood on its own.** DOC Tracks and Bike tracks are now two independent halves of DOC's
-lines: the first hides walking-only tracks, the second the tracks that can be ridden, their casing and their
-badges. Choosing only Bike tracks shows the rideable line as well as its bicycle, and tapping that line or badge
-opens the track card. Before this, DOC Tracks was above Bike tracks and took the rideable line away while leaving
-its badge on the map with nothing to answer the finger. It shipped as 0.3.26.
+**Then the layers sheet was rebuilt around Your Places.** The old list of full-width switches became two grouped
+tiles sections: **Your Places** with a master switch and four tiles - Spots, Tracks, Bike tracks and Recordings,
+each with a count - and **DOC reference** with Walking tracks, Bike trails, Huts and Campsites. The master says
+on, off or mixed; every tile is its own switch; Place names stays a map setting. The walker's own work and DOC's
+material are separate halves now, which is what let one "Bike tracks" switch stop meaning both at once. Old
+switches are read as the nearest new tiles, so an upgraded phone does not suddenly show or hide a layer. It
+shipped as 0.3.27.
+
+**Then a waypoint became a spot, and stopped being a destination.** The word was wrong for the thing: these are
+markers for water, a campsite, a junction or something interesting, not points on a route to navigate to. A spot
+now has no **Head for this** action, no empty activities section, and is not offered as a target in the recorder.
+A spot with an older recorded pass still shows that history read-only. The stored kind remains `WAYPOINT`, so
+nothing has to migrate; only the walker's word changed. It shipped as 0.3.27.
+
+**Then the bike switch stood on its own.** DOC Tracks and Bike tracks were made two independent halves of DOC's
+lines at this point: the first hid walking-only tracks, the second the tracks that could be ridden, their casing
+and their badges. Choosing only Bike tracks showed the rideable line as well as its bicycle, and tapping that line
+or badge opened the track card. In 0.3.27 the two switches became DOC's **Walking tracks** and **Bike trails**,
+with the walker's own bike tracks under **Your Places**. It shipped as 0.3.26.
 
 **Then a recording could become a walking track or a bike track.** The name dialog's new type row decides the
 kind of the place the pass is saved as, so a ride is drawn, listed and filtered as a bike track rather than being

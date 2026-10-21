@@ -16,6 +16,8 @@ import nz.mckenzie.trailday.data.RecordingRepository
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
+import nz.mckenzie.trailday.domain.asset.AssetKind
+import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.METRES_PER_DEG_LNG_AT_EQUATOR
 import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
@@ -103,6 +105,25 @@ class RecordingViewModelTest {
         .observeActiveAssets()
         .first()
         .filter { it.name == name }
+
+    @Test
+    fun aSpotIsNotSomethingTheRecorderOffersToFollow() = runBlocking {
+        val spot = assetRepository.createAsset(
+            name = "Lookout",
+            geometry = listOf(line.first()),
+            kind = AssetKind.WAYPOINT,
+            shape = AssetShape.POINT
+        )
+        val track = assetRepository.createAsset(name = "Ridge track", geometry = line)
+
+        val viewModel = viewModel()
+        val targets = withTimeout(5_000) {
+            viewModel.recordingTargets.first { it.isNotEmpty() }
+        }
+
+        assertEquals("the line is a target", listOf(track), targets.map { it.id })
+        assertFalse("the spot is only a marker", spot in targets.map { it.id })
+    }
 
     @Test
     fun finishingANewLineAsksForANameAndCreatesATrack() = runBlocking {

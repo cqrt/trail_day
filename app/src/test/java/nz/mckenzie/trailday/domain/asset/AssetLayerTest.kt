@@ -38,15 +38,14 @@ class AssetLayerTest {
     }
 
     @Test
-    fun `an older build's places switch hides every kind of place`() {
-        // Before the map had a layer per kind, one switch hid every kind of place. Somebody who
-        // threw it meant the huts, the campsites and their own spots alike - so it is read back as
-        // the three, because a layer that comes back is a map that has quietly changed under them.
+    fun `an older build's places switch hides both DOC place kinds`() {
+        // Before the map had a layer per kind, one switch hid every kind of place. The two DOC
+        // place kinds are read back from it; the walker's own spots belong to YourPlaceLayer now.
         assertEquals(
             AssetLayer.ALL.filter { it.kind.shape == AssetShape.POINT }.toSet(),
             AssetLayer.hiddenIn(setOf("places"))
         )
-        assertEquals(3, AssetLayer.hiddenIn(setOf("places")).size)
+        assertEquals(2, AssetLayer.hiddenIn(setOf("places")).size)
     }
 
     @Test
@@ -57,15 +56,15 @@ class AssetLayerTest {
     }
 
     @Test
-    fun `there is one switch per kind of place, and no kind without one`() {
-        assertEquals("five kinds, five switches", AssetKind.entries.size, AssetLayer.ALL.size)
+    fun `the four DOC reference layers each have their own kind and switch`() {
+        assertEquals("four DOC reference layers", 4, AssetLayer.ALL.size)
         assertEquals(
-            "and one of them for each kind, so a kind cannot arrive without a switch",
-            AssetKind.entries.toSet(),
+            "one for each kind DOC publishes as a reference layer",
+            setOf(AssetKind.TRACK, AssetKind.BIKE_TRACK, AssetKind.HUT, AssetKind.CAMPSITE),
             AssetLayer.ALL.map { it.kind }.toSet()
         )
         assertEquals(
-            "which is what lets a kind be hidden on its own, rather than in a family",
+            "which is what lets one be hidden on its own, rather than in a family",
             AssetLayer.ALL.size,
             AssetLayer.ALL.map { it.id }.toSet().size
         )

@@ -1,18 +1,17 @@
 package nz.mckenzie.trailday.map
 
 import nz.mckenzie.trailday.domain.asset.AssetLayer
+import nz.mckenzie.trailday.domain.asset.YourPlaceLayer
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
  * Which of DOC's own layers each switch hides.
  *
- * The bug that started this: a switch called "Huts" left DOC's huts standing on the ground, because the
- * switches hid only the walker's own layers. What is pinned here is that **every layer DOC draws can be
- * hidden, and by the switch that names it** - a casing hides with the line it edges, a place hides with
- * the kind it is drawn as, DOC's rideable tracks hide with the bike switch, and the walker's waypoint
- * switch has no DOC layer because a bike point is a bike trail now.
+ * What is pinned here is that **every layer DOC draws can be hidden, and by the switch that names
+ * it** - a casing hides with the line it edges, a place hides with the kind it is drawn as, and
+ * DOC's rideable tracks hide with the Bike trails switch. The walker's own layers are a
+ * [YourPlaceLayer] group, not these.
  */
 class DocLayerIdsTest {
 
@@ -62,11 +61,4 @@ class DocLayerIdsTest {
         )
     }
 
-    @Test
-    fun `the waypoint switch has no DOC layer, because bike points are bike trails now`() {
-        assertTrue(
-            "DOC has no waypoint marker layer; its bike points are badges under the bike switch",
-            DocLayerIds.idsOf(AssetLayer.WAYPOINTS).isEmpty()
-        )
-    }
 }

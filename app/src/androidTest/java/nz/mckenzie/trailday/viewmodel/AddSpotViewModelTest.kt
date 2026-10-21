@@ -94,7 +94,7 @@ class AddSpotViewModelTest {
     }
 
     @Test
-    fun aWaypointIsOneTapAndSavesWhereItIs(): Unit = runBlocking {
+    fun aSpotIsOneTapAndSavesWhereItIs(): Unit = runBlocking {
         val viewModel = viewModel()
 
         viewModel.dropSpot(-41.5100, 173.9600)
@@ -106,7 +106,7 @@ class AddSpotViewModelTest {
         val repository = AssetRepository(db)
         val asset = repository.getAsset(saved)!!
         assertEquals(
-            "everything added here is a waypoint",
+            "everything added here is a spot",
             AssetKind.WAYPOINT,
             AssetKind.fromStorage(asset.kind)
         )
@@ -136,7 +136,7 @@ class AddSpotViewModelTest {
     }
 
     @Test
-    fun aWaypointKeepsItsDescriptionAndPhoto(): Unit = runBlocking {
+    fun aSpotKeepsItsDescriptionAndPhoto(): Unit = runBlocking {
         val viewModel = viewModel()
         val photo = byteArrayOf(0x01, 0x02, 0x03)
 

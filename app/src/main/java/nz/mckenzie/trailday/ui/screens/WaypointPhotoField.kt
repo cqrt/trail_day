@@ -31,7 +31,7 @@ import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.photo.WaypointPhotos
 
 /**
- * The optional photograph on a waypoint.
+ * The optional photograph on a spot.
  *
  * Two ways in, because a camera is not always the right one: the system camera for the spot in
  * front of the walker, and the phone's pictures for a photograph already taken. Both come back as
@@ -86,7 +86,7 @@ internal fun WaypointPhotoField(
             image?.let {
                 Image(
                     bitmap = it,
-                    contentDescription = "Waypoint photo",
+                    contentDescription = "Spot photo",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxWidth()

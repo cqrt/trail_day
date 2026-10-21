@@ -7,7 +7,7 @@ import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
 
 /**
- * A place on the map: a track, a hut, a campsite, or a waypoint of the walker's own.
+ * A place on the map: a track, a hut, a campsite, or a spot of the walker's own.
  *
  * The word is deliberately wider than "track". The same list holds a walked line, a ridden line and
  * a single spot, and those differ only in [kind] and [shape].

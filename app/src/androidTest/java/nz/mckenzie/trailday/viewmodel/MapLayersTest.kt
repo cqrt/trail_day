@@ -13,6 +13,7 @@ import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.asset.AssetLayer
+import nz.mckenzie.trailday.domain.asset.YourPlaceLayer
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.tracking.LocationSource
@@ -47,11 +48,13 @@ class MapLayersTest {
         db = Room.inMemoryDatabaseBuilder(context, TrailDayDatabase::class.java).build()
         settings = SettingsRepository(context)
         settings.setHiddenMapLayers(emptySet())
+        settings.setAllYourPlacesHidden(false)
     }
 
     @After
     fun tearDown() = runBlocking {
         settings.setHiddenMapLayers(emptySet())
+        settings.setAllYourPlacesHidden(false)
         // And the one switch in that sheet that starts off goes back to off: a run that left the
         // place names on would change the map the next run looks at, and the emulator somebody then
         // looks at.
@@ -74,10 +77,12 @@ class MapLayersTest {
     @Test
     fun nothingIsHiddenUntilSomebodySaysSo() = runBlocking {
         assertTrue("a stored nothing hides nothing", settings.hiddenMapLayers.first().isEmpty())
+        assertTrue(settings.hiddenYourPlaces.first().isEmpty())
 
         val viewModel = viewModel()
 
         assertEquals(emptySet<AssetLayer>(), viewModel.hiddenLayers.first())
+        assertEquals(emptySet<YourPlaceLayer>(), viewModel.hiddenYourPlaces.first())
     }
 
     @Test
@@ -88,13 +93,14 @@ class MapLayersTest {
         val one = withTimeout(5_000) { viewModel.hiddenLayers.first { it.isNotEmpty() } }
         assertEquals(setOf(AssetLayer.BIKE_TRACKS), one)
 
-        viewModel.setLayerHidden(AssetLayer.WAYPOINTS, hidden = true)
-        val two = withTimeout(5_000) { viewModel.hiddenLayers.first { it.size == 2 } }
-        assertEquals(setOf(AssetLayer.BIKE_TRACKS, AssetLayer.WAYPOINTS), two)
+        viewModel.setYourPlaceHidden(YourPlaceLayer.SPOTS, hidden = true)
+        val two = withTimeout(5_000) { viewModel.hiddenYourPlaces.first { it.isNotEmpty() } }
+        assertEquals(setOf(YourPlaceLayer.SPOTS), two)
 
-        viewModel.setLayerHidden(AssetLayer.WAYPOINTS, hidden = false)
-        val back = withTimeout(5_000) { viewModel.hiddenLayers.first { it.size == 1 } }
-        assertEquals("showing one layer again is not a way to show the rest", setOf(AssetLayer.BIKE_TRACKS), back)
+        viewModel.setYourPlaceHidden(YourPlaceLayer.SPOTS, hidden = false)
+        val back = withTimeout(5_000) { viewModel.hiddenYourPlaces.first { it.isEmpty() } }
+        assertEquals(emptySet<YourPlaceLayer>(), back)
+        assertEquals("DOC's bike switch is untouched by a Your Places tile", setOf(AssetLayer.BIKE_TRACKS), viewModel.hiddenLayers.first())
     }
 
     @Test
@@ -132,12 +138,16 @@ class MapLayersTest {
         val viewModel = viewModel()
         viewModel.setLayerHidden(AssetLayer.TRACKS, hidden = true)
         viewModel.setLayerHidden(AssetLayer.HUTS, hidden = true)
+        viewModel.setAllYourPlacesHidden(true)
         withTimeout(5_000) { viewModel.hiddenLayers.first { it.size == 2 } }
+        withTimeout(5_000) { viewModel.hiddenYourPlaces.first { it.size == YourPlaceLayer.ALL.size } }
 
         viewModel.showEveryLayer()
 
         withTimeout(5_000) { viewModel.hiddenLayers.first { it.isEmpty() } }
+        withTimeout(5_000) { viewModel.hiddenYourPlaces.first { it.isEmpty() } }
         assertTrue(settings.hiddenMapLayers.first().isEmpty())
+        assertTrue(settings.hiddenYourPlaces.first().isEmpty())
     }
 
     /**

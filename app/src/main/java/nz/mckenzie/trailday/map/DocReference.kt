@@ -77,8 +77,8 @@ object DocLayerIds {
      * The bicycle badges for every bike point DOC publishes.
      *
      * A badge rather than a place marker: a bike point on a track is a note about that track, and one
-     * with no track is still a bike trail rather than a waypoint. Both are drawn with the bicycle and
-     * hidden by the Bike tracks switch - along with the bike-friendly tracks themselves.
+     * with no track is still a bike trail rather than a spot. Both are drawn with the bicycle and
+     * hidden by the Bike trails switch - along with the bike-friendly tracks themselves.
      */
     const val BIKE_BADGES = "trailday-doc-bike-badges"
 
@@ -118,18 +118,16 @@ object DocLayerIds {
     /**
      * The style layers [layer] hides of DOC's own material, when the walker switches that layer off.
      *
-     * **DOC Tracks hides the walking-only tracks; Bike tracks hides the rideable ones.** The two
-     * sets are independent halves of DOC's lines, so switching DOC Tracks off leaves a rideable
-     * track and its badge standing when Bike tracks is on - which is what the walker asked for by
-     * choosing only bike tracks. A bike point is a bike trail now, so its badge goes with the Bike
-     * tracks switch, not with a waypoint switch that no longer exists.
+     * **Walking tracks hides the walking-only tracks; Bike trails hides the rideable ones.** The
+     * two sets are independent halves of DOC's lines, so switching Walking tracks off leaves a
+     * rideable track and its badge standing when Bike trails is on - which is what the walker asked
+     * for by choosing only bike trails. A bike point is a bike trail, so its badge goes with the
+     * Bike trails switch.
      */
     fun idsOf(layer: AssetLayer): List<String> = when (layer) {
         // The casing is under the line it edges, so it is hidden with it.
         AssetLayer.TRACKS -> listOf(CASING, TRACKS)
         AssetLayer.BIKE_TRACKS -> listOf(BIKE_CASING, BIKE_TRACKS, BIKE_BADGES)
-        // The walker's own spots; DOC has no waypoint layer any more.
-        AssetLayer.WAYPOINTS -> emptyList()
         else -> listOf(pointOf(layer.kind))
     }
 

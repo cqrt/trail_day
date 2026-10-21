@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import nz.mckenzie.trailday.BuildConfig
 import nz.mckenzie.trailday.domain.asset.AssetLayer
+import nz.mckenzie.trailday.domain.asset.YourPlaceLayer
 import nz.mckenzie.trailday.domain.backup.BackupDestination
 import nz.mckenzie.trailday.domain.backup.BackupSettingsRecord
 import nz.mckenzie.trailday.domain.backup.BackupSwitches
@@ -39,7 +40,9 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     private val basemapPref = stringPreferencesKey("basemap")
     private val themeChoicePref = stringPreferencesKey("theme_choice")
     private val hiddenMapLayersPref = stringSetPreferencesKey("hidden_map_layers")
-    private val yourTracksHiddenPref = booleanPreferencesKey("your_tracks_hidden")
+    private val hiddenYourPlacesPref = stringSetPreferencesKey("hidden_your_places")
+    /** The old "Your Tracks" switch: read once to seed [hiddenYourPlaces], never written again. */
+    private val legacyYourTracksHiddenPref = booleanPreferencesKey("your_tracks_hidden")
     private val placeNamesPref = booleanPreferencesKey("place_names")
     private val webEditorTokenRequiredPref = booleanPreferencesKey("web_editor_token_required")
 
@@ -163,19 +166,59 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     }
 
     /**
-     * Whether the tracks the walker has recorded are left off the map.
+     * Which parts of the walker's own work are left off the map.
      *
-     * Stored like the other layers, and **shown when unset**: what was walked is the work, and a
-     * recorded line is the one layer that is the walker's own evidence rather than a plan or DOC's
-     * material. Its own switch rather than a kind's, because a recording is not one of the places.
+     * Stored as what is **hidden**, like the DOC switches: an install that has never touched the
+     * sheet draws everything, and a layer added in a later build arrives visible. Empty means every
+     * part is shown; all four means the master **Your Places** switch is off.
+     *
+     * A preference written before this sheet existed is read as the nearest equivalent rather than
+     * dropped: the old "Your Tracks" switch hid the planned tracks and the recorded lines, and the
+     * old "Bike tracks" and "Waypoints" ids are still in the DOC set on an upgraded phone.
      */
-    val yourTracksHidden: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
-        prefs[yourTracksHiddenPref] ?: false
+    val hiddenYourPlaces: Flow<Set<YourPlaceLayer>> = context.settingsDataStore.data.map { prefs ->
+        prefs[hiddenYourPlacesPref]?.let { stored ->
+            // An explicit "all visible" marker, rather than an empty set: it is what stops the
+            // legacy mapping below from putting back a switch the walker has just cleared.
+            if (ALL_VISIBLE in stored) emptySet() else YourPlaceLayer.hiddenIn(stored)
+        } ?: legacyHiddenYourPlaces(prefs)
     }
 
-    suspend fun setYourTracksHidden(hidden: Boolean) {
+    private fun legacyHiddenYourPlaces(prefs: Preferences): Set<YourPlaceLayer> =
+        buildSet {
+            if (prefs[legacyYourTracksHiddenPref] == true) {
+                add(YourPlaceLayer.TRACKS)
+                add(YourPlaceLayer.RECORDINGS)
+            }
+            val old = prefs[hiddenMapLayersPref].orEmpty()
+            if (AssetLayer.BIKE_TRACKS.id in old) add(YourPlaceLayer.BIKE_TRACKS)
+            if (LEGACY_WAYPOINTS in old || LEGACY_PLACES in old) add(YourPlaceLayer.SPOTS)
+        }
+
+    /**
+     * Hides or shows one part of the walker's own work, in a single write.
+     *
+     * The old value is read inside the edit so two taps add up instead of undoing each other. An
+     * explicit all-visible marker is written when nothing is hidden: it is what stops the legacy
+     * mapping above from putting back a switch the walker has just cleared.
+     */
+    suspend fun setYourPlaceHidden(layer: YourPlaceLayer, hidden: Boolean) {
         context.settingsDataStore.edit { prefs ->
-            if (hidden) prefs[yourTracksHiddenPref] = true else prefs.remove(yourTracksHiddenPref)
+            val now = prefs[hiddenYourPlacesPref]?.let(YourPlaceLayer::hiddenIn)
+                ?: legacyHiddenYourPlaces(prefs)
+            val ids = (if (hidden) now + layer else now - layer).mapTo(mutableSetOf()) { it.id }
+            prefs[hiddenYourPlacesPref] = if (ids.isEmpty()) setOf(ALL_VISIBLE) else ids
+        }
+    }
+
+    /** The master switch: hide all of the walker's own work, or put all of it back. */
+    suspend fun setAllYourPlacesHidden(hidden: Boolean) {
+        context.settingsDataStore.edit { prefs ->
+            prefs[hiddenYourPlacesPref] = if (hidden) {
+                YourPlaceLayer.ALL.mapTo(mutableSetOf()) { it.id }
+            } else {
+                setOf(ALL_VISIBLE)
+            }
         }
     }
 
@@ -441,5 +484,14 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     companion object {
         /** The repository this app's backups were set up for; the field can be changed. */
         const val DEFAULT_BACKUP_REPO = "cqrt/trail-day-backups"
+
+        /** The id the old sheet stored for the walker's own point markers. */
+        private const val LEGACY_WAYPOINTS = "waypoints"
+
+        /** The id an even older sheet stored for every place. */
+        private const val LEGACY_PLACES = "places"
+
+        /** A stored marker meaning "the walker has chosen to show every Your Places tile". */
+        private const val ALL_VISIBLE = "__all-visible"
     }
 }

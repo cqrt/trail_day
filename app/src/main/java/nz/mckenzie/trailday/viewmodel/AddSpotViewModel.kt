@@ -30,11 +30,11 @@ import nz.mckenzie.trailday.tracking.LocationSource
 import nz.mckenzie.trailday.tracking.frameOnDevice
 
 /**
- * Adds a waypoint by tapping the map once.
+ * Adds a spot by tapping the map once.
  *
- * A waypoint is somewhere you stop - the water, the lunch spot, a campsite - so it is one
- * coordinate and one tap. The app's own huts and campsites are DOC's reference material now, so
- * this screen makes the walker's plain spot and lets the description say what it is.
+ * A spot is somewhere worth saving - the water, the lunch stop, a campsite, something found - so it
+ * is one coordinate and one tap. The app's own huts and campsites are DOC's reference material now,
+ * so this screen makes the walker's plain spot and lets the description say what it is.
  *
  * The draft is held in memory only - nothing is written until Save, so a tap that landed in the
  * wrong place leaves no trace in the database.
@@ -71,7 +71,7 @@ class AddSpotViewModel(
     private val _spot = MutableStateFlow<GeoPoint?>(null)
 
     /**
-     * The spot as the map draws it, in the waypoint's own colour and glyph.
+     * The spot as the map draws it, in the spot kind's own colour and glyph.
      *
      * What is being placed is the thing itself, so the walker sees the marker they are about to
      * keep while they place it.

@@ -33,12 +33,13 @@ import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.viewmodel.AddSpotViewModel
 
 /**
- * Adds a waypoint to the map: one tap where it is, a name, and it is kept.
+ * Adds a spot to the map: one tap where it is, a name, and it is kept.
  *
- * One tap is the whole of it, because a waypoint is a single coordinate - the water, the lunch spot,
- * the junction. A line is not made here at all: the app's lines come from DOC, from a file, or from
- * walking them. The description is how the walker says what kind of spot it is; the app no longer
- * asks them to choose hut or campsite before they have said a word about it.
+ * One tap is the whole of it, because a spot is a single coordinate - the water, the lunch stop,
+ * the junction, something worth finding again. A line is not made here at all: the app's lines come
+ * from DOC, from a file, or from walking them. The description is how the walker says what kind of
+ * spot it is; the app no longer asks them to choose hut or campsite before they have said a word
+ * about it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,7 +68,7 @@ fun AddSpotScreen(viewModel: AddSpotViewModel, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Add a waypoint") },
+                title = { Text("Add a spot") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         AppIcon(IconGlyph.BACK, contentDescription = "Back")
@@ -109,7 +110,7 @@ fun AddSpotScreen(viewModel: AddSpotViewModel, onBack: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = if (placed) "Placed here" else "No waypoint yet",
+                        text = if (placed) "Placed here" else "No spot yet",
                         style = MaterialTheme.typography.titleSmall
                     )
                     Text(
@@ -137,7 +138,7 @@ fun AddSpotScreen(viewModel: AddSpotViewModel, onBack: () -> Unit) {
                     .padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("Save this waypoint", style = MaterialTheme.typography.titleLarge)
+                Text("Save this spot", style = MaterialTheme.typography.titleLarge)
                 OutlinedTextField(
                     value = draftName,
                     onValueChange = { draftName = it },
@@ -168,7 +169,7 @@ fun AddSpotScreen(viewModel: AddSpotViewModel, onBack: () -> Unit) {
                     enabled = draftName.isNotBlank(),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Save waypoint")
+                    Text("Save spot")
                 }
                 TextButton(
                     onClick = { detailsOpen = false },

@@ -21,7 +21,7 @@ class AssetPhraseTest {
         assertEquals("Bike track", AssetPhrase.kind(AssetKind.BIKE_TRACK))
         assertEquals("Hut", AssetPhrase.kind(AssetKind.HUT))
         assertEquals("Campsite", AssetPhrase.kind(AssetKind.CAMPSITE))
-        assertEquals("Waypoint", AssetPhrase.kind(AssetKind.WAYPOINT))
+        assertEquals("Spot", AssetPhrase.kind(AssetKind.WAYPOINT))
 
         AssetKind.entries.forEach { kind ->
             assertTrue("$kind has no name", AssetPhrase.kind(kind).isNotBlank())

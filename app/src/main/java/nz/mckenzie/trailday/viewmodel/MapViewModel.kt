@@ -28,6 +28,7 @@ import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetLayer
 import nz.mckenzie.trailday.domain.asset.AssetShape
+import nz.mckenzie.trailday.domain.asset.YourPlaceLayer
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.splitAtBreaks
@@ -67,6 +68,16 @@ import nz.mckenzie.trailday.tracking.frameOnDevice
  */
 data class RecentreRequest(val bounds: LatLngBounds, val count: Int)
 
+/** What the four **Your Places** tiles count, shown under their names. */
+data class YourPlaceCounts(
+    val spots: Int = 0,
+    val tracks: Int = 0,
+    val bikeTracks: Int = 0,
+    val recordings: Int = 0
+) {
+    val total: Int get() = spots + tracks + bikeTracks + recordings
+}
+
 /**
  * Feeds the map: every active place, and the GeoJSON MapLibre draws.
  */
@@ -90,7 +101,7 @@ class MapViewModel(
      */
     private val recordedFor: Flow<Set<Long>> = flowOf(emptySet()),
     /**
-     * The walks and rides themselves, for the "Your Tracks" layer.
+     * The walks and rides themselves, for the "Recordings" tile under Your Places.
      *
      * The map's other lines are places and DOC's material. A recording is evidence of ground covered
      * and is kept in its own table, so this is a separate read rather than an asset query.
@@ -118,13 +129,18 @@ class MapViewModel(
     val hiddenLayers: StateFlow<Set<AssetLayer>> = settingsRepository.hiddenMapLayers
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
-    /** Whether the recorded walks and rides are left off the map: the "Your Tracks" switch. */
-    val yourTracksHidden: StateFlow<Boolean> = settingsRepository.yourTracksHidden
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    /**
+     * Which parts of the walker's own work are left off the map: the **Your Places** tiles.
+     *
+     * Empty means every part is shown; all four means the master is off. The old single "Your
+     * Tracks" switch is read by the settings store as the nearest pair of these.
+     */
+    val hiddenYourPlaces: StateFlow<Set<YourPlaceLayer>> = settingsRepository.hiddenYourPlaces
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     /**
      * The recorded walks and rides as the map draws them: the finished ones, in the recorded green
-     * with their gold edge.
+     * with their gold edge. This is the raw evidence, not a place a pass was recorded against.
      *
      * A recording in progress is left out rather than drawn from its last stored fix: the layer is a
      * record of what is done, and a line that grew only when the database happened to be read would
@@ -261,6 +277,41 @@ class MapViewModel(
 
     val assets: StateFlow<List<AssetEntity>> = assetRepository.observeActiveAssets()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
+    private val finishedRecordingCount: StateFlow<Int> =
+        (recordingRepository?.observeSessions() ?: flowOf(emptyList()))
+            .map { sessions ->
+                sessions.count {
+                    it.status == RecordingStatus.FINISHED.name && it.pointCount >= 2
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
+
+    /**
+     * The four **Your Places** tiles' counts.
+     *
+     * Counted from the same lists the map draws rather than from the style: a count on a switch
+     * is about the walker's work, not about how many features happen to be visible at this zoom.
+     */
+    val yourPlaceCounts: StateFlow<YourPlaceCounts> =
+        combine(assets, finishedRecordingCount) { places, recordings ->
+            YourPlaceCounts(
+                spots = places.count { AssetShape.fromStorage(it.shape) == AssetShape.POINT },
+                tracks = places.count {
+                    AssetKind.fromStorage(it.kind) == AssetKind.TRACK &&
+                        AssetShape.fromStorage(it.shape) == AssetShape.LINE
+                },
+                bikeTracks = places.count {
+                    AssetKind.fromStorage(it.kind) == AssetKind.BIKE_TRACK &&
+                        AssetShape.fromStorage(it.shape) == AssetShape.LINE
+                },
+                recordings = recordings
+            )
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+            YourPlaceCounts()
+        )
 
     /**
      * Where the phone is, for the card. One subscriber to the fixes, and no marker: the marker belongs to
@@ -436,18 +487,11 @@ class MapViewModel(
             _pickedPlaceId.value = assetId
             _selectionFrame.value = boundsOf(points)
             val kind = AssetKind.fromStorage(asset.kind)
-            if (kind == AssetKind.TRACK) {
-                // The walker's tracks have their own switch now; asking to see one should turn that
-                // on rather than the DOC tracks it used to be hidden with.
-                if (settingsRepository.yourTracksHidden.first()) {
-                    settingsRepository.setYourTracksHidden(false)
-                }
-            } else {
-                layerOf(kind)?.let { layer ->
-                    if (layer in settingsRepository.hiddenMapLayers.first()) {
-                        settingsRepository.hideMapLayer(layer, false)
-                    }
-                }
+            // Asking to see one of the walker's own places turns its own tile back on, and says
+            // nothing about DOC's material underneath it.
+            val yourLayer = YourPlaceLayer.forKind(kind)
+            if (yourLayer in settingsRepository.hiddenYourPlaces.first()) {
+                settingsRepository.setYourPlaceHidden(yourLayer, hidden = false)
             }
             frame(points)
         }
@@ -639,17 +683,12 @@ class MapViewModel(
      * something they cannot see - the same rule the card follows when it says nothing is there.
      */
     fun assetAt(lat: Double, lng: Double, radiusM: Double = AssetHitTest.DEFAULT_TOLERANCE_M): Long? {
-        val hidden = hiddenLayers.value
-        val yourTracksGone = yourTracksHidden.value
+        val hidden = hiddenYourPlaces.value
         val drawn = assets.value
             .filter { place ->
-                // A track of the walker's is on the map only while Your Tracks is on; the DOC Tracks
-                // switch says nothing about it. Everything else keeps the switch of its kind.
-                if (AssetKind.fromStorage(place.kind) == AssetKind.TRACK) {
-                    !yourTracksGone
-                } else {
-                    layerOf(AssetKind.fromStorage(place.kind)) !in hidden
-                }
+                // Every place of the walker's is governed by its own tile: spots together, tracks
+                // and bike tracks by their kind, and the DOC switches say nothing about any of them.
+                YourPlaceLayer.forKind(AssetKind.fromStorage(place.kind)) !in hidden
             }
             .mapNotNull { place -> geometryByTrack.value[place.id]?.let { place.id to it } }
             .toMap()
@@ -687,16 +726,21 @@ class MapViewModel(
         viewModelScope.launch { settingsRepository.hideMapLayer(layer, hidden) }
     }
 
-    /** Shows or hides the recorded walks and rides, written straight through like the other layers. */
-    fun setYourTracksHidden(hidden: Boolean) {
-        viewModelScope.launch { settingsRepository.setYourTracksHidden(hidden) }
+    /** Shows or hides one part of the walker's own work, written straight through like the DOC tiles. */
+    fun setYourPlaceHidden(layer: YourPlaceLayer, hidden: Boolean) {
+        viewModelScope.launch { settingsRepository.setYourPlaceHidden(layer, hidden) }
+    }
+
+    /** The master **Your Places** switch: all four on the map, or all four off. */
+    fun setAllYourPlacesHidden(hidden: Boolean) {
+        viewModelScope.launch { settingsRepository.setAllYourPlacesHidden(hidden) }
     }
 
     /** Puts every layer back on the map: one switch to undo the lot. */
     fun showEveryLayer() {
         viewModelScope.launch {
             settingsRepository.setHiddenMapLayers(emptySet())
-            settingsRepository.setYourTracksHidden(false)
+            settingsRepository.setAllYourPlacesHidden(false)
         }
     }
 

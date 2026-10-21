@@ -107,7 +107,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
     val heading by viewModel.heading.collectAsStateWithLifecycle()
     val drift by viewModel.drift.collectAsStateWithLifecycle()
     val assetName by viewModel.selectedTrackName.collectAsStateWithLifecycle()
-    val assets by viewModel.assets.collectAsStateWithLifecycle()
+    val recordingTargets by viewModel.recordingTargets.collectAsStateWithLifecycle()
     val pendingTrackName by viewModel.pendingTrackName.collectAsStateWithLifecycle()
 
     var permissionGranted by remember { mutableStateOf(viewModel.hasLocationPermission()) }
@@ -364,18 +364,18 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                 // sheet: a season is dozens of places, and the sheet's content does not scroll by itself.
                 // Your places first, then DOC's, because the walker's own work comes first.
                 LazyColumn(modifier = Modifier.heightIn(max = PICKER_LIST_MAX_HEIGHT)) {
-                    item { GroupLabel("Your places") }
-                    if (assets.isEmpty()) {
+                    item { GroupLabel("Your tracks and places") }
+                    if (recordingTargets.isEmpty()) {
                         item {
                             Text(
-                                text = "None yet",
+                                text = "No track or place to follow yet",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
                             )
                         }
                     }
-                    itemsIndexed(assets, key = { _, item -> item.id }) { _, item ->
+                    itemsIndexed(recordingTargets, key = { _, item -> item.id }) { _, item ->
                         ListItem(
                             modifier = Modifier.clickable {
                                 viewModel.selectTrack(item.id)
@@ -432,7 +432,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                         )
                     }
                 }
-                if (assets.isNotEmpty()) HorizontalDivider()
+                if (recordingTargets.isNotEmpty()) HorizontalDivider()
                 // Recording without choosing a place stays possible: the line that was
                 // recorded is the evidence, and which place it belongs to can be settled later.
                 // The way out of the list, on a strip of its own: the same sheet, but not one more row of

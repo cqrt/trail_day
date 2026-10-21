@@ -15,6 +15,7 @@ import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.asset.AssetLayer
+import nz.mckenzie.trailday.domain.asset.YourPlaceLayer
 import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.domain.doc.DocHitTest
@@ -132,8 +133,9 @@ class MapDocPickTest {
 
     @Test
     fun aLayerThatIsSwitchedOffIsNotTappable() = runBlocking {
-        // A hut of the walker's and a hut DOC publishes, both under the same finger. With the huts switched
-        // off, neither answers: a tap where nothing is drawn must not open something the walker cannot see.
+        // A hut of the walker's and a hut DOC publishes, both under the same finger. They are on two
+        // different switches now: DOC's Huts and Your Places' Spots. Each must answer only while its
+        // own switch is on.
         val hut = DocItem(
             source = DocSource.HUTS,
             objectId = 1,
@@ -172,26 +174,41 @@ class MapDocPickTest {
             viewModel.pickDocAt(-41.6200, 172.6500, 10.0)
             assertNotNull("and DOC's hut is too", viewModel.pickedDoc.value)
 
-            settings.hideMapLayer(nz.mckenzie.trailday.domain.asset.AssetLayer.HUTS, true)
+            settings.hideMapLayer(AssetLayer.HUTS, true)
 
             // The switch is a stored preference and the map reads it through its own flow, so the test waits
             // for the layer to be shut rather than for the write to return: a loaded machine can take a
             // moment between the two, and reading too early made a passing change fail in CI.
             withTimeout(5_000) {
-                while (viewModel.assetAt(-41.6201, 172.6501, 5.0) != null) delay(50)
+                viewModel.hiddenLayers.first { AssetLayer.HUTS in it }
             }
-            assertNull("switched off, the place is not tappable", viewModel.assetAt(-41.6201, 172.6501, 5.0))
+            assertEquals(
+                "DOC's hut switch does not take the walker's own point away",
+                spotId,
+                viewModel.assetAt(-41.6201, 172.6501, 5.0)
+            )
             viewModel.pickDocAt(-41.6200, 172.6500, 10.0)
-            assertNull("and neither is DOC's hut", viewModel.pickedDoc.value)
+            assertNull("but DOC's hut is not tappable", viewModel.pickedDoc.value)
+
+            settings.setYourPlaceHidden(YourPlaceLayer.SPOTS, true)
+            withTimeout(5_000) {
+                viewModel.hiddenYourPlaces.first { YourPlaceLayer.SPOTS in it }
+            }
+            assertNull(
+                "the walker's own point goes with its own tile",
+                viewModel.assetAt(-41.6201, 172.6501, 5.0)
+            )
         } finally {
             watching.cancel()
+            settings.hideMapLayer(AssetLayer.HUTS, false)
+            settings.setYourPlaceHidden(YourPlaceLayer.SPOTS, false)
         }
     }
 
     @Test
     fun aRideableTrackIsTappableWhenOnlyBikeTracksAreShown() = runBlocking {
         // DOC publishes a track and a bike point sitting on it under the same name. The map draws
-        // that track under the Bike tracks switch, so with DOC Tracks off it must still answer a tap.
+        // that track under the Bike trails switch, so with Walking tracks off it must still answer a tap.
         val track = DocItem(
             source = DocSource.TRACKS,
             objectId = 70,

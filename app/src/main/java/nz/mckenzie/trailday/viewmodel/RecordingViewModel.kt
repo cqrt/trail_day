@@ -113,8 +113,20 @@ class RecordingViewModel(
 
     val tracking: StateFlow<TrackingState.State> = TrackingState.state
 
-    /** Places to follow, so a recording can be linked to the line it was made for. */
+    /** Everything the walker has, for naming a chosen target and for the map's own lines. */
     val assets: StateFlow<List<AssetEntity>> = assetRepository.observeActiveAssets()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
+    /**
+     * What the recorder may be aimed at: lines to follow, and places to reach.
+     *
+     * A spot is a marker for something found, not a destination, so it is deliberately absent. It
+     * still appears on the map and in Places; it is simply not a thing to record a pass against.
+     */
+    val recordingTargets: StateFlow<List<AssetEntity>> = assets
+        .map { places ->
+            places.filter { AssetKind.fromStorage(it.kind) != AssetKind.WAYPOINT }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     private val _initialFrame = MutableStateFlow<LatLngBounds?>(null)

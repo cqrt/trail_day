@@ -9,14 +9,17 @@ package nz.mckenzie.trailday.domain.asset
 object AssetPhrase {
 
     /**
-     * "Track", "Bike track", "Hut", "Campsite", "Waypoint".
+     * "Track", "Bike track", "Hut", "Campsite", "Spot".
+     *
+     * The stored kind is still `WAYPOINT`, because a database value is not a word on a screen. The
+     * walker's word is **spot**: a marker for something they found, not a point on a route.
      */
     fun kind(kind: AssetKind): String = when (kind) {
         AssetKind.TRACK -> "Track"
         AssetKind.BIKE_TRACK -> "Bike track"
         AssetKind.HUT -> "Hut"
         AssetKind.CAMPSITE -> "Campsite"
-        AssetKind.WAYPOINT -> "Waypoint"
+        AssetKind.WAYPOINT -> "Spot"
     }
 
     /**

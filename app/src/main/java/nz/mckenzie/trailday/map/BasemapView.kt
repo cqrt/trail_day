@@ -36,6 +36,7 @@ import kotlin.math.roundToInt
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetLayer
 import nz.mckenzie.trailday.domain.asset.AssetShape
+import nz.mckenzie.trailday.domain.asset.YourPlaceLayer
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 
@@ -53,16 +54,11 @@ const val DEFAULT_CAMERA_ZOOM = 6.0
 
 internal const val ASSETS_SOURCE = "trailday-assets"
 
-/** The gold line under a recorded line: see [AssetColors.RECORDED_EDGE]. */
-internal const val RECORDED_CASING = "trailday-recorded-casing"
-
 /**
  * The walks and rides the walker has recorded: their own source, because they are evidence rather
  * than one of the places, and their own gold-edged style for the same reason.
  */
 internal const val YOUR_TRACKS_SOURCE = "trailday-your-tracks"
-internal const val YOUR_TRACKS_CASING = "trailday-your-tracks-casing"
-internal const val YOUR_TRACKS_LINE = "trailday-your-tracks-line"
 
 /**
  * Where DOC's material is drawn from: its own source, so it can be styled, ordered and tapped
@@ -230,8 +226,13 @@ fun BasemapView(
      * stay exactly where the walker left them.
      */
     hiddenLayers: Set<AssetLayer> = emptySet(),
-    /** Whether the recorded walks and rides are left off: the layers sheet's "Your Tracks" switch. */
-    yourTracksHidden: Boolean = false,
+    /**
+     * Which parts of the walker's own work are left off: the layers sheet's **Your Places** tiles.
+     *
+     * Empty by default, for the same reason [hiddenLayers] is: a screen that is about one asset
+     * must show it whatever the home map says.
+     */
+    hiddenYourPlaces: Set<YourPlaceLayer> = emptySet(),
     /**
      * Whether LINZ's place names are drawn over the imagery - see
      * [nz.mckenzie.trailday.domain.tiles.PlaceLabels].
@@ -365,7 +366,7 @@ fun BasemapView(
                         positionGeoJson = positionGeoJson,
                         density = density,
                         hiddenLayers = hiddenLayers,
-                        yourTracksHidden = yourTracksHidden,
+                        hiddenYourPlaces = hiddenYourPlaces,
                         placeNames = placeNames
                     ) { style ->
                         styleState.value = style
@@ -400,7 +401,7 @@ fun BasemapView(
                 positionGeoJson = positionGeoJson,
                 density = density,
                 hiddenLayers = hiddenLayers,
-                yourTracksHidden = yourTracksHidden,
+                hiddenYourPlaces = hiddenYourPlaces,
                 placeNames = placeNames
             ) { style ->
                 styleState.value = style
@@ -436,9 +437,9 @@ fun BasemapView(
     // property of a layer rather than a new style, so the camera, the tiles and the zoom are all
     // left exactly where they were - which is what makes the switch usable while reading the map
     // rather than something that sends you back to the start every time you touch it.
-    LaunchedEffect(hiddenLayers, yourTracksHidden, styleState.value) {
+    LaunchedEffect(hiddenLayers, hiddenYourPlaces, styleState.value) {
         val style = styleState.value ?: return@LaunchedEffect
-        applyLayerVisibility(style, hiddenLayers, yourTracksHidden)
+        applyLayerVisibility(style, hiddenLayers, hiddenYourPlaces)
     }
 
     // The marker follows the fixes. Setting the GeoJSON on one source rather than rebuilding
@@ -536,7 +537,7 @@ internal fun MapLibreMap.loadTrailDayStyle(
     positionGeoJson: String,
     density: Float,
     hiddenLayers: Set<AssetLayer>,
-    yourTracksHidden: Boolean = false,
+    hiddenYourPlaces: Set<YourPlaceLayer> = emptySet(),
     placeNames: Boolean,
     onLoaded: (Style) -> Unit
 ) {
@@ -600,23 +601,11 @@ internal fun MapLibreMap.loadTrailDayStyle(
                     )
             )
         }
-        // The recorded line's own gold edge, under it, filtered on the line's own colour so every screen that
-        // draws a recorded line wears it without knowing about layers: the mock screens draw what was walked
-        // with an edge, and that edge is what says "this line happened" rather than "this line is planned".
-        if (style.getLayer(RECORDED_CASING) == null) {
-            style.addLayer(
-                LineLayer(RECORDED_CASING, ASSETS_SOURCE)
-                    .withProperties(
-                        PropertyFactory.lineColor(Expression.literal(AssetColors.RECORDED_EDGE)),
-                        PropertyFactory.lineWidth(Expression.literal(ASSET_LINE_WIDTH + 4f)),
-                        PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
-                        PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
-                    )
-                    .withFilter(
-                        Expression.eq(Expression.get("stroke"), Expression.literal(AssetColors.RECORDED))
-                    )
-            )
-        }
+        // The recorded line's own gold edge, under it. One per line kind rather than one for both:
+        // an edge with no line over it is a gold ghost, so the edge has to be hidden with the line
+        // it belongs to when Tracks and Bike tracks are switched separately.
+        addRecordedCasing(style, YourPlaceLayerIds.RECORDED_TRACK_CASING, AssetKind.TRACK)
+        addRecordedCasing(style, YourPlaceLayerIds.RECORDED_BIKE_CASING, AssetKind.BIKE_TRACK)
         // One line layer per kind, because line-dasharray is a constant in MapLibre
         // rather than something a feature can carry. So a track is solid and a bike track
         // is dashed, and the filter is what keeps them apart.
@@ -627,9 +616,9 @@ internal fun MapLibreMap.loadTrailDayStyle(
         if (style.getSource(YOUR_TRACKS_SOURCE) == null) {
             style.addSource(GeoJsonSource(YOUR_TRACKS_SOURCE, yourTracksGeoJson))
         }
-        if (style.getLayer(YOUR_TRACKS_CASING) == null) {
+        if (style.getLayer(YourPlaceLayerIds.YOUR_TRACKS_CASING) == null) {
             style.addLayer(
-                LineLayer(YOUR_TRACKS_CASING, YOUR_TRACKS_SOURCE)
+                LineLayer(YourPlaceLayerIds.YOUR_TRACKS_CASING, YOUR_TRACKS_SOURCE)
                     .withProperties(
                         PropertyFactory.lineColor(Expression.literal(AssetColors.RECORDED_EDGE)),
                         PropertyFactory.lineWidth(Expression.literal(ASSET_LINE_WIDTH + 4f)),
@@ -641,9 +630,9 @@ internal fun MapLibreMap.loadTrailDayStyle(
                     )
             )
         }
-        if (style.getLayer(YOUR_TRACKS_LINE) == null) {
+        if (style.getLayer(YourPlaceLayerIds.YOUR_TRACKS_LINE) == null) {
             style.addLayer(
-                LineLayer(YOUR_TRACKS_LINE, YOUR_TRACKS_SOURCE)
+                LineLayer(YourPlaceLayerIds.YOUR_TRACKS_LINE, YOUR_TRACKS_SOURCE)
                     .withProperties(
                         PropertyFactory.lineColor(Expression.literal(AssetColors.RECORDED)),
                         PropertyFactory.lineWidth(Expression.literal(ASSET_LINE_WIDTH)),
@@ -698,59 +687,64 @@ internal fun MapLibreMap.loadTrailDayStyle(
         // The switches, applied to the style that has just been built, so that the first frame is
         // already the map the walker asked for rather than one that flashes everything and then
         // hides half of it.
-        applyLayerVisibility(style, hiddenLayers, yourTracksHidden)
+        applyLayerVisibility(style, hiddenLayers, hiddenYourPlaces)
         onLoaded(style)
     }
 }
 
+/** The gold edge under a recorded planned line of [kind], matching the line's own kind filter. */
+private fun addRecordedCasing(style: Style, id: String, kind: AssetKind) {
+    if (style.getLayer(id) != null) return
+
+    style.addLayer(
+        LineLayer(id, ASSETS_SOURCE)
+            .withProperties(
+                PropertyFactory.lineColor(Expression.literal(AssetColors.RECORDED_EDGE)),
+                PropertyFactory.lineWidth(Expression.literal(ASSET_LINE_WIDTH + 4f)),
+                PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
+            )
+            .withFilter(
+                Expression.all(
+                    Expression.eq(
+                        Expression.get("stroke"),
+                        Expression.literal(AssetColors.RECORDED)
+                    ),
+                    Expression.eq(Expression.get("kind"), Expression.literal(kind.name))
+                )
+            )
+    )
+}
+
 /**
- * Draws or hides each layer of the work, as the switches have it.
+ * Draws or hides each layer, as the switches have it.
  *
- * Visibility rather than removing and re-adding the layers: MapLibre keeps them, so a layer that
- * has been switched off costs nothing to switch back on, and the source is left alone - which is
- * the difference between this and reloading the style.
- *
- * Called as the style is built and again whenever the choice changes. A layer that is not in the
- * style is skipped: this is the map's own list, and a style that is missing one of them is a
- * reason to draw the rest rather than to stop.
+ * The sheet has two halves: DOC's reference material, and the walker's own work. They are separate
+ * because the same word - "tracks", "bike tracks" - names one of each, and hiding one must not take
+ * the other with it. A layer that is not in the style is skipped.
  */
 private fun applyLayerVisibility(
     style: Style,
     hidden: Set<AssetLayer>,
-    yourTracksHidden: Boolean = false
+    hiddenYourPlaces: Set<YourPlaceLayer> = emptySet()
 ) {
     AssetLayer.ALL.forEach { layer ->
-        // DOC Tracks and Bike tracks are two halves of DOC's lines rather than one above the other:
-        // the first hides the walking-only tracks, the second the rideable ones and their badges.
-        // The walker's tracks have their own switch, so DOC Tracks must not hide them or take a
-        // recorded line's green core away with its gold edge. See [DocLayerIds.idsOf] for which of
-        // DOC's layers each switch hides.
-        val ids = if (layer == AssetLayer.TRACKS) {
-            DocLayerIds.idsOf(layer)
-        } else {
-            AssetLayerIds.idsOf(layer) + DocLayerIds.idsOf(layer)
-        }
-        ids.forEach inner@{ id ->
+        DocLayerIds.idsOf(layer).forEach inner@{ id ->
             val target = style.getLayer(id) ?: return@inner
             target.setProperties(
                 PropertyFactory.visibility(if (layer in hidden) Property.NONE else Property.VISIBLE)
             )
         }
     }
-    // The walker's tracks are one switch: every line of theirs, every name beside one, the gold edge
-    // under a recorded line, and the recordings themselves. A track that was recorded is one line
-    // here rather than a green core under a Tracks switch that can strip its edge away.
-    listOf(
-        AssetLayerIds.TRACKS,
-        AssetLayerIds.TRACK_NAMES,
-        RECORDED_CASING,
-        YOUR_TRACKS_CASING,
-        YOUR_TRACKS_LINE
-    ).forEach inner@{ id ->
-        val target = style.getLayer(id) ?: return@inner
-        target.setProperties(
-            PropertyFactory.visibility(if (yourTracksHidden) Property.NONE else Property.VISIBLE)
-        )
+    YourPlaceLayer.ALL.forEach { layer ->
+        YourPlaceLayerIds.idsOf(layer).forEach inner@{ id ->
+            val target = style.getLayer(id) ?: return@inner
+            target.setProperties(
+                PropertyFactory.visibility(
+                    if (layer in hiddenYourPlaces) Property.NONE else Property.VISIBLE
+                )
+            )
+        }
     }
 }
 

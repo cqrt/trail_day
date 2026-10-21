@@ -20,7 +20,7 @@ import nz.mckenzie.trailday.domain.tiles.withMinimumSpan
  * The place list, its geometry, and the shape of a place.
  *
  * The list holds tracks, huts, campsites and the walker's own
- * waypoints, and they differ only in their kind and shape.
+ * spots, and they differ only in their kind and shape.
  */
 class AssetRepository(
     private val db: TrailDayDatabase

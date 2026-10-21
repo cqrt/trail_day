@@ -1,27 +1,20 @@
 package nz.mckenzie.trailday.domain.asset
 
 /**
- * One layer of the work on the map, as the walker's switches see it.
+ * One part of DOC's reference material on the map, as the walker's switches see it.
  *
- * **One layer per kind of place** - five of them, the same five the list's chips offer - because
- * the reason to hide a layer is to read another: a network of tracks under a set of waypoints is
- * noise, and a scatter of waypoints buries the one hut that is the thing being looked for. Hiding
- * "places" was not enough for the second of those, so a place kind can be hidden on its own.
+ * **DOC's half of the sheet, not the walker's.** The walker's own spots, tracks, bike tracks and
+ * recordings are grouped under [YourPlaceLayer]; these four switches are the material DOC publishes
+ * underneath that work. The reason to hide a layer is still to read another: a network of DOC tracks
+ * under a set of spots is noise, and a scatter of spots buries the one DOC hut being looked for.
  *
- * **Waypoints are the walker's own spots only.** DOC's bike points used to be drawn as waypoints;
- * they are bike trails now, drawn with a bicycle under the Bike tracks switch. The Waypoints switch
- * shows nothing until the walker has dropped a spot of their own.
+ * **DOC Tracks and Bike trails are separate halves of DOC's lines.** Walking tracks hides the
+ * walking-only tracks, and Bike trails hides the rideable ones and their badges; switching one off
+ * does not switch the other off. The walker's own bike tracks are not here - they are under
+ * [YourPlaceLayer.BIKE_TRACKS].
  *
- * [kind] is the kind the layer draws, which is what the map's own style filters on, and what the
- * marker's shape and colour are read from. It is the same enum the picker, the list and the record
- * screens use: a layer per kind, a chip per kind, one vocabulary.
- *
- * **DOC Tracks and Bike tracks are separate halves of DOC's lines.** DOC Tracks hides the
- * walking-only tracks, and Bike tracks hides the rideable ones and their badges; switching one off
- * does not switch the other off. The walker's own tracks - planned, imported and recorded - are the
- * sheet's "Your Tracks", which is not an [AssetLayer] because a recording is evidence rather than a
- * place. DOC Huts and DOC Campsites are named for the reference material, which is the only hut and
- * campsite the app draws. The walker's own bike tracks and waypoints keep a switch per kind.
+ * [kind] is the kind the layer is drawn as, which is what the map's own style filters on and what
+ * the marker's shape and colour are read from.
  *
  * **What a preference stores is what is hidden, not what is shown.** Everything is drawn until
  * somebody says otherwise, so the map is what it always was for anyone who never opens this, and a
@@ -38,32 +31,26 @@ enum class AssetLayer(
 ) {
     TRACKS(
         id = "tracks",
-        displayName = "DOC Tracks",
+        displayName = "Walking tracks",
         kind = AssetKind.TRACK
     ),
 
     BIKE_TRACKS(
         id = "bike-tracks",
-        displayName = "Bike tracks",
+        displayName = "Bike trails",
         kind = AssetKind.BIKE_TRACK
     ),
 
     HUTS(
         id = "huts",
-        displayName = "DOC Huts",
+        displayName = "Huts",
         kind = AssetKind.HUT
     ),
 
     CAMPSITES(
         id = "campsites",
-        displayName = "DOC Campsites",
+        displayName = "Campsites",
         kind = AssetKind.CAMPSITE
-    ),
-
-    WAYPOINTS(
-        id = "waypoints",
-        displayName = "Waypoints",
-        kind = AssetKind.WAYPOINT
     );
 
     companion object {
@@ -74,10 +61,10 @@ enum class AssetLayer(
         /**
          * The id an older build stored for the one switch that hid every place.
          *
-         * Before the map had a switch per kind, the fifth kind of thing was "places". A walker who hid
-         * them meant the huts, the campsites and their own spots alike, so the id is read back as the
-         * three place kinds rather than dropped - a hidden layer coming back is a map that has quietly
-         * changed under somebody.
+         * Before the map had a switch per kind, the fifth kind of thing was "places". The two place
+         * kinds DOC publishes are read back from it rather than dropped - a hidden layer coming back
+         * is a map that has quietly changed under somebody. The walker's own spots are a
+         * [YourPlaceLayer] now and have their own legacy mapping.
          */
         private const val LEGACY_PLACES = "places"
 
@@ -94,7 +81,7 @@ enum class AssetLayer(
             ?.flatMapTo(mutableSetOf()) { id -> layersFor(id) }
             .orEmpty()
 
-        /** The layers one stored id names: one, or - the old "places" - all three of them. */
+        /** The layers one stored id names: one, or - the old "places" - both DOC place kinds. */
         private fun layersFor(id: String): List<AssetLayer> = if (id == LEGACY_PLACES) {
             entries.filter { it.kind.shape == AssetShape.POINT }
         } else {
