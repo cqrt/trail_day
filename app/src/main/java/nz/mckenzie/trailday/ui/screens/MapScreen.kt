@@ -460,7 +460,7 @@ private fun LayersSheet(
                 second = {
                     LayerTile(
                         title = "Recordings",
-                        subtitle = "${yourPlaceCounts.recordings} finished",
+                        subtitle = "${yourPlaceCounts.recordings} standalone",
                         checked = YourPlaceLayer.RECORDINGS !in hiddenYourPlaces,
                         onToggle = { onYourPlaceHidden(YourPlaceLayer.RECORDINGS, !it) },
                         icon = { GlyphTile(IconGlyph.RECORDINGS) }

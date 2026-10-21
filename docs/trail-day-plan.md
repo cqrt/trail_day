@@ -617,6 +617,14 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
+**Then a pass stopped being drawn twice.** A finished recording linked to one of the walker's line places was
+drawn once as the place - green and gold because it had been recorded - and again as the raw pass on the
+Recordings layer. The two were nearly coincident, and GPS drift made them read as duplicate tracks. A pass linked
+to a line place is now left out of the raw recorded line drawing; the place is its line. Standalone passes,
+passes following DOC, and older passes linked to a point place still draw because no line place stands for them.
+The Recordings tile counts the raw lines it actually controls, and the Activities page and place page still keep
+every pass. It shipped as 0.3.28.
+
 **Then the layers sheet was rebuilt around Your Places.** The old list of full-width switches became two grouped
 tiles sections: **Your Places** with a master switch and four tiles - Spots, Tracks, Bike tracks and Recordings,
 each with a count - and **DOC reference** with Walking tracks, Bike trails, Huts and Campsites. The master says

@@ -138,42 +138,61 @@ class MapViewModel(
     val hiddenYourPlaces: StateFlow<Set<YourPlaceLayer>> = settingsRepository.hiddenYourPlaces
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
+    val assets: StateFlow<List<AssetEntity>> = assetRepository.observeActiveAssets()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
     /**
      * The recorded walks and rides as the map draws them: the finished ones, in the recorded green
-     * with their gold edge. This is the raw evidence, not a place a pass was recorded against.
+     * with their gold edge.
+     *
+     * **A pass linked to one of the walker's line places is not drawn here.** The place already
+     * represents that ground, and drawing both produced two green-and-gold lines on the same
+     * track - one the planned line, one the raw pass - which read as a duplicate. The pass is
+     * still in Activities, still on the place's own page, and appears here again if the place is
+     * deleted. A standalone pass, a pass following DOC, and an older pass linked to a point place
+     * have no line place to stand for them, so they are drawn.
      *
      * A recording in progress is left out rather than drawn from its last stored fix: the layer is a
      * record of what is done, and a line that grew only when the database happened to be read would
      * be a still photograph of a walk still happening.
      */
     val yourTracksGeoJson: StateFlow<String> =
-        (recordingRepository?.observeSessions() ?: flowOf(emptyList()))
-            .map { sessions ->
-                val recordings = recordingRepository
-                    ?: return@map AssetGeoJson.build(emptyList())
-                val lines = sessions
-                    .filter { it.status == RecordingStatus.FINISHED.name && it.pointCount >= 2 }
-                    .mapNotNull { session ->
-                        val points = runCatching { recordings.getPoints(session.id) }.getOrNull()
-                            ?.takeIf { points -> points.size >= 2 }
-                            ?: return@mapNotNull null
-                        // A pause is a gap in the ground covered, not a line across it: the recorded
-                        // line is broken where the walker stopped, as it is on the recording's page.
-                        val breaks = runCatching { recordings.getBreaks(session.id) }.getOrDefault(emptyList())
-                        AssetLine(
-                            assetId = 0L,
-                            name = session.name,
-                            colorHex = AssetColors.RECORDED,
-                            points = points,
-                            kind = AssetKind.TRACK,
-                            shape = AssetShape.LINE,
-                            stretches = points.splitAtBreaks(breaks).map { piece ->
-                                AssetStretch(colorHex = AssetColors.RECORDED, points = piece)
-                            }
-                        )
-                    }
-                AssetGeoJson.build(lines)
-            }
+        combine(
+            recordingRepository?.observeSessions() ?: flowOf(emptyList()),
+            assets
+        ) { sessions, places ->
+            val recordings = recordingRepository
+                ?: return@combine AssetGeoJson.build(emptyList())
+            val lineAssetIds = places
+                .filter { AssetShape.fromStorage(it.shape) == AssetShape.LINE }
+                .mapTo(mutableSetOf()) { it.id }
+            val lines = sessions
+                .filter {
+                    it.status == RecordingStatus.FINISHED.name &&
+                        it.pointCount >= 2 &&
+                        (it.assetId == null || it.assetId !in lineAssetIds)
+                }
+                .mapNotNull { session ->
+                    val points = runCatching { recordings.getPoints(session.id) }.getOrNull()
+                        ?.takeIf { points -> points.size >= 2 }
+                        ?: return@mapNotNull null
+                    // A pause is a gap in the ground covered, not a line across it: the recorded
+                    // line is broken where the walker stopped, as it is on the recording's page.
+                    val breaks = runCatching { recordings.getBreaks(session.id) }.getOrDefault(emptyList())
+                    AssetLine(
+                        assetId = 0L,
+                        name = session.name,
+                        colorHex = AssetColors.RECORDED,
+                        points = points,
+                        kind = AssetKind.TRACK,
+                        shape = AssetShape.LINE,
+                        stretches = points.splitAtBreaks(breaks).map { piece ->
+                            AssetStretch(colorHex = AssetColors.RECORDED, points = piece)
+                        }
+                    )
+                }
+            AssetGeoJson.build(lines)
+        }
             .flowOn(Dispatchers.IO)
             .stateIn(
                 viewModelScope,
@@ -275,17 +294,24 @@ class MapViewModel(
         runCatching { DocSource.entries.flatMap { source -> docStore.cached(source) } }
             .getOrDefault(emptyList())
 
-    val assets: StateFlow<List<AssetEntity>> = assetRepository.observeActiveAssets()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
-
-    private val finishedRecordingCount: StateFlow<Int> =
-        (recordingRepository?.observeSessions() ?: flowOf(emptyList()))
-            .map { sessions ->
-                sessions.count {
-                    it.status == RecordingStatus.FINISHED.name && it.pointCount >= 2
-                }
+    /**
+     * The raw recorded lines the Recordings tile actually draws: finished passes not represented by
+     * one of the walker's line places. A pass linked to a track is counted with that track.
+     */
+    private val rawRecordingCount: StateFlow<Int> =
+        combine(
+            recordingRepository?.observeSessions() ?: flowOf(emptyList()),
+            assets
+        ) { sessions, places ->
+            val lineAssetIds = places
+                .filter { AssetShape.fromStorage(it.shape) == AssetShape.LINE }
+                .mapTo(mutableSetOf()) { it.id }
+            sessions.count {
+                it.status == RecordingStatus.FINISHED.name &&
+                    it.pointCount >= 2 &&
+                    (it.assetId == null || it.assetId !in lineAssetIds)
             }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
 
     /**
      * The four **Your Places** tiles' counts.
@@ -294,7 +320,7 @@ class MapViewModel(
      * is about the walker's work, not about how many features happen to be visible at this zoom.
      */
     val yourPlaceCounts: StateFlow<YourPlaceCounts> =
-        combine(assets, finishedRecordingCount) { places, recordings ->
+        combine(assets, rawRecordingCount) { places, recordings ->
             YourPlaceCounts(
                 spots = places.count { AssetShape.fromStorage(it.shape) == AssetShape.POINT },
                 tracks = places.count {
