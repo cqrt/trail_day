@@ -42,7 +42,8 @@ enum class IconGlyph {
     LOCATE,
     LAYERS,
     SEARCH,
-    CLOSE
+    CLOSE,
+    PLUS
 }
 
 /**
@@ -99,6 +100,12 @@ internal fun AppIcon(
             IconGlyph.CLOSE -> {
                 line(0.30f, 0.30f, 0.70f, 0.70f)
                 line(0.70f, 0.30f, 0.30f, 0.70f)
+            }
+
+            // A plus: the way into making a new place on the Places page.
+            IconGlyph.PLUS -> {
+                line(0.50f, 0.22f, 0.50f, 0.78f)
+                line(0.22f, 0.50f, 0.78f, 0.50f)
             }
 
             IconGlyph.BACK -> {

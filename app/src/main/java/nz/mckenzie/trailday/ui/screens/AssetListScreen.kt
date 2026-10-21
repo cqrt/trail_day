@@ -8,7 +8,10 @@ import nz.mckenzie.trailday.ui.docBikeLine
 import nz.mckenzie.trailday.ui.docRowDetail
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,24 +20,28 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.data.db.AssetEntity
@@ -47,10 +54,11 @@ import nz.mckenzie.trailday.viewmodel.AssetListViewModel
 /**
  * The place library: what places you keep, and how long the lines among them are.
  *
- * **The list is the screen.** A search field at the top narrows it to the name typed; the two ways to make a
- * place and the door to what DOC publishes sit under it while nothing is being searched for; and the places
- * themselves are cards - the kind's tile, the name, how long the line is - with nothing destructive on them.
- * A place is removed from its own page, which is where the walker can also see what goes with it.
+ * **The page is a shelf of shelves.** The front door is a green Add a spot card, with import and DOC
+ * reference beside it; the filter row carries the count of each kind; and the places themselves are
+ * grouped by kind - spots first, then tracks - so the page reads as a collection rather than one long
+ * undifferentiated list. The kind's tile, the name and how long the line is are the row; nothing
+ * destructive lives here, because a place is removed from its own page.
  *
  * [onOpenDoc] is not a third way to make a place: what DOC publishes is read here rather than kept.
  */
@@ -79,6 +87,18 @@ fun AssetListScreen(
     ) { uri -> uri?.let(viewModel::importTrackFile) }
 
     val searching = query.isNotBlank()
+    val counts = remember(assets) {
+        assets.groupingBy { AssetKind.fromStorage(it.kind) }.eachCount()
+    }
+    val openPlace: (AssetEntity) -> Unit = { item ->
+        // A track is a line on the ground, and the map is where a line is read; a spot opens the
+        // page about it, which is where it can be changed.
+        if (AssetShape.fromStorage(item.shape) == AssetShape.LINE) {
+            onShowOnMap(item)
+        } else {
+            onOpenAsset(item.id)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -116,26 +136,25 @@ fun AssetListScreen(
             // publishes. Both step aside when the walker is looking for something, so the answer has the
             // screen rather than the tools.
             if (!searching) {
+                AddSpotAction(onClick = onAddSpot)
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Button(onClick = onAddSpot, modifier = Modifier.weight(1f)) {
-                        Text("Add a spot")
-                    }
-                    OutlinedButton(
-                        onClick = { importLauncher.launch(TRACK_MIME_TYPES) },
+                    SecondaryPlaceAction(
+                        label = if (busy) "Importing…" else "Import a file",
+                        glyph = IconGlyph.OFFLINE,
                         enabled = !busy,
+                        onClick = { importLauncher.launch(TRACK_MIME_TYPES) },
                         modifier = Modifier.weight(1f)
-                    ) {
-                        Text(if (busy) "Importing…" else "Import a file")
-                    }
-                }
-
-                // Not a way to add: what DOC publishes is read, not kept - see the plan. A text button
-                // because it is a way out of the list rather than an action on it.
-                TextButton(onClick = onOpenDoc, modifier = Modifier.fillMaxWidth()) {
-                    Text("What DOC publishes")
+                    )
+                    SecondaryPlaceAction(
+                        label = "DOC reference",
+                        glyph = IconGlyph.MAP,
+                        onClick = onOpenDoc,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
 
                 // What the list is showing. One line that scrolls sideways rather than a block of chips:
@@ -147,14 +166,14 @@ fun AssetListScreen(
                         item(key = "all") {
                             ChoiceChip(
                                 selected = filter.kind == null,
-                                label = "All",
+                                label = "All ${assets.size}",
                                 onClick = { viewModel.showOnly(null) }
                             )
                         }
-                        items(AssetPhrase.kinds, key = { kind -> kind.name }) { kind ->
+                        items(PLACE_SHELF_ORDER, key = { kind -> kind.name }) { kind ->
                             ChoiceChip(
                                 selected = filter.kind == kind,
-                                label = AssetPhrase.kind(kind),
+                                label = "${kindFilterLabel(kind)} ${counts[kind] ?: 0}",
                                 onClick = { viewModel.showOnly(kind) }
                             )
                         }
@@ -178,9 +197,7 @@ fun AssetListScreen(
                         EmptyState(
                             glyph = IconGlyph.ASSETS,
                             title = "No places yet",
-                            body = "Add a spot, or bring in a GPX, KML, KMZ or GeoJSON file.",
-                            actionLabel = "Add a spot",
-                            onAction = onAddSpot
+                            body = "Add a spot, or bring in a GPX, KML, KMZ or GeoJSON file."
                         )
                     }
 
@@ -198,19 +215,38 @@ fun AssetListScreen(
                         )
                     }
 
-                    else -> items(shown, key = { item -> item.id }) { item ->
-                        PlaceCard(
-                            item = item,
-                            onOpen = {
-                                // A track is a line on the ground, and the map is where a line is read;
-                                // a spot opens the page about it, which is where it can be changed.
-                                if (AssetShape.fromStorage(item.shape) == AssetShape.LINE) {
-                                    onShowOnMap(item)
+                    searching || filter.kind != null -> {
+                        item(key = "result-heading") {
+                            GroupLabel(
+                                if (searching) {
+                                    "Search results · ${shown.size}"
                                 } else {
-                                    onOpenAsset(item.id)
+                                    "${kindPlural(filter.kind!!)} · ${shown.size}"
+                                }
+                            )
+                        }
+                        items(shown, key = { item -> item.id }) { item ->
+                            PlaceCard(item = item, onOpen = { openPlace(item) })
+                        }
+                    }
+
+                    else -> {
+                        item(key = "your-places") {
+                            GroupLabel("Your places · ${shown.size}")
+                        }
+                        PLACE_SHELF_ORDER.forEach { kind ->
+                            val group = shown.filter {
+                                AssetKind.fromStorage(it.kind) == kind
+                            }
+                            if (group.isNotEmpty()) {
+                                item(key = "shelf-${kind.name}") {
+                                    GroupLabel("${kindPlural(kind)} · ${group.size}")
+                                }
+                                items(group, key = { item -> item.id }) { item ->
+                                    PlaceCard(item = item, onOpen = { openPlace(item) })
                                 }
                             }
-                        )
+                        }
                     }
                 }
 
@@ -250,6 +286,125 @@ private val TRACK_MIME_TYPES = arrayOf(
     "text/plain",
     "*/*"
 )
+
+/** The order of the shelves: the walker's markers first, then the lines they keep. */
+private val PLACE_SHELF_ORDER = listOf(
+    AssetKind.WAYPOINT,
+    AssetKind.TRACK,
+    AssetKind.BIKE_TRACK,
+    AssetKind.HUT,
+    AssetKind.CAMPSITE
+)
+
+/** The plural on a shelf heading. */
+private fun kindPlural(kind: AssetKind): String = when (kind) {
+    AssetKind.TRACK -> "Tracks"
+    AssetKind.BIKE_TRACK -> "Bike tracks"
+    AssetKind.HUT -> "Huts"
+    AssetKind.CAMPSITE -> "Campsites"
+    AssetKind.WAYPOINT -> "Spots"
+}
+
+/** The shorter words a filter chip uses, so the rarer kinds still fit on a phone. */
+private fun kindFilterLabel(kind: AssetKind): String = when (kind) {
+    AssetKind.TRACK -> "Tracks"
+    AssetKind.BIKE_TRACK -> "Bike"
+    AssetKind.HUT -> "Huts"
+    AssetKind.CAMPSITE -> "Camps"
+    AssetKind.WAYPOINT -> "Spots"
+}
+
+/**
+ * The front door of the page: the one thing a walker most often comes here to do.
+ *
+ * A green card rather than a button because it is the page's subject, not one action among equals:
+ * adding a spot is how this library grows.
+ */
+@Composable
+private fun AddSpotAction(onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center
+            ) {
+                AppIcon(
+                    glyph = IconGlyph.PLUS,
+                    dimension = 22.dp,
+                    tint = MaterialTheme.colorScheme.onPrimary
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Add a spot", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = "Save a place you found",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                )
+            }
+            AppIcon(
+                glyph = IconGlyph.CHEVRON,
+                dimension = 18.dp,
+                tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+            )
+        }
+    }
+}
+
+/** One of the two quieter ways into the library: import a file, or read DOC's material. */
+@Composable
+private fun SecondaryPlaceAction(
+    label: String,
+    glyph: IconGlyph,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface.copy(
+            alpha = if (enabled) 1f else 0.45f
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 52.dp)
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            AppIcon(glyph = glyph, dimension = 20.dp)
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1
+            )
+        }
+    }
+}
 
 /** A heading over the small group of DOC's tracks: a spaced capital label, as the pages write a thing. */
 @Composable

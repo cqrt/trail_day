@@ -617,6 +617,12 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
+**Then the Places page became a shelf of shelves.** Adding a spot is the page's green front door; import and
+DOC reference sit beside it as quieter tiles. The filter chips carry the count of each kind, and the library is
+grouped Spots, Tracks, Bike tracks, Huts and Campsites rather than one long undifferentiated list. Search still
+flattens the shelves while it is being used, and Nearby from DOC stays a separate read-only group below. It
+shipped as 0.3.29.
+
 **Then a pass stopped being drawn twice.** A finished recording linked to one of the walker's line places was
 drawn once as the place - green and gold because it had been recorded - and again as the raw pass on the
 Recordings layer. The two were nearly coincident, and GPS drift made them read as duplicate tracks. A pass linked
