@@ -8,7 +8,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -50,7 +48,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -319,6 +316,9 @@ fun MapScreen(
     }
 }
 
+/** The two pages of the layers sheet: the walker's own map, and DOC's reference material. */
+private enum class LayerTab { YOUR_MAP, DOC }
+
 /**
  * What the map draws, and the switches for it.
  *
@@ -328,9 +328,10 @@ fun MapScreen(
  * still draws that place, whatever is switched off here - a switch that left one of those blank
  * would have gone too far.
  *
- * **Two halves, because two things are called "tracks".** The walker's own work is under Your
- * Places - spots, their planned or imported tracks, their bike tracks, and the raw recorded lines.
- * DOC's reference material is the group below it. Each half can be read without the other.
+ * **Two pages, because two things are called "tracks".** **Your map** holds the walker's own work -
+ * spots, their planned or imported tracks, their bike tracks, the raw recorded lines and the place
+ * names. **DOC** holds the reference material underneath it. Switching page changes which switches
+ * are in front of the walker; it never changes what is drawn.
  *
  * **The content scrolls.** Opened at its full height (`skipPartiallyExpanded`) *and* scrollable is what
  * makes every switch reachable on a short screen: the height is so that the sheet does not open halfway up
@@ -356,6 +357,7 @@ private fun LayersSheet(
     val shownYourPlaces = YourPlaceLayer.ALL.count { it !in hiddenYourPlaces }
     val allYourPlacesHidden = shownYourPlaces == 0
     val mixedYourPlaces = shownYourPlaces in 1 until YourPlaceLayer.ALL.size
+    var tab by remember { mutableStateOf(LayerTab.YOUR_MAP) }
 
     // The sheet is the page's own pale sage, and each row is a white strip on it: the app's cards on the
     // app's page, the same pairing as every other list.
@@ -391,139 +393,147 @@ private fun LayersSheet(
                 }
             }
 
-            LayerSection("Your Places")
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 56.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Your Places", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        text = "${yourPlaceCounts.total} saved",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            LayerTabs(selected = tab, onSelect = { tab = it })
+
+            when (tab) {
+                LayerTab.YOUR_MAP -> {
+                    LayerSection("Your Places")
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 2.dp)
+                            .heightIn(min = 54.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Your Places", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                text = "${yourPlaceCounts.total} saved",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            text = when {
+                                allYourPlacesHidden -> "OFF"
+                                mixedYourPlaces -> "MIXED"
+                                else -> "ON"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (allYourPlacesHidden) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
+                            letterSpacing = 1.1.sp
+                        )
+                        Switch(
+                            checked = !allYourPlacesHidden,
+                            onCheckedChange = onAllYourPlaces,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+
+                    LayerPanel {
+                        LayerSwitchRow(
+                            icon = { KindTile(kind = AssetKind.WAYPOINT, size = 34.dp) },
+                            title = "Spots",
+                            subtitle = "${yourPlaceCounts.spots} saved",
+                            checked = YourPlaceLayer.SPOTS !in hiddenYourPlaces,
+                            onToggle = { onYourPlaceHidden(YourPlaceLayer.SPOTS, !it) }
+                        )
+                        LayerDivider()
+                        LayerSwitchRow(
+                            icon = { KindTile(kind = AssetKind.TRACK, size = 34.dp) },
+                            title = "Tracks",
+                            subtitle = "${yourPlaceCounts.tracks} saved",
+                            checked = YourPlaceLayer.TRACKS !in hiddenYourPlaces,
+                            onToggle = { onYourPlaceHidden(YourPlaceLayer.TRACKS, !it) }
+                        )
+                        LayerDivider()
+                        LayerSwitchRow(
+                            icon = { KindTile(kind = AssetKind.BIKE_TRACK, size = 34.dp) },
+                            title = "Bike tracks",
+                            subtitle = "${yourPlaceCounts.bikeTracks} saved",
+                            checked = YourPlaceLayer.BIKE_TRACKS !in hiddenYourPlaces,
+                            onToggle = { onYourPlaceHidden(YourPlaceLayer.BIKE_TRACKS, !it) }
+                        )
+                        LayerDivider()
+                        LayerSwitchRow(
+                            icon = {
+                                GlyphTile(
+                                    glyph = IconGlyph.RECORDINGS,
+                                    background = MaterialTheme.colorScheme.primaryContainer,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            },
+                            title = "Recordings",
+                            subtitle = "${yourPlaceCounts.recordings} standalone",
+                            checked = YourPlaceLayer.RECORDINGS !in hiddenYourPlaces,
+                            onToggle = { onYourPlaceHidden(YourPlaceLayer.RECORDINGS, !it) }
+                        )
+                    }
+
+                    LayerSection("Map")
+                    LayerPanel {
+                        LayerSwitchRow(
+                            icon = {
+                                GlyphTile(
+                                    glyph = IconGlyph.MAP,
+                                    background = MaterialTheme.colorScheme.tertiaryContainer,
+                                    tint = MaterialTheme.colorScheme.onTertiaryContainer
+                                )
+                            },
+                            title = "Place names",
+                            subtitle = "Fetched names over the imagery",
+                            checked = placeNames,
+                            onToggle = onPlaceNames
+                        )
+                    }
                 }
-                Text(
-                    text = when {
-                        allYourPlacesHidden -> "OFF"
-                        mixedYourPlaces -> "MIXED"
-                        else -> "ON"
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (allYourPlacesHidden) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
-                    letterSpacing = 1.1.sp
-                )
-                Switch(
-                    checked = !allYourPlacesHidden,
-                    onCheckedChange = onAllYourPlaces,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
+
+                LayerTab.DOC -> {
+                    LayerSection("DOC reference")
+                    LayerPanel {
+                        LayerSwitchRow(
+                            icon = { KindTile(kind = AssetKind.TRACK, size = 34.dp) },
+                            title = "Walking tracks",
+                            subtitle = "Tramping tracks DOC publishes",
+                            checked = AssetLayer.TRACKS !in hidden,
+                            onToggle = { onHide(AssetLayer.TRACKS, !it) }
+                        )
+                        LayerDivider()
+                        LayerSwitchRow(
+                            icon = { KindTile(kind = AssetKind.BIKE_TRACK, size = 34.dp) },
+                            title = "Bike trails",
+                            subtitle = "Rideable tracks and their badges",
+                            checked = AssetLayer.BIKE_TRACKS !in hidden,
+                            onToggle = { onHide(AssetLayer.BIKE_TRACKS, !it) }
+                        )
+                        LayerDivider()
+                        LayerSwitchRow(
+                            icon = { KindTile(kind = AssetKind.HUT, size = 34.dp) },
+                            title = "Huts",
+                            subtitle = "DOC huts",
+                            checked = AssetLayer.HUTS !in hidden,
+                            onToggle = { onHide(AssetLayer.HUTS, !it) }
+                        )
+                        LayerDivider()
+                        LayerSwitchRow(
+                            icon = { KindTile(kind = AssetKind.CAMPSITE, size = 34.dp) },
+                            title = "Campsites",
+                            subtitle = "DOC campsites",
+                            checked = AssetLayer.CAMPSITES !in hidden,
+                            onToggle = { onHide(AssetLayer.CAMPSITES, !it) }
+                        )
+                    }
+                }
             }
-
-            LayerTileRow(
-                first = {
-                    LayerTile(
-                        title = "Spots",
-                        subtitle = "${yourPlaceCounts.spots} saved",
-                        checked = YourPlaceLayer.SPOTS !in hiddenYourPlaces,
-                        onToggle = { onYourPlaceHidden(YourPlaceLayer.SPOTS, !it) },
-                        icon = { KindTile(kind = AssetKind.WAYPOINT, size = 34.dp) }
-                    )
-                },
-                second = {
-                    LayerTile(
-                        title = "Tracks",
-                        subtitle = "${yourPlaceCounts.tracks} saved",
-                        checked = YourPlaceLayer.TRACKS !in hiddenYourPlaces,
-                        onToggle = { onYourPlaceHidden(YourPlaceLayer.TRACKS, !it) },
-                        icon = { KindTile(kind = AssetKind.TRACK, size = 34.dp) }
-                    )
-                }
-            )
-            LayerTileRow(
-                first = {
-                    LayerTile(
-                        title = "Bike tracks",
-                        subtitle = "${yourPlaceCounts.bikeTracks} saved",
-                        checked = YourPlaceLayer.BIKE_TRACKS !in hiddenYourPlaces,
-                        onToggle = { onYourPlaceHidden(YourPlaceLayer.BIKE_TRACKS, !it) },
-                        icon = { KindTile(kind = AssetKind.BIKE_TRACK, size = 34.dp) }
-                    )
-                },
-                second = {
-                    LayerTile(
-                        title = "Recordings",
-                        subtitle = "${yourPlaceCounts.recordings} standalone",
-                        checked = YourPlaceLayer.RECORDINGS !in hiddenYourPlaces,
-                        onToggle = { onYourPlaceHidden(YourPlaceLayer.RECORDINGS, !it) },
-                        icon = { GlyphTile(IconGlyph.RECORDINGS) }
-                    )
-                }
-            )
-
-            LayerSection("DOC reference")
-            LayerTileRow(
-                first = {
-                    LayerTile(
-                        title = "Walking tracks",
-                        subtitle = "DOC",
-                        checked = AssetLayer.TRACKS !in hidden,
-                        onToggle = { onHide(AssetLayer.TRACKS, !it) },
-                        icon = { KindTile(kind = AssetKind.TRACK, size = 34.dp) }
-                    )
-                },
-                second = {
-                    LayerTile(
-                        title = "Bike trails",
-                        subtitle = "DOC",
-                        checked = AssetLayer.BIKE_TRACKS !in hidden,
-                        onToggle = { onHide(AssetLayer.BIKE_TRACKS, !it) },
-                        icon = { KindTile(kind = AssetKind.BIKE_TRACK, size = 34.dp) }
-                    )
-                }
-            )
-            LayerTileRow(
-                first = {
-                    LayerTile(
-                        title = "Huts",
-                        subtitle = "DOC",
-                        checked = AssetLayer.HUTS !in hidden,
-                        onToggle = { onHide(AssetLayer.HUTS, !it) },
-                        icon = { KindTile(kind = AssetKind.HUT, size = 34.dp) }
-                    )
-                },
-                second = {
-                    LayerTile(
-                        title = "Campsites",
-                        subtitle = "DOC",
-                        checked = AssetLayer.CAMPSITES !in hidden,
-                        onToggle = { onHide(AssetLayer.CAMPSITES, !it) },
-                        icon = { KindTile(kind = AssetKind.CAMPSITE, size = 34.dp) }
-                    )
-                }
-            )
-
-            LayerSection("Map")
-            LayerTile(
-                title = "Place names",
-                subtitle = "Fetched names over the imagery",
-                checked = placeNames,
-                onToggle = { onPlaceNames(it) },
-                modifier = Modifier.fillMaxWidth(),
-                icon = { GlyphTile(IconGlyph.MAP) }
-            )
         }
     }
 }
 
-/** A small capital heading over a group of tiles. */
+/** A small capital heading over a group of rows. */
 @Composable
 private fun LayerSection(title: String) {
     Text(
@@ -535,115 +545,147 @@ private fun LayerSection(title: String) {
     )
 }
 
-/** Two tiles side by side, equal widths: the sheet's own 2-column grid without a nested scroll. */
+/** The two-page switch at the top of the sheet: the walker's map, then DOC's material. */
 @Composable
-private fun LayerTileRow(
-    first: @Composable () -> Unit,
-    second: @Composable () -> Unit
-) {
+private fun LayerTabs(selected: LayerTab, onSelect: (LayerTab) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(3.dp)
     ) {
-        Box(modifier = Modifier.weight(1f)) { first() }
-        Box(modifier = Modifier.weight(1f)) { second() }
+        LayerTabButton(
+            label = "Your map",
+            selected = selected == LayerTab.YOUR_MAP,
+            onClick = { onSelect(LayerTab.YOUR_MAP) },
+            modifier = Modifier.weight(1f)
+        )
+        LayerTabButton(
+            label = "DOC",
+            selected = selected == LayerTab.DOC,
+            onClick = { onSelect(LayerTab.DOC) },
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
-/**
- * One tile of the layers sheet: icon, name, count, and its on/off state.
- *
- * The whole tile is the switch, because this is a screen used with gloves on. A state that was
- * carried only by a tint would disappear in the sun, so a tick and the dimming say it twice.
- */
 @Composable
-private fun LayerTile(
-    title: String,
-    subtitle: String?,
-    checked: Boolean,
-    onToggle: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-    icon: @Composable () -> Unit
+private fun LayerTabButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(14.dp)
-    Surface(
+    Box(
         modifier = modifier
-            .clip(shape)
-            .toggleable(value = checked, role = Role.Switch, onValueChange = onToggle)
-            .alpha(if (checked) 1f else 0.58f),
-        shape = shape,
+            .heightIn(min = 38.dp)
+            .clip(RoundedCornerShape(9.dp))
+            .background(
+                if (selected) MaterialTheme.colorScheme.surfaceContainerLow else Color.Transparent
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        )
+    }
+}
+
+/** A rounded white list of rows, the same card-on-sage pairing as the rest of the app. */
+@Composable
+private fun LayerPanel(content: @Composable () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = BorderStroke(
             width = 1.dp,
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
         )
     ) {
-        Row(
-            modifier = Modifier
-                .heightIn(min = 76.dp)
-                .padding(horizontal = 10.dp, vertical = 9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            icon()
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 2
-                )
-                subtitle?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .size(18.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (checked) MaterialTheme.colorScheme.primary else Color.Transparent
-                    )
-                    .border(
-                        width = 1.5.dp,
-                        color = if (checked) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.outline
-                        },
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                if (checked) {
-                    AppIcon(
-                        glyph = IconGlyph.CHECK,
-                        dimension = 12.dp,
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
-            }
-        }
+        Column { content() }
     }
 }
 
-/** A tile-sized mark for the things that are not one of the place kinds. */
+/** The hairline between two rows, aligned under the text rather than the icon. */
 @Composable
-private fun GlyphTile(glyph: IconGlyph) {
+private fun LayerDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 56.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+    )
+}
+
+/**
+ * One row of the layers sheet: a coloured icon, its name, a line about it, and its switch.
+ *
+ * The whole row is the switch, because this is a screen used with gloves on. The Switch itself is
+ * only the state: the row owns the tap, so a thumb on the switch does not toggle twice.
+ */
+@Composable
+private fun LayerSwitchRow(
+    icon: @Composable () -> Unit,
+    title: String,
+    subtitle: String?,
+    checked: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onToggle)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        icon()
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1
+            )
+            subtitle?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+        }
+        Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+/**
+ * A tile-sized mark for the things that are not one of the place kinds.
+ *
+ * The background and the glyph are both given a colour: a neutral tile made these the one
+ * monochrome thing in an otherwise coloured sheet.
+ */
+@Composable
+private fun GlyphTile(glyph: IconGlyph, background: Color, tint: Color) {
     Box(
         modifier = Modifier
             .size(34.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            .background(background),
         contentAlignment = Alignment.Center
     ) {
-        AppIcon(glyph = glyph, dimension = 20.dp)
+        AppIcon(glyph = glyph, dimension = 20.dp, tint = tint)
     }
 }
 

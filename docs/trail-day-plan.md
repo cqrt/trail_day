@@ -617,6 +617,12 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
+**Then the layers drawer became two pages.** **Your map** holds Your Places and the place-name setting;
+**DOC** holds the reference tracks, bike trails, huts and campsites. The rows carry the same coloured kind
+tiles as the rest of the app, and Recordings and Place names got coloured tiles too rather than the
+monochrome ones they had. Switching page only changes which switches are in front of the walker; it never
+changes what is drawn. It shipped as 0.3.31.
+
 **Then the Places filters narrowed to what the walker actually keeps.** Huts and Campsites were DOC's
 reference material, not places the walker makes, so their filters left the Places page; the shelves still show
 any older own hut or campsite that is already on the phone rather than hiding it. The Nearby from DOC row also
