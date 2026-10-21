@@ -617,6 +617,12 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
+**Then the Places filters narrowed to what the walker actually keeps.** Huts and Campsites were DOC's
+reference material, not places the walker makes, so their filters left the Places page; the shelves still show
+any older own hut or campsite that is already on the phone rather than hiding it. The Nearby from DOC row also
+got the track's own kind tile, so it reads as a line to follow rather than a name with a DOC tag. It shipped as
+0.3.30.
+
 **Then the Places page became a shelf of shelves.** Adding a spot is the page's green front door; import and
 DOC reference sit beside it as quieter tiles. The filter chips carry the count of each kind, and the library is
 grouped Spots, Tracks, Bike tracks, Huts and Campsites rather than one long undifferentiated list. Search still

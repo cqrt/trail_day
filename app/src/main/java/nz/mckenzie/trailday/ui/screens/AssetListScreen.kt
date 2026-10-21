@@ -170,7 +170,7 @@ fun AssetListScreen(
                                 onClick = { viewModel.showOnly(null) }
                             )
                         }
-                        items(PLACE_SHELF_ORDER, key = { kind -> kind.name }) { kind ->
+                        items(PLACE_FILTER_ORDER, key = { kind -> kind.name }) { kind ->
                             ChoiceChip(
                                 selected = filter.kind == kind,
                                 label = "${kindFilterLabel(kind)} ${counts[kind] ?: 0}",
@@ -285,6 +285,17 @@ private val TRACK_MIME_TYPES = arrayOf(
     "text/xml",
     "text/plain",
     "*/*"
+)
+
+/**
+ * The filters the page offers. A hut or a campsite is DOC's reference material now, not something
+ * the walker makes, so those filters are gone; legacy own huts and campsites still appear on the
+ * shelves below, but nothing invites the walker to collect more of them.
+ */
+private val PLACE_FILTER_ORDER = listOf(
+    AssetKind.WAYPOINT,
+    AssetKind.TRACK,
+    AssetKind.BIKE_TRACK
 )
 
 /** The order of the shelves: the walker's markers first, then the lines they keep. */
@@ -419,11 +430,11 @@ private fun GroupLabel(text: String) {
 }
 
 /**
- * One of DOC's tracks near the walker, as a card: **the name, what DOC says about it, and how far away it is**
- * - with a DOC tag where a place's kind tile would be, because it is not a place of the walker's.
+ * One of DOC's tracks near the walker, as a card: **the track's tile, its name, what DOC says about
+ * it, and how far away it is** - with a DOC tag at the end, because it is not a place of the walker's.
  *
- * The tag is the whole of the difference: DOC's material is read here and nowhere else, and a row that looked
- * like one of the walker's own would be a row they would try to rename.
+ * The tile is the same track tile the walker's own lines use, so the row reads as a line to follow;
+ * the DOC tag is what says whose line it is, and why there is no rename or delete here.
  */
 @Composable
 private fun DocNearbyCard(
@@ -436,6 +447,7 @@ private fun DocNearbyCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            KindTile(kind = AssetKind.TRACK)
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = choice.item.name, style = MaterialTheme.typography.titleMedium)
                 Text(
