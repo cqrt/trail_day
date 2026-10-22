@@ -182,6 +182,20 @@ class BasemapTest {
     }
 
     @Test
+    fun `the LiDAR hillshade elevation is LINZ terrain-rgb, keyed`() {
+        assertEquals(
+            "https://basemaps.linz.govt.nz/v1/tiles/elevation/WebMercatorQuad/14/1017/660.png" +
+                "?pipeline=terrain-rgb&api=$key",
+            Basemap.elevationUrl(key, 14, 1017, 660)
+        )
+        assertEquals(
+            "https://basemaps.linz.govt.nz/v1/tiles/elevation/WebMercatorQuad/{z}/{x}/{y}.png" +
+                "?pipeline=terrain-rgb&api=$key",
+            Basemap.elevationTemplate(key)
+        )
+    }
+
+    @Test
     fun `the LiDAR hillshade basemap still names the Topo raster tiles it draws under the shade`() {
         val hillshade = Basemap.LINZ_TOPO_LIDAR_HILLSHADE
 

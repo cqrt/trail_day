@@ -171,6 +171,8 @@ enum class Basemap(
                 "style/$LINZ_TOPO_LIDAR_HILLSHADE_TILESET.json?api=${sanitiseKey(apiKey)}"
         }
 
+
+
     /** The credit as HTML, single-quoted so it drops into a style document without escaping. */
     fun attributionHtml(): String = "<a href='$attributionLink'>$attribution</a>"
 
@@ -242,6 +244,21 @@ enum class Basemap(
         fun linzStyleUrl(apiKey: String): String =
             "$LINZ_HOST/v1/tiles/aerial/$LINZ_TILE_MATRIX/style/aerial.json" +
                 "?api=${sanitiseKey(apiKey)}"
+
+        /**
+         * LINZ's terrain-rgb elevation, which a renderer shades into the hillshade.
+         *
+         * The hosted style carries this source for the phone. The desk cannot read a hosted style, so
+         * it is given the same source through the phone's own tile server and draws the shade itself.
+         */
+        fun elevationTemplate(apiKey: String): String =
+            "$LINZ_HOST/v1/tiles/elevation/$LINZ_TILE_MATRIX/{z}/{x}/{y}.png" +
+                "?pipeline=terrain-rgb&api=${sanitiseKey(apiKey)}"
+
+        /** One elevation tile, as the fetchers need it. */
+        fun elevationUrl(apiKey: String, zoom: Int, x: Int, y: Int): String =
+            "$LINZ_HOST/v1/tiles/elevation/$LINZ_TILE_MATRIX/$zoom/$x/$y.png" +
+                "?pipeline=terrain-rgb&api=${sanitiseKey(apiKey)}"
 
         /** LINZ's hosted topographic style, for a basemap this build does not offer yet. */
         fun linzTopographicStyleUrl(apiKey: String): String =

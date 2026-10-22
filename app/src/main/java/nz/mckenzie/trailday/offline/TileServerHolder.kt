@@ -30,6 +30,19 @@ object TileServerHolder {
     /** Where a browsed basemap's tiles are cached, e.g. `tiles-cache-osm`. */
     const val CACHE_DIR_PREFIX = "tiles-cache-"
 
+    /**
+     * The hidden source behind the LiDAR hillshade.
+     *
+     * It is not a basemap a walker picks; it is the elevation the desk shades when the chosen
+     * basemap is LINZ's hosted Topo + hillshade. Served through the same server so the key stays on
+     * the phone and the tiles are cached like everything else.
+     */
+    const val ELEVATION_ID = "linz-elevation"
+
+    /** LINZ answers the terrain-rgb elevation as PNG. */
+    const val ELEVATION_SUFFIX = ".png"
+    const val ELEVATION_CONTENT_TYPE = "image/png"
+
     @Volatile
     private var server: LocalTileServer? = null
 
@@ -39,6 +52,10 @@ object TileServerHolder {
     /** The XYZ template for [basemap] to give the map, or null if the server is not up yet. */
     fun templateUrl(basemap: Basemap): String? =
         server?.takeIf { it.isRunning }?.tileUrlTemplate(basemap.id)
+
+    /** The XYZ template for the hidden elevation source, or null if the server is not up yet. */
+    fun elevationTemplateUrl(): String? =
+        server?.takeIf { it.isRunning }?.tileUrlTemplate(ELEVATION_ID)
 
     /** Safe to ask for twice: the second ask finds the server up - the app and the tests both ask. */
     fun start(context: Context, initialKey: String = BuildConfig.LINZ_API_KEY) {
@@ -102,7 +119,7 @@ object TileServerHolder {
                     }
                 }
             )
-        } + listOf(placeLabelsSource(context))
+        } + listOf(placeLabelsSource(context), elevationSource(context))
 
     /**
      * The place names, as one more source in the same server.
@@ -125,6 +142,34 @@ object TileServerHolder {
                 LinzTileFetcher(key, urlFor = { zoom, x, y -> PlaceLabels.tileUrl(key, zoom, x, y) })
             }
         }
+    )
+
+    /**
+     * The elevation behind the LiDAR hillshade, as one more source in the same server.
+     *
+     * No key, no shade: the upstream is null and the route answers 404, exactly as the imagery does.
+     * It is fetched on the way through like any other tile, so the desk can draw the shade from the
+     * phone rather than from LINZ itself.
+     */
+    private fun elevationSource(context: Context): TileSource = TileSource(
+        id = ELEVATION_ID,
+        store = elevationStore(context),
+        suffix = ELEVATION_SUFFIX,
+        contentType = ELEVATION_CONTENT_TYPE,
+        upstream = {
+            currentKey.takeIf { it.isNotBlank() }?.let { key ->
+                LinzTileFetcher(
+                    key,
+                    urlFor = { zoom, x, y -> Basemap.elevationUrl(key, zoom, x, y) }
+                )
+            }
+        }
+    )
+
+    /** Where the elevation tiles are kept: a cache of what the desk has shaded. */
+    fun elevationStore(context: Context): OfflineTileStore = OfflineTileStore(
+        File(context.applicationContext.cacheDir, "$CACHE_DIR_PREFIX$ELEVATION_ID"),
+        ELEVATION_SUFFIX
     )
 
     /**

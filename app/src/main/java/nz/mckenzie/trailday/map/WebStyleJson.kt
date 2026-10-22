@@ -11,6 +11,7 @@ import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
+import nz.mckenzie.trailday.offline.TileServerHolder
 
 /**
  * The style the editor's page loads, built from the same tables the app's own map is built from.
@@ -70,7 +71,9 @@ object WebStyleJson {
         basemap: Basemap,
         tileUrlTemplate: String,
         assetsUrl: String,
-        placeNamesUrl: String? = null
+        placeNamesUrl: String? = null,
+        /** The terrain-rgb elevation, when the chosen basemap draws a LiDAR hillshade. */
+        elevationUrlTemplate: String? = null
     ): String = buildJsonObject {
         put("version", 8)
         put("name", "Trail Day - the work")
@@ -91,15 +94,16 @@ object WebStyleJson {
         // a name on the desk is written from the letters that travel inside the app rather than from a
         // font the laptop happens to have.
         put("glyphs", GlyphFonts.urlTemplateFrom(tileUrlTemplate))
-        put("sources", sources(basemap, tileUrlTemplate, assetsUrl, placeNamesUrl))
-        put("layers", layers(basemap, placeNamesUrl != null))
+        put("sources", sources(basemap, tileUrlTemplate, assetsUrl, placeNamesUrl, elevationUrlTemplate))
+        put("layers", layers(basemap, placeNamesUrl != null, elevationUrlTemplate != null))
     }.toString()
 
     private fun sources(
         basemap: Basemap,
         tileUrlTemplate: String,
         assetsUrl: String,
-        placeNamesUrl: String?
+        placeNamesUrl: String?,
+        elevationUrlTemplate: String?
     ) = buildJsonObject {
         put(
             basemap.id,
@@ -114,6 +118,21 @@ object WebStyleJson {
                 put("attribution", basemap.attributionHtml())
             }
         )
+        // The elevation the LiDAR hillshade is drawn from, served by the phone's own tile server so
+        // the desk shades the same ground the phone does and the key never leaves the phone.
+        if (elevationUrlTemplate != null) {
+            put(
+                TileServerHolder.ELEVATION_ID,
+                buildJsonObject {
+                    put("type", "raster-dem")
+                    put("tiles", buildJsonArray { add(elevationUrlTemplate) })
+                    put("tileSize", 256)
+                    put("minzoom", 0)
+                    put("maxzoom", basemap.maxZoom)
+                    put("attribution", basemap.attributionHtml())
+                }
+            )
+        }
         put(
             ASSETS_SOURCE,
             buildJsonObject {
@@ -138,7 +157,7 @@ object WebStyleJson {
         }
     }
 
-    private fun layers(basemap: Basemap, placeNames: Boolean) = buildJsonArray {
+    private fun layers(basemap: Basemap, placeNames: Boolean, hillshade: Boolean) = buildJsonArray {
         add(
             buildJsonObject {
                 put("id", "background")
@@ -155,6 +174,29 @@ object WebStyleJson {
                 put("maxzoom", basemap.maxZoom)
             }
         )
+        // The LiDAR shade sits over the Topo map, exactly as LINZ's own style draws it.
+        if (hillshade) {
+            add(
+                buildJsonObject {
+                    put("id", "hillshade")
+                    put("type", "hillshade")
+                    put("source", TileServerHolder.ELEVATION_ID)
+                    put("minzoom", 0)
+                    put("maxzoom", basemap.maxZoom)
+                    put(
+                        "paint",
+                        buildJsonObject {
+                            put("hillshade-exaggeration", 0.4)
+                            put("hillshade-illumination-anchor", "map")
+                            put("hillshade-illumination-direction", 315)
+                            put("hillshade-shadow-color", "#0c0c0c")
+                            put("hillshade-highlight-color", "#e1e5e0")
+                            put("hillshade-accent-color", "#646464")
+                        }
+                    )
+                }
+            )
+        }
         // The names, straight over the imagery and **under the work**: this is the phone's own
         // arrangement, and the reason is the same on both - the work is what the map is for, and a
         // town name is the furniture around it.

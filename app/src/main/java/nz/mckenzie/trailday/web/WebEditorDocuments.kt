@@ -26,6 +26,7 @@ import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.WebStyleJson
 import nz.mckenzie.trailday.offline.HttpResponse
+import nz.mckenzie.trailday.offline.TileServerHolder
 
 /**
  * The documents the editor serves, built from the same repository calls the app's own screens use.
@@ -411,6 +412,13 @@ class WebEditorDocuments(
             placeNamesUrl = if (placeNames()) {
                 "http://$authority/tiles/${PlaceLabels.ID}/{z}/{x}/{y}" +
                     "${PlaceLabels.TILE_SUFFIX}$tokenQuery"
+            } else null,
+            // The hosted Topo + hillshade basemap is two sources, and the desk cannot read LINZ's
+            // hosted style. The shade's elevation comes from this phone's own server instead, so the
+            // desk draws the same ground with the key still on the phone.
+            elevationUrlTemplate = if (chosen.usesHostedStyle) {
+                "http://$authority/tiles/${TileServerHolder.ELEVATION_ID}/{z}/{x}/{y}" +
+                    "${TileServerHolder.ELEVATION_SUFFIX}$tokenQuery"
             } else null
         )
     }

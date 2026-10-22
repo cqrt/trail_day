@@ -409,6 +409,28 @@ class WebStyleJsonTest {
         )
     }
 
+    @Test
+    fun `the desk draws the LiDAR hillshade when the basemap is the hosted style`() {
+        val hillshade = Json.parseToJsonElement(
+            WebStyleJson.build(
+                Basemap.LINZ_TOPO_LIDAR_HILLSHADE,
+                "http://192.168.1.23:8799/tiles/linz-topo-lidar-hillshade/{z}/{x}/{y}.webp?k=7f3a",
+                assets,
+                elevationUrlTemplate = "http://192.168.1.23:8799/tiles/linz-elevation/{z}/{x}/{y}.png?k=7f3a"
+            )
+        ).jsonObject
+
+        val source = hillshade["sources"]!!.jsonObject["linz-elevation"]!!.jsonObject
+        assertEquals("raster-dem", source["type"]!!.jsonPrimitive.content)
+
+        val ids = hillshade["layers"]!!.jsonArray.map { it.jsonObject["id"]!!.jsonPrimitive.content }
+        assertTrue("the shade is drawn", ids.contains("hillshade"))
+        assertTrue(
+            "and it sits over the Topo map, as LINZ draws it",
+            ids.indexOf("hillshade") > ids.indexOf(Basemap.LINZ_TOPO_LIDAR_HILLSHADE.id)
+        )
+    }
+
     /**
      * The whole document, against the rules MapLibre judges an expression by.
      *
