@@ -85,6 +85,9 @@ data class DocItem(
     val walkingDuration: String? get() =
         fact("walkingDuration") ?: characteristic("WEB_WALKING_DURATION")
 
+    /** The category DOC's website puts the track in, such as "Walking track". */
+    val category: String? get() = fact("walkCategory") ?: characteristic("WEB_CATEGORY_TRACK")
+
     /** What DOC permits on the track, when it filled the slot in. */
     val permittedActivities: String? get() =
         DocText.plain(fact("permittedActivities")) ?: characteristic("WEB_PERMITTED_ACTIVITIES")

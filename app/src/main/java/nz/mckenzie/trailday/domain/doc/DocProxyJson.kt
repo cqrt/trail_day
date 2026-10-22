@@ -71,15 +71,15 @@ object DocProxyJson {
 
     private fun detailOf(root: JsonObject): DocTrackCompanion = DocTrackCompanion(
         introduction = root.text("introduction")?.let(DocText::plain),
-        difficulty = root.array("walkTrackCategory")?.firstOrNull(),
+        difficulty = root.array("walkTrackCategory")?.joinToString(", "),
         completionTime = root.text("walkDuration"),
         webPage = root.text("staticLink"),
         thumbnail = root.text("introductionThumbnail"),
-        walkingDuration = root.array("walkDurationCategory")?.firstOrNull(),
+        walkingDuration = root.array("walkDurationCategory")?.joinToString(", "),
         permittedActivities = root.array("permittedActivities")?.joinToString(", "),
         wheelchairsAndBuggies = root.text("wheelchairsAndBuggies")?.let(DocText::plain),
         mtbDuration = root.text("mtbDuration"),
-        mtbCategory = root.array("mtbTrackCategory")?.firstOrNull(),
+        mtbCategory = root.array("mtbTrackCategory")?.joinToString(", "),
         kayakingDuration = root.text("kayakingDuration"),
         dogsAllowed = root.text("dogsAllowed")?.let(DocText::plain),
         place = root.text("locationString"),

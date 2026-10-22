@@ -6,13 +6,16 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
+import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDetailReader
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.doc.DocProxyDetails
@@ -20,9 +23,12 @@ import nz.mckenzie.trailday.domain.doc.DocAlertsState
 import nz.mckenzie.trailday.domain.doc.DocCache
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
+import nz.mckenzie.trailday.domain.doc.isPictureAddress
 import nz.mckenzie.trailday.domain.doc.withCompanion
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.offline.OfflineDocStore
+import java.net.HttpURLConnection
+import java.net.URL
 
 /**
  * The facts behind one DOC detail page.
@@ -69,10 +75,41 @@ class DocDetailViewModel(
                 }
             }
             val current = _item.value
-            _picture.value = current.pictureUrl?.let { url ->
-                runCatching { docStore.picture(url) }.getOrNull()
-            }
+            _picture.value = pictureFor(current.pictureUrl)
             _alerts.value = reader.alertsFor(current)
+        }
+    }
+
+    /**
+     * The picture for [url]: the phone's own copy when the area was downloaded, otherwise the
+     * website's thumbnail fetched for this visit.
+     *
+     * The download keeps a copy so the page works with no reception; a track looked at without being
+     * downloaded still has its picture, because the API publishes one and a page without it is a
+     * page missing the thing the walker looks at first.
+     */
+    private suspend fun pictureFor(url: String?): ByteArray? {
+        if (url.isNullOrBlank()) return null
+        runCatching { docStore.picture(url) }.getOrNull()?.let { return it }
+        if (!isPictureAddress(url)) return null
+        return withContext(Dispatchers.IO) {
+            val connection = runCatching {
+                (URL(url).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 10_000
+                    readTimeout = 15_000
+                    setRequestProperty("User-Agent", ArcGisDoc.USER_AGENT)
+                }
+            }.getOrNull() ?: return@withContext null
+            try {
+                if (connection.responseCode != HttpURLConnection.HTTP_OK) return@withContext null
+                if (!(connection.contentType ?: "").startsWith("image/")) return@withContext null
+                connection.inputStream.use { it.readBytes() }
+            } catch (_: Exception) {
+                null
+            } finally {
+                connection.disconnect()
+            }
         }
     }
 

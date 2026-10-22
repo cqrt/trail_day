@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -41,9 +41,9 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.doc.DocAlert
 import nz.mckenzie.trailday.domain.doc.DocAlertsState
-import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
@@ -58,13 +58,13 @@ import nz.mckenzie.trailday.viewmodel.DocDetailViewModel
 /**
  * One of DOC's things, on its own page.
  *
- * The map is the top of the page and the facts are below it: the short introduction, the kind and
- * condition, the facts worth reading at a glance, current DOC alerts, and the prose sections the
- * service actually gives us. A track gets **Follow this track**; every item with a page link gets a
- * way to the full DOC page, where the prose DOC keeps only on its website lives.
+ * The design is the chosen mockup: the map at the top, a labelled back pill over it, and a white
+ * sheet below with the area, the name, a row of coloured chips, the introduction, the at-a-glance
+ * grid and whatever prose DOC actually publishes. A track gets **Follow this track** and every item
+ * with a page link gets **DOC**.
  *
- * **Only sections with something in them are drawn.** An empty facilities line or a missing picture
- * is not a reason to leave a blank card: the page uses its space for what DOC said.
+ * **Only sections with something in them are drawn.** A missing facilities line or an empty
+ * accessibility note is not a reason to leave a blank card.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -131,12 +131,10 @@ fun DocDetailScreen(
                     fitBoundsMaxZoom = 15.0,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(260.dp)
+                        .height(250.dp)
                 )
-                RoundIconButton(
-                    glyph = IconGlyph.BACK,
-                    description = "Back",
-                    onClick = onBack,
+                DocBackPill(
+                    onBack = onBack,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(12.dp)
@@ -145,21 +143,23 @@ fun DocDetailScreen(
                     basemap = basemap,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(start = 6.dp, bottom = 32.dp)
+                        .padding(start = 6.dp, bottom = 28.dp)
                 )
             }
 
             Column(
                 modifier = Modifier
-                    .offset(y = (-24).dp)
+                    .offset(y = (-22).dp)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
                     .background(MaterialTheme.colorScheme.surface)
                     .padding(horizontal = 20.dp)
-                    .padding(top = 20.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(top = 10.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                DocHeader(item = item, bike = bike)
+                SheetHandle()
+                DocHeader(item = item)
+                DocChips(item = item, bike = bike)
 
                 if (photo != null) {
                     Image(
@@ -168,9 +168,13 @@ fun DocDetailScreen(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(170.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .height(180.dp)
+                            .clip(RoundedCornerShape(16.dp))
                     )
+                }
+
+                item.introduction?.let { intro ->
+                    Text(text = intro, style = MaterialTheme.typography.bodyMedium)
                 }
 
                 when (val state = alertState) {
@@ -197,14 +201,10 @@ fun DocDetailScreen(
                     DocFactGrid(facts)
                 }
 
-                item.introduction?.let { intro ->
-                    DocSectionLabel("About")
-                    Text(text = intro, style = MaterialTheme.typography.bodyMedium)
-                }
-
-                DocTextSection("Facilities", item.facilities)
+                DocTextSection("Accessibility", item.wheelchairsAndBuggies)
+                DocTextSection("Getting there", item.access)
+                DocTextSection("Nearby facilities", item.facilities)
                 DocTextSection("Activities", item.activities)
-                DocTextSection("Access", item.access)
                 DocTextSection("Landscape", item.landscape)
 
                 if (link != null) {
@@ -212,54 +212,133 @@ fun DocDetailScreen(
                         onClick = openDoc,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Read the full description and access on DOC")
+                        Text("Open the full DOC page \u2197")
                     }
                 }
-
             }
         }
     }
 }
 
 @Composable
-private fun DocHeader(item: DocItem, bike: DocItem?) {
-    Row(
+private fun SheetHandle() {
+    Box(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.Top
+        contentAlignment = Alignment.Center
     ) {
-        KindTile(kind = item.source.drawingKind(), size = 44.dp)
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+        Box(
+            modifier = Modifier
+                .width(38.dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.outlineVariant)
+        )
+    }
+}
+
+@Composable
+private fun DocBackPill(onBack: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onBack,
+        modifier = modifier,
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                if (bike != null) AssetKindIcon(kind = AssetKind.BIKE_TRACK, dimension = 13.dp)
-                Text(
-                    text = if (bike != null) {
-                        "DOC ${item.source.singular} · BIKE-FRIENDLY".uppercase()
-                    } else {
-                        "DOC ${item.source.singular}".uppercase()
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    letterSpacing = 1.1.sp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
+            AppIcon(glyph = IconGlyph.BACK, dimension = 16.dp)
             Text(
-                text = item.name,
-                style = MaterialTheme.typography.headlineSmall
+                text = "TRACK",
+                style = MaterialTheme.typography.labelSmall,
+                letterSpacing = 1.1.sp
             )
+        }
+    }
+}
+
+@Composable
+private fun DocHeader(item: DocItem) {
+    val area = item.region ?: item.place ?: "DOC reference"
+    val distance = item.lengthM.takeIf { it > 0.0 }?.let { formatDistance(it) }
+    val shape = listOfNotNull(distance, item.trackType?.lowercase()).joinToString(" ").ifBlank { null }
+    val subtitle = listOfNotNull(item.place, item.region, shape).joinToString(" \u00b7 ")
+
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Text(
+            text = "DOC ${item.source.singular} \u00b7 $area",
+            style = MaterialTheme.typography.labelSmall,
+            letterSpacing = 1.1.sp,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(text = item.name, style = MaterialTheme.typography.headlineSmall)
+        if (subtitle.isNotBlank()) {
             Text(
-                text = listOfNotNull(item.place, item.region).distinct().joinToString(" \u00b7 ")
-                    .ifBlank { "DOC reference" },
+                text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DocChips(item: DocItem, bike: DocItem?) {
+    val chips = buildList {
+        (item.kind ?: item.category)?.let { add(it to DocChipTone.Kind) }
+        item.difficulty?.let { add(it to DocChipTone.Good) }
+        item.trackType?.let { add(it to DocChipTone.Neutral) }
+        (item.completionTime ?: item.walkingDuration)?.let { add(it to DocChipTone.Neutral) }
+        item.status?.let {
+            val open = it.equals("open", ignoreCase = true)
+            add(it to if (open) DocChipTone.Good else DocChipTone.Bad)
+        }
+        if (bike != null || item.source == DocSource.BIKES) {
+            add("Bike-friendly" to DocChipTone.Kind)
+        }
+    }
+    if (chips.isEmpty()) return
+
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        chips.forEach { (text, tone) -> DocChip(text = text, tone = tone) }
+    }
+}
+
+private enum class DocChipTone { Kind, Good, Bad, Neutral }
+
+@Composable
+private fun DocChip(text: String, tone: DocChipTone) {
+    val colors = when (tone) {
+        DocChipTone.Kind -> MaterialTheme.colorScheme.primaryContainer to
+            MaterialTheme.colorScheme.onPrimaryContainer
+
+        DocChipTone.Good -> MaterialTheme.colorScheme.tertiaryContainer to
+            MaterialTheme.colorScheme.onTertiaryContainer
+
+        DocChipTone.Bad -> MaterialTheme.colorScheme.errorContainer to
+            MaterialTheme.colorScheme.onErrorContainer
+
+        DocChipTone.Neutral -> MaterialTheme.colorScheme.surfaceContainerHigh to
+            MaterialTheme.colorScheme.onSurface
+    }
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = colors.first,
+        contentColor = colors.second
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+        )
     }
 }
 
@@ -281,23 +360,25 @@ private fun docFacts(item: DocItem, bike: DocItem?): List<DocFact> {
         value?.takeIf { it.isNotBlank() }?.let { facts += DocFact(label, it, note) }
     }
 
-    add("What it is", item.kind)
     if (item.source == DocSource.TRACKS) {
         add("Difficulty", item.difficulty)
         add(
-            "Time",
+            "Completion time",
             item.completionTime ?: item.walkingDuration,
             item.completionTime?.let { item.walkingDuration }?.takeIf {
                 it.isNotBlank() && !it.equals(item.completionTime, ignoreCase = true)
-            }?.let { "DOC walking range: $it" }
+            }?.let { "DOC range: $it" }
         )
-        add("Distance", item.lengthM.takeIf { it > 0.0 }?.let { formatDistance(it) })
-        add("Track type", item.trackType)
-        add("Activities", item.permittedActivities)
+        add(
+            "Distance",
+            item.lengthM.takeIf { it > 0.0 }?.let { formatDistance(it) },
+            item.trackType?.lowercase()
+        )
+        add("Category", item.category ?: item.kind)
         add("Dogs", item.dogsAllowed)
         add("Status", item.status)
-        add("Wheelchairs", item.wheelchairsAndBuggies)
-        add("Mountain biking", listOfNotNull(item.mtbCategory, item.mtbDuration).joinToString(" · ").ifBlank { null })
+        add("Activities", item.permittedActivities)
+        add("Mountain biking", listOfNotNull(item.mtbCategory, item.mtbDuration).joinToString(" \u00b7 ").ifBlank { null })
         add("Kayaking", item.kayakingDuration)
         bike?.let {
             add("Bike difficulty", it.difficulty)
@@ -312,7 +393,7 @@ private fun docFacts(item: DocItem, bike: DocItem?): List<DocFact> {
             "Sites",
             listOfNotNull(item.unpoweredSites, item.poweredSites)
                 .takeIf { it.isNotEmpty() }
-                ?.let { "Unpowered ${item.unpoweredSites ?: 0} · Powered ${item.poweredSites ?: 0}" }
+                ?.let { "Unpowered ${item.unpoweredSites ?: 0} \u00b7 Powered ${item.poweredSites ?: 0}" }
         )
     } else if (item.source == DocSource.HUTS) {
         add("Bookable", item.bookable)
@@ -346,7 +427,7 @@ private fun DocFactGrid(facts: List<DocFact>) {
 private fun DocFactTile(fact: DocFact, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
@@ -354,7 +435,7 @@ private fun DocFactTile(fact: DocFact, modifier: Modifier = Modifier) {
         )
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Text(fact.value, style = MaterialTheme.typography.titleSmall)
@@ -378,6 +459,7 @@ private fun DocFactTile(fact: DocFact, modifier: Modifier = Modifier) {
 private fun DocTextSection(title: String, text: String?) {
     text?.takeIf { it.isNotBlank() }?.let {
         DocSectionLabel(title)
+        Spacer(modifier = Modifier.height(2.dp))
         Text(text = it, style = MaterialTheme.typography.bodyMedium)
     }
 }
@@ -436,14 +518,14 @@ private fun DocDetailActions(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (canFollow) {
-                Button(onClick = onFollow, modifier = Modifier.weight(1f)) {
+                Button(onClick = onFollow, modifier = Modifier.weight(1.7f)) {
                     Text("Follow this track")
                 }
             }
             if (hasLink) {
                 if (canFollow) {
                     OutlinedButton(onClick = onOpenDoc, modifier = Modifier.weight(1f)) {
-                        Text("DOC page")
+                        Text("DOC \u2197")
                     }
                 } else {
                     Button(onClick = onOpenDoc, modifier = Modifier.weight(1f)) {
