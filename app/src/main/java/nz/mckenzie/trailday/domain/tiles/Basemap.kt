@@ -94,15 +94,14 @@ enum class Basemap(
     /**
      * LINZ's Topo maps with a LiDAR hillshade under them.
      *
-     * **A hosted style, not a single tile set.** The map is two sources - the Topo50/250 raster and
-     * a terrain-rgb elevation layer the renderer shades - and LINZ publishes them together as a
-     * style document. The app loads that document with the key in it, which is also what makes the
-     * two sources line up exactly as LINZ draws them.
+     * **Two sources, not a single tile set.** The map is the Topo50/250 raster and a terrain-rgb
+     * elevation layer the renderer shades. The app builds that pair itself through its own tile
+     * server, so the key stays on the phone and the tiles are cached like every other basemap.
      */
     LINZ_TOPO_LIDAR_HILLSHADE(
         id = "linz-topo-lidar-hillshade",
         displayName = "Topo LiDAR hillshade",
-        summary = "Topographic maps with LiDAR hillshade. Needs a LINZ key; looked at as you browse.",
+        summary = "Topographic maps with LiDAR hillshade. Needs a LINZ key; tiles are cached when browsing.",
         needsKey = true,
         tileSuffix = ".webp",
         contentType = "image/webp",
@@ -192,6 +191,9 @@ enum class Basemap(
 
         /** LINZ's Topo maps plus a LiDAR hillshade, published as a style over two sources. */
         const val LINZ_TOPO_LIDAR_HILLSHADE_TILESET = "topo-raster-gridded"
+
+        /** The hidden elevation source behind the hillshade, served by the app's tile server. */
+        const val ELEVATION_SOURCE_ID = "linz-elevation"
 
         /**
          * OpenStreetMap's standard tile layer.

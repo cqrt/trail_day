@@ -148,6 +148,23 @@ class BasemapStylesTest {
         }
     }
 
+    @Test
+    fun `the LiDAR basemap draws a hillshade over the Topo raster`() {
+        val json = BasemapStyles.rasterStyleJson(
+            Basemap.LINZ_TOPO_LIDAR_HILLSHADE,
+            "http://127.0.0.1:41234/tiles/linz-topo-lidar-hillshade/{z}/{x}/{y}.webp",
+            elevationUrlTemplate = "http://127.0.0.1:41234/tiles/linz-elevation/{z}/{x}/{y}.png"
+        )
+
+        assertTrue(json.contains("\"${Basemap.ELEVATION_SOURCE_ID}\""))
+        assertTrue(json.contains("\"type\": \"raster-dem\""))
+        assertTrue(json.contains("\"type\": \"hillshade\""))
+        assertTrue(
+            json.indexOf("\"id\": \"hillshade\"") >
+                json.indexOf("\"id\": \"${Basemap.LINZ_TOPO_LIDAR_HILLSHADE.id}\"")
+        )
+    }
+
     /**
      * The phone's own style document, against the rules MapLibre judges an expression by.
      *

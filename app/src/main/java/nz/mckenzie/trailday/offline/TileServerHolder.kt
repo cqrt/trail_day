@@ -37,7 +37,7 @@ object TileServerHolder {
      * basemap is LINZ's hosted Topo + hillshade. Served through the same server so the key stays on
      * the phone and the tiles are cached like everything else.
      */
-    const val ELEVATION_ID = "linz-elevation"
+    const val ELEVATION_ID = Basemap.ELEVATION_SOURCE_ID
 
     /** LINZ answers the terrain-rgb elevation as PNG. */
     const val ELEVATION_SUFFIX = ".png"

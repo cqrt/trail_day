@@ -11,7 +11,6 @@ import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
-import nz.mckenzie.trailday.offline.TileServerHolder
 
 /**
  * The style the editor's page loads, built from the same tables the app's own map is built from.
@@ -122,7 +121,7 @@ object WebStyleJson {
         // the desk shades the same ground the phone does and the key never leaves the phone.
         if (elevationUrlTemplate != null) {
             put(
-                TileServerHolder.ELEVATION_ID,
+                Basemap.ELEVATION_SOURCE_ID,
                 buildJsonObject {
                     put("type", "raster-dem")
                     put("tiles", buildJsonArray { add(elevationUrlTemplate) })
@@ -180,7 +179,7 @@ object WebStyleJson {
                 buildJsonObject {
                     put("id", "hillshade")
                     put("type", "hillshade")
-                    put("source", TileServerHolder.ELEVATION_ID)
+                    put("source", Basemap.ELEVATION_SOURCE_ID)
                     put("minzoom", 0)
                     put("maxzoom", basemap.maxZoom)
                     put(

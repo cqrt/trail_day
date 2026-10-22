@@ -38,7 +38,9 @@ object BasemapStyles {
         basemap: Basemap,
         tileUrlTemplate: String,
         glyphsUrl: String? = null,
-        placeNamesUrl: String? = null
+        placeNamesUrl: String? = null,
+        /** The terrain-rgb elevation, when the basemap draws a LiDAR hillshade. */
+        elevationUrlTemplate: String? = null
     ): String {
         val names = if (placeNamesUrl != null && glyphsUrl != null) placeNamesUrl else null
 
@@ -55,7 +57,9 @@ object BasemapStyles {
                   "minzoom": 0,
                   "maxzoom": ${basemap.maxZoom},
                   "attribution": "${basemap.attributionHtml()}"
-                }${names?.let { ",\n" + placeLabelsSource(it) }.orEmpty()}
+                }${names?.let { ",\n" + placeLabelsSource(it) }.orEmpty()}${
+            elevationUrlTemplate?.let { ",\n" + elevationSource(it, basemap) }.orEmpty()
+        }
               },
               "layers": [
                 {
@@ -69,11 +73,44 @@ object BasemapStyles {
                   "source": "${basemap.id}",
                   "minzoom": 0,
                   "maxzoom": ${basemap.maxZoom}
-                }${names?.let { ",\n" + labelsLayers() }.orEmpty()}
+                }${
+            elevationUrlTemplate?.let { ",\n" + hillshadeLayer(basemap) }.orEmpty()
+        }${names?.let { ",\n" + labelsLayers() }.orEmpty()}
               ]
             }
         """.trimIndent()
     }
+
+    /** The terrain-rgb source the LiDAR shade is drawn from, as a style entry. */
+    private fun elevationSource(url: String, basemap: Basemap): String = """
+        "${Basemap.ELEVATION_SOURCE_ID}": {
+          "type": "raster-dem",
+          "tiles": ["$url"],
+          "tileSize": 256,
+          "minzoom": 0,
+          "maxzoom": ${basemap.maxZoom},
+          "attribution": "${basemap.attributionHtml()}"
+        }
+    """.trimIndent()
+
+    /** The shade itself, over the Topo raster and under any names. */
+    private fun hillshadeLayer(basemap: Basemap): String = """
+        {
+          "id": "hillshade",
+          "type": "hillshade",
+          "source": "${Basemap.ELEVATION_SOURCE_ID}",
+          "minzoom": 0,
+          "maxzoom": ${basemap.maxZoom},
+          "paint": {
+            "hillshade-exaggeration": 0.4,
+            "hillshade-illumination-anchor": "map",
+            "hillshade-illumination-direction": 315,
+            "hillshade-shadow-color": "#0c0c0c",
+            "hillshade-highlight-color": "#e1e5e0",
+            "hillshade-accent-color": "#646464"
+          }
+        }
+    """.trimIndent()
 
     /**
      * The place names' own source, as a style entry.

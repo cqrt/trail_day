@@ -541,11 +541,14 @@ internal fun MapLibreMap.loadTrailDayStyle(
     placeNames: Boolean,
     onLoaded: (Style) -> Unit
 ) {
-    // A hosted-style basemap is loaded from LINZ's own style document, because that is where its two
-    // sources - the Topo raster and the elevation the hillshade is drawn from - are declared
-    // together. It is the one path that does not go through the app's tile server, and it is
-    // therefore the one basemap that cannot be downloaded ahead of time.
-    val hostedStyle = basemap.hostedStyleUrl(apiKey)?.takeIf { apiKey.isNotBlank() }
+    // The LiDAR hillshade is two sources: the Topo raster and the terrain-rgb elevation the renderer
+    // shades. Both go through the app's own tile server, so the map keeps its key handling and cache.
+    val elevationTemplate = when {
+        basemap != Basemap.LINZ_TOPO_LIDAR_HILLSHADE -> null
+        !tileUrlTemplate.isNullOrBlank() -> TileServerHolder.elevationTemplateUrl()
+        apiKey.isNotBlank() -> Basemap.elevationTemplate(apiKey)
+        else -> null
+    }
     val json = when {
         // A running tile server is the preferred source: it serves downloaded areas
         // with no reception, keeps whatever it fetches, and holds the LINZ key so the
@@ -557,22 +560,25 @@ internal fun MapLibreMap.loadTrailDayStyle(
             basemap,
             tileUrlTemplate,
             glyphsUrl = GlyphFonts.urlTemplateFrom(tileUrlTemplate),
-            placeNamesUrl = if (placeNames) PlaceLabels.urlTemplateFrom(tileUrlTemplate) else null
+            placeNamesUrl = if (placeNames) PlaceLabels.urlTemplateFrom(tileUrlTemplate) else null,
+            elevationUrlTemplate = elevationTemplate
         )
 
         // No server (tests, previews). A basemap that needs no key can simply be talked to.
         !basemap.needsKey -> BasemapStyles.rasterStyleJson(basemap, basemap.tileTemplate(""))
 
-        apiKey.isNotBlank() -> BasemapStyles.rasterStyleJson(basemap, basemap.tileTemplate(apiKey))
+        apiKey.isNotBlank() -> BasemapStyles.rasterStyleJson(
+            basemap,
+            basemap.tileTemplate(apiKey),
+            elevationUrlTemplate = elevationTemplate
+        )
 
         // A key is needed and there is none: a calm placeholder rather than thousands of
         // tiles that will come back HTTP 400.
         else -> BasemapStyles.blankStyleJson()
     }
 
-    val styleBuilder = hostedStyle?.let { Style.Builder().fromUri(it) } ?: Style.Builder().fromJson(json)
-
-    setStyle(styleBuilder) { style ->
+    setStyle(Style.Builder().fromJson(json)) { style ->
         // DOC's material first, so it lies **under** the walker's own work: what you made is what you
         // are reading, and the reference is the ground it sits on.
         if (style.getSource(DOC_SOURCE) == null) {
