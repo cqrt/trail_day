@@ -8,14 +8,20 @@ this app without anyone exporting a file first.
 
 DOC publishes its tracks as a hosted **ArcGIS Feature Service**, not a file store:
 
-- item `5cba3b0a2e1041c9ad02ec694f3f3d37`, **"DOC Tracks — Deprecated Dataset"**, public, CC-BY 4.0,
-  Crown copyright;
-- one polyline layer, **3,255 tracks**, native **NZTM2000 (EPSG:2193)**, refreshed nightly upstream;
-- `https://services1.arcgis.com/3JjYDyG3oajxU6HO/arcgis/rest/services/DOC_Tracks_EAM/FeatureServer/0`
+- item `8de802e1239c4906947c3b4b8a98c1e3`, **"DOC Tracks"**, public, CC-BY 4.0, Crown copyright;
+- one polyline layer, native **NZTM2000 (EPSG:2193)**, refreshed upstream;
+- `https://services1.arcgis.com/3JjYDyG3oajxU6HO/arcgis/rest/services/DOC_Tracks_Open_Data/FeatureServer/0`
 
-**DOC has deprecated this dataset and says a replacement is coming.** The service is therefore named
-in exactly one place — `DocTracksUrl.SERVICE_URL` — so the day the replacement has a URL, one line
-changes and nothing else does.
+**The deprecated dataset is not read.** Item `5cba3b0a2e1041c9ad02ec694f3f3d37` ("DOC Tracks —
+Deprecated Dataset", service `DOC_Tracks_EAM`) carried the old object ids and characteristic slots.
+The replacement numbers its tracks differently and keeps characteristics in slots **2-9 and 14-15**
+rather than 1-11, so the field list changes with the URL. Cached tracks from the old service are
+cleared once on upgrade; huts, campsites and bike locations are untouched, and the area can be
+downloaded again for tracks.
+
+**The companion layer, `DOC_Walking_Experiences`, is also deprecated**, but DOC has not published a
+replacement yet. It is still read for the website summary; the day a replacement appears, the layer
+name is the one line to change.
 
 ## How it searches
 

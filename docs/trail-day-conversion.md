@@ -93,7 +93,7 @@ the app already reads, so one read-and-cache path serves all four.
 
 | Browser tab | Service | Geometry | Records | What a row shows |
 | --- | --- | --- | --- | --- |
-| **Tracks** | `DOC_Tracks_EAM` (already used) | lines | 3,255 | kind, track type, length, distance |
+| **Tracks** | `DOC_Tracks_Open_Data` (replacement for the deprecated `DOC_Tracks_EAM`) | lines | — | kind, track type, length, distance |
 | **Huts** | `DOC_Huts` | points | 1,429 | place, region, whether bookable, distance |
 | **Bikes** | `DOC_Mountain_Bike_Tracks` | points | — | difficulty (Easiest→Extreme), biking time, distance |
 | **Campsites** | `DOC_Campsites` | points | — | category, powered/unpowered, free or bookable |

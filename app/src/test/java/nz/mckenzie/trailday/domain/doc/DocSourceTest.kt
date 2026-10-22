@@ -21,13 +21,14 @@ class DocSourceTest {
 
     private val host = "https://services1.arcgis.com/3JjYDyG3oajxU6HO/arcgis/rest/services"
 
-    /** Every name-and-value slot the tracks service publishes: eleven of them. */
-    private val characteristicSlots = (1..11).flatMap { slot -> listOf("CharName$slot", "CharValue$slot") }
+    /** Every name-and-value slot the replacement tracks service publishes. */
+    private val characteristicSlots = listOf(2, 3, 4, 5, 6, 7, 8, 9, 14, 15)
+        .flatMap { slot -> listOf("CharName$slot", "CharValue$slot") }
 
     @Test
     fun `each service is asked at its own folder on DOC's one host`() {
         assertEquals(
-            "$host/DOC_Tracks_EAM/FeatureServer/0/query",
+            "$host/DOC_Tracks_Open_Data/FeatureServer/0/query",
             DocSource.TRACKS.serviceUrl
         )
         assertEquals("$host/DOC_Huts/FeatureServer/0/query", DocSource.HUTS.serviceUrl)
@@ -104,7 +105,7 @@ class DocSourceTest {
     }
 
     @Test
-    fun `a track's facts are its own two and the eleven slots DOC keeps characteristics in`() {
+    fun `a track's facts are its own two and the slots the replacement service keeps characteristics in`() {
         assertEquals(listOf("SubObjectType", "FlocID") + characteristicSlots, DocSource.TRACKS.fields)
     }
 

@@ -12,17 +12,16 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * The one database change this app has ever made, on a database that already had something in it.
+ * The database changes this app has made, each run on a database that already had something in it.
  *
- * The DOC cache gained the source it came from, and **what a walker had already downloaded is carried
- * across rather than dropped**: every row of the old table was a track, so each is copied as one and the
- * fields the old table held as columns are written into the facts column the new model reads. A cache is
- * cheap to refill and the walker is not always somewhere they can refill it, so the version changing is
- * not a reason for their downloaded area to vanish.
+ * **Carry what is still true; drop what is no longer.** The DOC cache gaining a source carried a
+ * walker's downloaded tracks across, because they were still that service's tracks. Moving to DOC's
+ * replacement tracks dataset is the other case: its object ids are different, so the old rows would sit
+ * beside the new ones as duplicates, and they leave the cache instead.
  *
- * Room's own harness is what makes this a real check rather than a description: it builds a version 1
- * database from the exported schema, runs the migration, and then validates the result against the
- * version 2 schema the build produces.
+ * Room's own harness is what makes these real checks rather than descriptions: it builds a database from
+ * the exported schema, runs the migration, and validates the result against the schema the build
+ * produces.
  */
 @RunWith(AndroidJUnit4::class)
 class MigrationTest {
@@ -152,6 +151,38 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun oldTracksLeaveTheCacheWhenTheDatasetChanges() {
+        // Version 5's tracks came from the deprecated service, whose object ids differ from the
+        // replacement's. Keeping them would make the same track appear twice after the next download.
+        helper.createDatabase(TEST_DATABASE_TRACKS, 5).apply {
+            execSQL(
+                """
+                INSERT INTO offline_doc_items
+                    (source, objectId, name, lengthM, pathsJson, factsJson, downloadedAtEpochMs)
+                VALUES
+                    ('tracks', 35239127, 'Old Forks Flat', 0.0, '[[-46.0,168.0]]', '{}', 1),
+                    ('huts', 35239127, 'A hut that stays', 0.0, '[[-46.0,168.0]]', '{}', 2)
+                """.trimIndent()
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(
+            TEST_DATABASE_TRACKS,
+            6,
+            true,
+            MIGRATION_5_6
+        )
+
+        migrated.query("SELECT source, name FROM offline_doc_items ORDER BY source").use { rows ->
+            assertTrue("the hut is still there", rows.moveToFirst())
+            assertEquals("huts", rows.getString(0))
+            assertEquals("A hut that stays", rows.getString(1))
+            assertEquals("and the old track is gone", 1, rows.count)
+        }
+    }
+
     private companion object {
         /** Names of this test's own: the real database is never opened by a test. */
         const val TEST_DATABASE = "migration-test.db"
@@ -167,5 +198,8 @@ class MigrationTest {
 
         /** And a fourth, for the version 4 to 5 change. */
         const val TEST_DATABASE_PHOTOS = "migration-test-photos.db"
+
+        /** And a fifth, for the version 5 to 6 change. */
+        const val TEST_DATABASE_TRACKS = "migration-test-tracks.db"
     }
 }

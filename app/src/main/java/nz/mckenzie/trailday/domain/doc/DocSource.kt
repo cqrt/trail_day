@@ -17,16 +17,19 @@ enum class DocShape { LINE, POINT }
 data class DocFilter(val field: String, val label: String)
 
 /**
- * How many free name-and-value slots the tracks service publishes.
+ * The free name-and-value slots the replacement tracks service publishes.
  *
- * Eleven, and it is DOC's number rather than the app's: the service keeps whatever characteristics
- * somebody needs by putting them in a pair of columns, and the app reads the pairs it has a word for
- * and keeps the rest as they arrived.
+ * The replacement (`DOC_Tracks_Open_Data`) keeps characteristics in 2-9 and 14-15; the deprecated
+ * `DOC_Tracks_EAM` used 1-11. The numbers are kept rather than a count because asking for a slot the
+ * service does not have is a rejected request, not an empty answer.
  *
  * Top-level rather than in the companion, because the table below is built from it: the companion does
  * not exist yet while the entries are being constructed.
  */
-private const val CHARACTERISTIC_SLOT_COUNT = 11
+private val TRACK_CHARACTERISTIC_SLOTS = listOf(2, 3, 4, 5, 6, 7, 8, 9, 14, 15)
+
+/** The highest slot number any tracks service has published, for reading cached facts. */
+private const val CHARACTERISTIC_SLOT_COUNT = 15
 
 /** The characteristic the app has a word for: one way, loop or return. */
 private const val TRACK_TYPE_SLOT_NAME = "WEB_TRACK_TYPE"
@@ -127,18 +130,18 @@ enum class DocSource(
      *
      * The odd one out twice over. It is the only line service, so a row is a path and a length rather
      * than a coordinate; and its name lives in `TechObjectName` while the other three call it `name`.
-     * Its extras are also the oddest: rather than fields of its own it publishes eleven free slots,
-     * each a name and a value, and the app reads the one it knows (`WEB_TRACK_TYPE`: one way, loop or
-     * return) - keeping the rest as they came.
+     * Its extras are also the oddest: rather than fields of its own it publishes free name-and-value
+     * slots, and the app reads the one it knows (`WEB_TRACK_TYPE`: one way, loop or return) - keeping
+     * the rest as they came.
      */
     TRACKS(
         id = "tracks",
         displayName = "Tracks",
         singular = "Track",
-        service = "DOC_Tracks_EAM",
+        service = "DOC_Tracks_Open_Data",
         shape = DocShape.LINE,
         nameField = "TechObjectName",
-        fields = listOf("SubObjectType", "FlocID") + characteristicSlots(CHARACTERISTIC_SLOT_COUNT),
+        fields = listOf("SubObjectType", "FlocID") + characteristicSlots(TRACK_CHARACTERISTIC_SLOTS),
         filters = listOf(
             DocFilter("SubObjectType", "What it is"),
             // The top-level constant rather than the companion's, because the table is built before the
@@ -258,11 +261,10 @@ enum class DocSource(
         const val OBJECT_ID_FIELD = "OBJECTID"
 
         /**
-         * How many free name-and-value slots the tracks service publishes.
+         * The highest free name-and-value slot any tracks service has published.
          *
-         * Eleven, and it is DOC's number rather than the app's: the service keeps whatever characteristics
-         * somebody needs by putting them in a pair of columns, and the app reads the pairs it is asked
-         * for and keeps the rest as they arrived.
+         * The replacement service numbers its slots 2-9 and 14-15, while cached tracks from the older
+         * service can carry 1-11. Reading up to the highest of both finds either shape in stored facts.
          */
         const val CHARACTERISTIC_SLOTS = CHARACTERISTIC_SLOT_COUNT
 
@@ -274,11 +276,6 @@ enum class DocSource(
     }
 }
 
-/**
- * The eleven name-and-value pairs, in the order DOC publishes them.
- *
- * A function rather than a constant list so the slots and the count cannot disagree - the count is
- * DOC's, and a build that asked for ten of eleven would lose a characteristic without saying so.
- */
-private fun characteristicSlots(count: Int): List<String> =
-    (1..count).flatMap { slot -> listOf("CharName$slot", "CharValue$slot") }
+/** The name-and-value pairs for [slots], in the order DOC publishes them. */
+private fun characteristicSlots(slots: List<Int>): List<String> =
+    slots.flatMap { slot -> listOf("CharName$slot", "CharValue$slot") }

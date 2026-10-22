@@ -134,3 +134,17 @@ internal val MIGRATION_4_5 = object : Migration(4, 5) {
         )
     }
 }
+
+/**
+ * Where the cache stops holding tracks from DOC's deprecated dataset.
+ *
+ * The replacement service numbers its tracks differently, so the old rows would sit beside the new
+ * ones as apparent duplicates rather than being replaced. The tracks are the one service that moved;
+ * the huts, campsites and bike locations are untouched. A walker re-downloads an area to get tracks
+ * again, which is the same act that was always needed to refresh a cache.
+ */
+internal val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("DELETE FROM offline_doc_items WHERE source = 'tracks'")
+    }
+}
