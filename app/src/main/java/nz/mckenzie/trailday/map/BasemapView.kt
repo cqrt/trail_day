@@ -728,11 +728,28 @@ private fun applyLayerVisibility(
     hidden: Set<AssetLayer>,
     hiddenYourPlaces: Set<YourPlaceLayer> = emptySet()
 ) {
+    val tracksShown = AssetLayer.TRACKS !in hidden
+    val bikeTrailsShown = AssetLayer.BIKE_TRACKS !in hidden
+
     AssetLayer.ALL.forEach { layer ->
         DocLayerIds.idsOf(layer).forEach inner@{ id ->
             val target = style.getLayer(id) ?: return@inner
+            val shown = when (id) {
+                // The base line is every DOC track; the bike line and its casing fill in only
+                // when the base line is switched off, so a dual-use track is never drawn twice.
+                DocLayerIds.CASING, DocLayerIds.TRACKS ->
+                    DocTrackVisibility.baseTracksShown(tracksShown)
+
+                DocLayerIds.BIKE_CASING, DocLayerIds.BIKE_TRACKS ->
+                    DocTrackVisibility.bikeTracksShown(tracksShown, bikeTrailsShown)
+
+                DocLayerIds.BIKE_BADGES ->
+                    DocTrackVisibility.badgesShown(bikeTrailsShown)
+
+                else -> layer !in hidden
+            }
             target.setProperties(
-                PropertyFactory.visibility(if (layer in hidden) Property.NONE else Property.VISIBLE)
+                PropertyFactory.visibility(if (shown) Property.VISIBLE else Property.NONE)
             )
         }
     }
@@ -934,9 +951,12 @@ private fun addTrackNameLayer(style: Style) {
  * see the plan for where the reference layer gets its own control, if it ever does.
  */
 private fun addDocLayers(style: Style) {
-    addDocCasing(style, DocLayerIds.CASING, bikeFriendly = false)
+    // The base layer is every DOC track: a dual-use track is walkable too, and losing it because
+    // Bike trails is off is exactly the bug this two-layer split now avoids. The bike layer is the
+    // rideable subset, used when the base layer is switched off.
+    addDocCasing(style, DocLayerIds.CASING)
     addDocCasing(style, DocLayerIds.BIKE_CASING, bikeFriendly = true)
-    addLineLayer(style, DocLayerIds.TRACKS, AssetKind.TRACK, source = DOC_SOURCE, bikeFriendly = false)
+    addLineLayer(style, DocLayerIds.TRACKS, AssetKind.TRACK, source = DOC_SOURCE)
     addLineLayer(
         style,
         DocLayerIds.BIKE_TRACKS,
@@ -978,14 +998,14 @@ private fun addDocBikeBadgeLayer(style: Style) {
  * and pale scree alike, and the walker's own lines have no casing - so the casing is also what says, at
  * a glance, which lines are DOC's. The mock screens draw their track exactly this way.
  */
-private fun addDocCasing(style: Style, id: String, bikeFriendly: Boolean) {
+private fun addDocCasing(style: Style, id: String, bikeFriendly: Boolean? = null) {
     if (style.getLayer(id) != null) return
 
     val filters = mutableListOf(
         Expression.eq(Expression.get("kind"), Expression.literal(AssetKind.TRACK.name)),
         shapeIs(AssetShape.LINE)
     )
-    filters += bikeFriendlyFilter(bikeFriendly)
+    bikeFriendly?.let { filters += bikeFriendlyFilter(it) }
 
     style.addLayer(
         LineLayer(id, DOC_SOURCE)

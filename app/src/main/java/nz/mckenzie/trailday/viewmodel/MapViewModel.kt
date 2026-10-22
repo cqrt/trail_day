@@ -49,6 +49,7 @@ import nz.mckenzie.trailday.domain.doc.DocPick
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetStretch
 import nz.mckenzie.trailday.map.DocGeoJson
+import nz.mckenzie.trailday.map.DocTrackVisibility
 import nz.mckenzie.trailday.map.drawingKind
 import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.map.AssetHitTest
@@ -443,8 +444,18 @@ class MapViewModel(
                 bikes = items.filter { it.source == DocSource.BIKES }
             )
             items.filter { item ->
-                docLayerOf(item, links) !in hidden &&
-                    !(item.source == DocSource.BIKES && item.sourceRef in links.linkedBikeRefs)
+                val shown = if (item.source == DocSource.TRACKS) {
+                    // A dual-use track is walkable too: Tracks draws every track, and Bike trails
+                    // draws the rideable subset on its own when Tracks is off.
+                    DocTrackVisibility.lineShown(
+                        tracksShown = AssetLayer.TRACKS !in hidden,
+                        bikeTrailsShown = AssetLayer.BIKE_TRACKS !in hidden,
+                        bikeFriendly = item.sourceRef in links.linkedTrackRefs
+                    )
+                } else {
+                    layerOf(item.source.drawingKind()) !in hidden
+                }
+                shown && !(item.source == DocSource.BIKES && item.sourceRef in links.linkedBikeRefs)
             }
         }
         val item = withContext(Dispatchers.Default) { DocHitTest.nearest(held, lat, lng, radiusM) }
@@ -724,21 +735,6 @@ class MapViewModel(
     /** The switch that governs [kind]: one layer of the work per kind. */
     private fun layerOf(kind: AssetKind): AssetLayer? =
         AssetLayer.ALL.firstOrNull { it.kind == kind }
-
-    /**
-     * The switch that governs [item] on the reference layer.
-     *
-     * A DOC track is drawn as one of two layers depending on whether a bike point sits on it: the
-     * walking-only line under [AssetLayer.TRACKS], the rideable one under [AssetLayer.BIKE_TRACKS].
-     * Tapping the line or its bicycle badge must follow the same split, or a map showing only bike
-     * tracks would draw a track that can never answer a finger.
-     */
-    private fun docLayerOf(item: DocItem, links: DocBikeLinks): AssetLayer? =
-        if (item.source == DocSource.TRACKS && item.sourceRef in links.linkedTrackRefs) {
-            AssetLayer.BIKE_TRACKS
-        } else {
-            layerOf(item.source.drawingKind())
-        }
 
     /**
      * Hides or shows one layer of the work, leaving the others as they are.

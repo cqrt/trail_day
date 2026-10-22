@@ -35,9 +35,9 @@ class DocLayerIdsTest {
     }
 
     @Test
-    fun `DOC Tracks goes with the walking-only tracks, casing and all`() {
-        // The white casing is the line's own edge: leaving it behind would draw a white line along the
-        // ground where a track used to be.
+    fun `Tracks goes with the base DOC line, casing and all`() {
+        // The base layer is every DOC track, not only the walking-only ones. Its white casing is the
+        // line's own edge: leaving it behind would draw a white line where a track used to be.
         assertEquals(
             listOf(DocLayerIds.CASING, DocLayerIds.TRACKS),
             DocLayerIds.idsOf(AssetLayer.TRACKS)

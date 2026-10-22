@@ -617,8 +617,14 @@ action, and both hand the line to the recorder and change tab, so the walk start
 Nothing is copied: a followed DOC line never becomes a place. The chooser's way out, "Just record, no place", moved
 onto a strip of its own, because it looked like one more row of tracks and was not read as a choice.
 
+**Then Tracks stopped meaning walking-only.** A dual-use DOC track is walkable too, so hiding it because Bike trails was
+off was wrong. **Tracks** now draws every DOC track, including the rideable ones. **Bike trails** adds the bicycle
+badges, and draws the rideable subset on its own when Tracks is off - so a walker with Bike trails off keeps the
+dual-use tracks, and a rider with Tracks off still has lines to follow. A dual-use track is drawn once either way.
+Tapping follows the same table. It shipped as 0.3.32.
+
 **Then the layers drawer became two pages.** **Your map** holds Your Places and the place-name setting;
-**DOC** holds the reference tracks, bike trails, huts and campsites. The rows carry the same coloured kind
+**DOC** holds its tracks, bike trails, huts and campsites. The rows carry the same coloured kind
 tiles as the rest of the app, and Recordings and Place names got coloured tiles too rather than the
 monochrome ones they had. Switching page only changes which switches are in front of the walker; it never
 changes what is drawn. It shipped as 0.3.31.

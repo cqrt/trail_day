@@ -50,16 +50,26 @@ class MapDocPickTest {
     private lateinit var assetRepository: AssetRepository
 
     @Before
-    fun setUp() {
+    fun setUp() = runBlocking {
         context = ApplicationProvider.getApplicationContext()
         db = Room.inMemoryDatabaseBuilder(context, TrailDayDatabase::class.java).build()
         assetRepository = AssetRepository(db)
+        SettingsRepository(context).apply {
+            setHiddenMapLayers(emptySet())
+            setAllYourPlacesHidden(false)
+        }
+        Unit
     }
 
     @After
-    fun tearDown() {
-        // The position is a process-wide holder, so a test that sets it has to put it back.
+    fun tearDown() = runBlocking {
+        // The position and the switches are process-wide, so a test that sets them puts them back.
         DevicePosition.useForTest(null)
+        SettingsRepository(context).apply {
+            setHiddenMapLayers(emptySet())
+            setAllYourPlacesHidden(false)
+        }
+        Unit
     }
 
     /** A source that hands over the fixes it was given. */
@@ -208,7 +218,7 @@ class MapDocPickTest {
     @Test
     fun aRideableTrackIsTappableWhenOnlyBikeTracksAreShown() = runBlocking {
         // DOC publishes a track and a bike point sitting on it under the same name. The map draws
-        // that track under the Bike trails switch, so with Walking tracks off it must still answer a tap.
+        // that track under the Bike trails switch, so with Tracks off it must still answer a tap.
         val track = DocItem(
             source = DocSource.TRACKS,
             objectId = 70,
@@ -252,6 +262,83 @@ class MapDocPickTest {
         assertEquals("the rideable track answers under the bike switch", "Estuary ride", pick.item.name)
         assertEquals(DocSource.TRACKS, pick.item.source)
         assertNotNull("and the card knows it can be ridden", pick.bike)
+    }
+
+    @Test
+    fun aDualUseTrackIsStillTappableWithBikeTrailsOff() = runBlocking {
+        // The same pairing, but the walker is looking at Tracks with Bike trails off. The line is
+        // walkable, so it must still be there and still answer a finger.
+        val track = DocItem(
+            source = DocSource.TRACKS,
+            objectId = 80,
+            name = "Valley dual use",
+            paths = listOf(
+                listOf(
+                    GeoPoint(lat = -41.5000, lng = 173.9600),
+                    GeoPoint(lat = -41.5100, lng = 173.9700)
+                )
+            )
+        )
+        val bike = DocItem(
+            source = DocSource.BIKES,
+            objectId = 81,
+            name = "Valley dual use",
+            paths = listOf(listOf(GeoPoint(lat = -41.5000, lng = 173.9600)))
+        )
+        val docs = OfflineDocStore(dao = db.offlineDocItemDao(), downloader = DocDownloader(ArcGisDoc()))
+        docs.store(listOf(track, bike))
+        val settings = SettingsRepository(context)
+        settings.hideMapLayer(AssetLayer.BIKE_TRACKS, true)
+
+        val viewModel = MapViewModel(
+            assetRepository = assetRepository,
+            settingsRepository = settings,
+            locationSource = FakeLocation(emptyList()),
+            docStore = docs,
+            loadGeometry = { AssetGeometry.NONE }
+        )
+        withTimeout(5_000) {
+            viewModel.hiddenLayers.first { AssetLayer.BIKE_TRACKS in it }
+        }
+
+        viewModel.pickDocAt(-41.5001, 173.9601, DocHitTest.DEFAULT_TOLERANCE_M)
+
+        val pick = withTimeout(5_000) { viewModel.docPick.first { it != null } }!!
+        assertEquals("the track is walked as well as ridden", "Valley dual use", pick.item.name)
+    }
+
+    @Test
+    fun aWalkingOnlyTrackIsNotTappableInTheBikeOnlyView() = runBlocking {
+        val track = DocItem(
+            source = DocSource.TRACKS,
+            objectId = 90,
+            name = "Walking only",
+            paths = listOf(
+                listOf(
+                    GeoPoint(lat = -41.5000, lng = 173.9600),
+                    GeoPoint(lat = -41.5100, lng = 173.9700)
+                )
+            )
+        )
+        val docs = OfflineDocStore(dao = db.offlineDocItemDao(), downloader = DocDownloader(ArcGisDoc()))
+        docs.store(listOf(track))
+        val settings = SettingsRepository(context)
+        settings.hideMapLayer(AssetLayer.TRACKS, true)
+
+        val viewModel = MapViewModel(
+            assetRepository = assetRepository,
+            settingsRepository = settings,
+            locationSource = FakeLocation(emptyList()),
+            docStore = docs,
+            loadGeometry = { AssetGeometry.NONE }
+        )
+        withTimeout(5_000) {
+            viewModel.hiddenLayers.first { AssetLayer.TRACKS in it }
+        }
+
+        viewModel.pickDocAt(-41.5001, 173.9601, DocHitTest.DEFAULT_TOLERANCE_M)
+
+        assertNull("a walking-only track is not part of the bike-only view", viewModel.pickedDoc.value)
     }
 
     @Test

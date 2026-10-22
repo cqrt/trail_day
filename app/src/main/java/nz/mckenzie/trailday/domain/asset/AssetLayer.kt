@@ -8,10 +8,11 @@ package nz.mckenzie.trailday.domain.asset
  * underneath that work. The reason to hide a layer is still to read another: a network of DOC tracks
  * under a set of spots is noise, and a scatter of spots buries the one DOC hut being looked for.
  *
- * **DOC Tracks and Bike trails are separate halves of DOC's lines.** Walking tracks hides the
- * walking-only tracks, and Bike trails hides the rideable ones and their badges; switching one off
- * does not switch the other off. The walker's own bike tracks are not here - they are under
- * [YourPlaceLayer.BIKE_TRACKS].
+ * **Tracks and Bike trails are two views of DOC's lines, not two exclusive halves.** Tracks is
+ * every DOC track, including the dual-use ones; Bike trails adds the bicycle badges, and draws the
+ * rideable subset when Tracks is off. A walker with Tracks on therefore never loses a dual-use track
+ * because Bike trails is off, and a rider with Tracks off still has a map with lines on it. The
+ * walker's own bike tracks are not here - they are under [YourPlaceLayer.BIKE_TRACKS].
  *
  * [kind] is the kind the layer is drawn as, which is what the map's own style filters on and what
  * the marker's shape and colour are read from.
@@ -31,7 +32,7 @@ enum class AssetLayer(
 ) {
     TRACKS(
         id = "tracks",
-        displayName = "Walking tracks",
+        displayName = "Tracks",
         kind = AssetKind.TRACK
     ),
 
