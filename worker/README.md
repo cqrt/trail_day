@@ -31,22 +31,30 @@ Every route is read-only. The Worker is not a general pass-through.
    npx wrangler secret put DOC_API_KEY
    ```
 
-3. Make sure `trailday.app` is a zone in the same Cloudflare account. The custom domain
-   `doc-api.trailday.app` is declared in `wrangler.jsonc`.
-
-4. Deploy:
+3. Deploy. `wrangler.jsonc` uses Cloudflare's free `workers.dev` URL, so no domain is needed:
 
    ```text
    npm run deploy
    ```
 
+4. Wrangler prints the URL it deployed to, like:
+
+   ```text
+   https://trailday-doc-proxy.your-name.workers.dev
+   ```
+
+   Put that URL in the app's `DocProxyDetails.BASE_URL` and ship a release.
+
 5. Try it:
 
    ```text
-   curl https://doc-api.trailday.app/v1/health
-   curl "https://doc-api.trailday.app/v1/lookup?name=Piwakawaka%20Track&lat=-41.05&lon=173.77"
-   curl https://doc-api.trailday.app/v1/track/000a09c6-dfde-4dfe-ba62-af4c7e6045ed/detail
+   curl https://trailday-doc-proxy.your-name.workers.dev/v1/health
+   curl "https://trailday-doc-proxy.your-name.workers.dev/v1/lookup?name=Piwakawaka%20Track&lat=-41.05&lon=173.77"
+   curl https://trailday-doc-proxy.your-name.workers.dev/v1/track/000a09c6-dfde-4dfe-ba62-af4c7e6045ed/detail
    ```
+
+   A custom domain can replace the `workers.dev` URL later by adding a `routes` block back to
+   `wrangler.jsonc`.
 
 ## Rate limiting
 

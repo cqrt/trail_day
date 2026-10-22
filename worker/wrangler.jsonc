@@ -6,12 +6,7 @@
   "observability": {
     "enabled": true
   },
-  "routes": [
-    {
-      "pattern": "doc-api.trailday.app",
-      "custom_domain": true
-    }
-  ],
+  "workers_dev": true,
   "ratelimits": [
     {
       "name": "RATE_LIMITER",
