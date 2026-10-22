@@ -5,7 +5,9 @@ import nz.mckenzie.trailday.domain.doc.DocCompanion
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.DocQuery
+import nz.mckenzie.trailday.domain.doc.DocTrackCompanion
 import nz.mckenzie.trailday.domain.doc.pictureWhere
+import nz.mckenzie.trailday.domain.doc.withCompanion
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -191,6 +193,42 @@ class DocDownloaderTest {
             track.pictureUrl
         )
         assertEquals("and the line's own facts are still there", "Walking Track", track.kind)
+    }
+
+    /** An enricher that adds one API fact, or refuses to answer at all. */
+    private class Enriching(private val fail: Boolean = false) : DocEnricher {
+        override suspend fun enrich(items: List<DocItem>): List<DocItem> {
+            if (fail) error("no proxy")
+            return items.map { item ->
+                if (item.source == DocSource.TRACKS) {
+                    item.withCompanion(DocTrackCompanion(permittedActivities = "Walking and tramping"))
+                } else {
+                    item
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `an area download lets the proxy add its richer facts`() {
+        val download = runBlocking {
+            DocDownloader(WithCompanion(), enricher = Enriching()).downloadArea(box)
+        }
+
+        val track = download.items.single { it.source == DocSource.TRACKS }
+        assertEquals("Walking and tramping", track.permittedActivities)
+        assertEquals("and the public summary is still there", "A gentle walk through native bush.", track.introduction)
+    }
+
+    @Test
+    fun `an enricher that cannot answer leaves the layers' own facts alone`() {
+        val download = runBlocking {
+            DocDownloader(WithCompanion(), enricher = Enriching(fail = true)).downloadArea(box)
+        }
+
+        val track = download.items.single { it.source == DocSource.TRACKS }
+        assertEquals("A gentle walk through native bush.", track.introduction)
+        assertEquals(null, track.permittedActivities)
     }
 
     @Test

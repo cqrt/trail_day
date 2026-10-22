@@ -336,7 +336,7 @@ class DocBrowserViewModel(
                         // The same cache the offline screen downloads into.
                         cache = OfflineDocStore(
                             dao = database.offlineDocItemDao(),
-                            downloader = DocDownloader(ArcGisDoc())
+                            downloader = DocDownloader.online()
                         )
                     )
                 }

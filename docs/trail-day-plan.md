@@ -816,3 +816,5 @@ The key cannot live in the APK, so a small Cloudflare Worker at `doc-api.trailda
 **Then the proxy got its own address.** The Worker deployed to Cloudflare's free
 `trailday-doc-proxy.le-mckenzies.workers.dev`, and the app's `DocProxyDetails` points at it. No domain
 was needed. It shipped as 0.3.37.
+
+**Then the API facts came offline too.** A new Worker route, `POST /v1/enrich`, takes a batch of up to 40 tracks (the app's own key, name and midpoint), matches each to an `assetId`, and returns the cached detail. The offline download now sends its tracks through that route after the public layers arrive and before the cache is written, so an area downloaded with the proxy carries the API's introduction, exact time, difficulty, permitted activities, wheelchair/buggy notes, mountain-bike and kayaking fields, fuller dog rules, location and region. A track the proxy cannot answer for keeps the public layer's summary, and a download with no proxy is unchanged. Alerts stay live. It shipped as 0.3.38.

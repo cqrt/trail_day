@@ -37,7 +37,6 @@ import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.domain.tiles.withMinimumSpan
 import nz.mckenzie.trailday.map.AssetColors
-import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDetailReader
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.doc.DocProxyDetails
@@ -852,7 +851,7 @@ class MapViewModel(
                         locationSource = FusedLocationSource(appContext),
                         docStore = OfflineDocStore(
                             dao = TrailDayDatabase.get(appContext).offlineDocItemDao(),
-                            downloader = DocDownloader(ArcGisDoc())
+                            downloader = DocDownloader.online()
                         ),
                         // The places a walk has been made of, read from the trips themselves: a trip deleted
                         // puts its line back to what it was, with nothing to remember on the place.

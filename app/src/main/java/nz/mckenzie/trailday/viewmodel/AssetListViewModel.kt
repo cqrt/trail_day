@@ -22,7 +22,6 @@ import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.tracking.DevicePosition
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.domain.asset.AssetKind
@@ -248,7 +247,7 @@ class AssetListViewModel(
                         // The tracks DOC has published for this area, for the nearby group.
                         docStore = OfflineDocStore(
                             dao = TrailDayDatabase.get(appContext).offlineDocItemDao(),
-                            downloader = DocDownloader(ArcGisDoc())
+                            downloader = DocDownloader.online()
                         )
                     )
                 }

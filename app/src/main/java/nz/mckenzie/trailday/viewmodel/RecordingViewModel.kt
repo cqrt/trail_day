@@ -28,7 +28,6 @@ import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
@@ -848,7 +847,7 @@ class RecordingViewModel(
                         // What DOC has published for this area, so the chooser can offer its tracks.
                         docStore = OfflineDocStore(
                             dao = database.offlineDocItemDao(),
-                            downloader = DocDownloader(ArcGisDoc())
+                            downloader = DocDownloader.online()
                         ),
                         initialTargetId = initialTargetId
                     )

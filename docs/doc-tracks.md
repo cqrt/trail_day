@@ -41,6 +41,11 @@ geometry and for offline area downloads. The app matches an API record to an Arc
 plus position, and falls back to the companion layer and alert endpoint when the proxy is
 unavailable.
 
+An **offline area download** also uses the proxy: `POST /v1/enrich` takes up to 40 tracks per request
+and returns their details, so the cached track carries the same richer facts as the online page. A
+track the proxy cannot answer for keeps the public layer's summary, and a download with no proxy is
+unchanged. Alerts are not cached; they are checked live when a card is shown.
+
 ## How it searches
 
 Searching happens at DOC; the phone never downloads the whole network. A search is an ArcGIS REST

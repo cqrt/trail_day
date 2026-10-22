@@ -49,24 +49,42 @@ object DocProxyJson {
 
     /** A track's detail as the website summary the rest of the app already reads. */
     fun detail(text: String): DocTrackCompanion? = runCatching {
-        val root = Json.parseToJsonElement(text).jsonObject
-        DocTrackCompanion(
-            introduction = root.text("introduction")?.let(DocText::plain),
-            difficulty = root.array("walkTrackCategory")?.firstOrNull(),
-            completionTime = root.text("walkDuration"),
-            webPage = root.text("staticLink"),
-            thumbnail = root.text("introductionThumbnail"),
-            walkingDuration = root.array("walkDurationCategory")?.firstOrNull(),
-            permittedActivities = root.array("permittedActivities")?.joinToString(", "),
-            wheelchairsAndBuggies = root.text("wheelchairsAndBuggies")?.let(DocText::plain),
-            mtbDuration = root.text("mtbDuration"),
-            mtbCategory = root.array("mtbTrackCategory")?.firstOrNull(),
-            kayakingDuration = root.text("kayakingDuration"),
-            dogsAllowed = root.text("dogsAllowed")?.let(DocText::plain),
-            place = root.text("locationString"),
-            region = root.array("region")?.joinToString(", ")
-        )
+        detailOf(Json.parseToJsonElement(text).jsonObject)
     }.getOrNull()
+
+    /**
+     * The batch enrich answer, by the key the app asked with.
+     *
+     * A track the proxy could not match, or could not read, is simply absent: the caller keeps what
+     * the public layers already gave it.
+     */
+    fun enriched(text: String): Map<String, DocTrackCompanion> = runCatching {
+        val root = Json.parseToJsonElement(text).jsonObject
+        val tracks = (root["tracks"] as? JsonArray).orEmpty()
+        tracks.mapNotNull { element ->
+            val entry = element as? JsonObject ?: return@mapNotNull null
+            val key = entry.text("key") ?: return@mapNotNull null
+            val detail = entry["detail"] as? JsonObject ?: return@mapNotNull null
+            key to detailOf(detail)
+        }.toMap()
+    }.getOrDefault(emptyMap())
+
+    private fun detailOf(root: JsonObject): DocTrackCompanion = DocTrackCompanion(
+        introduction = root.text("introduction")?.let(DocText::plain),
+        difficulty = root.array("walkTrackCategory")?.firstOrNull(),
+        completionTime = root.text("walkDuration"),
+        webPage = root.text("staticLink"),
+        thumbnail = root.text("introductionThumbnail"),
+        walkingDuration = root.array("walkDurationCategory")?.firstOrNull(),
+        permittedActivities = root.array("permittedActivities")?.joinToString(", "),
+        wheelchairsAndBuggies = root.text("wheelchairsAndBuggies")?.let(DocText::plain),
+        mtbDuration = root.text("mtbDuration"),
+        mtbCategory = root.array("mtbTrackCategory")?.firstOrNull(),
+        kayakingDuration = root.text("kayakingDuration"),
+        dogsAllowed = root.text("dogsAllowed")?.let(DocText::plain),
+        place = root.text("locationString"),
+        region = root.array("region")?.joinToString(", ")
+    )
 
     /** One track's alerts. */
     fun alerts(text: String): List<DocAlert> = runCatching {

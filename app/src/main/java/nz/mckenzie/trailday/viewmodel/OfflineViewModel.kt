@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
@@ -194,7 +193,7 @@ class OfflineViewModel(
                         // fall back to when the service cannot be reached.
                         docStore = OfflineDocStore(
                             dao = database.offlineDocItemDao(),
-                            downloader = DocDownloader(ArcGisDoc())
+                            downloader = DocDownloader.online()
                         )
                     )
                 }

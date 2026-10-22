@@ -35,7 +35,6 @@ import nz.mckenzie.trailday.R
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.offline.LocalTileServer
@@ -193,7 +192,7 @@ class WebEditorService : Service() {
             // DOC cannot be reached - the same cache the offline screen fills.
             docCache = OfflineDocStore(
                 dao = database.offlineDocItemDao(),
-                downloader = DocDownloader(ArcGisDoc())
+                downloader = DocDownloader.online()
             )
         )
 

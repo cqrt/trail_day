@@ -21,7 +21,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.doc.DocInventory
 import nz.mckenzie.trailday.domain.doc.DocBounds
@@ -451,7 +450,7 @@ class OfflineAreaPickerViewModel(
                         // The tracks the DOC browser falls back to when the service cannot be reached.
                         docStore = OfflineDocStore(
                             dao = database.offlineDocItemDao(),
-                            downloader = DocDownloader(ArcGisDoc())
+                            downloader = DocDownloader.online()
                         ),
                         mode = mode,
                         aroundAssetId = aroundAssetId

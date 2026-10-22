@@ -61,7 +61,15 @@ data class DocAreaDownload(
  */
 class DocDownloader(
     private val reader: DocReader,
-    private val pageSize: Int = PAGE
+    private val pageSize: Int = PAGE,
+    /**
+     * The richer facts for the tracks that arrived, when a source has any to add.
+     *
+     * The public layers are the fallback and the geometry; the proxy is what carries DOC's website
+     * facts into an offline area. A download with no enricher - a test, or a build with no proxy -
+     * keeps exactly what the layers sent.
+     */
+    private val enricher: DocEnricher = DocEnricher.None
 ) {
 
     /**
@@ -103,7 +111,10 @@ class DocDownloader(
         } else {
             items
         }
-        return DocAreaDownload(items = withSummaries, counts = counts, failed = failed)
+        // The proxy is the richer source, and it is optional: a download that cannot reach it keeps
+        // the website summary the public layer already gave each track.
+        val enriched = runCatching { enricher.enrich(withSummaries) }.getOrDefault(withSummaries)
+        return DocAreaDownload(items = enriched, counts = counts, failed = failed)
     }
 
     /**
@@ -182,6 +193,15 @@ class DocDownloader(
     }
 
     companion object {
+        /**
+         * The downloader the app uses: DOC's layers, enriched through the Trail Day proxy.
+         *
+         * A named constructor rather than a default argument, because the enricher is the one thing
+         * every screen's factory would otherwise have to remember to pass.
+         */
+        fun online(reader: DocReader = ArcGisDoc()): DocDownloader =
+            DocDownloader(reader, enricher = DocProxyEnricher())
+
         /** The service's own ceiling per request, so one page is one request. */
         const val PAGE = 2000
 

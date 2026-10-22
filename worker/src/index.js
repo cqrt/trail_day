@@ -11,10 +11,13 @@ import { findTrack, toAlerts, toIndex } from "./transform.js";
  */
 export default {
   async fetch(request, env, ctx) {
-    if (request.method !== "GET") return json({ error: "Only GET is supported" }, 405);
-
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
+    const isEnrich = path === "/v1/enrich";
+
+    if (request.method !== "GET" && !(isEnrich && request.method === "POST")) {
+      return json({ error: "Only GET is supported" }, 405);
+    }
 
     const limited = await rateLimited(request, env);
     if (limited) return limited;
@@ -24,6 +27,8 @@ export default {
     }
 
     if (path === "/v1/health") return json({ ok: true, service: "trailday-doc-proxy" });
+
+    if (isEnrich) return enrichRoute(request, env, ctx);
 
     if (path === "/v1/index") return indexRoute(request, env, ctx);
 
@@ -71,13 +76,71 @@ async function lookupRoute(request, env, ctx) {
 
 async function detailRoute(id, env, ctx) {
   if (!isTrackId(id)) return json({ error: "Not a track id" }, 400);
+  const value = await detailValue(id, env, ctx);
+  if (!value.ok) return json({ error: value.message }, value.status);
+  return json(value.data, 200, 86400);
+}
+
+/**
+ * Enriches a batch of tracks in one app request.
+ *
+ * The app sends its own key for each track plus a name and a point; the Worker matches each to an
+ * `assetId` and returns the detail it already caches. The batch is capped well below Cloudflare's
+ * free-plan subrequest limit, so a whole area is several small requests rather than one that dies.
+ */
+async function enrichRoute(request, env, ctx) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Expected a JSON body" }, 400);
+  }
+
+  const asked = Array.isArray(body?.tracks) ? body.tracks : [];
+  if (!asked.length) return json({ tracks: [] });
+  if (asked.length > MAX_ENRICH) {
+    return json({ error: `Send at most ${MAX_ENRICH} tracks at a time` }, 413);
+  }
+
+  const index = await indexValue(env, ctx);
+  if (!index.ok) return json({ error: index.message }, index.status);
+
+  const found = await mapWithConcurrency(asked, ENRICH_CONCURRENCY, async (entry) => {
+    const key = typeof entry?.key === "string" ? entry.key : null;
+    if (!key) return null;
+    const match = findTrack(index.data, entry?.name, Number(entry?.lat), Number(entry?.lon));
+    if (!match) return null;
+    const detail = await detailValue(match.assetId, env, ctx);
+    if (!detail.ok) return null;
+    return { key, assetId: match.assetId, detail: detail.data };
+  });
+
+  return json({ tracks: found.filter(Boolean) });
+}
+
+/** One track's detail from the cache, or fetched and cached. */
+async function detailValue(id, env, ctx) {
   return cached(ctx, cacheKey(`detail/${id}`), 86400, async () => {
     const answer = await upstream(
       env,
       `/tracks/${encodeURIComponent(id)}/detail?coordinates=wgs84&mode=line`
     );
     return answer;
+  }, { asValue: true });
+}
+
+/** Runs [work] over [items] with at most [limit] in flight at once. */
+async function mapWithConcurrency(items, limit, work) {
+  const results = new Array(items.length).fill(null);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await work(items[index]);
+    }
   });
+  await Promise.all(workers);
+  return results;
 }
 
 async function trackAlertsRoute(id, env, ctx) {
@@ -223,3 +286,9 @@ function cacheKey(part) {
 function isTrackId(id) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 }
+
+/** Tracks per enrich request: under Cloudflare's free-plan subrequest limit, with room for the index. */
+const MAX_ENRICH = 40;
+
+/** Detail reads in flight at once, so one batch does not open forty connections at DOC. */
+const ENRICH_CONCURRENCY = 5;

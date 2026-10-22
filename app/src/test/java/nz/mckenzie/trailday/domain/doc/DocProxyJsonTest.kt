@@ -79,6 +79,35 @@ class DocProxyJsonTest {
     }
 
     @Test
+    fun `a batch enrich answer is read by the key the app asked with`() {
+        val details = DocProxyJson.enriched(
+            """
+            {"tracks":[
+              {"key":"doc-tracks:2879735","assetId":"000a09c6","detail":{
+                "introduction":"A gentle walk.",
+                "walkDuration":"45 min",
+                "walkDurationCategory":["1-4 hours"],
+                "walkTrackCategory":["Easy"],
+                "permittedActivities":["Walking and tramping"],
+                "dogsAllowed":"Dogs on a leash only.",
+                "region":["Marlborough"],
+                "staticLink":"https://www.doc.govt.nz/link/example.aspx"
+              }},
+              {"key":"doc-tracks:999","assetId":null,"detail":null}
+            ]}
+            """.trimIndent()
+        )
+
+        val detail = details["doc-tracks:2879735"]
+        assertEquals("A gentle walk.", detail?.introduction)
+        assertEquals("Easy", detail?.difficulty)
+        assertEquals("45 min", detail?.completionTime)
+        assertEquals("Walking and tramping", detail?.permittedActivities)
+        assertEquals("Marlborough", detail?.region)
+        assertEquals(null, details["doc-tracks:999"])
+    }
+
+    @Test
     fun `a bulk alert answer is read track by track`() {
         val tracks = DocProxyJson.alertTracks(
             """

@@ -11,8 +11,13 @@ The app calls this Worker; the Worker adds `x-api-key` and forwards only the rou
 | `GET /v1/index` | `/v1/tracks`, trimmed to `assetId`, `name`, `region`, `lon`, `lat` | 24 h |
 | `GET /v1/lookup?name=…&lat=…&lon=…` | matched against the index | 24 h |
 | `GET /v1/track/{id}/detail` | `/v1/tracks/{id}/detail?coordinates=wgs84&mode=line` | 24 h |
-| `GET /v1/track/{id}/alerts` | `/v1/tracks/{id}/alerts` | 5 min |
+| `GET /v1/track/{id}/alerts` | read from the bulk alert feed | 5 min |
 | `GET /v1/alerts` | `/v1/tracks/alerts` | 5 min |
+| `POST /v1/enrich` | a batch of details for an offline download | 24 h per track |
+
+`POST /v1/enrich` takes `{"tracks":[{"key":"…","name":"…","lat":…,"lon":…}]}`, at most 40 at a
+time, and answers with the matching detail for each key. The app sends one batch per 40 tracks when
+it downloads an area, so the offline copy carries the same facts as the online page.
 
 Every route is read-only. The Worker is not a general pass-through.
 
