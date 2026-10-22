@@ -2,6 +2,9 @@ package nz.mckenzie.trailday.doc
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import nz.mckenzie.trailday.domain.doc.DocBounds
+import nz.mckenzie.trailday.domain.doc.DocCompanion
+import nz.mckenzie.trailday.domain.doc.DocCompanionJson
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocJson
 import nz.mckenzie.trailday.domain.doc.DocQuery
@@ -17,6 +20,19 @@ sealed interface DocReadResult {
 
     /** The question could not be asked, and [message] says why in words the walker can read. */
     data class Failed(val message: String) : DocReadResult
+}
+
+/** What reading DOC's website summaries for an area came back with. */
+sealed interface DocCompanionResult {
+
+    /** The points that arrived. Empty is a real answer: the area has no walking experiences. */
+    data class Found(val companions: List<DocCompanion>) : DocCompanionResult
+
+    /** The read stopped short; [companions] are the pages that did arrive before it did. */
+    data class Failed(
+        val message: String,
+        val companions: List<DocCompanion> = emptyList()
+    ) : DocCompanionResult
 }
 
 /** What asking one of DOC's services **how many** records it has came back with. */
@@ -49,6 +65,15 @@ interface DocReader {
         query: DocQuery,
         where: String = DocUrl.where(query.source, query.nameContains)
     ): DocCountResult
+
+    /**
+     * The website summaries for walking experiences in [bounds], one point per page.
+     *
+     * A reader that has no companion layer - a fake in a test, or another build's reader - answers
+     * with none, so a download still works and simply keeps the tracks as the line service sent them.
+     */
+    suspend fun companions(bounds: DocBounds): DocCompanionResult =
+        DocCompanionResult.Found(emptyList())
 }
 
 /**
@@ -99,6 +124,61 @@ class ArcGisDoc(
         }
     }
 
+    override suspend fun companions(bounds: DocBounds): DocCompanionResult =
+        withContext(Dispatchers.IO) {
+            val all = mutableListOf<DocCompanion>()
+            var offset = 0
+            while (true) {
+                val result = runCatching {
+                    val url = DocUrl.companions(bounds, offset, COMPANION_PAGE)
+                    val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                        requestMethod = "GET"
+                        connectTimeout = connectTimeoutMs
+                        readTimeout = readTimeoutMs
+                        setRequestProperty("Accept", "application/json")
+                        setRequestProperty("User-Agent", USER_AGENT)
+                    }
+                    try {
+                        val status = connection.responseCode
+                        if (status != HttpURLConnection.HTTP_OK) {
+                            return@runCatching DocCompanionResult.Failed(
+                                "DOC's track details answered HTTP $status.",
+                                all.toList()
+                            )
+                        }
+                        val body = connection.inputStream.use { it.readBytes().decodeToString() }
+                        DocCompanionResult.Found(DocCompanionJson.parse(body))
+                    } finally {
+                        connection.disconnect()
+                    }
+                }.getOrElse { error ->
+                    DocCompanionResult.Failed(
+                        error.message ?: error::class.java.simpleName,
+                        all.toList()
+                    )
+                }
+
+                when (result) {
+                    is DocCompanionResult.Failed ->
+                        return@withContext if (all.isEmpty()) {
+                            result
+                        } else {
+                            DocCompanionResult.Failed(result.message, all.toList())
+                        }
+
+                    is DocCompanionResult.Found -> {
+                        all += result.companions
+                        if (result.companions.size < COMPANION_PAGE || all.size >= COMPANION_MAX) {
+                            return@withContext DocCompanionResult.Found(all)
+                        }
+                        offset += result.companions.size
+                    }
+                }
+            }
+            @Suppress("UNREACHABLE_CODE")
+            DocCompanionResult.Found(all)
+        }
+
     override suspend fun count(query: DocQuery, where: String): DocCountResult =
         withContext(Dispatchers.IO) {
             runCatching {
@@ -133,5 +213,11 @@ class ArcGisDoc(
 
     companion object {
         const val USER_AGENT = "TrailDay-Android"
+
+        /** One page of website summaries; the same ceiling DOC's feature services use. */
+        private const val COMPANION_PAGE = 2000
+
+        /** Where reading the website summaries stops, whatever the box. */
+        private const val COMPANION_MAX = 4000
     }
 }

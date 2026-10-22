@@ -43,7 +43,8 @@ enum class IconGlyph {
     LAYERS,
     SEARCH,
     CLOSE,
-    PLUS
+    PLUS,
+    ALERT
 }
 
 /**
@@ -106,6 +107,19 @@ internal fun AppIcon(
             IconGlyph.PLUS -> {
                 line(0.50f, 0.22f, 0.50f, 0.78f)
                 line(0.22f, 0.50f, 0.78f, 0.50f)
+            }
+
+            // A warning triangle, with its exclamation.
+            IconGlyph.ALERT -> {
+                val triangle = Path().apply {
+                    moveTo(width * 0.50f, height * 0.12f)
+                    lineTo(width * 0.90f, height * 0.86f)
+                    lineTo(width * 0.10f, height * 0.86f)
+                    close()
+                }
+                drawPath(triangle, tint, style = Stroke(width = stroke))
+                line(0.50f, 0.38f, 0.50f, 0.60f)
+                bobble(0.50f, 0.70f, radius = dot * 0.8f)
             }
 
             IconGlyph.BACK -> {

@@ -1,6 +1,7 @@
 package nz.mckenzie.trailday.doc
 
 import nz.mckenzie.trailday.domain.doc.DocBounds
+import nz.mckenzie.trailday.domain.doc.DocCompanion
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.DocQuery
@@ -133,6 +134,63 @@ class DocDownloaderTest {
             download.counts
         )
         assertTrue("with nothing left unread", download.failed.isEmpty())
+    }
+
+    /** A reader whose area has one track, and a website summary for it. */
+    private class WithCompanion : DocReader {
+        override suspend fun search(query: DocQuery): DocReadResult =
+            if (query.source == DocSource.TRACKS) {
+                DocReadResult.Found(
+                    listOf(
+                        DocItem(
+                            source = DocSource.TRACKS,
+                            objectId = 1,
+                            name = "Forks Flat Tk",
+                            paths = listOf(
+                                listOf(GeoPoint(-46.1282, 168.6067), GeoPoint(-46.13, 168.61))
+                            ),
+                            facts = mapOf("SubObjectType" to "Walking Track")
+                        )
+                    )
+                )
+            } else {
+                DocReadResult.Found(emptyList())
+            }
+
+        override suspend fun count(query: DocQuery, where: String): DocCountResult =
+            DocCountResult.Done(0)
+
+        override suspend fun companions(bounds: DocBounds): DocCompanionResult =
+            DocCompanionResult.Found(
+                listOf(
+                    DocCompanion(
+                        name = "Forks Flat Track",
+                        point = GeoPoint(-46.1282, 168.6067),
+                        introduction = "A gentle walk through native bush.",
+                        difficulty = "Easy",
+                        completionTime = "1 hour",
+                        webPage = "https://www.doc.govt.nz/link/example.aspx",
+                        thumbnail = "https://www.doc.govt.nz/images/example.jpg"
+                    )
+                )
+            )
+    }
+
+    @Test
+    fun `an area download folds each track's website summary into its facts`() {
+        val download = runBlocking { DocDownloader(WithCompanion()).downloadArea(box) }
+
+        val track = download.items.single { it.source == DocSource.TRACKS }
+        assertEquals("A gentle walk through native bush.", track.introduction)
+        assertEquals("Easy", track.difficulty)
+        assertEquals("1 hour", track.completionTime)
+        assertEquals("https://www.doc.govt.nz/link/example.aspx", track.link)
+        assertEquals(
+            "the website picture travels with the track, so the area's pictures can keep it",
+            "https://www.doc.govt.nz/images/example.jpg",
+            track.pictureUrl
+        )
+        assertEquals("and the line's own facts are still there", "Walking Track", track.kind)
     }
 
     @Test

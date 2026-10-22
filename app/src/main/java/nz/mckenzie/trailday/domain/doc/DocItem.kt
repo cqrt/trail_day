@@ -79,16 +79,27 @@ data class DocItem(
      * reading slot one: the service makes no promise about the order, and a track whose type is in
      * slot seven is not a track without one.
      */
-    val trackType: String?
-        get() {
-            val slots = DocSource.CHARACTERISTIC_SLOTS
-            for (slot in 1..slots) {
-                if (facts["CharName$slot"] == DocSource.TRACK_TYPE_CHARACTERISTIC) {
-                    return fact("CharValue$slot")
-                }
-            }
-            return null
+    val trackType: String? get() = characteristic(DocSource.TRACK_TYPE_CHARACTERISTIC)
+
+    /** The walking time DOC publishes in its own range, such as "1-4 hours". */
+    val walkingDuration: String? get() = characteristic("WEB_WALKING_DURATION")
+
+    /** What DOC permits on the track, when it filled the slot in. */
+    val permittedActivities: String? get() = characteristic("WEB_PERMITTED_ACTIVITIES")
+
+    /** The track's own status, such as "OPEN". */
+    val status: String? get() = fact("status") ?: characteristic("USER_STATUS")
+
+    /**
+     * The one value under [name] in DOC's free name-and-value slots, or null when the row did not use
+     * that slot. Tracks are the only service that publishes these.
+     */
+    fun characteristic(name: String): String? {
+        for (slot in 1..DocSource.CHARACTERISTIC_SLOTS) {
+            if (facts["CharName$slot"] == name) return fact("CharValue$slot")
         }
+        return null
+    }
 
     /** The site code DOC uses for a track's place. Tracks only, and only to work out the place. */
     val flocId: String? get() = fact("FlocID")
@@ -118,8 +129,18 @@ data class DocItem(
     /** What DOC says about the place in prose, for a campsite or a bike location. */
     val introduction: String? get() = DocText.plain(fact("introduction"))
 
+    /** What DOC says can be done here, for a campsite. */
+    val activities: String? get() = DocText.plain(fact("activities"))
+
+    /** How to get to the place, for a campsite. */
+    val access: String? get() = DocText.plain(fact("access"))
+
+    /** The landscape a campsite sits in. */
+    val landscape: String? get() = DocText.plain(fact("landscape"))
+
     /** Whether dogs are allowed here: DOC's words, which differ from site to site. */
-    val dogsAllowed: String? get() = DocText.plain(fact("dogsAllowed"))
+    val dogsAllowed: String? get() =
+        DocText.plain(fact("dogsAllowed") ?: characteristic("WEB_DOGS_ALLOWED"))
 
     /** The sites a campsite has, and how many of them have power. */
     val unpoweredSites: Int? get() = fact("numberOfUnpoweredSites")?.toIntOrNull()
@@ -130,6 +151,9 @@ data class DocItem(
 
     /** How long DOC says the ride takes, as it wrote it: "3 hr". */
     val bikingTime: String? get() = fact("bikingTime")
+
+    /** How long DOC's website says the track takes to complete, when it has said. */
+    val completionTime: String? get() = fact("completionTime")
 
     /**
      * What DOC says about alerts, which is **not** whether there are any.
@@ -149,7 +173,8 @@ data class DocItem(
      * Two fields because two services publish it under different names, and the walker's question is
      * the same one either way.
      */
-    val link: String? get() = fact("staticLink") ?: fact("mountainBikingTrackWebPage")
+    val link: String? get() =
+        fact("staticLink") ?: fact("walkingAndTrampingWebPage") ?: fact("mountainBikingTrackWebPage")
 
     /** One fact, trimmed, or null when DOC sent nothing or nothing but spaces. */
     private fun fact(field: String): String? = facts[field]?.trim()?.takeIf { it.isNotEmpty() }

@@ -67,7 +67,9 @@ import nz.mckenzie.trailday.domain.asset.AssetLayer
 import nz.mckenzie.trailday.domain.asset.AssetPhrase
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.asset.YourPlaceLayer
+import nz.mckenzie.trailday.domain.doc.DocAlertsState
 import nz.mckenzie.trailday.domain.doc.DocBikeLinks
+import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocPick
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.viewmodel.PendingFollow
@@ -92,7 +94,8 @@ fun MapScreen(
     viewModel: MapViewModel,
     onOpenTab: (Tab) -> Unit = {},
     onOpenSettings: () -> Unit = {},
-    onOpenAsset: (Long) -> Unit = {}
+    onOpenAsset: (Long) -> Unit = {},
+    onOpenDocDetail: (DocItem, DocItem?) -> Unit = { _, _ -> }
 ) {
     val apiKey by viewModel.linzApiKey.collectAsStateWithLifecycle()
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
@@ -110,6 +113,7 @@ fun MapScreen(
     val yourTracksGeoJson by viewModel.yourTracksGeoJson.collectAsStateWithLifecycle()
     val placeNames by viewModel.placeNames.collectAsStateWithLifecycle()
     val docPick by viewModel.docPick.collectAsStateWithLifecycle()
+    val docAlerts by viewModel.pickedDocAlerts.collectAsStateWithLifecycle()
     val places by viewModel.assets.collectAsStateWithLifecycle()
     val recordedPlaces by viewModel.recordedPlaces.collectAsStateWithLifecycle()
 
@@ -204,7 +208,12 @@ fun MapScreen(
                         // The map says so itself when DOC has nothing there: the card goes away rather
                         // than growing a nearest-thing answer nobody asked for.
                         viewModel.clearPickedPlace()
-                        mapScope.launch { viewModel.pickDocAt(lat, lng, radiusM) }
+                        mapScope.launch {
+                            val picked = viewModel.pickDocAt(lat, lng, radiusM)
+                            if (picked != null) {
+                                onOpenDocDetail(picked, viewModel.bikeFor(picked))
+                            }
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxSize()
@@ -275,6 +284,7 @@ fun MapScreen(
                     // screen.
                     DocCard(
                         pick = picked,
+                        alerts = docAlerts,
                         onClose = viewModel::clearPickedDoc,
                         onFollow = {
                             // The recorder takes it from here: the walk starts on the screen that asks about
@@ -861,14 +871,16 @@ private fun PlaceCard(
  * What DOC publishes, as the walker tapped it: the kind of thing, its name, DOC's own facts about it, and how
  * far the phone is from it now.
  *
- * **A card and no more.** This material is not the walker's to change and has no page of its own; the header
- * says whose it is, and nothing else on the card needs to. The facts are the phone's own words for the row -
- * the same line the browser puts under a name - so the two surfaces cannot drift. Tapping the map anywhere
- * else puts the card away.
+ * **A glance, and the live alert check.** This material is not the walker's to change; the header says whose
+ * it is, and the facts are the phone's own words for the row - the same line the browser puts under a name,
+ * so the two surfaces cannot drift. The alert state belongs to the picked thing, not to the area: the
+ * view model asks DOC when the card appears, because an alert kept with a download would be yesterday's
+ * answer. Tapping the map anywhere else puts the card away.
  */
 @Composable
 private fun DocCard(
     pick: DocPick,
+    alerts: DocAlertsState?,
     onClose: () -> Unit,
     onFollow: () -> Unit,
     modifier: Modifier = Modifier
@@ -926,6 +938,25 @@ private fun DocCard(
                     )
                 }
                 Text(text = item.name, style = MaterialTheme.typography.titleLarge)
+                when (val state = alerts) {
+                    is DocAlertsState.Found -> if (state.alerts.isNotEmpty()) {
+                        DocAlertSection(state.alerts)
+                    }
+
+                    is DocAlertsState.Failed -> Text(
+                        text = "Could not check DOC alerts.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+
+                    DocAlertsState.Loading -> Text(
+                        text = "Checking DOC alerts\u2026",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    DocAlertsState.NotAvailable, null -> Unit
+                }
                 facts.forEach { fact ->
                     Text(text = fact, style = MaterialTheme.typography.bodySmall)
                 }

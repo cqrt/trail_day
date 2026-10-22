@@ -67,7 +67,7 @@ import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
 fun DocBrowserScreen(
     viewModel: DocBrowserViewModel,
     onBack: () -> Unit,
-    onShowOnMap: (DocItem, DocItem?) -> Unit = { _, _ -> }
+    onOpenDoc: (DocItem, DocItem?) -> Unit = { _, _ -> }
 ) {
     val name by viewModel.name.collectAsStateWithLifecycle()
     val nearMe by viewModel.nearMe.collectAsStateWithLifecycle()
@@ -250,7 +250,7 @@ fun DocBrowserScreen(
                             distanceM = phoneFix?.let { position -> shown.distanceM(position) },
                             // Every one of these is read best where it is: the map frames the line or
                             // the place and raises the card that says what DOC says about it.
-                            onOpen = { onShowOnMap(shown, bike) }
+                            onOpen = { onOpenDoc(shown, bike) }
                         )
                     }
                 }

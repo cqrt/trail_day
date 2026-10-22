@@ -33,12 +33,16 @@ import nz.mckenzie.trailday.ui.screens.Tab
 import nz.mckenzie.trailday.ui.screens.AssetDetailScreen
 import nz.mckenzie.trailday.ui.screens.AssetEditScreen
 import nz.mckenzie.trailday.ui.screens.AssetListScreen
+import nz.mckenzie.trailday.ui.screens.DocDetailScreen
 import nz.mckenzie.trailday.ui.theme.TrailDayTheme
+import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.viewmodel.AddSpotViewModel
 import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
+import nz.mckenzie.trailday.viewmodel.DocDetailViewModel
 import nz.mckenzie.trailday.viewmodel.MapFocus
 import nz.mckenzie.trailday.viewmodel.MapViewModel
 import nz.mckenzie.trailday.viewmodel.OfflineAreaPickerViewModel
+import nz.mckenzie.trailday.viewmodel.PendingFollow
 import nz.mckenzie.trailday.viewmodel.PendingMapFocus
 import nz.mckenzie.trailday.viewmodel.OfflineViewModel
 import nz.mckenzie.trailday.viewmodel.RecordingDetailViewModel
@@ -53,7 +57,7 @@ import nz.mckenzie.trailday.web.WebEditorService
 import nz.mckenzie.trailday.web.WebEditorState
 
 /** Destinations for now; swap for a NavHost when routes need arguments. */
-private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, OFFLINE_PICKER_AROUND, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC }
+private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, OFFLINE_PICKER_AROUND, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC, DOC_DETAIL }
 
 class MainActivity : ComponentActivity() {
 
@@ -91,6 +95,9 @@ class MainActivity : ComponentActivity() {
                 var destination by rememberSaveable { mutableStateOf(Destination.MAP) }
                 var selectedAssetId by rememberSaveable { mutableStateOf<Long?>(null) }
                 var selectedSessionId by rememberSaveable { mutableStateOf<Long?>(null) }
+                var selectedDocItem by remember { mutableStateOf<DocItem?>(null) }
+                var selectedDocBike by remember { mutableStateOf<DocItem?>(null) }
+                var docDetailOrigin by remember { mutableStateOf(Destination.MAP) }
     // The place a page sent the recorder here to follow: chosen on the page, and read by the recorder's own
     // view model for as long as it is up.
     var recordTargetId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -100,9 +107,13 @@ class MainActivity : ComponentActivity() {
                 // its "just saved" signal) into the next one.
                 var addSpotVisit by rememberSaveable { mutableStateOf(0) }
 
-                // System back always returns to the map rather than leaving the app.
+                // System back returns the way the walker came, and never leaves the app.
                 BackHandler(enabled = destination != Destination.MAP) {
-                    destination = Destination.MAP
+                    destination = if (destination == Destination.DOC_DETAIL) {
+                        docDetailOrigin
+                    } else {
+                        Destination.MAP
+                    }
                 }
 
                 // A reminder tap asks for the track list. Done here rather than in the
@@ -139,6 +150,12 @@ class MainActivity : ComponentActivity() {
                             onOpenAsset = { assetId ->
                                 selectedAssetId = assetId
                                 destination = Destination.ASSET_DETAIL
+                            },
+                            onOpenDocDetail = { item, bike ->
+                                selectedDocItem = item
+                                selectedDocBike = bike
+                                docDetailOrigin = Destination.MAP
+                                destination = Destination.DOC_DETAIL
                             }
                         )
                     }
@@ -178,11 +195,37 @@ class MainActivity : ComponentActivity() {
                         DocBrowserScreen(
                             viewModel = docViewModel,
                             onBack = { destination = Destination.ASSETS },
-                            onShowOnMap = { item, bike ->
-                                PendingMapFocus.offer(MapFocus.Doc(item, bike))
-                                destination = Destination.MAP
+                            onOpenDoc = { item, bike ->
+                                selectedDocItem = item
+                                selectedDocBike = bike
+                                docDetailOrigin = Destination.DOC
+                                destination = Destination.DOC_DETAIL
                             }
                         )
+                    }
+
+                    Destination.DOC_DETAIL -> {
+                        val item = selectedDocItem
+                        if (item == null) {
+                            destination = Destination.MAP
+                        } else {
+                            val detailViewModel: DocDetailViewModel = viewModel(
+                                key = "doc-detail-${item.sourceRef}",
+                                factory = DocDetailViewModel.factory(
+                                    applicationContext,
+                                    item,
+                                    selectedDocBike
+                                )
+                            )
+                            DocDetailScreen(
+                                viewModel = detailViewModel,
+                                onBack = { destination = docDetailOrigin },
+                                onFollow = { followed ->
+                                    PendingFollow.offer(followed)
+                                    destination = Destination.RECORD
+                                }
+                            )
+                        }
                     }
 
                     Destination.ASSET_DETAIL -> {

@@ -151,6 +151,39 @@ object DocUrl {
         )
     }
 
+    /**
+     * The URL for one page of DOC's walking-experience points in [bounds].
+     *
+     * The companion layer is not one of the four sources: it is a point per website page, matched to a
+     * track line by name and position. It carries no source id of its own, so its fields are asked for
+     * whole - the extra fields are how this build learned that the layer also publishes a thumbnail.
+     */
+    fun companions(bounds: DocBounds, offset: Int, limit: Int): String {
+        val parameters = linkedMapOf(
+            "where" to "1=1",
+            "geometry" to envelope(bounds),
+            "geometryType" to "esriGeometryEnvelope",
+            "inSR" to "4326",
+            "spatialRel" to "esriSpatialRelIntersects",
+            "outFields" to "*",
+            "returnGeometry" to "true",
+            "outSR" to "4326",
+            "orderByFields" to DocSource.OBJECT_ID_FIELD,
+            "resultOffset" to offset.coerceAtLeast(0).toString(),
+            "resultRecordCount" to limit.coerceIn(1, MAX_RECORD_COUNT).toString(),
+            "f" to "geojson"
+        )
+        val queryString = parameters.entries.joinToString("&") { (key, value) ->
+            "$key=${URLEncoder.encode(value, "UTF-8")}"
+        }
+        return "$COMPANION_SERVICE_URL?$queryString"
+    }
+
+    /** DOC's website summaries for walking experiences, one point per page. */
+    const val COMPANION_SERVICE_URL =
+        "https://services1.arcgis.com/3JjYDyG3oajxU6HO/arcgis/rest/services/" +
+            "DOC_Walking_Experiences/FeatureServer/0/query"
+
     /** The box to ask about, as the map is showing it. */
     fun envelope(bounds: DocBounds): String = box(
         minLng = bounds.minLng,

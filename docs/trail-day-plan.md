@@ -800,3 +800,9 @@ tried on the published file.
 **The plan is complete**: eleven steps, each landed and each looked at on a screen. What is left in the plan's own
 words is nothing; what is left in the project is the pair of tests that wait on a stored preference with a clock,
 which is worth its own small change, and the question of DOC's duplicate hut records.
+
+**Then a DOC thing got a page of its own, and its website facts came offline with the area.** Tapping a track, hut or campsite in the DOC browser now opens a detail page rather than only marking it on the map: the line or place at the top, a white sheet beneath it with the picture the phone kept, DOC's own facts, its prose, and any current alerts. The page is built from DOC's public layers and its alert endpoint, with no HTML scraping. **Follow this track** stays at the foot for a line, and DOC's own page is one tap away.
+
+The website summary that sits above a track's map - introduction, difficulty, completion time, page link and thumbnail - is now read once for a downloaded area and merged into each cached track before it is stored. That means the detail page works offline with the same words, link and picture it had online, and an area download now keeps the track thumbnails too. A live search result still fetches its summary when the page opens.
+
+Alerts are deliberately not cached: every DOC card asks the alert endpoint when it is shown, so "no alerts" and "could not check" keep their different meanings. It shipped as 0.3.34.

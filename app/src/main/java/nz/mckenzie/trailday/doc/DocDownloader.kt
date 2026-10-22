@@ -1,10 +1,13 @@
 package nz.mckenzie.trailday.doc
 
 import nz.mckenzie.trailday.domain.doc.DocBounds
+import nz.mckenzie.trailday.domain.doc.DocCompanion
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocQuery
 import nz.mckenzie.trailday.domain.doc.DocSource
+import nz.mckenzie.trailday.domain.doc.DocTrackCompanions
 import nz.mckenzie.trailday.domain.doc.pictureWhere
+import nz.mckenzie.trailday.domain.doc.withCompanion
 
 /** How a download of DOC's material for an area went. */
 sealed interface DocDownloadResult {
@@ -88,7 +91,41 @@ class DocDownloader(
                 }
             }
         }
-        return DocAreaDownload(items = items, counts = counts, failed = failed)
+        // The website layer is read once for the whole box, not once per track: an area can hold
+        // hundreds of lines, and its summaries are points that arrive in the same paged answer. A
+        // failed companion read leaves the tracks exactly as the line service sent them.
+        val withSummaries = if (items.any { it.source == DocSource.TRACKS }) {
+            val companions = when (val result = reader.companions(bounds)) {
+                is DocCompanionResult.Found -> result.companions
+                is DocCompanionResult.Failed -> result.companions
+            }
+            mergeCompanions(items, companions)
+        } else {
+            items
+        }
+        return DocAreaDownload(items = withSummaries, counts = counts, failed = failed)
+    }
+
+    /**
+     * The same tracks with the website summary matched to each one.
+     *
+     * Matching is name first and distance second, so a summary from another part of the country cannot
+     * land on a line that happens to share a name. A track with no match is kept untouched.
+     */
+    private fun mergeCompanions(
+        items: List<DocItem>,
+        companions: List<DocCompanion>
+    ): List<DocItem> {
+        if (companions.isEmpty()) return items
+        return items.map { item ->
+            if (item.source != DocSource.TRACKS) {
+                item
+            } else {
+                DocTrackCompanions.bestFor(item, companions)
+                    ?.let { item.withCompanion(it.summary()) }
+                    ?: item
+            }
+        }
     }
 
     /**

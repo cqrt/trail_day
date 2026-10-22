@@ -38,7 +38,10 @@ import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.domain.tiles.withMinimumSpan
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.doc.ArcGisDoc
+import nz.mckenzie.trailday.doc.DocDetailReader
 import nz.mckenzie.trailday.doc.DocDownloader
+import nz.mckenzie.trailday.doc.DocWebDetails
+import nz.mckenzie.trailday.domain.doc.DocAlertsState
 import nz.mckenzie.trailday.domain.doc.DocBikeLinks
 import nz.mckenzie.trailday.domain.doc.DocCache
 import nz.mckenzie.trailday.domain.doc.DocHitTest
@@ -93,6 +96,13 @@ class MapViewModel(
      * why it draws in the hills with no reception at all. See [DocGeoJson].
      */
     private val docStore: DocCache = EmptyDocCache,
+    /**
+     * The live DOC alert check for a card.
+     *
+     * DOC's alerts are current by definition, so a card asks when it is shown rather than reading a
+     * copy kept with the area. The reader is injected so a test can answer without a network.
+     */
+    private val detailReader: DocDetailReader = DocWebDetails(),
     /**
      * The places a walk or ride has been recorded for, as they change.
      *
@@ -362,12 +372,23 @@ class MapViewModel(
     /**
      * The thing DOC publishes the walker last tapped, or null.
      *
-     * DOC's material is not the walker's to change and has no page of its own, so a tap on it is a question -
-     * "what is that?" - and the answer is the card at the bottom of the map. It is held here rather than in
-     * the screen so that it survives the map being redrawn, and the next tap that lands on nothing lets it go.
+     * DOC's material is not the walker's to change, so a tap on it is a question - "what is that?" - and
+     * the answer starts with the card at the bottom of the map before its own page opens. It is held here
+     * rather than in the screen so that it survives the map being redrawn, and the next tap that lands on
+     * nothing lets it go.
      */
     private val _pickedDoc = MutableStateFlow<DocItem?>(null)
     val pickedDoc: StateFlow<DocItem?> = _pickedDoc
+
+    /**
+     * What DOC's alert service said about [pickedDoc], or null when no DOC card is up.
+     *
+     * A fresh check each time a thing is picked: an alert cached with an area would be a claim about
+     * today made from an old answer. Null while none is being shown, and [DocAlertsState.NotAvailable]
+     * when the thing has no page to ask about.
+     */
+    private val _pickedDocAlerts = MutableStateFlow<DocAlertsState?>(null)
+    val pickedDocAlerts: StateFlow<DocAlertsState?> = _pickedDocAlerts
 
     /**
      * The walker's own place the card is about, or null.
@@ -433,7 +454,7 @@ class MapViewModel(
      * if nothing is watching the reference layer at that moment - and worked out off the main thread, because
      * DOC's cache can hold thousands of things and a tap must not stop the map drawing.
      */
-    suspend fun pickDocAt(lat: Double, lng: Double, radiusM: Double) {
+    suspend fun pickDocAt(lat: Double, lng: Double, radiusM: Double): DocItem? {
         // What is switched off is not tappable either: DOC's huts go with the huts. A linked bike point
         // is not a place under the finger: its track is, and the track's card carries the bike facts.
         val hidden = hiddenLayers.value
@@ -470,6 +491,35 @@ class MapViewModel(
         _pickedPlaceId.value = null
         _pickedDoc.value = item
         _selectionFrame.value = item?.let { boundsOf(it.paths.flatten()) }
+        checkAlerts(item)
+        return item
+    }
+
+    /** The bicycle note paired with [item], when one of DOC's bike points sits on it. */
+    fun bikeFor(item: DocItem): DocItem? = bikeLinks.value.bikeFor(item)
+
+    /**
+     * Asks DOC for the current alerts for the card's subject.
+     *
+     * The answer is tied back to what is still picked: a slow reply for a card the walker has already
+     * closed must not put an alert under something else.
+     */
+    private fun checkAlerts(item: DocItem?) {
+        if (item == null) {
+            _pickedDocAlerts.value = null
+            return
+        }
+        if (item.link == null) {
+            _pickedDocAlerts.value = DocAlertsState.NotAvailable
+            return
+        }
+        _pickedDocAlerts.value = DocAlertsState.Loading
+        viewModelScope.launch {
+            val state = detailReader.alertsFor(item)
+            if (_pickedDoc.value?.sourceRef == item.sourceRef) {
+                _pickedDocAlerts.value = state
+            }
+        }
     }
 
     /** Lets go of a picked thing, so the card is about what is nearest again. */
@@ -477,6 +527,7 @@ class MapViewModel(
         _pickedPicture.value = null
         _pickedBike.value = null
         _pickedDoc.value = null
+        _pickedDocAlerts.value = null
         _focusedDoc.value = null
         _focusedBike.value = null
         _pickedPlaceId.value = null
@@ -552,6 +603,7 @@ class MapViewModel(
             _pickedPlaceId.value = null
             _pickedDoc.value = item
             _selectionFrame.value = boundsOf(item.paths.flatten())
+            checkAlerts(item)
             layerOf(item.source.drawingKind())?.let { layer ->
                 if (layer in settingsRepository.hiddenMapLayers.first()) {
                     settingsRepository.hideMapLayer(layer, false)
