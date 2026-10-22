@@ -88,6 +88,17 @@ object TileServerHolder {
                         Basemap.OPENSTREETMAP, Basemap.TOPOGRAPHIC -> DrawnTileFetcher(
                             urlFor = { zoom, x, y -> basemap.tileUrl("", zoom, x, y) }
                         )
+
+                        // A hosted-style basemap draws from LINZ's own style, not from this server;
+                        // the route exists so the table stays whole, and serves the Topo raster for
+                        // anything that does ask.
+                        Basemap.LINZ_TOPO_LIDAR_HILLSHADE ->
+                            currentKey.takeIf { it.isNotBlank() }?.let { key ->
+                                LinzTileFetcher(
+                                    key,
+                                    urlFor = { zoom, x, y -> basemap.tileUrl(key, zoom, x, y) }
+                                )
+                            }
                     }
                 }
             )
@@ -149,7 +160,7 @@ object TileServerHolder {
         val root = when (basemap) {
             Basemap.LINZ_AERIAL -> File(appContext.filesDir, TILES_DIR)
             // Every drawn map is a cache of what has been looked at: see the comment above.
-            Basemap.OPENSTREETMAP, Basemap.TOPOGRAPHIC ->
+            Basemap.OPENSTREETMAP, Basemap.TOPOGRAPHIC, Basemap.LINZ_TOPO_LIDAR_HILLSHADE ->
                 File(appContext.cacheDir, "$CACHE_DIR_PREFIX${basemap.id}")
         }
         return OfflineTileStore(root, basemap.tileSuffix)

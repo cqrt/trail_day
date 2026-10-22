@@ -135,6 +135,10 @@ class BasemapTest {
             "and the topographic map's is the same shape: looked at, never fetched ahead",
             topo.prefetchable
         )
+        assertFalse(
+            "and the LiDAR hillshade is a hosted style, which cannot be pointed at the tile server",
+            Basemap.LINZ_TOPO_LIDAR_HILLSHADE.prefetchable
+        )
     }
 
     @Test
@@ -157,10 +161,35 @@ class BasemapTest {
     }
 
     @Test
-    fun `only the imagery needs a key`() {
+    fun `only the LINZ basemaps need a key`() {
         assertTrue(aerial.needsKey)
         assertFalse(osm.needsKey)
         assertFalse(topo.needsKey)
+        assertTrue(Basemap.LINZ_TOPO_LIDAR_HILLSHADE.needsKey)
+    }
+
+    @Test
+    fun `the LiDAR hillshade basemap loads LINZ's own style with the key in it`() {
+        val hillshade = Basemap.LINZ_TOPO_LIDAR_HILLSHADE
+
+        assertEquals(
+            "https://basemaps.linz.govt.nz/v1/tiles/topo-raster-gridded/WebMercatorQuad/" +
+                "style/topo-raster-gridded.json?api=$key",
+            hillshade.hostedStyleUrl(key)
+        )
+        assertTrue(hillshade.usesHostedStyle)
+        assertFalse(aerial.usesHostedStyle)
+    }
+
+    @Test
+    fun `the LiDAR hillshade basemap still names the Topo raster tiles it draws under the shade`() {
+        val hillshade = Basemap.LINZ_TOPO_LIDAR_HILLSHADE
+
+        assertEquals(
+            "https://basemaps.linz.govt.nz/v1/tiles/topo-raster-gridded/WebMercatorQuad/" +
+                "14/1017/660.webp?api=$key",
+            hillshade.tileUrl(key, 14, 1017, 660)
+        )
     }
 
     @Test

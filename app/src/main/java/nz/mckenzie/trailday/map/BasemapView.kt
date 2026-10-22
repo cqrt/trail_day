@@ -541,6 +541,11 @@ internal fun MapLibreMap.loadTrailDayStyle(
     placeNames: Boolean,
     onLoaded: (Style) -> Unit
 ) {
+    // A hosted-style basemap is loaded from LINZ's own style document, because that is where its two
+    // sources - the Topo raster and the elevation the hillshade is drawn from - are declared
+    // together. It is the one path that does not go through the app's tile server, and it is
+    // therefore the one basemap that cannot be downloaded ahead of time.
+    val hostedStyle = basemap.hostedStyleUrl(apiKey)?.takeIf { apiKey.isNotBlank() }
     val json = when {
         // A running tile server is the preferred source: it serves downloaded areas
         // with no reception, keeps whatever it fetches, and holds the LINZ key so the
@@ -565,7 +570,9 @@ internal fun MapLibreMap.loadTrailDayStyle(
         else -> BasemapStyles.blankStyleJson()
     }
 
-    setStyle(Style.Builder().fromJson(json)) { style ->
+    val styleBuilder = hostedStyle?.let { Style.Builder().fromUri(it) } ?: Style.Builder().fromJson(json)
+
+    setStyle(styleBuilder) { style ->
         // DOC's material first, so it lies **under** the walker's own work: what you made is what you
         // are reading, and the reference is the ground it sits on.
         if (style.getSource(DOC_SOURCE) == null) {
