@@ -102,7 +102,7 @@ enum class Basemap(
     LINZ_TOPO_LIDAR_HILLSHADE(
         id = "linz-topo-lidar-hillshade",
         displayName = "Topo LiDAR hillshade",
-        summary = "Topographic maps with LiDAR hillshade. Needs a LINZ key; tiles are cached when browsing.",
+        summary = "Topographic maps with LiDAR hillshade. Needs a LINZ key; looked at as you browse.",
         needsKey = true,
         tileSuffix = ".webp",
         contentType = "image/webp",
