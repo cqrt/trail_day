@@ -175,9 +175,11 @@ class MainActivity : ComponentActivity() {
                                 PendingMapFocus.offer(MapFocus.Place(place.id))
                                 destination = Destination.MAP
                             },
-                            onShowDocOnMap = { item, bike ->
-                                PendingMapFocus.offer(MapFocus.Doc(item, bike))
-                                destination = Destination.MAP
+                            onOpenDocDetail = { item, bike ->
+                                selectedDocItem = item
+                                selectedDocBike = bike
+                                docDetailOrigin = Destination.ASSETS
+                                destination = Destination.DOC_DETAIL
                             },
                             onAddSpot = {
                                 addSpotVisit++

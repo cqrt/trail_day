@@ -61,6 +61,7 @@ import nz.mckenzie.trailday.viewmodel.AssetListViewModel
  * destructive lives here, because a place is removed from its own page.
  *
  * [onOpenDoc] is not a third way to make a place: what DOC publishes is read here rather than kept.
+ * A track in **Nearby from DOC** opens its own detail page, like a row in the DOC browser.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -69,7 +70,7 @@ fun AssetListScreen(
     onOpenTab: (Tab) -> Unit = {},
     onOpenAsset: (Long) -> Unit,
     onShowOnMap: (AssetEntity) -> Unit,
-    onShowDocOnMap: (DocItem, DocItem?) -> Unit,
+    onOpenDocDetail: (DocItem, DocItem?) -> Unit,
     onAddSpot: () -> Unit,
     onOpenDoc: () -> Unit,
     onOpenSettings: () -> Unit
@@ -255,7 +256,7 @@ fun AssetListScreen(
                     items(docNearby, key = { "doc-${it.item.sourceRef}" }) { choice ->
                         DocNearbyCard(
                             choice = choice,
-                            onOpen = { onShowDocOnMap(choice.item, choice.bike) }
+                            onOpen = { onOpenDocDetail(choice.item, choice.bike) }
                         )
                     }
                     item {
