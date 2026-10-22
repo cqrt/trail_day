@@ -498,7 +498,7 @@ private fun LayersSheet(
                         LayerSwitchRow(
                             icon = { KindTile(kind = AssetKind.TRACK, size = 34.dp) },
                             title = "Tracks",
-                            subtitle = "All DOC tracks, including rideable",
+                            subtitle = "All DOC tracks",
                             checked = AssetLayer.TRACKS !in hidden,
                             onToggle = { onHide(AssetLayer.TRACKS, !it) }
                         )
@@ -506,7 +506,7 @@ private fun LayersSheet(
                         LayerSwitchRow(
                             icon = { KindTile(kind = AssetKind.BIKE_TRACK, size = 34.dp) },
                             title = "Bike trails",
-                            subtitle = "Badges, or a bike-only view",
+                            subtitle = "Bike friendly DOC tracks",
                             checked = AssetLayer.BIKE_TRACKS !in hidden,
                             onToggle = { onHide(AssetLayer.BIKE_TRACKS, !it) }
                         )
