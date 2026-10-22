@@ -812,3 +812,7 @@ Alerts are deliberately not cached: every DOC card asks the alert endpoint when 
 **Then a proxy let the app use DOC's richer Tracks API without shipping the key.** The API at `api.doc.govt.nz/v1` gives a track's introduction, thumbnail, exact walking time, walking category, difficulty, permitted activities, wheelchair/buggy notes, mountain-bike and kayaking fields, richer dog rules, location, region and page link — everything the deprecated `DOC_Walking_Experiences` layer gives, and more. It also gives current alerts per track and in bulk. It does not give track status or track type, so ArcGIS stays for those, for geometry and for offline area downloads.
 
 The key cannot live in the APK, so a small Cloudflare Worker at `doc-api.trailday.app` holds it. The app asks the Worker for a track's detail and alerts, with the Worker matching a track by name and position because the API's `assetId` does not join to ArcGIS. If the Worker cannot answer, the app falls back to the public companion layer and alert endpoint. The Worker is allowlisted to those routes, caches the index and details for a day and alerts for five minutes, and is rate limited per IP. It shipped as 0.3.36.
+
+**Then the proxy got its own address.** The Worker deployed to Cloudflare's free
+`trailday-doc-proxy.le-mckenzies.workers.dev`, and the app's `DocProxyDetails` points at it. No domain
+was needed. It shipped as 0.3.37.

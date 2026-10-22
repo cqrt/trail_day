@@ -83,13 +83,22 @@ async function detailRoute(id, env, ctx) {
 async function trackAlertsRoute(id, env, ctx) {
   if (!isTrackId(id)) return json({ error: "Not a track id" }, 400);
   return cached(ctx, cacheKey(`alerts/${id}`), 300, async () => {
-    const answer = await upstream(env, `/tracks/${encodeURIComponent(id)}/alerts`);
-    if (!answer.ok) return answer;
-    return { ok: true, data: { assetId: id, alerts: toAlerts(answer.data) } };
+    // DOC's per-track alert route and its bulk route do not always agree; the bulk feed is the one
+    // the website itself shows, so a track's answer is read from there.
+    const all = await allAlertsValue(env, ctx);
+    if (!all.ok) return all;
+    const track = all.data.find((candidate) => candidate.assetId === id);
+    return { ok: true, data: { assetId: id, alerts: track?.alerts ?? [] } };
   });
 }
 
 async function allAlertsRoute(env, ctx) {
+  const value = await allAlertsValue(env, ctx);
+  if (!value.ok) return json({ error: value.message }, value.status);
+  return json(value.data, 200, 300);
+}
+
+async function allAlertsValue(env, ctx) {
   return cached(ctx, cacheKey("alerts"), 300, async () => {
     const answer = await upstream(env, "/tracks/alerts");
     if (!answer.ok) return answer;
@@ -102,7 +111,7 @@ async function allAlertsRoute(env, ctx) {
         alerts: toAlerts(track),
       })),
     };
-  });
+  }, { asValue: true });
 }
 
 /** The cached track index, read without caching the lookup itself. */

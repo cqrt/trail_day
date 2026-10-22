@@ -92,6 +92,6 @@ class DocProxyDetails(
 
     companion object {
         /** Where the Trail Day proxy answers. Blank disables the proxy and keeps the public path. */
-        const val BASE_URL = "https://doc-api.trailday.app"
+        const val BASE_URL = "https://trailday-doc-proxy.le-mckenzies.workers.dev"
     }
 }
