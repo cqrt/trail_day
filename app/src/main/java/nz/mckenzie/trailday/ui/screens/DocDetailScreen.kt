@@ -293,8 +293,12 @@ private fun docFacts(item: DocItem, bike: DocItem?): List<DocFact> {
         )
         add("Distance", item.lengthM.takeIf { it > 0.0 }?.let { formatDistance(it) })
         add("Track type", item.trackType)
+        add("Activities", item.permittedActivities)
         add("Dogs", item.dogsAllowed)
         add("Status", item.status)
+        add("Wheelchairs", item.wheelchairsAndBuggies)
+        add("Mountain biking", listOfNotNull(item.mtbCategory, item.mtbDuration).joinToString(" · ").ifBlank { null })
+        add("Kayaking", item.kayakingDuration)
         bike?.let {
             add("Bike difficulty", it.difficulty)
             add("Bike time", it.bikingTime)

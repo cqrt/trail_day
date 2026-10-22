@@ -40,7 +40,7 @@ import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDetailReader
 import nz.mckenzie.trailday.doc.DocDownloader
-import nz.mckenzie.trailday.doc.DocWebDetails
+import nz.mckenzie.trailday.doc.DocProxyDetails
 import nz.mckenzie.trailday.domain.doc.DocAlertsState
 import nz.mckenzie.trailday.domain.doc.DocBikeLinks
 import nz.mckenzie.trailday.domain.doc.DocCache
@@ -102,7 +102,7 @@ class MapViewModel(
      * DOC's alerts are current by definition, so a card asks when it is shown rather than reading a
      * copy kept with the area. The reader is injected so a test can answer without a network.
      */
-    private val detailReader: DocDetailReader = DocWebDetails(),
+    private val detailReader: DocDetailReader = DocProxyDetails(),
     /**
      * The places a walk or ride has been recorded for, as they change.
      *

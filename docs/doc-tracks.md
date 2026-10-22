@@ -23,6 +23,23 @@ downloaded again for tracks.
 replacement yet. It is still read for the website summary; the day a replacement appears, the layer
 name is the one line to change.
 
+## The DOC Tracks API and the proxy
+
+DOC also publishes a **Tracks API** at `api.doc.govt.nz/v1`, with a richer record than the companion
+layer: introduction, thumbnail, exact walking time, walking category, difficulty, permitted
+activities, wheelchair/buggy notes, mountain-bike and kayaking fields, fuller dog rules, location,
+region and page link. It also publishes current alerts per track and in bulk.
+
+The API needs an `x-api-key`, and a key in an Android APK can be extracted. The app therefore reads
+it through a small Cloudflare Worker in `worker/`, deployed at `doc-api.trailday.app`. The Worker
+holds the key, exposes only a handful of read-only routes, caches the index and detail for a day and
+alerts for five minutes, and rate limits per IP. See `worker/README.md`.
+
+The API does not publish track status or track type, so ArcGIS remains the source for those, for
+geometry and for offline area downloads. The app matches an API record to an ArcGIS track by name
+plus position, and falls back to the companion layer and alert endpoint when the proxy is
+unavailable.
+
 ## How it searches
 
 Searching happens at DOC; the phone never downloads the whole network. A search is an ArcGIS REST

@@ -82,10 +82,24 @@ data class DocItem(
     val trackType: String? get() = characteristic(DocSource.TRACK_TYPE_CHARACTERISTIC)
 
     /** The walking time DOC publishes in its own range, such as "1-4 hours". */
-    val walkingDuration: String? get() = characteristic("WEB_WALKING_DURATION")
+    val walkingDuration: String? get() =
+        fact("walkingDuration") ?: characteristic("WEB_WALKING_DURATION")
 
     /** What DOC permits on the track, when it filled the slot in. */
-    val permittedActivities: String? get() = characteristic("WEB_PERMITTED_ACTIVITIES")
+    val permittedActivities: String? get() =
+        DocText.plain(fact("permittedActivities")) ?: characteristic("WEB_PERMITTED_ACTIVITIES")
+
+    /** DOC's own words about wheelchairs and buggies on the track, when it has any. */
+    val wheelchairsAndBuggies: String? get() = DocText.plain(fact("wheelchairsAndBuggies"))
+
+    /** How long DOC says the track takes by mountain bike, when it says. */
+    val mtbDuration: String? get() = fact("mtbDuration")
+
+    /** How hard DOC says the track is by mountain bike, when it says. */
+    val mtbCategory: String? get() = fact("mtbTrackCategory")
+
+    /** How long DOC says the track takes by kayak, when it says. */
+    val kayakingDuration: String? get() = fact("kayakingDuration")
 
     /** The track's own status, such as "OPEN". */
     val status: String? get() = fact("status") ?: characteristic("USER_STATUS")

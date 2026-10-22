@@ -16,7 +16,7 @@ import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDetailReader
 import nz.mckenzie.trailday.doc.DocDownloader
-import nz.mckenzie.trailday.doc.DocWebDetails
+import nz.mckenzie.trailday.doc.DocProxyDetails
 import nz.mckenzie.trailday.domain.doc.DocAlertsState
 import nz.mckenzie.trailday.domain.doc.DocCache
 import nz.mckenzie.trailday.domain.doc.DocItem
@@ -87,7 +87,7 @@ class DocDetailViewModel(
                         item = item,
                         bike = bike,
                         settingsRepository = SettingsRepository(appContext),
-                        reader = DocWebDetails(),
+                        reader = DocProxyDetails(),
                         docStore = OfflineDocStore(
                             dao = database.offlineDocItemDao(),
                             downloader = DocDownloader(ArcGisDoc())
