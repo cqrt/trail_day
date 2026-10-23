@@ -65,8 +65,8 @@ import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
 private val DenseControlHeight = 32.dp
 
 /**
- * How the browser's tool labels are set: Material's large label, which is as large as the tools' one line
- * will take.
+ * How the browser's control labels are set: Material's large label, which is as large as the bar's one line
+ * will take - the sources' four segments and the tools' pills alike.
  */
 private val DenseControlLabel: TextStyle
     @Composable get() = MaterialTheme.typography.labelLarge
@@ -334,10 +334,14 @@ private fun DocControlsDeck(
                         // No tick: the filled segment is what says which one is chosen, and in a bar this
                         // narrow the tick was the difference between one line and two.
                         icon = {},
+                        // The segments share the row's width, so this is what stands between a label and
+                        // the ellipsis: "Camps" needs a few points more than Material's own padding leaves
+                        // it on the narrowest screens.
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                         label = {
                             Text(
                                 text = option.shortName,
-                                style = MaterialTheme.typography.labelMedium,
+                                style = DenseControlLabel,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
