@@ -73,6 +73,9 @@ object LinzVectorStyle {
                     put("tileSize", 256)
                     put("minzoom", 0)
                     put("maxzoom", basemap.maxZoom)
+                    // LINZ serves the Mapbox terrain-rgb encoding; saying so is what lets the
+                    // renderer turn the picture into heights rather than read it as a flat image.
+                    put("encoding", "terrain-rgb")
                 }
             )
         }

@@ -173,15 +173,23 @@ object TileServerHolder {
             currentKey.takeIf { it.isNotBlank() }?.let { key ->
                 LinzTileFetcher(
                     key,
-                    urlFor = { zoom, x, y -> Basemap.elevationUrl(key, zoom, x, y) }
+                    urlFor = { zoom, x, y -> Basemap.elevationUrl(key, zoom, x, y) },
+                    // The DEM endpoint answers PNG, and MapLibre decodes it as PNG: asking for WebP
+                    // first gets bytes the renderer cannot read, which is a hillshade that never draws.
+                    accept = "image/png"
                 )
             }
         }
     )
 
-    /** Where the elevation tiles are kept: a cache of what the desk has shaded. */
+    /**
+     * Where the elevation tiles are kept: a cache of what the desk has shaded.
+     *
+     * The `-png` in the folder name is a version: an earlier build asked LINZ for WebP while
+     * declaring PNG, and those undecodable bytes must not be served now that the request is fixed.
+     */
     fun elevationStore(context: Context): OfflineTileStore = OfflineTileStore(
-        File(context.applicationContext.cacheDir, "$CACHE_DIR_PREFIX$ELEVATION_ID"),
+        File(context.applicationContext.cacheDir, "$CACHE_DIR_PREFIX$ELEVATION_ID-png"),
         ELEVATION_SUFFIX
     )
 
