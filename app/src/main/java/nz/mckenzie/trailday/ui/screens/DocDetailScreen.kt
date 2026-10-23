@@ -13,9 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -118,9 +116,14 @@ fun DocDetailScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
         ) {
-            Box {
+            // The map is the top of the page and does not scroll away: the line or place is what the
+            // page is about, and it stays in front of the walker while the words below it move.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(250.dp)
+            ) {
                 BasemapView(
                     basemap = basemap,
                     apiKey = apiKey,
@@ -128,10 +131,10 @@ fun DocDetailScreen(
                     docGeoJson = geoJson,
                     docBikeBadgesGeoJson = badgeGeoJson,
                     fitBounds = bounds,
-                    fitBoundsMaxZoom = 15.0,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(250.dp)
+                    fitBoundsMaxZoom = 16.0,
+                    // Room for the credit strip along the foot, so the line is never under it.
+                    fitBoundsPaddingPx = 150,
+                    modifier = Modifier.fillMaxSize()
                 )
                 DocBackPill(
                     onBack = onBack,
@@ -147,17 +150,18 @@ fun DocDetailScreen(
                 )
             }
 
+            // The information scrolls inside its own viewport, under the map.
             Column(
                 modifier = Modifier
-                    .offset(y = (-22).dp)
+                    .weight(1f)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
+                    .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
                     .background(MaterialTheme.colorScheme.surface)
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp)
-                    .padding(top = 10.dp, bottom = 24.dp),
+                    .padding(top = 16.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                SheetHandle()
                 DocHeader(item = item)
                 DocChips(item = item, bike = bike)
 
@@ -221,22 +225,6 @@ fun DocDetailScreen(
 }
 
 @Composable
-private fun SheetHandle() {
-    Box(
-        modifier = Modifier.fillMaxWidth(),
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .width(38.dp)
-                .height(4.dp)
-                .clip(RoundedCornerShape(50))
-                .background(MaterialTheme.colorScheme.outlineVariant)
-        )
-    }
-}
-
-@Composable
 private fun DocBackPill(onBack: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onBack,
@@ -252,7 +240,7 @@ private fun DocBackPill(onBack: () -> Unit, modifier: Modifier = Modifier) {
         ) {
             AppIcon(glyph = IconGlyph.BACK, dimension = 16.dp)
             Text(
-                text = "TRACK",
+                text = "BACK",
                 style = MaterialTheme.typography.labelSmall,
                 letterSpacing = 1.1.sp
             )

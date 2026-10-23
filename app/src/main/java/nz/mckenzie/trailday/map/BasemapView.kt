@@ -201,6 +201,13 @@ fun BasemapView(
      */
     fitBoundsMaxZoom: Double? = null,
     /**
+     * The room left around [fitBounds], in screen pixels.
+     *
+     * The default suits a map that fills a screen. A map with a credit strip along its foot needs a
+     * little more, so the line it is about does not end up under the attribution.
+     */
+    fitBoundsPaddingPx: Int = BOUNDS_PADDING_PX,
+    /**
      * Whether the walker may move this map.
      *
      * True on every map the work is read on. False for a **preview** - the thumbnail in a listing
@@ -534,12 +541,12 @@ fun BasemapView(
     // Frame the track network the first time we know where it is, so opening the
     // app shows "my tracks", not an arbitrary patch of countryside. The asset's own page
     // also says how close it is allowed to end up - see [fitBoundsMaxZoom].
-    LaunchedEffect(fitBounds, fitBoundsMaxZoom, mapState.value) {
+    LaunchedEffect(fitBounds, fitBoundsMaxZoom, fitBoundsPaddingPx, mapState.value) {
         val map = mapState.value ?: return@LaunchedEffect
         val bounds = fitBounds ?: return@LaunchedEffect
         if (boundsApplied) return@LaunchedEffect
 
-        map.animateCamera(cameraFor(map, bounds, fitBoundsMaxZoom))
+        map.animateCamera(cameraFor(map, bounds, fitBoundsMaxZoom, fitBoundsPaddingPx))
         boundsApplied = true
     }
 
@@ -1118,13 +1125,18 @@ private fun partIs(part: String): Expression =
  * has, by the time bounds arrive - and it is what lets the asset's own page end up at 15
  * rather than at the deepest zoom the map has.
  */
-private fun cameraFor(map: MapLibreMap, bounds: DomainBounds, maxZoom: Double? = null): CameraUpdate {
+private fun cameraFor(
+    map: MapLibreMap,
+    bounds: DomainBounds,
+    maxZoom: Double? = null,
+    paddingPx: Int = BOUNDS_PADDING_PX
+): CameraUpdate {
     val maplibreBounds = org.maplibre.android.geometry.LatLngBounds.Builder()
         .include(LatLng(bounds.minLat, bounds.minLng))
         .include(LatLng(bounds.maxLat, bounds.maxLng))
         .build()
 
-    if (maxZoom == null) return CameraUpdateFactory.newLatLngBounds(maplibreBounds, BOUNDS_PADDING_PX)
+    if (maxZoom == null) return CameraUpdateFactory.newLatLngBounds(maplibreBounds, paddingPx)
 
     // Null when the library cannot work a camera out at all - a map with no size yet, or bounds
     // it refuses. Falling back to the plain fit is what every other screen does anyway, and it is
@@ -1132,8 +1144,8 @@ private fun cameraFor(map: MapLibreMap, bounds: DomainBounds, maxZoom: Double? =
     // the asset's own page, whose map is laid out long before its geometry arrives.
     val fitted = map.getCameraForLatLngBounds(
         maplibreBounds,
-        intArrayOf(BOUNDS_PADDING_PX, BOUNDS_PADDING_PX, BOUNDS_PADDING_PX, BOUNDS_PADDING_PX)
-    ) ?: return CameraUpdateFactory.newLatLngBounds(maplibreBounds, BOUNDS_PADDING_PX)
+        intArrayOf(paddingPx, paddingPx, paddingPx, paddingPx)
+    ) ?: return CameraUpdateFactory.newLatLngBounds(maplibreBounds, paddingPx)
 
     return CameraUpdateFactory.newCameraPosition(
         CameraPosition.Builder(fitted).zoom(minOf(fitted.zoom, maxZoom)).build()
