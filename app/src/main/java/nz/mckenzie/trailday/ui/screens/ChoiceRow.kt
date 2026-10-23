@@ -4,12 +4,23 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+
+/**
+ * How tall a dense chip is, where a row of them has to share one line with other controls.
+ *
+ * Material's own minimum is a finger's whole target; in a control bar of four or five of them that minimum
+ * is what pushes the last one onto a line of its own, which costs the list a row for nothing. A chip this
+ * high still reads as something to press, and the row's own spacing keeps the targets apart.
+ */
+internal val DenseChipHeight = 32.dp
 
 /**
  * One chip of a single-choice row: the Material chip, with the tick the sun demands.
@@ -19,7 +30,13 @@ import androidx.compose.ui.unit.dp
  * only noticed out on the track.
  */
 @Composable
-internal fun ChoiceChip(selected: Boolean, label: String, onClick: () -> Unit) {
+internal fun ChoiceChip(
+    selected: Boolean,
+    label: String,
+    onClick: () -> Unit,
+    /** A dense chip for a control bar: a smaller tick and label, and a shorter pill. */
+    compact: Boolean = false
+) {
     FilterChip(
         selected = selected,
         onClick = onClick,
@@ -29,11 +46,14 @@ internal fun ChoiceChip(selected: Boolean, label: String, onClick: () -> Unit) {
         // Material marks the chosen chip with a tick as well as the tint. Out in the sun, a tint is
         // not enough to read, and this is a screen the walker uses in exactly that light.
         leadingIcon = if (selected) {
-            { AppIcon(glyph = IconGlyph.CHECK, dimension = 18.dp) }
+            { AppIcon(glyph = IconGlyph.CHECK, dimension = if (compact) 14.dp else 18.dp) }
         } else {
             null
         },
-        label = { Text(label) }
+        label = {
+            if (compact) Text(text = label, style = MaterialTheme.typography.labelMedium) else Text(label)
+        },
+        modifier = if (compact) Modifier.height(DenseChipHeight) else Modifier
     )
 }
 
@@ -52,7 +72,9 @@ internal fun <T> ChoiceRow(
     choices: List<T>,
     selected: T,
     onChoose: (T) -> Unit,
-    text: (T) -> String
+    text: (T) -> String,
+    /** The dense chips a control bar uses, rather than the ones a form offers. */
+    compact: Boolean = false
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         label?.let { Text(it, style = MaterialTheme.typography.labelLarge) }
@@ -64,7 +86,8 @@ internal fun <T> ChoiceRow(
                 ChoiceChip(
                     selected = choice == selected,
                     label = text(choice),
-                    onClick = { onChoose(choice) }
+                    onClick = { onChoose(choice) },
+                    compact = compact
                 )
             }
         }

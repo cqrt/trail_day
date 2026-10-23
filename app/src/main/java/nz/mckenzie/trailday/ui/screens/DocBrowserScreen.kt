@@ -5,28 +5,27 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,9 +37,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.doc.DocBikeLinks
@@ -62,10 +60,10 @@ import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
  * walker's behalf, and a filter narrows the page already here rather than asking again.
  *
  * The shape is the mock screens': **the question on one white deck across the top** - a search field with a
- * magnifier, the sources as chips, a pill for "near me" with its radius beside it when it is on, and the
- * filter and the order as pills - and **the answer in its own viewport below it**: how many came back and in
- * what order, then each thing DOC published as a card - the kind's tile, the name, DOC's own facts about it,
- * and how far away it is in the app's own colour.
+ * magnifier, the sources as chips, a pill for "near me" that carries its own distance, and the filter and the
+ * order as pills - and **the answer in its own viewport below it**: how many came back and in what order,
+ * then each thing DOC published as a card - the kind's tile, the name, DOC's own facts about it, and how far
+ * away it is in the app's own colour.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -227,8 +225,13 @@ fun DocBrowserScreen(
  * **One surface, not a loose column of controls.** The mock screens draw the question on a white card and
  * the answer on the pale page below it, and that is the split the walker reads in: everything that changes
  * the question is here, and nothing that is the answer is. The pieces inside are the ones the page has
- * always had - the search field, the source chips, the "near me" pill with its radius, and the filter and
- * sort menus - so this is a layout, not a second set of controls.
+ * always had - the search field, the source chips, the "near me" pill, and the filter and sort menus - so
+ * this is a layout, not a second set of controls.
+ *
+ * **The controls are dense, and each kind sits on one line.** Every row here used to wrap once it had more
+ * than two things on it, and every wrapped row cost the list a row of results. The chips and the pills are
+ * therefore the shorter ones, and the distance "near me" looks is carried by its own pill rather than by a
+ * text field beside it.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -262,11 +265,13 @@ private fun DocControlsDeck(
         shadowElevation = 2.dp
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // The search, and the button that asks it. The keyboard's own search key works too, but a
-            // field with nothing beside it reads as a field that does not do anything.
+            // field with nothing beside it reads as a field that does not do anything. The button is a
+            // round magnifier rather than the word, which gives the field the width back without making
+            // the row any taller than the field already is.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -279,51 +284,42 @@ private fun DocControlsDeck(
                     onSearch = onSearch,
                     modifier = Modifier.weight(1f)
                 )
-                Button(onClick = onSearch) { Text("Search") }
+                FilledIconButton(
+                    onClick = onSearch,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    AppIcon(glyph = IconGlyph.SEARCH, contentDescription = "Search")
+                }
             }
 
             // Which of DOC's services is being read. Asked here rather than with the search, because it
-            // is not part of the question - it is which of four datasets the question is put to.
+            // is not part of the question - it is which of four datasets the question is put to. Dense
+            // chips, so all four hold one line.
             ChoiceRow(
                 choices = DocSource.entries,
                 selected = source,
                 onChoose = onChooseSource,
-                text = { it.displayName }
+                text = { it.displayName },
+                compact = true
             )
 
-            // How the answer is narrowed and ordered, and how far around the phone it looks. A wrapping
-            // row rather than one line, because the radius field appears beside "near me" when it is on,
-            // and a gloved hand still has to be able to reach everything.
+            // How the answer is narrowed and ordered, and how far around the phone it looks. Dense
+            // controls, so the whole row is one line: the distance rides on the "near me" pill rather
+            // than in a field of its own, which is what used to push the filter and the order onto a
+            // second line and cost the list a row.
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // "Near me", as the mock screens draw it: a green pill that says how far around the phone
-                // it is looking. Off, it says only what it would do.
-                FilterChip(
-                    selected = nearMe,
-                    onClick = { onNearMeChange(!nearMe) },
-                    label = {
-                        Text(
-                            if (nearMe) "Near me \u00b7 ${radiusKm.ifBlank { "25" }} km" else "Near me"
-                        )
-                    },
-                    shape = CircleShape
+                NearMeControl(
+                    nearMe = nearMe,
+                    radiusKm = radiusKm,
+                    onNearMeChange = onNearMeChange,
+                    onRadiusChange = onRadiusChange
                 )
-                if (nearMe) {
-                    OutlinedTextField(
-                        value = radiusKm,
-                        onValueChange = onRadiusChange,
-                        label = { Text("km") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Number,
-                            imeAction = ImeAction.Search
-                        ),
-                        keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-                        modifier = Modifier.width(104.dp)
-                    )
-                }
                 FilterMenu(
                     choices = filterChoices,
                     filters = filters,
@@ -337,11 +333,72 @@ private fun DocControlsDeck(
                     FilterChip(
                         selected = bikeOnly,
                         onClick = { onBikeOnly(!bikeOnly) },
-                        label = { Text("Bike-friendly") },
-                        shape = CircleShape
+                        shape = CircleShape,
+                        label = {
+                            Text("Bike-friendly", style = MaterialTheme.typography.labelMedium)
+                        },
+                        modifier = Modifier.height(DenseChipHeight)
                     )
                 }
             }
+        }
+    }
+}
+
+/** The distances the "near me" menu offers, in the round numbers a walker thinks in. */
+private val NearMeRadiusChoices = listOf(5, 10, 25, 50, 100)
+
+/**
+ * The **Near me** control: one pill that is both the switch and the distance.
+ *
+ * Off, it says what it would do and turns itself on. On, it says how far it is looking and opens a menu of
+ * distances - and the way back off. The distance used to sit in a text field of its own, which was taller
+ * than the pill beside it and pushed the filter and the order onto a second line; the menu keeps the same
+ * answer without costing the list a row, and the chevron is what says so.
+ */
+@Composable
+private fun NearMeControl(
+    nearMe: Boolean,
+    radiusKm: String,
+    onNearMeChange: (Boolean) -> Unit,
+    onRadiusChange: (String) -> Unit
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        FilterChip(
+            selected = nearMe,
+            onClick = { if (nearMe) open = true else onNearMeChange(true) },
+            shape = CircleShape,
+            label = {
+                Text(
+                    text = if (nearMe) "Near me \u00b7 ${radiusKm.ifBlank { "25" }} km" else "Near me",
+                    style = MaterialTheme.typography.labelMedium
+                )
+            },
+            // Only when it is on: the chevron is what says the pill now opens a menu rather than switching.
+            trailingIcon = if (nearMe) {
+                { AppIcon(glyph = IconGlyph.CHEVRON, dimension = 14.dp, modifier = Modifier.rotate(90f)) }
+            } else {
+                null
+            },
+            modifier = Modifier.height(DenseChipHeight)
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            MenuHeading("How far around the phone")
+            NearMeRadiusChoices.forEach { km ->
+                MenuChoice("$km km", radiusKm.trim() == "$km") {
+                    onRadiusChange("$km")
+                    open = false
+                }
+            }
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text("Turn off Near me") },
+                onClick = {
+                    onNearMeChange(false)
+                    open = false
+                }
+            )
         }
     }
 }
@@ -392,8 +449,17 @@ private fun FilterMenu(
     val offerable = choices.filter { (_, values) -> values.isNotEmpty() }
 
     Box {
-        OutlinedButton(onClick = { open = true }, enabled = offerable.isNotEmpty()) {
-            Text(if (count == 0) "Filter" else "Filter ($count)")
+        OutlinedButton(
+            onClick = { open = true },
+            enabled = offerable.isNotEmpty(),
+            modifier = Modifier.height(DenseChipHeight),
+            contentPadding = PaddingValues(horizontal = 12.dp)
+        ) {
+            Text(
+                text = if (count == 0) "Filter" else "Filter ($count)",
+                style = MaterialTheme.typography.labelMedium
+            )
+            AppIcon(glyph = IconGlyph.CHEVRON, dimension = 14.dp, modifier = Modifier.rotate(90f))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             offerable.forEach { (filter, values) ->
@@ -422,13 +488,22 @@ private fun FilterMenu(
 @Composable
 private fun SortMenu(sort: DocSort, onSort: (DocSort) -> Unit) {
     var open by remember { mutableStateOf(false) }
+    // The order's own word rather than "Sort: Nearest": the chevron beside it already says this opens a
+    // menu, and the prefix was a pill's worth of width for a word the pill did not need.
     val label = when (sort) {
-        DocSort.NEAREST -> "Sort: Nearest"
-        DocSort.NAME -> "Sort: Name"
+        DocSort.NEAREST -> "Nearest"
+        DocSort.NAME -> "Name"
     }
 
     Box {
-        OutlinedButton(onClick = { open = true }) { Text(label) }
+        OutlinedButton(
+            onClick = { open = true },
+            modifier = Modifier.height(DenseChipHeight),
+            contentPadding = PaddingValues(horizontal = 12.dp)
+        ) {
+            Text(label, style = MaterialTheme.typography.labelMedium)
+            AppIcon(glyph = IconGlyph.CHEVRON, dimension = 14.dp, modifier = Modifier.rotate(90f))
+        }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             MenuChoice("Nearest to phone", sort == DocSort.NEAREST) {
                 onSort(DocSort.NEAREST)
