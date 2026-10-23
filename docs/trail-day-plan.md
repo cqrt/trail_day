@@ -840,3 +840,5 @@ was needed. It shipped as 0.3.37.
 **Then the hillshade's elevation was fixed.** The elevation tiles were being fetched from LINZ with `Accept: image/webp,image/*` while the tile server declared them PNG, so MapLibre received a DEM it could not decode and drew no shade. The fetch now asks for PNG, the `raster-dem` source states its `terrain-rgb` encoding, and the elevation cache moved to a `-png` folder so the old bytes are not served. It shipped as 0.3.49.
 
 **Then the hillshade was lifted over the vector fills.** LINZ's own style puts the `hillshade` layer below the landcover fills, which is why raising its exaggeration changed nothing. The adapted style now moves it to just under the first label layer, over the fills and under the names, and keeps exaggeration 1.0. It shipped as 0.3.50.
+
+**Then the hillshade's elevation came straight from LINZ.** The app's tile server was the one variable the working browser test did not have: the browser used LINZ's elevation URL directly. The adapted style now does the same, leaving only the vector tiles on the tile server. It shipped as 0.3.51.

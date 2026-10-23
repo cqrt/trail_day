@@ -27,7 +27,6 @@ import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.LinzVectorStyle
 import nz.mckenzie.trailday.map.WebStyleJson
 import nz.mckenzie.trailday.offline.HttpResponse
-import nz.mckenzie.trailday.offline.TileServerHolder
 
 /**
  * The documents the editor serves, built from the same repository calls the app's own screens use.
@@ -408,9 +407,7 @@ class WebEditorDocuments(
                 apiKey = apiKey(),
                 basemap = chosen,
                 vectorTileTemplate = "http://$authority/tiles/${chosen.id}/{z}/{x}/{y}" +
-                    "${chosen.tileSuffix}$tokenQuery",
-                elevationTileTemplate = "http://$authority/tiles/${TileServerHolder.ELEVATION_ID}" +
-                    "/{z}/{x}/{y}${TileServerHolder.ELEVATION_SUFFIX}$tokenQuery"
+                    "${chosen.tileSuffix}$tokenQuery"
             )
         } else {
             null

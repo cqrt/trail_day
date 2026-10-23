@@ -41,8 +41,7 @@ object LinzVectorStyle {
     suspend fun load(
         apiKey: String,
         basemap: Basemap,
-        vectorTileTemplate: String?,
-        elevationTileTemplate: String?
+        vectorTileTemplate: String?
     ): String? = withContext(Dispatchers.IO) {
         val url = basemap.hostedStyleUrl(apiKey) ?: return@withContext null
         val body = read(url) ?: return@withContext null
@@ -66,10 +65,10 @@ object LinzVectorStyle {
                 ELEVATION_SOURCE,
                 buildJsonObject {
                     put("type", "raster-dem")
-                    put(
-                        "tiles",
-                        buildJsonArray { add(elevationTileTemplate ?: Basemap.elevationTemplate(apiKey)) }
-                    )
+                    // Straight from LINZ, exactly as LINZ's own style has it. The tile server is
+                    // what serves the vector tiles, but its elevation route was not producing a DEM
+                    // the renderer could shade, and the key is on the phone either way.
+                    put("tiles", buildJsonArray { add(Basemap.elevationTemplate(apiKey)) })
                     put("tileSize", 256)
                     put("minzoom", 0)
                     put("maxzoom", basemap.maxZoom)

@@ -276,8 +276,7 @@ fun BasemapView(
             LinzVectorStyle.load(
                 apiKey = apiKey,
                 basemap = basemap,
-                vectorTileTemplate = tileUrlTemplate,
-                elevationTileTemplate = TileServerHolder.elevationTemplateUrl()
+                vectorTileTemplate = tileUrlTemplate
             )
         } else {
             null
