@@ -1,11 +1,14 @@
 package nz.mckenzie.trailday.map
 
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
@@ -72,8 +75,20 @@ object WebStyleJson {
         assetsUrl: String,
         placeNamesUrl: String? = null,
         /** The terrain-rgb elevation, when the chosen basemap draws a LiDAR hillshade. */
-        elevationUrlTemplate: String? = null
-    ): String = buildJsonObject {
+        elevationUrlTemplate: String? = null,
+        /**
+         * LINZ's adapted vector style, when the chosen basemap uses one.
+         *
+         * The base document already carries its own sources, its own glyphs and its own 287 layers;
+         * the app adds its sources and its work on top rather than rebuilding the basemap.
+         */
+        baseStyleJson: String? = null
+    ): String {
+        if (baseStyleJson != null) {
+            val base = runCatching { Json.parseToJsonElement(baseStyleJson).jsonObject }.getOrNull()
+            if (base != null) return merged(base, assetsUrl)
+        }
+        return buildJsonObject {
         put("version", 8)
         put("name", "Trail Day - the work")
         // Where the phone's own map opens, so a page with nothing drawn on it yet opens there too
@@ -95,42 +110,82 @@ object WebStyleJson {
         put("glyphs", GlyphFonts.urlTemplateFrom(tileUrlTemplate))
         put("sources", sources(basemap, tileUrlTemplate, assetsUrl, placeNamesUrl, elevationUrlTemplate))
         put("layers", layers(basemap, placeNamesUrl != null, elevationUrlTemplate != null))
-    }.toString()
+        }.toString()
+    }
+
+    /**
+     * LINZ's style with the app's own sources and layers added.
+     *
+     * The base document is kept whole - its glyphs, its sprite, its sources and its 287 layers - and
+     * the work is appended after it, so the desk draws the clean vector Topographic map with the
+     * walker's tracks and places on top.
+     */
+    private fun merged(base: JsonObject, assetsUrl: String): String {
+        val appSources = sources(
+            basemap = Basemap.LINZ_TOPO_LIDAR_HILLSHADE,
+            tileUrlTemplate = "",
+            assetsUrl = assetsUrl,
+            placeNamesUrl = null,
+            elevationUrlTemplate = null,
+            includeBasemap = false
+        ).jsonObject
+        val appLayers = layers(
+            basemap = Basemap.LINZ_TOPO_LIDAR_HILLSHADE,
+            placeNames = false,
+            hillshade = false,
+            includeBase = false
+        ).jsonArray
+
+        val mergedSources = JsonObject(
+            (base["sources"] as? JsonObject)?.toMutableMap()?.apply { putAll(appSources) }
+                ?: appSources
+        )
+        val mergedLayers = JsonArray((base["layers"] as? JsonArray).orEmpty() + appLayers)
+        return JsonObject(
+            base.toMutableMap().apply {
+                put("sources", mergedSources)
+                put("layers", mergedLayers)
+            }
+        ).toString()
+    }
 
     private fun sources(
         basemap: Basemap,
         tileUrlTemplate: String,
         assetsUrl: String,
         placeNamesUrl: String?,
-        elevationUrlTemplate: String?
+        elevationUrlTemplate: String?,
+        includeBasemap: Boolean = true
     ) = buildJsonObject {
-        put(
-            basemap.id,
-            buildJsonObject {
-                put("type", "raster")
-                put("tiles", buildJsonArray { add(tileUrlTemplate) })
-                put("tileSize", 256)
-                put("minzoom", 0)
-                put("maxzoom", basemap.maxZoom)
-                // The credit the licence requires, in the source's own attribution, so the map
-                // itself carries it - the same as the app's own map.
-                put("attribution", basemap.attributionHtml())
-            }
-        )
-        // The elevation the LiDAR hillshade is drawn from, served by the phone's own tile server so
-        // the desk shades the same ground the phone does and the key never leaves the phone.
-        if (elevationUrlTemplate != null) {
+        if (includeBasemap) {
             put(
-                Basemap.ELEVATION_SOURCE_ID,
+                basemap.id,
                 buildJsonObject {
-                    put("type", "raster-dem")
-                    put("tiles", buildJsonArray { add(elevationUrlTemplate) })
+                    put("type", "raster")
+                    put("tiles", buildJsonArray { add(tileUrlTemplate) })
                     put("tileSize", 256)
                     put("minzoom", 0)
                     put("maxzoom", basemap.maxZoom)
+                    // The credit the licence requires, in the source's own attribution, so the map
+                    // itself carries it - the same as the app's own map.
                     put("attribution", basemap.attributionHtml())
                 }
             )
+            // The elevation the LiDAR hillshade is drawn from, served by the phone's own tile server so
+            // the desk shades the same ground the phone does and the key never leaves the phone.
+            if (elevationUrlTemplate != null) {
+                put(
+                    Basemap.ELEVATION_SOURCE_ID,
+                    buildJsonObject {
+                        put("type", "raster-dem")
+                        put("tiles", buildJsonArray { add(elevationUrlTemplate) })
+                        put("tileSize", 256)
+                        put("minzoom", 0)
+                        put("maxzoom", basemap.maxZoom)
+                        put("attribution", basemap.attributionHtml())
+                    }
+                )
+            }
         }
         put(
             ASSETS_SOURCE,
@@ -156,45 +211,52 @@ object WebStyleJson {
         }
     }
 
-    private fun layers(basemap: Basemap, placeNames: Boolean, hillshade: Boolean) = buildJsonArray {
-        add(
-            buildJsonObject {
-                put("id", "background")
-                put("type", "background")
-                put("paint", buildJsonObject { put("background-color", BACKGROUND) })
-            }
-        )
-        add(
-            buildJsonObject {
-                put("id", basemap.id)
-                put("type", "raster")
-                put("source", basemap.id)
-                put("minzoom", 0)
-                put("maxzoom", basemap.maxZoom)
-            }
-        )
-        // The LiDAR shade sits over the Topo map, exactly as LINZ's own style draws it.
-        if (hillshade) {
+    private fun layers(
+        basemap: Basemap,
+        placeNames: Boolean,
+        hillshade: Boolean,
+        includeBase: Boolean = true
+    ) = buildJsonArray {
+        if (includeBase) {
             add(
                 buildJsonObject {
-                    put("id", "hillshade")
-                    put("type", "hillshade")
-                    put("source", Basemap.ELEVATION_SOURCE_ID)
-                    put("minzoom", 0)
-                    put("maxzoom", basemap.maxZoom)
-                    put(
-                        "paint",
-                        buildJsonObject {
-                            put("hillshade-exaggeration", 0.4)
-                            put("hillshade-illumination-anchor", "map")
-                            put("hillshade-illumination-direction", 315)
-                            put("hillshade-shadow-color", "#0c0c0c")
-                            put("hillshade-highlight-color", "#e1e5e0")
-                            put("hillshade-accent-color", "#646464")
-                        }
-                    )
+                    put("id", "background")
+                    put("type", "background")
+                    put("paint", buildJsonObject { put("background-color", BACKGROUND) })
                 }
             )
+            add(
+                buildJsonObject {
+                    put("id", basemap.id)
+                    put("type", "raster")
+                    put("source", basemap.id)
+                    put("minzoom", 0)
+                    put("maxzoom", basemap.maxZoom)
+                }
+            )
+            // The LiDAR shade sits over the Topo map, exactly as LINZ's own style draws it.
+            if (hillshade) {
+                add(
+                    buildJsonObject {
+                        put("id", "hillshade")
+                        put("type", "hillshade")
+                        put("source", Basemap.ELEVATION_SOURCE_ID)
+                        put("minzoom", 0)
+                        put("maxzoom", basemap.maxZoom)
+                        put(
+                            "paint",
+                            buildJsonObject {
+                                put("hillshade-exaggeration", 0.4)
+                                put("hillshade-illumination-anchor", "map")
+                                put("hillshade-illumination-direction", 315)
+                                put("hillshade-shadow-color", "#0c0c0c")
+                                put("hillshade-highlight-color", "#e1e5e0")
+                                put("hillshade-accent-color", "#646464")
+                            }
+                        )
+                    }
+                )
+            }
         }
         // The names, straight over the imagery and **under the work**: this is the phone's own
         // arrangement, and the reason is the same on both - the work is what the map is for, and a

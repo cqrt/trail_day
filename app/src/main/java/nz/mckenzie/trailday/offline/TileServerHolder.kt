@@ -106,14 +106,14 @@ object TileServerHolder {
                             urlFor = { zoom, x, y -> basemap.tileUrl("", zoom, x, y) }
                         )
 
-                        // A hosted-style basemap draws from LINZ's own style, not from this server;
-                        // the route exists so the table stays whole, and serves the Topo raster for
-                        // anything that does ask.
+                        // The vector Topographic tiles, served through the same server as everything
+                        // else so the key stays on the phone and the desk can draw them too.
                         Basemap.LINZ_TOPO_LIDAR_HILLSHADE ->
                             currentKey.takeIf { it.isNotBlank() }?.let { key ->
                                 LinzTileFetcher(
                                     key,
-                                    urlFor = { zoom, x, y -> basemap.tileUrl(key, zoom, x, y) }
+                                    urlFor = { zoom, x, y -> basemap.tileUrl(key, zoom, x, y) },
+                                    accept = "application/x-protobuf"
                                 )
                             }
                     }

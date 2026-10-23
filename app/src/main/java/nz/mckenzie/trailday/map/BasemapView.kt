@@ -267,6 +267,23 @@ fun BasemapView(
     val mapViewState = remember { mutableStateOf<MapView?>(null) }
     var boundsApplied by remember { mutableStateOf(false) }
 
+    // LINZ's vector Topographic style is fetched and adapted before the renderer sees it: its `sky`
+    // block is dropped, its fonts and sprites get the key, and its two sources are pointed at the
+    // app's tile server. Null until it has arrived, and null forever for every other basemap.
+    var hostedStyleJson by remember(basemap, apiKey) { mutableStateOf<String?>(null) }
+    LaunchedEffect(basemap, apiKey, tileUrlTemplate) {
+        hostedStyleJson = if (basemap.usesHostedStyle && apiKey.isNotBlank()) {
+            LinzVectorStyle.load(
+                apiKey = apiKey,
+                basemap = basemap,
+                vectorTileTemplate = tileUrlTemplate,
+                elevationTileTemplate = TileServerHolder.elevationTemplateUrl()
+            )
+        } else {
+            null
+        }
+    }
+
     // The markers a place is drawn with are rendered at the device's own density, so a place is
     // the size it is meant to be, and sharp, on the screen it lands on. Read here and passed
     // in because a style is loaded from two places - the first frame, and a basemap change -
@@ -358,6 +375,7 @@ fun BasemapView(
                         basemap = basemap,
                         apiKey = apiKey,
                         tileUrlTemplate = tileUrlTemplate,
+                        hostedStyleJson = hostedStyleJson,
                         assetGeoJson = assetGeoJson,
                         yourTracksGeoJson = yourTracksGeoJson,
                         docGeoJson = docGeoJson,
@@ -385,7 +403,7 @@ fun BasemapView(
     // because they are a source the style either has or has not got - a style with no vector source
     // in it has nothing to show. It is a preference the walker sets once, not a switch they flip
     // while reading the map, and the tiles come from the app's own server either way.
-    LaunchedEffect(basemap, apiKey, tileUrlTemplate, placeNames) {
+    LaunchedEffect(basemap, apiKey, tileUrlTemplate, placeNames, hostedStyleJson) {
         val map = mapState.value
         val usable = !tileUrlTemplate.isNullOrBlank() || !basemap.needsKey || apiKey.isNotBlank()
         if (map != null && usable) {
@@ -393,6 +411,7 @@ fun BasemapView(
                 basemap = basemap,
                 apiKey = apiKey,
                 tileUrlTemplate = tileUrlTemplate,
+                hostedStyleJson = hostedStyleJson,
                 assetGeoJson = assetGeoJson,
                 yourTracksGeoJson = yourTracksGeoJson,
                 docGeoJson = docGeoJson,
@@ -520,6 +539,8 @@ internal fun MapLibreMap.loadTrailDayStyle(
     basemap: Basemap,
     apiKey: String,
     tileUrlTemplate: String?,
+    /** LINZ's adapted vector style, when this basemap uses one. Null for every basemap the app builds. */
+    hostedStyleJson: String? = null,
     assetGeoJson: String,
     /** The tracks the walker has recorded, drawn in the recorded green with the gold edge. */
     yourTracksGeoJson: String = AssetGeoJson.build(emptyList()),
@@ -541,15 +562,11 @@ internal fun MapLibreMap.loadTrailDayStyle(
     placeNames: Boolean,
     onLoaded: (Style) -> Unit
 ) {
-    // The LiDAR hillshade is two sources: the Topo raster and the terrain-rgb elevation the renderer
-    // shades. Both go through the app's own tile server, so the map keeps its key handling and cache.
-    val elevationTemplate = when {
-        basemap != Basemap.LINZ_TOPO_LIDAR_HILLSHADE -> null
-        !tileUrlTemplate.isNullOrBlank() -> TileServerHolder.elevationTemplateUrl()
-        apiKey.isNotBlank() -> Basemap.elevationTemplate(apiKey)
-        else -> null
-    }
     val json = when {
+        // LINZ's own vector Topographic style, already fetched and adapted. It is the one style the
+        // app does not build itself, because it is 287 layers of somebody else's cartography.
+        basemap.usesHostedStyle -> hostedStyleJson ?: BasemapStyles.blankStyleJson()
+
         // A running tile server is the preferred source: it serves downloaded areas
         // with no reception, keeps whatever it fetches, and holds the LINZ key so the
         // style does not have to. It is also the only place the letters for a track's name come
@@ -560,18 +577,13 @@ internal fun MapLibreMap.loadTrailDayStyle(
             basemap,
             tileUrlTemplate,
             glyphsUrl = GlyphFonts.urlTemplateFrom(tileUrlTemplate),
-            placeNamesUrl = if (placeNames) PlaceLabels.urlTemplateFrom(tileUrlTemplate) else null,
-            elevationUrlTemplate = elevationTemplate
+            placeNamesUrl = if (placeNames) PlaceLabels.urlTemplateFrom(tileUrlTemplate) else null
         )
 
         // No server (tests, previews). A basemap that needs no key can simply be talked to.
         !basemap.needsKey -> BasemapStyles.rasterStyleJson(basemap, basemap.tileTemplate(""))
 
-        apiKey.isNotBlank() -> BasemapStyles.rasterStyleJson(
-            basemap,
-            basemap.tileTemplate(apiKey),
-            elevationUrlTemplate = elevationTemplate
-        )
+        apiKey.isNotBlank() -> BasemapStyles.rasterStyleJson(basemap, basemap.tileTemplate(apiKey))
 
         // A key is needed and there is none: a calm placeholder rather than thousands of
         // tiles that will come back HTTP 400.

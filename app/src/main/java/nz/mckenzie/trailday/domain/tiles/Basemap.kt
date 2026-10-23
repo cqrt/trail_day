@@ -92,22 +92,21 @@ enum class Basemap(
     ),
 
     /**
-     * LINZ's Topo maps with a LiDAR hillshade under them.
+     * LINZ's clean vector Topographic map with its LiDAR hillshade.
      *
-     * **Two sources, not a single tile set.** The map is the Topo50/250 raster and a terrain-rgb
-     * elevation layer the renderer shades. The app builds that pair itself through its own tile
-     * server, so the key stays on the phone and the tiles are cached like every other basemap.
+     * **A vector style, not a raster tile set.** LINZ publishes `topographic-v2` as vector tiles plus
+     * a terrain-rgb elevation source, and its own style already draws the hillshade. The app fetches
+     * that style, points its two sources at the app's tile server, and loads it, so the key stays on
+     * the phone and both tile sets are cached like every other basemap.
      */
     LINZ_TOPO_LIDAR_HILLSHADE(
         id = "linz-topo-lidar-hillshade",
         displayName = "Topo LiDAR hillshade",
-        summary = "Topographic maps with LiDAR hillshade. Needs a LINZ key; tiles are cached when browsing.",
+        summary = "LINZ's clean Topographic map with LiDAR hillshade. Needs a LINZ key; tiles are cached when browsing.",
         needsKey = true,
-        tileSuffix = ".webp",
-        contentType = "image/webp",
-        maxZoom = 16,
-        // A hosted style cannot be pointed at the app's tile server, so it is looked at as it is
-        // browsed rather than downloaded ahead of time.
+        tileSuffix = ".pbf",
+        contentType = "application/x-protobuf",
+        maxZoom = 15,
         prefetchable = false,
         attribution = "LINZ CC BY 4.0 \u00a9 Topographic data and LiDAR hillshade",
         attributionLink = "https://www.linz.govt.nz/products-services/data/licensing-and-using-" +
@@ -133,8 +132,8 @@ enum class Basemap(
             "$TOPO_HOST/{z}/{x}/{y}.png"
 
         LINZ_TOPO_LIDAR_HILLSHADE ->
-            "$LINZ_HOST/v1/tiles/$LINZ_TOPO_LIDAR_HILLSHADE_TILESET/$LINZ_TILE_MATRIX/" +
-                "{z}/{x}/{y}.webp?api=${sanitiseKey(apiKey)}"
+            "$LINZ_HOST/v1/tiles/$LINZ_TOPOGRAPHIC_V2_TILESET/$LINZ_TILE_MATRIX/" +
+                "{z}/{x}/{y}.pbf?api=${sanitiseKey(apiKey)}"
     }
 
     /** One specific tile, as the fetchers need it. */
@@ -149,28 +148,27 @@ enum class Basemap(
             "$TOPO_HOST/$zoom/$x/$y.png"
 
         LINZ_TOPO_LIDAR_HILLSHADE ->
-            "$LINZ_HOST/v1/tiles/$LINZ_TOPO_LIDAR_HILLSHADE_TILESET/$LINZ_TILE_MATRIX/" +
-                "$zoom/$x/$y.webp?api=${sanitiseKey(apiKey)}"
+            "$LINZ_HOST/v1/tiles/$LINZ_TOPOGRAPHIC_V2_TILESET/$LINZ_TILE_MATRIX/" +
+                "$zoom/$x/$y.pbf?api=${sanitiseKey(apiKey)}"
     }
 
     /** Whether this basemap is one of LINZ's hosted style documents rather than a single tile set. */
     val usesHostedStyle: Boolean get() = this == LINZ_TOPO_LIDAR_HILLSHADE
 
     /**
-     * LINZ's own style document for a hosted-style basemap, with the key in it.
+     * LINZ's own style document for the vector Topographic basemap, with the key in it.
      *
-     * The style's own sources are rewritten by LINZ to carry the same key, so the renderer can fetch
-     * both the Topo raster and the elevation it shades without the app building either URL.
+     * The style is fetched by the app and adapted before it is loaded: LINZ's hosted document carries
+     * a `sky` block and glyph/sprite URLs without the key, and its sources are pointed at the app's
+     * tile server so the key stays on the phone. See [LinzVectorStyle].
      */
     fun hostedStyleUrl(apiKey: String): String? =
         if (!usesHostedStyle) {
             null
         } else {
-            "$LINZ_HOST/v1/tiles/$LINZ_TOPO_LIDAR_HILLSHADE_TILESET/$LINZ_TILE_MATRIX/" +
-                "style/$LINZ_TOPO_LIDAR_HILLSHADE_TILESET.json?api=${sanitiseKey(apiKey)}"
+            "$LINZ_HOST/v1/tiles/$LINZ_TOPOGRAPHIC_V2_TILESET/$LINZ_TILE_MATRIX/" +
+                "style/$LINZ_TOPOGRAPHIC_V2_TILESET.json?api=${sanitiseKey(apiKey)}"
         }
-
-
 
     /** The credit as HTML, single-quoted so it drops into a style document without escaping. */
     fun attributionHtml(): String = "<a href='$attributionLink'>$attribution</a>"
@@ -189,8 +187,8 @@ enum class Basemap(
         const val TOPO_HOST = "https://tile.opentopomap.org"
         const val LINZ_TILE_MATRIX = "WebMercatorQuad"
 
-        /** LINZ's Topo maps plus a LiDAR hillshade, published as a style over two sources. */
-        const val LINZ_TOPO_LIDAR_HILLSHADE_TILESET = "topo-raster-gridded"
+        /** LINZ's clean vector Topographic map, whose own style carries the LiDAR hillshade. */
+        const val LINZ_TOPOGRAPHIC_V2_TILESET = "topographic-v2"
 
         /** The hidden elevation source behind the hillshade, served by the app's tile server. */
         const val ELEVATION_SOURCE_ID = "linz-elevation"

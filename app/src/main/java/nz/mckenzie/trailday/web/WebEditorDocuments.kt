@@ -24,6 +24,7 @@ import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
+import nz.mckenzie.trailday.map.LinzVectorStyle
 import nz.mckenzie.trailday.map.WebStyleJson
 import nz.mckenzie.trailday.offline.HttpResponse
 import nz.mckenzie.trailday.offline.TileServerHolder
@@ -62,6 +63,8 @@ class WebEditorDocuments(
      * is asked for on every page load and the walker may have changed their mind in between.
      */
     private val placeNames: suspend () -> Boolean = { false },
+    /** The LINZ key, for a basemap whose style has to be fetched and adapted. */
+    private val apiKey: suspend () -> String = { "" },
     /** One file of the page, from the APK's own assets, or null when it ships no such file. */
     private val readPageFile: (String) -> ByteArray?,
     /**
@@ -397,6 +400,21 @@ class WebEditorDocuments(
 
     override suspend fun style(authority: String): String {
         val chosen = basemap()
+        // The vector Topographic basemap is LINZ's own 287-layer style. It is fetched and adapted so
+        // its `sky` block is dropped, its fonts get the key, and both of its sources come from this
+        // phone rather than from LINZ. The desk then draws the work over LINZ's own cartography.
+        val baseStyle = if (chosen.usesHostedStyle) {
+            LinzVectorStyle.load(
+                apiKey = apiKey(),
+                basemap = chosen,
+                vectorTileTemplate = "http://$authority/tiles/${chosen.id}/{z}/{x}/{y}" +
+                    "${chosen.tileSuffix}$tokenQuery",
+                elevationTileTemplate = "http://$authority/tiles/${TileServerHolder.ELEVATION_ID}" +
+                    "/{z}/{x}/{y}${TileServerHolder.ELEVATION_SUFFIX}$tokenQuery"
+            )
+        } else {
+            null
+        }
         return WebStyleJson.build(
             basemap = chosen,
             // The page's own requests carry the token in the URL, and MapLibre's requests do not go
@@ -413,13 +431,7 @@ class WebEditorDocuments(
                 "http://$authority/tiles/${PlaceLabels.ID}/{z}/{x}/{y}" +
                     "${PlaceLabels.TILE_SUFFIX}$tokenQuery"
             } else null,
-            // The hosted Topo + hillshade basemap is two sources, and the desk cannot read LINZ's
-            // hosted style. The shade's elevation comes from this phone's own server instead, so the
-            // desk draws the same ground with the key still on the phone.
-            elevationUrlTemplate = if (chosen.usesHostedStyle) {
-                "http://$authority/tiles/${TileServerHolder.ELEVATION_ID}/{z}/{x}/{y}" +
-                    "${TileServerHolder.ELEVATION_SUFFIX}$tokenQuery"
-            } else null
+            baseStyleJson = baseStyle
         )
     }
 

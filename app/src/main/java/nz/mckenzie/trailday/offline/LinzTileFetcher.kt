@@ -29,6 +29,8 @@ class LinzTileFetcher(
      */
     private val urlFor: (zoom: Int, x: Int, y: Int) -> String =
         { zoom, x, y -> Basemap.LINZ_AERIAL.tileUrl(apiKey, zoom, x, y) },
+    /** What the caller will accept: a picture, or the vector tiles of the Topographic map. */
+    private val accept: String = "image/webp,image/*",
     private val connectTimeoutMs: Int = 10_000,
     private val readTimeoutMs: Int = 20_000
 ) : TileFetcher {
@@ -43,7 +45,7 @@ class LinzTileFetcher(
                     connectTimeout = connectTimeoutMs
                     readTimeout = readTimeoutMs
                     setRequestProperty("User-Agent", sprayDayUserAgent())
-                    setRequestProperty("Accept", "image/webp,image/*")
+                    setRequestProperty("Accept", accept)
                 }
                 try {
                     when (val code = connection.responseCode) {

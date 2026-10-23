@@ -169,12 +169,12 @@ class BasemapTest {
     }
 
     @Test
-    fun `the LiDAR hillshade basemap loads LINZ's own style with the key in it`() {
+    fun `the LiDAR hillshade basemap loads LINZ's own vector style with the key in it`() {
         val hillshade = Basemap.LINZ_TOPO_LIDAR_HILLSHADE
 
         assertEquals(
-            "https://basemaps.linz.govt.nz/v1/tiles/topo-raster-gridded/WebMercatorQuad/" +
-                "style/topo-raster-gridded.json?api=$key",
+            "https://basemaps.linz.govt.nz/v1/tiles/topographic-v2/WebMercatorQuad/" +
+                "style/topographic-v2.json?api=$key",
             hillshade.hostedStyleUrl(key)
         )
         assertTrue(hillshade.usesHostedStyle)
@@ -196,14 +196,17 @@ class BasemapTest {
     }
 
     @Test
-    fun `the LiDAR hillshade basemap still names the Topo raster tiles it draws under the shade`() {
+    fun `the LiDAR hillshade basemap names the vector Topographic tiles`() {
         val hillshade = Basemap.LINZ_TOPO_LIDAR_HILLSHADE
 
         assertEquals(
-            "https://basemaps.linz.govt.nz/v1/tiles/topo-raster-gridded/WebMercatorQuad/" +
-                "14/1017/660.webp?api=$key",
+            "https://basemaps.linz.govt.nz/v1/tiles/topographic-v2/WebMercatorQuad/" +
+                "14/1017/660.pbf?api=$key",
             hillshade.tileUrl(key, 14, 1017, 660)
         )
+        assertEquals(".pbf", hillshade.tileSuffix)
+        assertEquals("application/x-protobuf", hillshade.contentType)
+        assertEquals(15, hillshade.maxZoom)
     }
 
     @Test

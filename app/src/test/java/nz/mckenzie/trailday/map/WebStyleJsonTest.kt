@@ -410,6 +410,43 @@ class WebStyleJsonTest {
     }
 
     @Test
+    fun `a hosted vector style keeps its own layers and gains the work on top`() {
+        val base = """
+            {
+              "version": 8,
+              "name": "topographic-v2",
+              "glyphs": "https://basemaps.linz.govt.nz/v1/fonts/{fontstack}/{range}.pbf?api=k",
+              "sources": {
+                "LINZ Basemaps": { "type": "vector", "tiles": ["http://phone/tiles/linz-topo-lidar-hillshade/{z}/{x}/{y}.pbf?k=1"] }
+              },
+              "layers": [
+                { "id": "land", "type": "fill", "source": "LINZ Basemaps", "source-layer": "land" },
+                { "id": "hillshade", "type": "hillshade", "source": "LINZ-Elevation-Hillshade" }
+              ]
+            }
+        """.trimIndent()
+
+        val style = Json.parseToJsonElement(
+            WebStyleJson.build(
+                Basemap.LINZ_TOPO_LIDAR_HILLSHADE,
+                "http://phone/tiles/linz-topo-lidar-hillshade/{z}/{x}/{y}.pbf?k=1",
+                assets,
+                baseStyleJson = base
+            )
+        ).jsonObject
+
+        val ids = style["layers"]!!.jsonArray.map { it.jsonObject["id"]!!.jsonPrimitive.content }
+        assertTrue("LINZ's own layers survive", ids.contains("land"))
+        assertTrue("its hillshade survives", ids.contains("hillshade"))
+        assertTrue("and the work is on top", ids.containsAll(AssetLayerIds.ALL))
+        assertEquals(
+            "and its own glyphs are kept",
+            "https://basemaps.linz.govt.nz/v1/fonts/{fontstack}/{range}.pbf?api=k",
+            style["glyphs"]!!.jsonPrimitive.content
+        )
+    }
+
+    @Test
     fun `the desk draws the LiDAR hillshade when the basemap is the hosted style`() {
         val hillshade = Json.parseToJsonElement(
             WebStyleJson.build(
