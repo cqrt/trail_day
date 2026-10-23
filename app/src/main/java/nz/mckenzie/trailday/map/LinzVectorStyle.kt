@@ -72,9 +72,10 @@ object LinzVectorStyle {
                     put("tileSize", 256)
                     put("minzoom", 0)
                     put("maxzoom", basemap.maxZoom)
-                    // LINZ serves the Mapbox terrain-rgb encoding; saying so is what lets the
-                    // renderer turn the picture into heights rather than read it as a flat image.
-                    put("encoding", "terrain-rgb")
+                    // MapLibre Native accepts only `mapbox` and `terrarium` here. LINZ's
+                    // `pipeline=terrain-rgb` is Mapbox Terrain-RGB, so this is the correct value -
+                    // and an unrecognised one is an error the native parser does not recover from.
+                    put("encoding", "mapbox")
                 }
             )
         }
@@ -107,9 +108,24 @@ object LinzVectorStyle {
         if (shadeIndex < 0) return JsonArray(layers)
 
         val shade = layers.removeAt(shadeIndex) as JsonObject
-        val paint = (shade["paint"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
-        paint["hillshade-exaggeration"] = JsonPrimitive(1.0)
-        val stronger = JsonObject(shade.toMutableMap().apply { put("paint", JsonObject(paint)) })
+        // LINZ's own colours fade to almost nothing at walking zooms (the highlight is 7% opaque at
+        // z11-14), and their interpolate expressions are another thing for the native parser to
+        // carry. Plain, stronger colours are what make the shade read on a phone.
+        val stronger = JsonObject(
+            shade.toMutableMap().apply {
+                put(
+                    "paint",
+                    buildJsonObject {
+                        put("hillshade-exaggeration", 1.0)
+                        put("hillshade-illumination-anchor", "map")
+                        put("hillshade-illumination-direction", 315)
+                        put("hillshade-shadow-color", "rgba(12, 12, 12, 0.85)")
+                        put("hillshade-highlight-color", "rgba(255, 255, 255, 0.45)")
+                        put("hillshade-accent-color", "rgba(70, 70, 70, 0.55)")
+                    }
+                )
+            }
+        )
 
         // Under the labels, over the fills: in LINZ's own order the shade sits below the landcover,
         // which is why it was invisible. The first symbol layer is the boundary that keeps the names
