@@ -196,6 +196,17 @@ class BasemapTest {
     }
 
     @Test
+    fun `each basemap has a real preview tile of its own`() {
+        assertTrue(aerial.previewTileUrl(key, 12, 2015, 1280).contains("/aerial/"))
+        assertTrue(osm.previewTileUrl("", 12, 2015, 1280).contains("tile.openstreetmap.org"))
+        assertTrue(topo.previewTileUrl("", 12, 2015, 1280).contains("tile.opentopomap.org"))
+        assertTrue(
+            Basemap.LINZ_TOPO_LIDAR_HILLSHADE.previewTileUrl(key, 12, 2015, 1280)
+                .contains("/topo-raster/")
+        )
+    }
+
+    @Test
     fun `the DEM hillshade is LINZ's own pre-rendered layer, keyed`() {
         assertEquals(
             "https://basemaps.linz.govt.nz/v1/tiles/hillshade/WebMercatorQuad/14/1017/660.webp" +

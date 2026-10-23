@@ -87,6 +87,7 @@ fun SettingsScreen(
     }
     val activeKeyLabel by viewModel.activeKeyLabel.collectAsStateWithLifecycle()
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
+    val linzKey by viewModel.linzKey.collectAsStateWithLifecycle()
     val themeChoice by viewModel.themeChoice.collectAsStateWithLifecycle()
     val webEditorUrl by viewModel.webEditorUrl.collectAsStateWithLifecycle()
     val webEditorTokenRequired by viewModel.webEditorTokenRequired.collectAsStateWithLifecycle()
@@ -221,14 +222,16 @@ fun SettingsScreen(
 
                     Text("Basemap", style = MaterialTheme.typography.titleMedium)
 
-                    ChoiceRow(
-                        choices = Basemap.entries,
-                        selected = basemap,
-                        onChoose = viewModel::setBasemap,
-                        text = { it.displayName }
-                    )
-
-                    Text(basemap.summary, style = MaterialTheme.typography.bodySmall)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Basemap.entries.forEach { choice ->
+                            BasemapChoice(
+                                basemap = choice,
+                                selected = choice == basemap,
+                                apiKey = linzKey,
+                                onClick = { viewModel.setBasemap(choice) }
+                            )
+                        }
+                    }
 
 
                     // Their tile usage policy asks for a way to report a problem, and a gate that

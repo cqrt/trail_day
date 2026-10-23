@@ -141,6 +141,19 @@ class SettingsViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialSource())
 
+    /**
+     * The LINZ key itself, for the basemap picker's preview tiles.
+     *
+     * Not shown anywhere: it is handed to the preview composable so each basemap can fetch one real
+     * tile. The masked [activeKeyLabel] stays the only form the walker ever reads.
+     */
+    val linzKey: StateFlow<String> = settings.linzApiKey
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+            BuildConfig.LINZ_API_KEY
+        )
+
     /** The key actually in force, masked: enough to tell two keys apart, no more. */
     val activeKeyLabel: StateFlow<String> = settings.linzApiKey
         .map { key -> if (key.isBlank()) "" else maskKey(key) }

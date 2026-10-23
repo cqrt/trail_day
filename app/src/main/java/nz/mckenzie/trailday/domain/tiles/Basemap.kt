@@ -79,7 +79,7 @@ enum class Basemap(
 
     TOPOGRAPHIC(
         id = "topo",
-        displayName = "Topographic",
+        displayName = "Topographic (OSM)",
         summary = "No key needed; cannot be downloaded but tiles are cached when browsing.",
         needsKey = false,
         tileSuffix = ".png",
@@ -101,7 +101,7 @@ enum class Basemap(
      */
     LINZ_TOPO_LIDAR_HILLSHADE(
         id = "linz-topo-lidar-hillshade",
-        displayName = "Topo LiDAR hillshade",
+        displayName = "Topographic (LINZ)",
         summary = "LINZ's clean Topographic map with LiDAR hillshade. Needs a LINZ key; tiles are cached when browsing.",
         needsKey = true,
         tileSuffix = ".pbf",
@@ -152,6 +152,21 @@ enum class Basemap(
                 "$zoom/$x/$y.pbf?api=${sanitiseKey(apiKey)}"
     }
 
+    /**
+     * One tile to show beside this basemap in the picker.
+     *
+     * A real tile from the source, at a fixed place and zoom, so the walker sees what each map
+     * actually looks like. The vector Topographic map cannot be drawn as a raster tile, so its
+     * preview is LINZ's clean gridless Topo raster of the same ground - the closest honest picture.
+     */
+    fun previewTileUrl(apiKey: String, zoom: Int, x: Int, y: Int): String = when (this) {
+        LINZ_AERIAL -> tileUrl(apiKey, zoom, x, y)
+        OPENSTREETMAP, TOPOGRAPHIC -> tileUrl("", zoom, x, y)
+        LINZ_TOPO_LIDAR_HILLSHADE ->
+            "$LINZ_HOST/v1/tiles/$PREVIEW_TOPO_TILESET/$LINZ_TILE_MATRIX/" +
+                "$zoom/$x/$y.webp?api=${sanitiseKey(apiKey)}"
+    }
+
     /** Whether this basemap is one of LINZ's hosted style documents rather than a single tile set. */
     val usesHostedStyle: Boolean get() = this == LINZ_TOPO_LIDAR_HILLSHADE
 
@@ -189,6 +204,9 @@ enum class Basemap(
 
         /** LINZ's clean vector Topographic map, whose own style carries the LiDAR hillshade. */
         const val LINZ_TOPOGRAPHIC_V2_TILESET = "topographic-v2"
+
+        /** LINZ's gridless Topo raster, used only as the picker's picture of the vector map. */
+        const val PREVIEW_TOPO_TILESET = "topo-raster"
 
         /** The hidden elevation source behind the hillshade, served by the app's tile server. */
         const val ELEVATION_SOURCE_ID = "linz-elevation"
