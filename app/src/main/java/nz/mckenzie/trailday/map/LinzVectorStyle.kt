@@ -100,14 +100,27 @@ object LinzVectorStyle {
      * built-in layer at a higher exaggeration is the better answer.
      */
     private fun layersWithStrongerHillshade(root: JsonObject): JsonArray {
-        val original = (root["layers"] as? JsonArray).orEmpty()
-        return JsonArray(original.map { element ->
-            val layer = element as? JsonObject ?: return@map element
-            if (layer["id"]?.jsonPrimitive?.contentOrNull != "hillshade") return@map element
-            val paint = (layer["paint"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
-            paint["hillshade-exaggeration"] = JsonPrimitive(1.0)
-            JsonObject(layer.toMutableMap().apply { put("paint", JsonObject(paint)) })
-        })
+        val layers = (root["layers"] as? JsonArray).orEmpty().toMutableList()
+
+        val shadeIndex = layers.indexOfFirst { element ->
+            (element as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull == "hillshade"
+        }
+        if (shadeIndex < 0) return JsonArray(layers)
+
+        val shade = layers.removeAt(shadeIndex) as JsonObject
+        val paint = (shade["paint"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
+        paint["hillshade-exaggeration"] = JsonPrimitive(1.0)
+        val stronger = JsonObject(shade.toMutableMap().apply { put("paint", JsonObject(paint)) })
+
+        // Under the labels, over the fills: in LINZ's own order the shade sits below the landcover,
+        // which is why it was invisible. The first symbol layer is the boundary that keeps the names
+        // readable.
+        val insertAt = layers.indexOfFirst { element ->
+            (element as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull == "symbol"
+        }.let { if (it < 0) layers.size else it }
+        layers.add(insertAt, stronger)
+
+        return JsonArray(layers)
     }
 
     /** A LINZ asset URL with the key added, whichever separator it already needs. */
