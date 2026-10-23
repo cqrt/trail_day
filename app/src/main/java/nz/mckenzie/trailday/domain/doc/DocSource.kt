@@ -98,6 +98,14 @@ enum class DocSource(
     val id: String,
     /** What the walker reads on a tab or a filter: "Huts", "Bike locations". */
     val displayName: String,
+    /**
+     * The same service in one word, for a control that has to share one line with three others.
+     *
+     * "Bike Trails" is two words, and two words is what pushes the fourth of four choices onto a line of
+     * its own on a small screen. This is for the control only; every other surface still says
+     * [displayName].
+     */
+    val shortName: String,
     /** One of these in the singular, for naming a row DOC gave no name to. */
     val singular: String,
     /** DOC's own service folder, under the host below. */
@@ -137,6 +145,7 @@ enum class DocSource(
     TRACKS(
         id = "tracks",
         displayName = "Tracks",
+        shortName = "Tracks",
         singular = "Track",
         service = "DOC_Tracks_Open_Data",
         shape = DocShape.LINE,
@@ -161,6 +170,7 @@ enum class DocSource(
     HUTS(
         id = "huts",
         displayName = "Huts",
+        shortName = "Huts",
         singular = "Hut",
         service = "DOC_Huts",
         shape = DocShape.POINT,
@@ -187,6 +197,7 @@ enum class DocSource(
     CAMPSITES(
         id = "campsites",
         displayName = "Camps",
+        shortName = "Camps",
         singular = "Campsite",
         service = "DOC_Campsites",
         shape = DocShape.POINT,
@@ -213,6 +224,7 @@ enum class DocSource(
     BIKES(
         id = "bikes",
         displayName = "Bike Trails",
+        shortName = "Bikes",
         singular = "Bike Trail",
         service = "DOC_Mountain_Bike_Tracks",
         shape = DocShape.POINT,

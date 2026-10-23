@@ -27,6 +27,9 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -39,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.doc.DocBikeLinks
@@ -54,16 +58,22 @@ import nz.mckenzie.trailday.ui.docRowDetail
 import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
 
 /**
+ * How tall the browser's dense controls are: a pill that still reads as something to press, in a bar where
+ * Material's own minimum is what pushes the last control onto a line of its own.
+ */
+private val DenseControlHeight = 32.dp
+
+/**
  * What DOC publishes, read through the phone: one of its four services at a time, searched and narrowed.
  *
  * **The phone does the asking, and nothing here is written.** A search is a question put to DOC on the
  * walker's behalf, and a filter narrows the page already here rather than asking again.
  *
  * The shape is the mock screens': **the question on one white deck across the top** - a search field with a
- * magnifier, the sources as chips, a pill for "near me" that carries its own distance, and the filter and the
- * order as pills - and **the answer in its own viewport below it**: how many came back and in what order,
- * then each thing DOC published as a card - the kind's tile, the name, DOC's own facts about it, and how far
- * away it is in the app's own colour.
+ * magnifier, the sources as one segmented bar, a pill for "near me" that carries its own distance, and the
+ * filter and the order as pills - and **the answer in its own viewport below it**: how many came back and in
+ * what order, then each thing DOC published as a card - the kind's tile, the name, DOC's own facts about it,
+ * and how far away it is in the app's own colour.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -232,6 +242,11 @@ fun DocBrowserScreen(
  * than two things on it, and every wrapped row cost the list a row of results. The chips and the pills are
  * therefore the shorter ones, and the distance "near me" looks is carried by its own pill rather than by a
  * text field beside it.
+ *
+ * **The sources and the tools are drawn as different things**, because they are: the sources are one choice
+ * out of four, so they are a single segmented bar that shares its width between them; the tools are three
+ * separate things that each do something, so they are three separate pills. Four chips and three chips of
+ * the same shape read as one row of seven.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -265,7 +280,7 @@ private fun DocControlsDeck(
         shadowElevation = 2.dp
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // The search, and the button that asks it. The keyboard's own search key works too, but a
@@ -295,24 +310,41 @@ private fun DocControlsDeck(
                 }
             }
 
-            // Which of DOC's services is being read. Asked here rather than with the search, because it
-            // is not part of the question - it is which of four datasets the question is put to. Dense
-            // chips, so all four hold one line.
-            ChoiceRow(
-                choices = DocSource.entries,
-                selected = source,
-                onChoose = onChooseSource,
-                text = { it.displayName },
-                compact = true
-            )
+            // Which of DOC's services is being read: **a selector, not a set of buttons**. It is drawn as
+            // one segmented bar rather than four chips so that it reads as the one choice it is, and so
+            // that the four share the row by width - four chips of their own length is what pushed the
+            // last one onto a second line on a narrow screen.
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                DocSource.entries.forEachIndexed { index, option ->
+                    SegmentedButton(
+                        selected = option == source,
+                        onClick = { onChooseSource(option) },
+                        shape = SegmentedButtonDefaults.itemShape(
+                            index = index,
+                            count = DocSource.entries.size
+                        ),
+                        // No tick: the filled segment is what says which one is chosen, and in a bar this
+                        // narrow the tick was the difference between one line and two.
+                        icon = {},
+                        label = {
+                            Text(
+                                text = option.shortName,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
+                        modifier = Modifier.height(DenseControlHeight)
+                    )
+                }
+            }
 
-            // How the answer is narrowed and ordered, and how far around the phone it looks. Dense
-            // controls, so the whole row is one line: the distance rides on the "near me" pill rather
-            // than in a field of its own, which is what used to push the filter and the order onto a
-            // second line and cost the list a row.
+            // How the answer is narrowed and ordered, and how far around the phone it looks. These are
+            // **the tools, not the sources**: separate pills that each do something, rather than one bar
+            // that chooses. Dense, so the whole row holds one line even with a hundred-kilometre radius.
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 NearMeControl(
                     nearMe = nearMe,
@@ -335,9 +367,9 @@ private fun DocControlsDeck(
                         onClick = { onBikeOnly(!bikeOnly) },
                         shape = CircleShape,
                         label = {
-                            Text("Bike-friendly", style = MaterialTheme.typography.labelMedium)
+                            Text("Bike-friendly", style = MaterialTheme.typography.labelSmall)
                         },
-                        modifier = Modifier.height(DenseChipHeight)
+                        modifier = Modifier.height(DenseControlHeight)
                     )
                 }
             }
@@ -354,7 +386,8 @@ private val NearMeRadiusChoices = listOf(5, 10, 25, 50, 100)
  * Off, it says what it would do and turns itself on. On, it says how far it is looking and opens a menu of
  * distances - and the way back off. The distance used to sit in a text field of its own, which was taller
  * than the pill beside it and pushed the filter and the order onto a second line; the menu keeps the same
- * answer without costing the list a row, and the chevron is what says so.
+ * answer without costing the list a row, and the chevron is what says so. The locate glyph carries the
+ * "near me" part once the pill is green, so the pill has room to say the distance instead.
  */
 @Composable
 private fun NearMeControl(
@@ -369,19 +402,24 @@ private fun NearMeControl(
             selected = nearMe,
             onClick = { if (nearMe) open = true else onNearMeChange(true) },
             shape = CircleShape,
+            // The locate glyph stands in for the words once it is on, so the pill can say how far it is
+            // looking instead of repeating what its own green fill already says. "Near me" and "100 km"
+            // together was the widest thing in the bar, and it was what pushed the order onto a second
+            // line on a narrow screen.
+            leadingIcon = { AppIcon(glyph = IconGlyph.LOCATE, dimension = 14.dp) },
             label = {
                 Text(
-                    text = if (nearMe) "Near me \u00b7 ${radiusKm.ifBlank { "25" }} km" else "Near me",
-                    style = MaterialTheme.typography.labelMedium
+                    text = if (nearMe) "${radiusKm.ifBlank { "25" }} km" else "Near me",
+                    style = MaterialTheme.typography.labelSmall
                 )
             },
             // Only when it is on: the chevron is what says the pill now opens a menu rather than switching.
             trailingIcon = if (nearMe) {
-                { AppIcon(glyph = IconGlyph.CHEVRON, dimension = 14.dp, modifier = Modifier.rotate(90f)) }
+                { AppIcon(glyph = IconGlyph.CHEVRON, dimension = 10.dp, modifier = Modifier.rotate(90f)) }
             } else {
                 null
             },
-            modifier = Modifier.height(DenseChipHeight)
+            modifier = Modifier.height(DenseControlHeight)
         )
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             MenuHeading("How far around the phone")
@@ -452,14 +490,14 @@ private fun FilterMenu(
         OutlinedButton(
             onClick = { open = true },
             enabled = offerable.isNotEmpty(),
-            modifier = Modifier.height(DenseChipHeight),
-            contentPadding = PaddingValues(horizontal = 12.dp)
+            modifier = Modifier.height(DenseControlHeight),
+            contentPadding = PaddingValues(horizontal = 8.dp)
         ) {
             Text(
                 text = if (count == 0) "Filter" else "Filter ($count)",
-                style = MaterialTheme.typography.labelMedium
+                style = MaterialTheme.typography.labelSmall
             )
-            AppIcon(glyph = IconGlyph.CHEVRON, dimension = 14.dp, modifier = Modifier.rotate(90f))
+            AppIcon(glyph = IconGlyph.CHEVRON, dimension = 10.dp, modifier = Modifier.rotate(90f))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             offerable.forEach { (filter, values) ->
@@ -498,11 +536,11 @@ private fun SortMenu(sort: DocSort, onSort: (DocSort) -> Unit) {
     Box {
         OutlinedButton(
             onClick = { open = true },
-            modifier = Modifier.height(DenseChipHeight),
-            contentPadding = PaddingValues(horizontal = 12.dp)
+            modifier = Modifier.height(DenseControlHeight),
+            contentPadding = PaddingValues(horizontal = 8.dp)
         ) {
-            Text(label, style = MaterialTheme.typography.labelMedium)
-            AppIcon(glyph = IconGlyph.CHEVRON, dimension = 14.dp, modifier = Modifier.rotate(90f))
+            Text(label, style = MaterialTheme.typography.labelSmall)
+            AppIcon(glyph = IconGlyph.CHEVRON, dimension = 10.dp, modifier = Modifier.rotate(90f))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             MenuChoice("Nearest to phone", sort == DocSort.NEAREST) {
