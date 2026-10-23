@@ -1,6 +1,5 @@
 package nz.mckenzie.trailday.ui.screens
 
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,26 +15,18 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import nz.mckenzie.trailday.domain.tiles.Basemap
-import nz.mckenzie.trailday.offline.sprayDayUserAgent
-import java.net.HttpURLConnection
-import java.net.URL
-import kotlin.math.cos
-import kotlin.math.ln
-import kotlin.math.tan
+import nz.mckenzie.trailday.map.BasemapPreviewCache
 
 /**
  * A real tile of [basemap], for the picker to show what the map looks like.
  *
- * The tile is fetched once per basemap and key, at a fixed place and zoom: one picture of the
- * ground, not a live map, so a settings screen with five of them costs five tiles rather than five
- * renderers. A tile that will not come is a calm tile with the basemap's initial rather than a
- * broken picture.
+ * The tile comes from [BasemapPreviewCache], which the application prefetches at launch: one small
+ * tile per basemap, remembered for the life of the process, so the picker draws its pictures at
+ * once rather than waiting on the network every time it opens. A tile that will not come is a calm
+ * tile with the basemap's initial rather than a broken picture.
  */
 @Composable
 internal fun BasemapPreview(
@@ -44,7 +35,7 @@ internal fun BasemapPreview(
     modifier: Modifier = Modifier
 ) {
     val tile by produceState<ImageBitmap?>(initialValue = null, basemap, apiKey) {
-        value = withContext(Dispatchers.IO) { fetchTile(basemap, apiKey) }
+        value = BasemapPreviewCache.load(basemap, apiKey)
     }
 
     Surface(
@@ -126,47 +117,3 @@ internal fun BasemapChoice(
         }
     }
 }
-
-private fun fetchTile(basemap: Basemap, apiKey: String): ImageBitmap? {
-    if (basemap.needsKey && apiKey.isBlank()) return null
-
-    val (x, y) = previewTile(PREVIEW_LAT, PREVIEW_LNG, PREVIEW_ZOOM)
-    val url = basemap.previewTileUrl(apiKey, PREVIEW_ZOOM, x, y)
-
-    val connection = runCatching {
-        (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 8_000
-            readTimeout = 12_000
-            setRequestProperty("User-Agent", sprayDayUserAgent())
-        }
-    }.getOrNull() ?: return null
-
-    return try {
-        if (connection.responseCode != HttpURLConnection.HTTP_OK) return null
-        val bytes = connection.inputStream.use { it.readBytes() }
-        runCatching {
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-        }.getOrNull()
-    } catch (_: Exception) {
-        null
-    } finally {
-        connection.disconnect()
-    }
-}
-
-/** The XYZ tile holding [lat]/[lng] at [zoom], in the usual Web Mercator scheme. */
-private fun previewTile(lat: Double, lng: Double, zoom: Int): Pair<Int, Int> {
-    val side = 1 shl zoom
-    val x = ((lng + 180.0) / 360.0 * side).toInt().coerceIn(0, side - 1)
-    val latitude = Math.toRadians(lat)
-    val y = ((1.0 - ln(tan(latitude) + 1.0 / cos(latitude)) / Math.PI) / 2.0 * side)
-        .toInt()
-        .coerceIn(0, side - 1)
-    return x to y
-}
-
-/** A piece of ground every basemap shows the same way, so the pictures can be compared. */
-private const val PREVIEW_LAT = -45.9395714
-private const val PREVIEW_LNG = 168.3909702
-private const val PREVIEW_ZOOM = 12

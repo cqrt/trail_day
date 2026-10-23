@@ -267,6 +267,11 @@ fun BasemapView(
     val mapViewState = remember { mutableStateOf<MapView?>(null) }
     var boundsApplied by remember { mutableStateOf(false) }
 
+    // The first style load is the map opening; every later one is a basemap change, and a walker
+    // switching maps is reading the ground under them, not asking to be sent home. So the camera is
+    // captured before a later style load and put back once it has finished.
+    var styleLoadedOnce by remember { mutableStateOf(false) }
+
     // LINZ's vector Topographic style is fetched and adapted before the renderer sees it: its `sky`
     // block is dropped, its fonts and sprites get the key, and its two sources are pointed at the
     // app's tile server. Null until it has arrived, and null forever for every other basemap.
@@ -375,6 +380,7 @@ fun BasemapView(
                         apiKey = apiKey,
                         tileUrlTemplate = tileUrlTemplate,
                         hostedStyleJson = hostedStyleJson,
+                        preserveCamera = styleLoadedOnce,
                         assetGeoJson = assetGeoJson,
                         yourTracksGeoJson = yourTracksGeoJson,
                         docGeoJson = docGeoJson,
@@ -386,6 +392,7 @@ fun BasemapView(
                         hiddenYourPlaces = hiddenYourPlaces,
                         placeNames = placeNames
                     ) { style ->
+                        styleLoadedOnce = true
                         styleState.value = style
                     }
                 }
@@ -411,6 +418,7 @@ fun BasemapView(
                 apiKey = apiKey,
                 tileUrlTemplate = tileUrlTemplate,
                 hostedStyleJson = hostedStyleJson,
+                preserveCamera = styleLoadedOnce,
                 assetGeoJson = assetGeoJson,
                 yourTracksGeoJson = yourTracksGeoJson,
                 docGeoJson = docGeoJson,
@@ -422,6 +430,7 @@ fun BasemapView(
                 hiddenYourPlaces = hiddenYourPlaces,
                 placeNames = placeNames
             ) { style ->
+                styleLoadedOnce = true
                 styleState.value = style
             }
         }
@@ -540,6 +549,13 @@ internal fun MapLibreMap.loadTrailDayStyle(
     tileUrlTemplate: String?,
     /** LINZ's adapted vector style, when this basemap uses one. Null for every basemap the app builds. */
     hostedStyleJson: String? = null,
+    /**
+     * Whether to put the camera back where it was once the new style has loaded.
+     *
+     * True for a basemap change: a walker switching maps is looking at the ground in front of them,
+     * and a style load must not send them back to the phone.
+     */
+    preserveCamera: Boolean = false,
     assetGeoJson: String,
     /** The tracks the walker has recorded, drawn in the recorded green with the gold edge. */
     yourTracksGeoJson: String = AssetGeoJson.build(emptyList()),
@@ -589,7 +605,13 @@ internal fun MapLibreMap.loadTrailDayStyle(
         else -> BasemapStyles.blankStyleJson()
     }
 
+    // A style load can put the camera back to the style's own default. A basemap change must not:
+    // the walker is reading the ground they are looking at, so the camera is taken before the load
+    // and put back after it.
+    val preservedCamera = if (preserveCamera) cameraPosition else null
+
     setStyle(Style.Builder().fromJson(json)) { style ->
+        preservedCamera?.let { cameraPosition = it }
         // DOC's material first, so it lies **under** the walker's own work: what you made is what you
         // are reading, and the reference is the ground it sits on.
         if (style.getSource(DOC_SOURCE) == null) {

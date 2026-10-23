@@ -4,9 +4,11 @@ import android.app.Application
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.backup.BackupScheduler
 import nz.mckenzie.trailday.data.SettingsRepository
+import nz.mckenzie.trailday.map.BasemapPreviewCache
 import nz.mckenzie.trailday.offline.TileServerHolder
 import nz.mckenzie.trailday.tracking.DevicePosition
 import nz.mckenzie.trailday.update.UpdateCheckScheduler
@@ -38,6 +40,12 @@ class TrailDayApplication : Application() {
 
         // The switches below have to actually stop the job they name, or the setting is a lie.
         val settings = SettingsRepository(this)
+
+        // The basemap picker's example tiles, fetched once at launch: one small tile each, so the
+        // pictures are there the moment Settings is opened rather than arriving while it is read.
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            BasemapPreviewCache.loadAll(settings.linzApiKey.first())
+        }
 
         // The same for the update check: the switch that turns it off has to actually
         // stop the job that does it, or the setting is a lie.
