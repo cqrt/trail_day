@@ -219,7 +219,10 @@ fun MapScreen(
                         // than growing a nearest-thing answer nobody asked for.
                         viewModel.clearPickedPlace()
                         mapScope.launch {
-                            val picked = viewModel.pickDocAt(lat, lng, radiusM)
+                            // The page this opens is the card at full size, so the map's own card is not
+                            // raised for it: coming back from the page should be coming back to the map,
+                            // not to the same thing twice.
+                            val picked = viewModel.pickDocAt(lat, lng, radiusM, raiseCard = false)
                             if (picked != null) {
                                 onOpenDocDetail(picked, viewModel.bikeFor(picked))
                             }

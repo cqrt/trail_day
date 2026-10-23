@@ -461,8 +461,19 @@ class MapViewModel(
      * Read from the cache rather than from the map's own flow, so a tap answers from what the phone holds even
      * if nothing is watching the reference layer at that moment - and worked out off the main thread, because
      * DOC's cache can hold thousands of things and a tap must not stop the map drawing.
+     *
+     * **[raiseCard] is false for a caller that opens the thing's own page.** The page is the card at full
+     * size, so the map's own card is not raised at all: raising it and putting it away again would read a
+     * picture and ask DOC about alerts for a card nobody ever sees, and leaving it raised is what put the old
+     * card back on the map when the walker pressed back from the page. The frame is set either way, so coming
+     * back lands on the line that was tapped.
      */
-    suspend fun pickDocAt(lat: Double, lng: Double, radiusM: Double): DocItem? {
+    suspend fun pickDocAt(
+        lat: Double,
+        lng: Double,
+        radiusM: Double,
+        raiseCard: Boolean = true
+    ): DocItem? {
         // What is switched off is not tappable either: DOC's huts go with the huts. A linked bike point
         // is not a place under the finger: its track is, and the track's card carries the bike facts.
         val hidden = hiddenLayers.value
@@ -488,18 +499,24 @@ class MapViewModel(
             }
         }
         val item = withContext(Dispatchers.Default) { DocHitTest.nearest(held, lat, lng, radiusM) }
-        // The picture is part of the answer, so it is read here rather than by the card: the card draws
-        // what it is given, and a phone without pictures answers null without failing the pick.
-        val picture = item?.pictureUrl?.let { url -> runCatching { docStore.picture(url) }.getOrNull() }
-        _pickedPicture.value = picture
         // A tap answers from the cache: no handed-over pair or live line from a list survives it.
         _pickedBike.value = null
         _focusedDoc.value = null
         _focusedBike.value = null
         _pickedPlaceId.value = null
-        _pickedDoc.value = item
         _selectionFrame.value = item?.let { boundsOf(it.paths.flatten()) }
-        checkAlerts(item)
+        if (raiseCard) {
+            // The picture is part of the answer, so it is read here rather than by the card: the card draws
+            // what it is given, and a phone without pictures answers null without failing the pick.
+            _pickedPicture.value =
+                item?.pictureUrl?.let { url -> runCatching { docStore.picture(url) }.getOrNull() }
+            _pickedDoc.value = item
+            checkAlerts(item)
+        } else {
+            _pickedPicture.value = null
+            _pickedDoc.value = null
+            _pickedDocAlerts.value = null
+        }
         return item
     }
 

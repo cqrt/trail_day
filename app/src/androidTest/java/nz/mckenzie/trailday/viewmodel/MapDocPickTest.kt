@@ -142,6 +142,47 @@ class MapDocPickTest {
     }
 
     @Test
+    fun aTapThatOpensTheThingsOwnPageLeavesNoCardBehind() = runBlocking {
+        // The map hands a tap straight to the thing's own page, which is the card at full size. The map's own
+        // card must not be raised behind it - that is what put the old card back on the map when the walker
+        // pressed back from the page - but the frame must be, so coming back lands on the line that was
+        // tapped rather than on wherever the map happened to be.
+        val track = DocItem(
+            source = DocSource.TRACKS,
+            objectId = 44,
+            name = "Greenstone Track",
+            paths = listOf(
+                listOf(
+                    GeoPoint(lat = -44.9000, lng = 168.1000),
+                    GeoPoint(lat = -44.9050, lng = 168.1050)
+                )
+            )
+        )
+        val docs = OfflineDocStore(dao = db.offlineDocItemDao(), downloader = DocDownloader(ArcGisDoc()))
+        docs.store(listOf(track))
+        DevicePosition.useForTest(FakeLocation(listOf(fix(-44.9000, 168.1000))))
+
+        val viewModel = MapViewModel(
+            assetRepository = assetRepository,
+            settingsRepository = SettingsRepository(context),
+            locationSource = FakeLocation(emptyList()),
+            docStore = docs,
+            loadGeometry = { AssetGeometry.NONE }
+        )
+
+        val picked = viewModel.pickDocAt(
+            -44.9010,
+            168.1010,
+            DocHitTest.DEFAULT_TOLERANCE_M,
+            raiseCard = false
+        )
+
+        assertEquals("the track under the finger is still the answer", "Greenstone Track", picked?.name)
+        assertNull("and no card is raised for it", viewModel.pickedDoc.value)
+        assertNotNull("but the map still has a frame to return to", viewModel.selectionFrame.value)
+    }
+
+    @Test
     fun aLayerThatIsSwitchedOffIsNotTappable() = runBlocking {
         // A hut of the walker's and a hut DOC publishes, both under the same finger. They are on two
         // different switches now: DOC's Huts and Your Places' Spots. Each must answer only while its
