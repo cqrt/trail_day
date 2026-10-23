@@ -43,13 +43,13 @@ import nz.mckenzie.trailday.offline.pictureCountWords
 import nz.mckenzie.trailday.viewmodel.OfflineViewModel
 
 /**
- * What is on the phone for the places with no reception: **imagery, what DOC publishes, and the trips.**
+ * What is on the phone for the places with no reception: **imagery and what DOC publishes.**
  *
  * The shape is the mock screens': one list rather than tabs - a card per cache, each saying what it holds in one
  * line and carrying its own progress while it downloads - one **Download an area** button that asks which kind,
- * a sentence about what is kept as the walker browses, and a row saying the trips are always here.
+ * and a sentence about what is kept as the walker browses.
  *
- * The three are one list because they answer one question ("what can I do with no reception?"), and because
+ * The two are one list because they answer one question ("what can I do with no reception?"), and because
  * tabs made the walker choose a page before they could see whether they even had anything.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -148,35 +148,6 @@ fun OfflineScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-
-            // The trips need nothing: they are the record, and the record is on the phone. The row says so
-            // and opens them, because a walker wondering whether they need to download their own walks
-            // deserves an answer rather than silence.
-            Card(
-                onClick = { onOpenTab(Tab.RECORDINGS) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    AppIcon(glyph = IconGlyph.RECORDINGS, tint = MaterialTheme.colorScheme.primary)
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("My activities", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            text = "Always on this phone - nothing to download",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    AppIcon(
-                        glyph = IconGlyph.CHEVRON,
-                        dimension = 18.dp,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
         }
     }
 
