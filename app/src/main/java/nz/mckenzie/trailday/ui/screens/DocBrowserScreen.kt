@@ -3,6 +3,8 @@ package nz.mckenzie.trailday.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
@@ -25,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -57,10 +61,11 @@ import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
  * **The phone does the asking, and nothing here is written.** A search is a question put to DOC on the
  * walker's behalf, and a filter narrows the page already here rather than asking again.
  *
- * The shape is the mock screens': a search field with a magnifier, a pill for "near me" with the radius beside
- * it when it is on, the sources as chips, the filter and the order as pills, and each thing DOC published as a
- * **card** - the kind's tile, the name, DOC's own facts about it, and how far away it is in the app's own
- * colour.
+ * The shape is the mock screens': **the question on one white deck across the top** - a search field with a
+ * magnifier, the sources as chips, a pill for "near me" with its radius beside it when it is on, and the
+ * filter and the order as pills - and **the answer in its own viewport below it**: how many came back and in
+ * what order, then each thing DOC published as a card - the kind's tile, the name, DOC's own facts about it,
+ * and how far away it is in the app's own colour.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,11 +112,161 @@ fun DocBrowserScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 16.dp),
+        ) {
+            // The controls, in one deck at the top: what is being asked, of which of DOC's services, and
+            // how the answer should be narrowed and ordered. One white surface is what separates the
+            // question from the answer below it, which is the shape the mock screens draw.
+            DocControlsDeck(
+                name = name,
+                onNameChange = viewModel::onNameChange,
+                onSearch = search,
+                nearMe = nearMe,
+                onNearMeChange = viewModel::onNearMeChange,
+                radiusKm = radiusKm,
+                onRadiusChange = viewModel::onRadiusChange,
+                source = source,
+                onChooseSource = viewModel::chooseSource,
+                filterChoices = filterChoices,
+                filters = filters,
+                onToggleFilter = viewModel::toggleFilter,
+                onClearFilters = viewModel::clearFilters,
+                sort = sort,
+                onSort = viewModel::setSort,
+                bikeOffered = source == DocSource.TRACKS &&
+                    (companions.bikeForTrack.isNotEmpty() || bikeOnly),
+                bikeOnly = bikeOnly,
+                onBikeOnly = viewModel::setBikeOnly
+            )
+
+            // The answer, in its own viewport below the deck: a busy line while DOC is being asked, what
+            // DOC said if it said something, and then how many came back and in what order.
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+
+                message?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+
+                when {
+                    results.isEmpty() && searched && message == null && !busy -> EmptyState(
+                        glyph = IconGlyph.ASSETS,
+                        title = "No ${source.displayName.lowercase()} matched",
+                        body = "Try part of a name, or turn on Near me and search again.",
+                        actionLabel = "Search again",
+                        onAction = { viewModel.search() }
+                    )
+
+                    // A filter that hides every row is not "nothing matched": the way out is to clear a
+                    // filter, so say that rather than showing the empty state again.
+                    results.isNotEmpty() && visible.isEmpty() -> Text(
+                        text = "Nothing matches those filters. Clear one to see the rest.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+
+                    else -> {
+                        // How many, and in what order, said once above the list rather than on every row.
+                        if (results.isNotEmpty()) {
+                            ResultSummary(
+                                count = visible.size,
+                                source = source,
+                                sort = sort,
+                                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
+                            )
+                        }
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)
+                        ) {
+                            items(visible, key = { item -> item.objectId }) { item ->
+                                // Bike Trails lists the track a bike point belongs to: a rider wants the
+                                // track, not the pin. An unmatched bike point is still its own row.
+                                val linkedTrack =
+                                    if (source == DocSource.BIKES) companions.trackForBike[item.sourceRef] else null
+                                val shown = linkedTrack ?: item
+                                val bike = when {
+                                    source == DocSource.BIKES && linkedTrack != null -> item
+                                    source == DocSource.TRACKS -> companions.bikeForTrack[item.sourceRef]
+                                    else -> null
+                                }
+                                DocItemCard(
+                                    item = shown,
+                                    bike = bike,
+                                    // Measured to what the row is about: the track's line when the bike point
+                                    // led us to a track, the bike point when it stands alone.
+                                    distanceM = phoneFix?.let { position -> shown.distanceM(position) },
+                                    // Every one of these is read best where it is: the map frames the line or
+                                    // the place and raises the card that says what DOC says about it.
+                                    onOpen = { onOpenDoc(shown, bike) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+/**
+ * The DOC browser's controls, in one deck across the top of the page: the search and the button that asks
+ * it, which of DOC's four services the question is put to, and how the answer should be narrowed, ordered,
+ * and how far around the phone to look.
+ *
+ * **One surface, not a loose column of controls.** The mock screens draw the question on a white card and
+ * the answer on the pale page below it, and that is the split the walker reads in: everything that changes
+ * the question is here, and nothing that is the answer is. The pieces inside are the ones the page has
+ * always had - the search field, the source chips, the "near me" pill with its radius, and the filter and
+ * sort menus - so this is a layout, not a second set of controls.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DocControlsDeck(
+    name: String,
+    onNameChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    nearMe: Boolean,
+    onNearMeChange: (Boolean) -> Unit,
+    radiusKm: String,
+    onRadiusChange: (String) -> Unit,
+    source: DocSource,
+    onChooseSource: (DocSource) -> Unit,
+    filterChoices: List<Pair<DocFilter, List<String>>>,
+    filters: Map<String, Set<String>>,
+    onToggleFilter: (DocFilter, String) -> Unit,
+    onClearFilters: () -> Unit,
+    sort: DocSort,
+    onSort: (DocSort) -> Unit,
+    bikeOffered: Boolean,
+    bikeOnly: Boolean,
+    onBikeOnly: (Boolean) -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(top = 4.dp, bottom = 4.dp),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shadowElevation = 2.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // The search, and the button that asks it. The keyboard's own search key works too, but a field
-            // with nothing beside it reads as a field that does not do anything.
+            // The search, and the button that asks it. The keyboard's own search key works too, but a
+            // field with nothing beside it reads as a field that does not do anything.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -119,144 +274,98 @@ fun DocBrowserScreen(
             ) {
                 SearchField(
                     value = name,
-                    onValueChange = viewModel::onNameChange,
+                    onValueChange = onNameChange,
                     placeholder = "Search ${source.displayName.lowercase()}",
-                    onSearch = search,
+                    onSearch = onSearch,
                     modifier = Modifier.weight(1f)
                 )
-                Button(
-                    onClick = {
-                        // The keyboard goes with the question: the answer arrives below it.
-                        focus.clearFocus()
-                        search()
-                    }
-                ) {
-                    Text("Search")
-                }
+                Button(onClick = onSearch) { Text("Search") }
             }
 
-            Row(
+            // Which of DOC's services is being read. Asked here rather than with the search, because it
+            // is not part of the question - it is which of four datasets the question is put to.
+            ChoiceRow(
+                choices = DocSource.entries,
+                selected = source,
+                onChoose = onChooseSource,
+                text = { it.displayName }
+            )
+
+            // How the answer is narrowed and ordered, and how far around the phone it looks. A wrapping
+            // row rather than one line, because the radius field appears beside "near me" when it is on,
+            // and a gloved hand still has to be able to reach everything.
+            FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // "Near me", as the mock screens draw it: a green pill that says how far around the phone it
-                // is looking. Off, it says only what it would do.
+                // "Near me", as the mock screens draw it: a green pill that says how far around the phone
+                // it is looking. Off, it says only what it would do.
                 FilterChip(
                     selected = nearMe,
-                    onClick = { viewModel.onNearMeChange(!nearMe) },
+                    onClick = { onNearMeChange(!nearMe) },
                     label = {
                         Text(
                             if (nearMe) "Near me \u00b7 ${radiusKm.ifBlank { "25" }} km" else "Near me"
                         )
                     },
-                    shape = androidx.compose.foundation.shape.CircleShape
+                    shape = CircleShape
                 )
                 if (nearMe) {
                     OutlinedTextField(
                         value = radiusKm,
-                        onValueChange = viewModel::onRadiusChange,
+                        onValueChange = onRadiusChange,
                         label = { Text("km") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Number,
                             imeAction = ImeAction.Search
                         ),
-                        keyboardActions = KeyboardActions(onSearch = { search() }),
+                        keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                         modifier = Modifier.width(104.dp)
                     )
                 }
-            }
-
-            // Which of DOC's services is being read. Asked here rather than with the search, because it is
-            // not part of the question - it is which of four datasets the question is put to.
-            ChoiceRow(
-                label = "What DOC publishes",
-                choices = DocSource.entries,
-                selected = source,
-                onChoose = viewModel::chooseSource,
-                text = { it.displayName }
-            )
-
-            if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-
-            message?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
-
-            // What a search found, narrowed and ordered here rather than by asking DOC again: the filters
-            // are the ones actually on the page, and the nearest order re-runs as the phone moves.
-            if (results.isNotEmpty()) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    FilterMenu(
-                        choices = filterChoices,
-                        filters = filters,
-                        onToggle = viewModel::toggleFilter,
-                        onClear = viewModel::clearFilters
+                FilterMenu(
+                    choices = filterChoices,
+                    filters = filters,
+                    onToggle = onToggleFilter,
+                    onClear = onClearFilters
+                )
+                SortMenu(sort = sort, onSort = onSort)
+                // The Tracks page can be narrowed to the ones DOC says may be ridden. It is not one of
+                // DOC's own fields, so it is a chip of its own rather than a filter value.
+                if (bikeOffered) {
+                    FilterChip(
+                        selected = bikeOnly,
+                        onClick = { onBikeOnly(!bikeOnly) },
+                        label = { Text("Bike-friendly") },
+                        shape = CircleShape
                     )
-                    SortMenu(sort = sort, onSort = viewModel::setSort)
-                    // The Tracks page can be narrowed to the ones DOC says may be ridden. It is not
-                    // one of DOC's own fields, so it is a chip of its own rather than a filter value.
-                    if (source == DocSource.TRACKS &&
-                        (companions.bikeForTrack.isNotEmpty() || bikeOnly)
-                    ) {
-                        FilterChip(
-                            selected = bikeOnly,
-                            onClick = { viewModel.setBikeOnly(!bikeOnly) },
-                            label = { Text("Bike-friendly") },
-                            shape = androidx.compose.foundation.shape.CircleShape
-                        )
-                    }
-                }
-            }
-
-            when {
-                results.isEmpty() && searched && message == null && !busy -> EmptyState(
-                    glyph = IconGlyph.ASSETS,
-                    title = "No ${source.displayName.lowercase()} matched",
-                    body = "Try part of a name, or turn on Near me and search again.",
-                    actionLabel = "Search again",
-                    onAction = { viewModel.search() }
-                )
-
-                // A filter that hides every row is not "nothing matched": the way out is to clear a
-                // filter, so say that rather than showing the empty state again.
-                results.isNotEmpty() && visible.isEmpty() -> Text(
-                    text = "Nothing matches those filters. Clear one to see the rest.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-
-                else -> LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)
-                ) {
-                    items(visible, key = { item -> item.objectId }) { item ->
-                        // Bike Trails lists the track a bike point belongs to: a rider wants the
-                        // track, not the pin. An unmatched bike point is still its own row.
-                        val linkedTrack =
-                            if (source == DocSource.BIKES) companions.trackForBike[item.sourceRef] else null
-                        val shown = linkedTrack ?: item
-                        val bike = when {
-                            source == DocSource.BIKES && linkedTrack != null -> item
-                            source == DocSource.TRACKS -> companions.bikeForTrack[item.sourceRef]
-                            else -> null
-                        }
-                        DocItemCard(
-                            item = shown,
-                            bike = bike,
-                            // Measured to what the row is about: the track's line when the bike point
-                            // led us to a track, the bike point when it stands alone.
-                            distanceM = phoneFix?.let { position -> shown.distanceM(position) },
-                            // Every one of these is read best where it is: the map frames the line or
-                            // the place and raises the card that says what DOC says about it.
-                            onOpen = { onOpenDoc(shown, bike) }
-                        )
-                    }
                 }
             }
         }
     }
+}
+
+/**
+ * The line above the list: **how many came back, and in what order** - the mock screens' own summary.
+ *
+ * The noun follows the count, so one result reads "1 hut" rather than "1 huts"; the order is said in the
+ * walker's words rather than the menu's, because this line is read, not pressed.
+ */
+@Composable
+private fun ResultSummary(count: Int, source: DocSource, sort: DocSort, modifier: Modifier = Modifier) {
+    val noun = source.displayName.lowercase()
+    val shown = if (count == 1) noun.removeSuffix("s") else noun
+    val order = when (sort) {
+        DocSort.NEAREST -> "nearest first"
+        DocSort.NAME -> "by name"
+    }
+    Text(
+        text = "$count $shown \u00b7 $order",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier
+    )
 }
 
 
