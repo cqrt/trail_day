@@ -260,12 +260,21 @@ fun BasemapView(
     tileUrlTemplate: String? = TileServerHolder.templateUrl(basemap),
     onMapClick: ((latitude: Double, longitude: Double, radiusM: Double) -> Unit)? = null,
     initialTarget: LatLng = DEFAULT_CAMERA_TARGET,
-    initialZoom: Double = DEFAULT_CAMERA_ZOOM
+    initialZoom: Double = DEFAULT_CAMERA_ZOOM,
+    /** The map has settled; report where, so the view model can open here next time. */
+    onCameraIdle: ((latitude: Double, longitude: Double, zoom: Double) -> Unit)? = null,
+    /**
+     * Whether [initialTarget]/[initialZoom] are a remembered camera rather than the opening view.
+     *
+     * When true the first-look frame is skipped: the walker is coming back to ground they chose,
+     * not opening the app.
+     */
+    restoreCamera: Boolean = false
 ) {
     val mapState = remember { mutableStateOf<MapLibreMap?>(null) }
     val styleState = remember { mutableStateOf<Style?>(null) }
     val mapViewState = remember { mutableStateOf<MapView?>(null) }
-    var boundsApplied by remember { mutableStateOf(false) }
+    var boundsApplied by remember { mutableStateOf(restoreCamera) }
 
     // The first style load is the map opening; every later one is a basemap change, and a walker
     // switching maps is reading the ground under them, not asking to be sent home. So the camera is
@@ -297,6 +306,7 @@ fun BasemapView(
     // Keeps the tap handler current without rebuilding the map.
     val currentOnMapClick by rememberUpdatedState(onMapClick)
     val currentOnFollowBroken by rememberUpdatedState(onFollowBroken)
+    val currentOnCameraIdle by rememberUpdatedState(onCameraIdle)
 
     // Where the phone is. Every map in the app shows it, and this is the whole of how: the
     // marker is built here from the app's own stream rather than handed in per screen, so a
@@ -343,6 +353,18 @@ fun BasemapView(
                         .target(initialTarget)
                         .zoom(initialZoom)
                         .build()
+                    // Remember where the walker leaves the map, so a tab change or a basemap change
+                    // opens here rather than on the work or the phone.
+                    map.addOnCameraIdleListener {
+                        map.cameraPosition?.let { position ->
+                            val target = position.target ?: return@let
+                            currentOnCameraIdle?.invoke(
+                                target.latitude,
+                                target.longitude,
+                                position.zoom
+                            )
+                        }
+                    }
                     map.addOnMapClickListener { latLng ->
                         val handler = currentOnMapClick
                         if (handler == null) {

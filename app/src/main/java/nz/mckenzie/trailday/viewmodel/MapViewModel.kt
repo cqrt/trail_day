@@ -71,6 +71,15 @@ import nz.mckenzie.trailday.tracking.frameOnDevice
  */
 data class RecentreRequest(val bounds: LatLngBounds, val count: Int)
 
+/**
+ * Where the map was last looking.
+ *
+ * Held by the view model rather than by the map view because the map is rebuilt when the walker
+ * leaves the tab: without this, coming back from Settings - or from changing the basemap - opens on
+ * the work or the phone instead of the ground they were reading.
+ */
+data class MapCamera(val lat: Double, val lng: Double, val zoom: Double)
+
 /** What the four **Your Places** tiles count, shown under their names. */
 data class YourPlaceCounts(
     val spots: Int = 0,
@@ -659,6 +668,18 @@ class MapViewModel(
      */
     private val _recentre = MutableStateFlow<RecentreRequest?>(null)
     val recentre: StateFlow<RecentreRequest?> = _recentre
+
+    /**
+     * Where the map was last looking, so leaving the tab and coming back - or changing the basemap -
+     * opens on the same ground rather than on the work or the phone.
+     */
+    private val _camera = MutableStateFlow<MapCamera?>(null)
+    val camera: StateFlow<MapCamera?> = _camera
+
+    /** The map has settled; keep where it settled. */
+    fun rememberCamera(lat: Double, lng: Double, zoom: Double) {
+        _camera.value = MapCamera(lat = lat, lng = lng, zoom = zoom)
+    }
 
     private val _locationNotice = MutableStateFlow<String?>(null)
 

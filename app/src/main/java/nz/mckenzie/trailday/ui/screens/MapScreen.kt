@@ -76,6 +76,9 @@ import nz.mckenzie.trailday.viewmodel.PendingFollow
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.map.BasemapView
+import nz.mckenzie.trailday.map.DEFAULT_CAMERA_TARGET
+import nz.mckenzie.trailday.map.DEFAULT_CAMERA_ZOOM
+import org.maplibre.android.geometry.LatLng
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.theme.TrailDayElevation
 import nz.mckenzie.trailday.ui.docBikeFacts
@@ -99,6 +102,7 @@ fun MapScreen(
 ) {
     val apiKey by viewModel.linzApiKey.collectAsStateWithLifecycle()
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
+    val camera by viewModel.camera.collectAsStateWithLifecycle()
     val geoJson by viewModel.assetGeoJson.collectAsStateWithLifecycle()
     val docGeoJson by viewModel.docGeoJson.collectAsStateWithLifecycle()
     val docBikeBadgesGeoJson by viewModel.docBikeBadgesGeoJson.collectAsStateWithLifecycle()
@@ -195,6 +199,12 @@ fun MapScreen(
                 // does not follow the phone, because it is also for reading the work.
                 recentreBounds = recentre?.bounds,
                 recentreCount = recentre?.count ?: 0,
+                // The ground the walker was last reading, so a tab change or a basemap change
+                // opens here rather than on the work or the phone.
+                initialTarget = camera?.let { LatLng(it.lat, it.lng) } ?: DEFAULT_CAMERA_TARGET,
+                initialZoom = camera?.zoom ?: DEFAULT_CAMERA_ZOOM,
+                restoreCamera = camera != null,
+                onCameraIdle = viewModel::rememberCamera,
                 // A tap lands on something: a line of the walker's own or a thing DOC publishes. Either
                 // way the card below says what it is, and the card's own tap opens the place. The radius
                 // comes from the map's zoom, so the tap works at country scale as well as at paddock
