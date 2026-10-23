@@ -367,7 +367,7 @@ private fun DocControlsDeck(
                         onClick = { onBikeOnly(!bikeOnly) },
                         shape = CircleShape,
                         label = {
-                            Text("Bike-friendly", style = MaterialTheme.typography.labelSmall)
+                            Text("Bike-friendly", style = MaterialTheme.typography.labelMedium)
                         },
                         modifier = Modifier.height(DenseControlHeight)
                     )
@@ -410,7 +410,7 @@ private fun NearMeControl(
             label = {
                 Text(
                     text = if (nearMe) "${radiusKm.ifBlank { "25" }} km" else "Near me",
-                    style = MaterialTheme.typography.labelSmall
+                    style = MaterialTheme.typography.labelMedium
                 )
             },
             // Only when it is on: the chevron is what says the pill now opens a menu rather than switching.
@@ -495,7 +495,7 @@ private fun FilterMenu(
         ) {
             Text(
                 text = if (count == 0) "Filter" else "Filter ($count)",
-                style = MaterialTheme.typography.labelSmall
+                style = MaterialTheme.typography.labelMedium
             )
             AppIcon(glyph = IconGlyph.CHEVRON, dimension = 10.dp, modifier = Modifier.rotate(90f))
         }
@@ -539,7 +539,7 @@ private fun SortMenu(sort: DocSort, onSort: (DocSort) -> Unit) {
             modifier = Modifier.height(DenseControlHeight),
             contentPadding = PaddingValues(horizontal = 8.dp)
         ) {
-            Text(label, style = MaterialTheme.typography.labelSmall)
+            Text(label, style = MaterialTheme.typography.labelMedium)
             AppIcon(glyph = IconGlyph.CHEVRON, dimension = 10.dp, modifier = Modifier.rotate(90f))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
