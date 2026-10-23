@@ -107,6 +107,11 @@ class MainActivity : ComponentActivity() {
                 // its "just saved" signal) into the next one.
                 var addSpotVisit by rememberSaveable { mutableStateOf(0) }
 
+                // The same for the offline area picker, and for the same reason: a shared view model opened
+                // the next area on the last one's name, corners and zoom range, so a walker downloading a
+                // second area found the first one's answers already filled in.
+                var offlinePickerVisit by rememberSaveable { mutableStateOf(0) }
+
                 // System back returns the way the walker came, and never leaves the app.
                 BackHandler(enabled = destination != Destination.MAP) {
                     destination = if (destination == Destination.DOC_DETAIL) {
@@ -243,7 +248,10 @@ class MainActivity : ComponentActivity() {
                                 viewModel = detailViewModel,
                                 onBack = { destination = Destination.ASSETS },
                                 onEdit = { destination = Destination.ASSET_EDIT },
-                                onKeepGround = { destination = Destination.OFFLINE_PICKER_AROUND },
+                                onKeepGround = {
+                                    offlinePickerVisit++
+                                    destination = Destination.OFFLINE_PICKER_AROUND
+                                },
                                 onRecord = {
                                     recordTargetId = assetId
                                     destination = Destination.RECORD
@@ -351,13 +359,20 @@ class MainActivity : ComponentActivity() {
                         OfflineScreen(
                             viewModel = offlineViewModel,
                             onOpenTab = { destination = destinationOf(it) },
-                            onChooseArea = { destination = Destination.OFFLINE_PICKER },
-                            onChooseDocArea = { destination = Destination.OFFLINE_DOC_PICKER }
+                            onChooseArea = {
+                                offlinePickerVisit++
+                                destination = Destination.OFFLINE_PICKER
+                            },
+                            onChooseDocArea = {
+                                offlinePickerVisit++
+                                destination = Destination.OFFLINE_DOC_PICKER
+                            }
                         )
                     }
 
                     Destination.OFFLINE_PICKER -> {
                         val pickerViewModel: OfflineAreaPickerViewModel = viewModel(
+                            key = "offline-picker-$offlinePickerVisit",
                             factory = OfflineAreaPickerViewModel.factory(
                                 applicationContext,
                                 OfflinePickerMode.IMAGERY
@@ -372,6 +387,7 @@ class MainActivity : ComponentActivity() {
 
                     Destination.OFFLINE_DOC_PICKER -> {
                         val pickerViewModel: OfflineAreaPickerViewModel = viewModel(
+                            key = "offline-doc-picker-$offlinePickerVisit",
                             factory = OfflineAreaPickerViewModel.factory(
                                 applicationContext,
                                 OfflinePickerMode.DOC_DATA
@@ -392,7 +408,7 @@ class MainActivity : ComponentActivity() {
                             destination = Destination.ASSETS
                         } else {
                             val pickerViewModel: OfflineAreaPickerViewModel = viewModel(
-                                key = "around-$assetId",
+                                key = "around-$assetId-$offlinePickerVisit",
                                 factory = OfflineAreaPickerViewModel.factory(
                                     applicationContext,
                                     OfflinePickerMode.AROUND_TRACK,
