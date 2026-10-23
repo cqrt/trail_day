@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -62,6 +63,13 @@ import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
  * Material's own minimum is what pushes the last control onto a line of its own.
  */
 private val DenseControlHeight = 32.dp
+
+/**
+ * How the browser's tool labels are set: Material's large label, which is as large as the tools' one line
+ * will take.
+ */
+private val DenseControlLabel: TextStyle
+    @Composable get() = MaterialTheme.typography.labelLarge
 
 /**
  * What DOC publishes, read through the phone: one of its four services at a time, searched and narrowed.
@@ -367,7 +375,7 @@ private fun DocControlsDeck(
                         onClick = { onBikeOnly(!bikeOnly) },
                         shape = CircleShape,
                         label = {
-                            Text("Bike-friendly", style = MaterialTheme.typography.labelMedium)
+                            Text("Bike-friendly", style = DenseControlLabel)
                         },
                         modifier = Modifier.height(DenseControlHeight)
                     )
@@ -410,7 +418,7 @@ private fun NearMeControl(
             label = {
                 Text(
                     text = if (nearMe) "${radiusKm.ifBlank { "25" }} km" else "Near me",
-                    style = MaterialTheme.typography.labelMedium
+                    style = DenseControlLabel
                 )
             },
             // Only when it is on: the chevron is what says the pill now opens a menu rather than switching.
@@ -495,7 +503,7 @@ private fun FilterMenu(
         ) {
             Text(
                 text = if (count == 0) "Filter" else "Filter ($count)",
-                style = MaterialTheme.typography.labelMedium
+                style = DenseControlLabel
             )
             AppIcon(glyph = IconGlyph.CHEVRON, dimension = 10.dp, modifier = Modifier.rotate(90f))
         }
@@ -539,7 +547,7 @@ private fun SortMenu(sort: DocSort, onSort: (DocSort) -> Unit) {
             modifier = Modifier.height(DenseControlHeight),
             contentPadding = PaddingValues(horizontal = 8.dp)
         ) {
-            Text(label, style = MaterialTheme.typography.labelMedium)
+            Text(label, style = DenseControlLabel)
             AppIcon(glyph = IconGlyph.CHEVRON, dimension = 10.dp, modifier = Modifier.rotate(90f))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
