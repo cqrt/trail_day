@@ -410,9 +410,7 @@ class WebEditorDocuments(
                 vectorTileTemplate = "http://$authority/tiles/${chosen.id}/{z}/{x}/{y}" +
                     "${chosen.tileSuffix}$tokenQuery",
                 elevationTileTemplate = "http://$authority/tiles/${TileServerHolder.ELEVATION_ID}" +
-                    "/{z}/{x}/{y}${TileServerHolder.ELEVATION_SUFFIX}$tokenQuery",
-                demHillshadeTileTemplate = "http://$authority/tiles/${TileServerHolder.HILLSHADE_ID}" +
-                    "/{z}/{x}/{y}${TileServerHolder.HILLSHADE_SUFFIX}$tokenQuery"
+                    "/{z}/{x}/{y}${TileServerHolder.ELEVATION_SUFFIX}$tokenQuery"
             )
         } else {
             null

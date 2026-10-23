@@ -277,8 +277,7 @@ fun BasemapView(
                 apiKey = apiKey,
                 basemap = basemap,
                 vectorTileTemplate = tileUrlTemplate,
-                elevationTileTemplate = TileServerHolder.elevationTemplateUrl(),
-                demHillshadeTileTemplate = TileServerHolder.hillshadeTemplateUrl()
+                elevationTileTemplate = TileServerHolder.elevationTemplateUrl()
             )
         } else {
             null
