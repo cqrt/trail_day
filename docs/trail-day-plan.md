@@ -844,3 +844,5 @@ was needed. It shipped as 0.3.37.
 **Then the hillshade's elevation came straight from LINZ.** The app's tile server was the one variable the working browser test did not have: the browser used LINZ's elevation URL directly. The adapted style now does the same, leaving only the vector tiles on the tile server. It shipped as 0.3.51.
 
 **Then the hillshade's encoding and colours were put right for MapLibre Native.** MapLibre Native accepts only `mapbox` or `terrarium` for a `raster-dem` source; the app was writing `terrain-rgb`, which the native parser rejects, and an unrecognised encoding can leave the source without the heights the shade needs. LINZ's own colours were also fading to 7% at walking zooms. The adapted style now says `encoding: "mapbox"` and gives the hillshade plain, stronger colours. It shipped as 0.3.52.
+
+**Then the hillshade was dialled back.** With it actually drawing, the plain colours were a little strong. The shadow is now 65% instead of 85%, the highlight 30% instead of 45%, the accent 40% instead of 55%, and the exaggeration 0.85 instead of 1.0. It shipped as 0.3.53.

@@ -116,12 +116,12 @@ object LinzVectorStyle {
                 put(
                     "paint",
                     buildJsonObject {
-                        put("hillshade-exaggeration", 1.0)
+                        put("hillshade-exaggeration", 0.85)
                         put("hillshade-illumination-anchor", "map")
                         put("hillshade-illumination-direction", 315)
-                        put("hillshade-shadow-color", "rgba(12, 12, 12, 0.85)")
-                        put("hillshade-highlight-color", "rgba(255, 255, 255, 0.45)")
-                        put("hillshade-accent-color", "rgba(70, 70, 70, 0.55)")
+                        put("hillshade-shadow-color", "rgba(12, 12, 12, 0.65)")
+                        put("hillshade-highlight-color", "rgba(255, 255, 255, 0.30)")
+                        put("hillshade-accent-color", "rgba(70, 70, 70, 0.40)")
                     }
                 )
             }
