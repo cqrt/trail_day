@@ -196,6 +196,20 @@ class BasemapTest {
     }
 
     @Test
+    fun `the DEM hillshade is LINZ's own pre-rendered layer, keyed`() {
+        assertEquals(
+            "https://basemaps.linz.govt.nz/v1/tiles/hillshade/WebMercatorQuad/14/1017/660.webp" +
+                "?api=$key",
+            Basemap.demHillshadeUrl(key, 14, 1017, 660)
+        )
+        assertEquals(
+            "https://basemaps.linz.govt.nz/v1/tiles/hillshade/WebMercatorQuad/{z}/{x}/{y}.webp" +
+                "?api=$key",
+            Basemap.demHillshadeTemplate(key)
+        )
+    }
+
+    @Test
     fun `the LiDAR hillshade basemap names the vector Topographic tiles`() {
         val hillshade = Basemap.LINZ_TOPO_LIDAR_HILLSHADE
 

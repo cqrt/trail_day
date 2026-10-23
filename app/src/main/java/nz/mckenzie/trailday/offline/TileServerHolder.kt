@@ -43,6 +43,11 @@ object TileServerHolder {
     const val ELEVATION_SUFFIX = ".png"
     const val ELEVATION_CONTENT_TYPE = "image/png"
 
+    /** LINZ's pre-rendered DEM hillshade, drawn over the vector Topographic map. */
+    const val HILLSHADE_ID = Basemap.DEM_HILLSHADE_SOURCE_ID
+    const val HILLSHADE_SUFFIX = ".webp"
+    const val HILLSHADE_CONTENT_TYPE = "image/webp"
+
     @Volatile
     private var server: LocalTileServer? = null
 
@@ -56,6 +61,10 @@ object TileServerHolder {
     /** The XYZ template for the hidden elevation source, or null if the server is not up yet. */
     fun elevationTemplateUrl(): String? =
         server?.takeIf { it.isRunning }?.tileUrlTemplate(ELEVATION_ID)
+
+    /** The XYZ template for the hidden DEM hillshade, or null if the server is not up yet. */
+    fun hillshadeTemplateUrl(): String? =
+        server?.takeIf { it.isRunning }?.tileUrlTemplate(HILLSHADE_ID)
 
     /** Safe to ask for twice: the second ask finds the server up - the app and the tests both ask. */
     fun start(context: Context, initialKey: String = BuildConfig.LINZ_API_KEY) {
@@ -119,7 +128,11 @@ object TileServerHolder {
                     }
                 }
             )
-        } + listOf(placeLabelsSource(context), elevationSource(context))
+        } + listOf(
+            placeLabelsSource(context),
+            elevationSource(context),
+            hillshadeSource(context)
+        )
 
     /**
      * The place names, as one more source in the same server.
@@ -170,6 +183,32 @@ object TileServerHolder {
     fun elevationStore(context: Context): OfflineTileStore = OfflineTileStore(
         File(context.applicationContext.cacheDir, "$CACHE_DIR_PREFIX$ELEVATION_ID"),
         ELEVATION_SUFFIX
+    )
+
+    /**
+     * LINZ's pre-rendered DEM hillshade, as one more source in the same server.
+     *
+     * No key, no shade: the upstream is null and the route answers 404, exactly as the imagery does.
+     */
+    private fun hillshadeSource(context: Context): TileSource = TileSource(
+        id = HILLSHADE_ID,
+        store = hillshadeStore(context),
+        suffix = HILLSHADE_SUFFIX,
+        contentType = HILLSHADE_CONTENT_TYPE,
+        upstream = {
+            currentKey.takeIf { it.isNotBlank() }?.let { key ->
+                LinzTileFetcher(
+                    key,
+                    urlFor = { zoom, x, y -> Basemap.demHillshadeUrl(key, zoom, x, y) }
+                )
+            }
+        }
+    )
+
+    /** Where the DEM hillshade tiles are kept: a cache of what has been looked at. */
+    fun hillshadeStore(context: Context): OfflineTileStore = OfflineTileStore(
+        File(context.applicationContext.cacheDir, "$CACHE_DIR_PREFIX$HILLSHADE_ID"),
+        HILLSHADE_SUFFIX
     )
 
     /**

@@ -193,6 +193,10 @@ enum class Basemap(
         /** The hidden elevation source behind the hillshade, served by the app's tile server. */
         const val ELEVATION_SOURCE_ID = "linz-elevation"
 
+        /** LINZ's pre-rendered New Zealand DEM Hillshade, drawn over the vector Topographic map. */
+        const val DEM_HILLSHADE_TILESET = "hillshade"
+        const val DEM_HILLSHADE_SOURCE_ID = "linz-dem-hillshade"
+
         /**
          * OpenStreetMap's standard tile layer.
          *
@@ -259,6 +263,16 @@ enum class Basemap(
         fun elevationUrl(apiKey: String, zoom: Int, x: Int, y: Int): String =
             "$LINZ_HOST/v1/tiles/elevation/$LINZ_TILE_MATRIX/$zoom/$x/$y.png" +
                 "?pipeline=terrain-rgb&api=${sanitiseKey(apiKey)}"
+
+        /** LINZ's pre-rendered DEM hillshade, as a template for the desk and the phone's server. */
+        fun demHillshadeTemplate(apiKey: String): String =
+            "$LINZ_HOST/v1/tiles/$DEM_HILLSHADE_TILESET/$LINZ_TILE_MATRIX/" +
+                "{z}/{x}/{y}.webp?api=${sanitiseKey(apiKey)}"
+
+        /** One DEM hillshade tile, as the fetchers need it. */
+        fun demHillshadeUrl(apiKey: String, zoom: Int, x: Int, y: Int): String =
+            "$LINZ_HOST/v1/tiles/$DEM_HILLSHADE_TILESET/$LINZ_TILE_MATRIX/" +
+                "$zoom/$x/$y.webp?api=${sanitiseKey(apiKey)}"
 
         /** LINZ's hosted topographic style, for a basemap this build does not offer yet. */
         fun linzTopographicStyleUrl(apiKey: String): String =

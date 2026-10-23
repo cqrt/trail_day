@@ -3,6 +3,7 @@ package nz.mckenzie.trailday.map
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
@@ -41,7 +42,8 @@ object LinzVectorStyle {
         apiKey: String,
         basemap: Basemap,
         vectorTileTemplate: String?,
-        elevationTileTemplate: String?
+        elevationTileTemplate: String?,
+        demHillshadeTileTemplate: String? = null
     ): String? = withContext(Dispatchers.IO) {
         val url = basemap.hostedStyleUrl(apiKey) ?: return@withContext null
         val body = read(url) ?: return@withContext null
@@ -74,6 +76,23 @@ object LinzVectorStyle {
                     put("maxzoom", basemap.maxZoom)
                 }
             )
+            // LINZ's own pre-rendered DEM hillshade, drawn over the vector map because the style's
+            // own shade is subtle enough to be missed.
+            put(
+                Basemap.DEM_HILLSHADE_SOURCE_ID,
+                buildJsonObject {
+                    put("type", "raster")
+                    put(
+                        "tiles",
+                        buildJsonArray {
+                            add(demHillshadeTileTemplate ?: Basemap.demHillshadeTemplate(apiKey))
+                        }
+                    )
+                    put("tileSize", 256)
+                    put("minzoom", 0)
+                    put("maxzoom", basemap.maxZoom)
+                }
+            )
         }
 
         val cleaned = JsonObject(
@@ -81,11 +100,43 @@ object LinzVectorStyle {
                 // The renderer has no sky, and a style it will not read is a blank rectangle.
                 remove("sky")
                 put("sources", sources)
+                put("layers", layersWithDemHillshade(root, basemap))
                 root["glyphs"]?.jsonPrimitive?.contentOrNull?.let { put("glyphs", withKey(it, apiKey)) }
                 root["sprite"]?.jsonPrimitive?.contentOrNull?.let { put("sprite", withKey(it, apiKey)) }
             }
         )
         cleaned.toString()
+    }
+
+    /**
+     * The style's layers with its own shade strengthened and the DEM hillshade inserted under the
+     * labels.
+     *
+     * The insert point is the first `symbol` layer: the hillshade has to be over the vector fills
+     * and lines, or it is hidden, and under the text, or it washes the names out.
+     */
+    private fun layersWithDemHillshade(root: JsonObject, basemap: Basemap): JsonArray {
+        val original = (root["layers"] as? JsonArray).orEmpty()
+        val strengthened = original.map { element ->
+            val layer = element as? JsonObject ?: return@map element
+            if (layer["id"]?.jsonPrimitive?.contentOrNull != "hillshade") return@map element
+            val paint = (layer["paint"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
+            paint["hillshade-exaggeration"] = JsonPrimitive(0.8)
+            JsonObject(layer.toMutableMap().apply { put("paint", JsonObject(paint)) })
+        }
+        val insertAt = strengthened.indexOfFirst { element ->
+            (element as? JsonObject)?.get("type")?.jsonPrimitive?.contentOrNull == "symbol"
+        }.let { if (it < 0) strengthened.size else it }
+
+        val hillshade = buildJsonObject {
+            put("id", "nz-dem-hillshade")
+            put("type", "raster")
+            put("source", Basemap.DEM_HILLSHADE_SOURCE_ID)
+            put("minzoom", 0)
+            put("maxzoom", basemap.maxZoom)
+            put("paint", buildJsonObject { put("raster-opacity", 0.55) })
+        }
+        return JsonArray(strengthened.toMutableList().apply { add(insertAt, hillshade) })
     }
 
     /** A LINZ asset URL with the key added, whichever separator it already needs. */
