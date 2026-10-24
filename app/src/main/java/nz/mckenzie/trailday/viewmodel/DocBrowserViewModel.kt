@@ -37,6 +37,26 @@ import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.tracking.DevicePosition
 
 /**
+ * The line the browser says above a page of results, or null when DOC's answer was the whole answer.
+ *
+ * **The figure is the one the walker can count**, which is not the page's own size: the service is asked
+ * about a box and answers with a page, while the search is a circle, so the corners of the box are trimmed
+ * before the rows are shown. Telling somebody looking at 241 rows that they are seeing 300 reads as a
+ * miscount - and saying "of the first 300" is what explains why there is a warning at all.
+ *
+ * A short page is DOC saying that is all there is, so it earns nothing.
+ */
+internal fun docPageMessage(sent: Int, shown: Int): String? {
+    if (sent < DocQuery.DEFAULT_LIMIT) return null
+    val rest = "Narrow the search to see the rest."
+    return if (shown < sent) {
+        "Showing $shown of the first $sent matches. $rest"
+    } else {
+        "Showing the first $shown matches. $rest"
+    }
+}
+
+/**
  * Reading what DOC publishes: its tracks, huts, campsites and bike locations.
  *
  * **Nothing here writes anything.** This screen is for finding out what is out there and how far away it
@@ -268,15 +288,10 @@ class DocBrowserViewModel(
                     // A new set of results, so a filter from the last search is not carried onto it.
                     _filters.value = emptyMap()
                     _searched.value = true
-                    _message.value = when {
-                        result.items.isEmpty() -> null
-                        // The service hands back a page, not the whole answer; say so rather than
-                        // letting a capped search look like a complete one.
-                        result.items.size >= DocQuery.DEFAULT_LIMIT ->
-                            "Showing the first ${result.items.size} matches. Narrow the search to see the rest."
-
-                        else -> null
-                    }
+                    _message.value = docPageMessage(
+                        sent = result.items.size,
+                        shown = primaryItems.size
+                    )
                 }
 
                 is DocReadResult.Failed -> {
