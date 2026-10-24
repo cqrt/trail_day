@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon for the download notification: an arrow coming down into a line,
+     which is the shape the app already uses for "out of the network and onto the phone". -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M11,3h2v9h3.5l-4.5,5 -4.5,-5h3.5z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M4,19h16v2h-16z" />
+</vector>

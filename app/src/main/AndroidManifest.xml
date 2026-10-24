@@ -71,6 +71,17 @@
             android:foregroundServiceType="dataSync" />
 
         <!--
+            A download in flight, so the walker can see how it is going without holding the screen
+            open - and so the system leaves the app alone to finish it. Data-sync typed, like the
+            editor: what it is for is fetching data. Started from the screens a download is started
+            from, and it stops itself when there is nothing left to report.
+        -->
+        <service
+            android:name=".offline.DownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!--
             Receives the installer's answer to a committed update session. Declared here
             rather than registered by the screen that started it, because the answer can
             arrive after this app's process has been replaced.

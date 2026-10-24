@@ -20,6 +20,9 @@
     <string name="web_editor_notification_title">Drawing from a computer</string>
     <string name="web_editor_notification_text">Open %1$s on a computer on the same Wi-Fi</string>
     <string name="web_editor_notification_starting">Getting the address ready\u2026</string>
+    <string name="download_notification_title">Downloading %1$s</string>
+    <string name="download_channel_name">Downloads</string>
+    <string name="download_channel_description">How a download for offline use is going</string>
     <!-- App updates -->
     <string name="update_channel_name">App updates</string>
     <string name="update_channel_description">Tells you when a newer version of Trail Day has been released</string>

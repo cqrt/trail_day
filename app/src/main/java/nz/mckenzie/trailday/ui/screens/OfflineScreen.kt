@@ -33,12 +33,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.offline.DownloadPacks
+import nz.mckenzie.trailday.offline.DownloadService
 import nz.mckenzie.trailday.offline.DownloadState
 import nz.mckenzie.trailday.offline.OfflineArea
 import nz.mckenzie.trailday.offline.docHeldWords
@@ -90,6 +92,13 @@ fun OfflineScreen(
     // Counted as the screen appears: the drawn map has no rows to watch, so the honest moment to count
     // it is when the walker is looking at the count - which is also just after a download from the picker.
     LaunchedEffect(Unit) { viewModel.refreshTopography() }
+
+    // A download can also be started from here - resuming an area - so this screen puts the notification
+    // up too. Asking twice is safe: the service is already running by then.
+    val context = LocalContext.current
+    LaunchedEffect(download != null) {
+        if (download != null) DownloadService.start(context)
+    }
 
     // The area being downloaded, if one is: its progress is the card's own bar.
     val active = stored.firstOrNull { !it.isComplete }

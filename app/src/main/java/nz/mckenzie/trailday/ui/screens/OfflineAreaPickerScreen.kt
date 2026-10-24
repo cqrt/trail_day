@@ -26,11 +26,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.doc.whatDocHasIn
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.map.BasemapView
+import nz.mckenzie.trailday.offline.DownloadService
 import nz.mckenzie.trailday.offline.DownloadState
 import nz.mckenzie.trailday.offline.OfflineAreaDraft
 import nz.mckenzie.trailday.offline.OfflinePickerMode
@@ -78,6 +80,13 @@ fun OfflineAreaPickerScreen(
     // What a download in flight is doing, in the words the notification uses. One sentence, read here and
     // there, so the card and the notification cannot describe one download two ways.
     val live = download?.let { downloadProgressWords(it) }
+
+    // A download outlives the screen that began it, so it is reported where a walker already looks for
+    // things that are still happening.
+    val context = LocalContext.current
+    LaunchedEffect(download != null) {
+        if (download != null) DownloadService.start(context)
+    }
 
     val imagery = viewModel.mode == OfflinePickerMode.IMAGERY
     val around = viewModel.mode == OfflinePickerMode.AROUND_TRACK
