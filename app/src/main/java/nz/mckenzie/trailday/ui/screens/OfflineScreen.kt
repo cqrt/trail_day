@@ -89,7 +89,7 @@ fun OfflineScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             DownloadCard(
-                title = "Imagery",
+                title = "LINZ imagery",
                 icon = { AppIcon(glyph = IconGlyph.MAP, tint = MaterialTheme.colorScheme.primary) },
                 summary = imagerySummary(stored, summary.sizeLabel, summary.tiles),
                 progress = active?.let { it.percent / 100f },
@@ -115,7 +115,7 @@ fun OfflineScreen(
             }
 
             DownloadCard(
-                title = "DOC data",
+                title = "DOC assets",
                 icon = { AssetKindIcon(kind = AssetKind.HUT, dimension = 24.dp) },
                 summary = if (docDataCount == 0) {
                     "Nothing downloaded yet"
@@ -164,8 +164,10 @@ fun OfflineScreen(
                         choosingDownload = false
                         onChooseArea()
                     },
-                    headlineContent = { Text("Imagery for the map") },
-                    supportingContent = { Text("Tiles inside an area, at a zoom range you choose") },
+                    headlineContent = { Text("LINZ imagery") },
+                    supportingContent = {
+                        Text("Land Information NZ tiles inside an area, at a zoom range you choose")
+                    },
                     leadingContent = { AppIcon(glyph = IconGlyph.MAP) }
                 )
                 ListItem(
@@ -173,9 +175,9 @@ fun OfflineScreen(
                         choosingDownload = false
                         onChooseDocArea()
                     },
-                    headlineContent = { Text("What DOC publishes") },
+                    headlineContent = { Text("DOC assets") },
                     supportingContent = {
-                        Text("Its tracks, huts, campsites and bike trails, and their pictures")
+                        Text("Dept of Conservation tracks, huts, campsites and bike trails, and their pictures")
                     },
                     leadingContent = { AssetKindIcon(kind = AssetKind.HUT) }
                 )
