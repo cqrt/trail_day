@@ -84,6 +84,9 @@ class OfflineAreaPickerTest {
             dao = db.offlineDocItemDao(),
             downloader = DocDownloader(ArcGisDoc())
         ),
+        // Nor are the drawn map's two stores: wired for the same reason.
+        topographyStore = OfflineTileStore(File(temp.root, "topography"), ".pbf"),
+        elevationStore = OfflineTileStore(File(temp.root, "elevation"), ".png"),
         // This test is about the imagery area the picker stores.
         mode = OfflinePickerMode.IMAGERY
     )
