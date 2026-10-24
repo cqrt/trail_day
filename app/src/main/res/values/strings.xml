@@ -19,6 +19,7 @@
     <string name="web_editor_channel_description">Shown while the phone is serving the track editor to a computer on the same Wi-Fi</string>
     <string name="web_editor_notification_title">Drawing from a computer</string>
     <string name="web_editor_notification_text">Open %1$s on a computer on the same Wi-Fi</string>
+    <string name="web_editor_notification_starting">Getting the address ready\u2026</string>
     <!-- App updates -->
     <string name="update_channel_name">App updates</string>
     <string name="update_channel_description">Tells you when a newer version of Trail Day has been released</string>

@@ -101,12 +101,24 @@ class WebEditorService : Service() {
             // "Be serving", which is answered by the run that is already going or already being
             // built: asking twice is how a rotation and a tap that landed twice arrive here, and
             // neither of those is a request for a second address.
-            ACTION_START -> if (server == null && !starting) start()
+            ACTION_START -> {
+                // Foreground first, whatever happens next. This action arrives through
+                // startForegroundService, which promises the system a notification within a few
+                // seconds - and a phone with no Wi-Fi is a phone with no address, which is exactly the
+                // case that gives up below. Stopping without ever going foreground is not "nothing
+                // happened": the system answers it by killing the app, which on a hillside with no
+                // reception is the app not opening at all.
+                goForeground()
+                if (server == null && !starting) start()
+            }
             // The same run, built again - for a setting it is built from having changed. One intent
             // rather than a stop and a start from the screen, because those two racing is a real
             // thing: the second ask can arrive before the service has gone, and the run it builds is
             // then torn down by the stop that is still in flight.
-            ACTION_REFRESH -> if (server != null) start() else stopSelf()
+            ACTION_REFRESH -> {
+                goForeground()
+                if (server != null) start() else stopSelf()
+            }
             ACTION_STOP -> stopSelf()
         }
         // Not sticky: a service that resurrected itself would put the phone back on the
@@ -318,6 +330,10 @@ class WebEditorService : Service() {
      * The notification carries the address rather than a way to stop: the walker is at a computer
      * and the switch is on the phone in their pocket. It is the shade where the address is found
      * when the laptop is not the one they read the card on.
+     *
+     * It is put up before the address is known, because the service has to be foreground the moment it
+     * is asked to serve - see [onStartCommand] - so the first version says only that it is getting
+     * ready, and the run's own address replaces it a moment later.
      */
     private fun buildNotification(): Notification {
         val open = PendingIntent.getActivity(
@@ -329,7 +345,11 @@ class WebEditorService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.web_editor_notification_title))
-            .setContentText(getString(R.string.web_editor_notification_text, WebEditorState.url.value.orEmpty()))
+            .setContentText(
+                WebEditorState.url.value
+                    ?.let { getString(R.string.web_editor_notification_text, it) }
+                    ?: getString(R.string.web_editor_notification_starting)
+            )
             .setSmallIcon(R.drawable.ic_stat_web)
             .setOngoing(true)
             .setContentIntent(open)
