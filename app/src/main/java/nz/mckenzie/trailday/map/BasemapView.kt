@@ -261,6 +261,14 @@ fun BasemapView(
     recentreBounds: DomainBounds? = null,
     recentreCount: Int = 0,
     /**
+     * The map has moved to the recentre it was given, so the request behind it can be let go.
+     *
+     * Handed back rather than left standing, because a request that outlived its move was re-applied every
+     * time this view was rebuilt - which a tab change does - putting a walker who had once tapped "where am
+     * I" back on the phone however far they had panned since.
+     */
+    onRecentreHandled: () -> Unit = {},
+    /**
      * Tile template to render. Defaults to the app's own tile server for the chosen basemap, so
      * every map shares one tile path - and therefore one cache, one set of offline tiles - rather
      * than some screens talking to a provider directly and some not.
@@ -326,6 +334,7 @@ fun BasemapView(
     val currentOnMapClick by rememberUpdatedState(onMapClick)
     val currentOnFollowBroken by rememberUpdatedState(onFollowBroken)
     val currentOnCameraIdle by rememberUpdatedState(onCameraIdle)
+    val currentOnRecentreHandled by rememberUpdatedState(onRecentreHandled)
 
     // Where the phone is. Every map in the app shows it, and this is the whole of how: the
     // marker is built here from the app's own stream rather than handed in per screen, so a
@@ -548,6 +557,9 @@ fun BasemapView(
         // database is dragged from their own paddock to the work a few seconds later, having
         // done nothing wrong.
         boundsApplied = true
+        // And the request is let go: it has been moved to, and a request that stayed would be moved to
+        // again every time the map was rebuilt.
+        currentOnRecentreHandled()
     }
 
     // Frame the track network the first time we know where it is, so opening the

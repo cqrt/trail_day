@@ -85,6 +85,21 @@ class MapPositionTest {
     }
 
     @Test
+    fun aRecentreTheMapHasTakenIsNotAskedForAgain() = runBlocking {
+        val viewModel = viewModel(FakeLocation(listOf(fix(-41.50, 173.95))))
+
+        viewModel.recentreOnDevice()
+        withTimeout(5_000) { viewModel.recentre.first { it != null } }!!
+
+        // The map has moved to it. Left standing, the request would be made again every time the map was
+        // rebuilt by a tab change - putting a walker who had once asked "where am I" back on the phone
+        // however far they had panned since.
+        viewModel.consumeRecentre()
+
+        assertNull("there is nothing left to move to", viewModel.recentre.value)
+    }
+
+    @Test
     fun aPhoneThatCannotSayWhereItIsSaysSoRatherThanDoingNothing() = runBlocking {
         val viewModel = viewModel(FakeLocation(emptyList()))
 

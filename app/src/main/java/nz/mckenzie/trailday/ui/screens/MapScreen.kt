@@ -199,6 +199,9 @@ fun MapScreen(
                 // does not follow the phone, because it is also for reading the work.
                 recentreBounds = recentre?.bounds,
                 recentreCount = recentre?.count ?: 0,
+                // The move has been made, so the request is let go: one that stayed would be made again
+                // every time this screen was rebuilt, which a tab change does.
+                onRecentreHandled = viewModel::consumeRecentre,
                 // The ground the walker was last reading, so a tab change or a basemap change
                 // opens here rather than on the work or the phone.
                 initialTarget = camera?.let { LatLng(it.lat, it.lng) } ?: DEFAULT_CAMERA_TARGET,

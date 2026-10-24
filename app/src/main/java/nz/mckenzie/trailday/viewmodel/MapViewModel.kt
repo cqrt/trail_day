@@ -735,6 +735,17 @@ class MapViewModel(
         }
     }
 
+    /**
+     * The map has moved to the recentre it was given, so there is nothing left to ask for.
+     *
+     * **A request is a moment, not a state.** Left standing it was re-applied every time the map was
+     * rebuilt, which a tab change and a basemap change both do - so a walker who had once tapped "where am
+     * I" was put back on the phone every time they returned to the map, however far they had panned since.
+     */
+    fun consumeRecentre() {
+        _recentre.value = null
+    }
+
     val assetGeoJson: StateFlow<String> = combine(
         assets,
         geometryByTrack,
