@@ -3,9 +3,9 @@ package nz.mckenzie.trailday.offline
 /**
  * Which offline pack the map picker is choosing an area for.
  *
- * The two packs are independent caches - imagery tiles, and everything DOC publishes - so they get an
- * area each, chosen the same way: tap two corners, then download. The picker is one screen because the
- * choosing is one thing; only what is downloaded afterwards differs.
+ * The three packs are independent caches - imagery tiles, everything DOC publishes, and the drawn
+ * Topographic map - so they get an area each, chosen the same way: tap two corners, then download. The
+ * picker is one screen because the choosing is one thing; only what is downloaded afterwards differs.
  */
 enum class OfflinePickerMode {
     /** Basemap imagery tiles, for the map to work with no reception. */
@@ -16,6 +16,15 @@ enum class OfflinePickerMode {
      * map's reference layer to work with no reception.
      */
     DOC_DATA,
+
+    /**
+     * LINZ's vector Topographic map: its tiles, and the heights its hillshade is drawn from.
+     *
+     * The other drawn map the app can keep. Vector tiles are a fraction of the size of imagery for the
+     * same ground, so this is the cheap way to carry a map with no reception - and the one a walker
+     * actually reads on a hillside, where the photograph says nothing about the shape of the land.
+     */
+    TOPOGRAPHY,
 
     /**
      * The ground around one track: the imagery that draws it, and what DOC publishes inside the same box.

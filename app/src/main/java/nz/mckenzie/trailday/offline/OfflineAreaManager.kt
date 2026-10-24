@@ -189,8 +189,7 @@ class OfflineAreaManager(
     }
 }
 
-private fun OfflineAreaEntity.toOfflineArea() = OfflineArea(
-    id = id,
+private fun OfflineAreaEntity.toOfflineArea() = OfflineArea(    id = id,
     name = name,
     bounds = LatLngBounds(minLat = minLat, minLng = minLng, maxLat = maxLat, maxLng = maxLng),
     plannedTiles = plannedTiles.toInt(),
@@ -199,3 +198,15 @@ private fun OfflineAreaEntity.toOfflineArea() = OfflineArea(
     isComplete = isComplete,
     lastError = lastError
 )
+
+/**
+ * The sentence a Topographic download earns: what was kept of the map, and of the heights it is shaded
+ * from.
+ *
+ * **Two numbers rather than one**, because they are two different things to a walker: the map is what
+ * they read - roads, contours, names - and the heights are what tells them the shape of the ground. A
+ * box with one and not the other is a map with no relief, which is the half that matters on a hillside.
+ */
+fun topoDownloadedMessage(map: TileDownloader.Progress, heights: TileDownloader.Progress): String =
+    "Kept ${map.stored} map tiles and ${heights.stored} height tiles, " +
+        "about ${formatBytes(map.bytes + heights.bytes)}."

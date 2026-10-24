@@ -68,15 +68,20 @@ fun OfflineAreaPickerScreen(
     val saved by viewModel.saved.collectAsStateWithLifecycle()
     val docWorking by viewModel.docWorking.collectAsStateWithLifecycle()
     val docMessage by viewModel.docMessage.collectAsStateWithLifecycle()
+    val topoMessage by viewModel.topoMessage.collectAsStateWithLifecycle()
     val docInventory by viewModel.docInventory.collectAsStateWithLifecycle()
     val docCounting by viewModel.docCounting.collectAsStateWithLifecycle()
 
     val imagery = viewModel.mode == OfflinePickerMode.IMAGERY
     val around = viewModel.mode == OfflinePickerMode.AROUND_TRACK
-    // What this run keeps: the imagery (a name, a zoom range, the tiles), and/or what DOC publishes in the
-    // same box. Around a track is both, which is why they are two questions rather than one flag.
-    val keepsImagery = viewModel.mode != OfflinePickerMode.DOC_DATA
-    val keepsDocData = viewModel.mode != OfflinePickerMode.IMAGERY
+    val topography = viewModel.mode == OfflinePickerMode.TOPOGRAPHY
+    // What this run keeps, as separate questions rather than one flag, because the packs are separate
+    // caches: the imagery (a name, a zoom range, the tiles), what DOC publishes in the same box, and the
+    // drawn Topographic map with the heights its shade comes from. Around a track is the first two.
+    val keepsImagery = imagery || around
+    val keepsDocData = viewModel.mode == OfflinePickerMode.DOC_DATA || around
+    // A zoom range is what any pack of tiles is asked, and the imagery and the drawn map are both that.
+    val keepsZooms = keepsImagery || topography
 
     LaunchedEffect(saved) {
         if (saved) {
@@ -95,6 +100,7 @@ fun OfflineAreaPickerScreen(
                         when (viewModel.mode) {
                             OfflinePickerMode.IMAGERY -> "Choose an offline area"
                             OfflinePickerMode.DOC_DATA -> "Choose a DOC area"
+                            OfflinePickerMode.TOPOGRAPHY -> "Choose an area to keep the map for"
                             OfflinePickerMode.AROUND_TRACK -> "Keep the ground around this track"
                         }
                     )
@@ -152,8 +158,8 @@ fun OfflineAreaPickerScreen(
                         style = MaterialTheme.typography.titleSmall
                     )
 
-                    // A name and a zoom range are an imagery area's own questions. A DOC area is the
-                    // box and nothing else, so the picker asks nothing else of it.
+                    // A name belongs to an imagery area, because an area is a row the walker finds again
+                    // later. The other packs are one cache each, so there is nothing to name.
                     if (keepsImagery) {
                         OutlinedTextField(
                             value = draft.name,
@@ -162,21 +168,28 @@ fun OfflineAreaPickerScreen(
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
+                    }
 
+                    // How deep to keep it, which every pack that is tiles needs asked - the imagery's
+                    // tiles, and the drawn map's own.
+                    if (keepsZooms) {
                         ZoomSlider(
                             label = "Shallowest level",
                             value = draft.minZoom,
+                            deepest = viewModel.deepestZoom,
                             onChange = { viewModel.setZoomRange(it, draft.maxZoom) }
                         )
                         ZoomSlider(
                             label = "Deepest level",
                             value = draft.maxZoom,
+                            deepest = viewModel.deepestZoom,
                             onChange = { viewModel.setZoomRange(draft.minZoom, it) }
                         )
 
                         Text(
                             text = if (draft.isComplete) {
-                                "${draft.tileCount} aerial tiles, roughly ${draft.estimatedSizeLabel} " +
+                                "${draft.tileCount} ${if (topography) "map" else "aerial"} tiles, " +
+                                    "roughly ${draft.estimatedSizeLabel} " +
                                     "· zoom ${draft.minZoom} to ${draft.maxZoom}"
                             } else {
                                 "Tap two corners to see how many tiles that is."
@@ -214,6 +227,22 @@ fun OfflineAreaPickerScreen(
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
+                    }
+
+                    // The drawn map: LINZ's own cartography, and the heights its shade is drawn from.
+                    if (topography) {
+                        Text(
+                            text = "LINZ's Topographic map - roads, tracks, contours and names - kept " +
+                                "with the heights its hillshade is shaded from.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = "LINZ publishes this map to zoom " +
+                                "${Basemap.LINZ_TOPO_LIDAR_HILLSHADE.maxZoom}; deeper levels are drawn " +
+                                "from that one, so that is as deep as the download goes.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        topoMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                     }
 
                     // What DOC publishes in the same box: the whole download for a DOC area, and the half
@@ -261,17 +290,22 @@ fun OfflineAreaPickerScreen(
                         ) { Text("Start over") }
                         Button(
                             onClick = viewModel::download,
-                            enabled = if (keepsImagery) {
-                                apiKey.isNotBlank() && draft.isComplete && !draft.isTooBig &&
-                                    !working && !docWorking
-                            } else {
-                                draft.isComplete && !docWorking
+                            enabled = when {
+                                keepsImagery -> apiKey.isNotBlank() && draft.isComplete &&
+                                    !draft.isTooBig && !working && !docWorking
+
+                                topography -> apiKey.isNotBlank() && draft.isComplete &&
+                                    !draft.isTooBig && !working
+
+                                else -> draft.isComplete && !docWorking
                             }
                         ) {
                             Text(
                                 when {
                                     around && working -> "Keeping the ground…"
                                     around -> "Keep the ground"
+                                    topography && working -> "Downloading the map…"
+                                    topography -> "Download the map"
                                     !imagery && docWorking -> "Downloading DOC data…"
                                     !imagery -> "Download DOC data"
                                     else -> "Download area"
@@ -287,7 +321,13 @@ fun OfflineAreaPickerScreen(
 
 /** A zoom level, as a slider with the number spelled out. */
 @Composable
-private fun ZoomSlider(label: String, value: Int, onChange: (Int) -> Unit) {
+private fun ZoomSlider(
+    label: String,
+    value: Int,
+    /** The deepest level this run will fetch: a map that stops at zoom 15 is not asked for 16. */
+    deepest: Int,
+    onChange: (Int) -> Unit
+) {
     Column {
         Text(
             text = "$label: zoom $value",
@@ -296,9 +336,9 @@ private fun ZoomSlider(label: String, value: Int, onChange: (Int) -> Unit) {
         Slider(
             value = value.toFloat(),
             onValueChange = { onChange(it.roundToInt()) },
-            valueRange = OfflineAreaDraft.MIN_ZOOM.toFloat()..OfflineAreaDraft.MAX_ZOOM.toFloat(),
-            // Twelve whole levels, so eleven gaps and ten intermediate stops.
-            steps = OfflineAreaDraft.MAX_ZOOM - OfflineAreaDraft.MIN_ZOOM - 1
+            valueRange = OfflineAreaDraft.MIN_ZOOM.toFloat()..deepest.toFloat(),
+            // One stop per whole level between the two ends, whatever they are.
+            steps = (deepest - OfflineAreaDraft.MIN_ZOOM - 1).coerceAtLeast(0)
         )
     }
 }

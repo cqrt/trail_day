@@ -21,6 +21,7 @@ import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.offline.OfflineArea
 import nz.mckenzie.trailday.offline.OfflineAreaManager
 import nz.mckenzie.trailday.offline.OfflineDocStore
+import nz.mckenzie.trailday.offline.OfflineTileStore
 import nz.mckenzie.trailday.offline.TileServerHolder
 import nz.mckenzie.trailday.offline.TileStoreSummary
 
@@ -35,7 +36,10 @@ import nz.mckenzie.trailday.offline.TileStoreSummary
 class OfflineViewModel(
     private val manager: OfflineAreaManager,
     private val settings: SettingsRepository,
-    private val docStore: OfflineDocStore
+    private val docStore: OfflineDocStore,
+    /** The drawn map's tiles, and the heights its hillshade is drawn from, so the screen can count them. */
+    private val topographyStore: OfflineTileStore,
+    private val elevationStore: OfflineTileStore
 ) : ViewModel() {
 
     val apiKey: StateFlow<String> = settings.linzApiKey
@@ -50,6 +54,16 @@ class OfflineViewModel(
 
     private val _summary = MutableStateFlow(TileStoreSummary(0, 0))
     val summary: StateFlow<TileStoreSummary> = _summary
+
+    private val _topoSummary = MutableStateFlow(TileStoreSummary(0, 0))
+
+    /**
+     * What the drawn Topographic map holds: its tiles, and the heights its shade is drawn from.
+     *
+     * Counted together because they are one thing to a walker - the map either draws this ground or it
+     * does not - and because a box with one and not the other is a map with no relief.
+     */
+    val topoSummary: StateFlow<TileStoreSummary> = _topoSummary
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
@@ -83,6 +97,7 @@ class OfflineViewModel(
 
     init {
         refreshSummary()
+        refreshTopography()
 
         // Keep "what is on the device" honest when an area is downloaded from the picker: its
         // download left this figure stale. Refreshed when the set of areas changes or one finishes -
@@ -173,6 +188,35 @@ class OfflineViewModel(
         }
     }
 
+    /**
+     * Counts what the drawn map holds.
+     *
+     * Asked for by the screen as it appears rather than collected, because there is nothing to collect:
+     * the map's tiles are one cache with no rows to watch, so the honest moment to count them is when
+     * the walker is looking at the count - which is also just after a download from the picker.
+     */
+    fun refreshTopography() {
+        viewModelScope.launch {
+            _topoSummary.value = runCatching {
+                TileStoreSummary(
+                    tiles = topographyStore.storedTileCount() + elevationStore.storedTileCount(),
+                    bytes = topographyStore.storedBytes() + elevationStore.storedBytes()
+                )
+            }.getOrDefault(TileStoreSummary(0, 0))
+        }
+    }
+
+    /** Reclaims the space the drawn map holds. It is fetched again as the map is looked at. */
+    fun clearTopography() {
+        viewModelScope.launch {
+            runCatching {
+                topographyStore.deleteAll()
+                elevationStore.deleteAll()
+            }
+            refreshTopography()
+        }
+    }
+
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L
 
@@ -194,7 +238,10 @@ class OfflineViewModel(
                         docStore = OfflineDocStore(
                             dao = database.offlineDocItemDao(),
                             downloader = DocDownloader.online()
-                        )
+                        ),
+                        // The drawn map's two stores, counted by the screen's own card.
+                        topographyStore = TileServerHolder.topographyStore(appContext),
+                        elevationStore = TileServerHolder.elevationStore(appContext)
                     )
                 }
             }

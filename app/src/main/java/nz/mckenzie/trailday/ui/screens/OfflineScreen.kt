@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,7 +59,8 @@ fun OfflineScreen(
     viewModel: OfflineViewModel,
     onOpenTab: (Tab) -> Unit = {},
     onChooseArea: () -> Unit,
-    onChooseDocArea: () -> Unit
+    onChooseDocArea: () -> Unit,
+    onChooseTopoArea: () -> Unit
 ) {
     val apiKey by viewModel.apiKey.collectAsStateWithLifecycle()
     val stored by viewModel.stored.collectAsStateWithLifecycle()
@@ -68,10 +70,16 @@ fun OfflineScreen(
     val docDataCount by viewModel.docDataCount.collectAsStateWithLifecycle()
     val docCounts by viewModel.docCounts.collectAsStateWithLifecycle()
     val docPictures by viewModel.docPictures.collectAsStateWithLifecycle()
+    val topoSummary by viewModel.topoSummary.collectAsStateWithLifecycle()
 
     var confirmingClearImagery by remember { mutableStateOf(false) }
     var confirmingClearDocData by remember { mutableStateOf(false) }
+    var confirmingClearTopo by remember { mutableStateOf(false) }
     var choosingDownload by remember { mutableStateOf(false) }
+
+    // Counted as the screen appears: the drawn map has no rows to watch, so the honest moment to count
+    // it is when the walker is looking at the count - which is also just after a download from the picker.
+    LaunchedEffect(Unit) { viewModel.refreshTopography() }
 
     // The area being downloaded, if one is: its progress is the card's own bar.
     val active = stored.firstOrNull { !it.isComplete }
@@ -136,6 +144,27 @@ fun OfflineScreen(
                 // point of it being one entry.
             }
 
+            // The drawn map: the other thing a walker can choose to keep, and the cheap one - vector
+            // tiles are a fraction of imagery for the same ground, and it is what reads on a hillside.
+            DownloadCard(
+                title = "Topographic map",
+                icon = { AppIcon(glyph = IconGlyph.LAYERS, tint = MaterialTheme.colorScheme.primary) },
+                summary = if (topoSummary.tiles == 0L) {
+                    "Nothing kept yet"
+                } else {
+                    "${topoSummary.tiles} tiles \u00b7 ${topoSummary.sizeLabel}"
+                },
+                progress = null,
+                progressLabel = null,
+                footnote = "LINZ's drawn map, with the heights its hillshade is shaded from.",
+                error = null,
+                clearLabel = "Clear the map".takeIf { topoSummary.tiles > 0L },
+                onClear = { confirmingClearTopo = true }
+            ) {
+                // No rows: the drawn map is one cache the whole app reads, wherever it is drawn - so
+                // there is nothing per-area to list, only what is held in total.
+            }
+
             Button(
                 onClick = { choosingDownload = true },
                 modifier = Modifier.fillMaxWidth()
@@ -180,6 +209,17 @@ fun OfflineScreen(
                         Text("Dept of Conservation tracks, huts, campsites and bike trails, and their pictures")
                     },
                     leadingContent = { AssetKindIcon(kind = AssetKind.HUT) }
+                )
+                ListItem(
+                    modifier = Modifier.clickable {
+                        choosingDownload = false
+                        onChooseTopoArea()
+                    },
+                    headlineContent = { Text("Topographic map") },
+                    supportingContent = {
+                        Text("LINZ's drawn map - roads, tracks, contours and names - for reading the land")
+                    },
+                    leadingContent = { AppIcon(glyph = IconGlyph.LAYERS) }
                 )
             }
         }
@@ -233,6 +273,32 @@ fun OfflineScreen(
             },
             dismissButton = {
                 TextButton(onClick = { confirmingClearDocData = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (confirmingClearTopo) {
+        AlertDialog(
+            onDismissRequest = { confirmingClearTopo = false },
+            title = { Text("Delete the kept map?") },
+            text = {
+                Text(
+                    "This removes the ${topoSummary.tiles} tiles (${topoSummary.sizeLabel}) the drawn " +
+                        "Topographic map is kept from. The map needs reception until an area is " +
+                        "downloaded again, or until it is looked at with a signal."
+                )
+            },
+            confirmButton = {
+                DestructiveTextButton(
+                    text = "Delete",
+                    onClick = {
+                        confirmingClearTopo = false
+                        viewModel.clearTopography()
+                    }
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingClearTopo = false }) { Text("Cancel") }
             }
         )
     }

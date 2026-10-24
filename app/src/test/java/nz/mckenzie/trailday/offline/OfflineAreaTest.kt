@@ -13,6 +13,32 @@ import org.junit.Test
  */
 class OfflineAreaTest {
 
+    @Test
+    fun `a Topographic download says what it kept of the map and of the heights`() {
+        val said = topoDownloadedMessage(
+            map = TileDownloader.Progress(
+                stored = 13,
+                total = 13,
+                bytes = 571_000,
+                unavailable = 0,
+                failed = 0
+            ),
+            heights = TileDownloader.Progress(
+                stored = 8,
+                total = 8,
+                bytes = 240_000,
+                unavailable = 0,
+                failed = 0
+            )
+        )
+
+        // Both halves, because they are two different things to a walker: the map is what they read, and
+        // the heights are what tells them the shape of the ground.
+        assertTrue("the map's own tiles are said", said.contains("13 map tiles"))
+        assertTrue("and the heights beside them", said.contains("8 height tiles"))
+        assertTrue("and what the two came to together", said.contains("792 KB"))
+    }
+
     private fun area(
         planned: Int = 100,
         stored: Int = 0,

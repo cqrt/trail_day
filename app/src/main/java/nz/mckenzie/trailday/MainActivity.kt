@@ -57,7 +57,7 @@ import nz.mckenzie.trailday.web.WebEditorService
 import nz.mckenzie.trailday.web.WebEditorState
 
 /** Destinations for now; swap for a NavHost when routes need arguments. */
-private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, OFFLINE_PICKER_AROUND, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC, DOC_DETAIL }
+private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, OFFLINE_TOPO_PICKER, OFFLINE_PICKER_AROUND, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC, DOC_DETAIL }
 
 class MainActivity : ComponentActivity() {
 
@@ -366,6 +366,10 @@ class MainActivity : ComponentActivity() {
                             onChooseDocArea = {
                                 offlinePickerVisit++
                                 destination = Destination.OFFLINE_DOC_PICKER
+                            },
+                            onChooseTopoArea = {
+                                offlinePickerVisit++
+                                destination = Destination.OFFLINE_TOPO_PICKER
                             }
                         )
                     }
@@ -391,6 +395,24 @@ class MainActivity : ComponentActivity() {
                             factory = OfflineAreaPickerViewModel.factory(
                                 applicationContext,
                                 OfflinePickerMode.DOC_DATA
+                            )
+                        )
+                        OfflineAreaPickerScreen(
+                            viewModel = pickerViewModel,
+                            onBack = { destination = Destination.OFFLINE },
+                            onSaved = { destination = Destination.OFFLINE }
+                        )
+                    }
+
+                    // The drawn map, kept for a box the walker draws: LINZ's vector Topographic tiles and
+                    // the heights its hillshade is shaded from, so the map draws this ground with no
+                    // reception. See OfflinePickerMode.TOPOGRAPHY.
+                    Destination.OFFLINE_TOPO_PICKER -> {
+                        val pickerViewModel: OfflineAreaPickerViewModel = viewModel(
+                            key = "offline-topo-picker-$offlinePickerVisit",
+                            factory = OfflineAreaPickerViewModel.factory(
+                                applicationContext,
+                                OfflinePickerMode.TOPOGRAPHY
                             )
                         )
                         OfflineAreaPickerScreen(

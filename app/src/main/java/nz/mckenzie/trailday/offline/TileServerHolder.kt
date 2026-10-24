@@ -28,6 +28,15 @@ object TileServerHolder {
     /** Where downloaded aerial imagery goes: the offline feature's own directory. */
     const val TILES_DIR = "tiles"
 
+    /**
+     * Where the vector Topographic map's tiles and its elevation go, once downloaded or browsed.
+     *
+     * The app's own files rather than the cache, for the same reason the imagery is: a walker can choose
+     * to download this map for an area, and a deliberate download that the storage trimmer may take away
+     * is not a download. See [store].
+     */
+    const val TOPOGRAPHY_DIR = "topography"
+
     /** Where a browsed basemap's tiles are cached, e.g. `tiles-cache-osm`. */
     const val CACHE_DIR_PREFIX = "tiles-cache-"
 
@@ -195,13 +204,15 @@ object TileServerHolder {
     )
 
     /**
-     * Where the elevation tiles are kept: a cache of what the desk has shaded.
+     * Where the elevation tiles are kept: a store an offline area covers, and the desk shades from.
      *
-     * The `-png` in the folder name is a version: an earlier build asked LINZ for WebP while
+     * The app's own files, because a downloaded Topographic area carries these with it - the heights are
+     * half of what the map needs to draw, and a cache the system may reclaim would leave a downloaded
+     * area flat. The `-png` in the folder name is a version: an earlier build asked LINZ for WebP while
      * declaring PNG, and those undecodable bytes must not be served now that the request is fixed.
      */
     fun elevationStore(context: Context): OfflineTileStore = OfflineTileStore(
-        File(context.applicationContext.cacheDir, "$CACHE_DIR_PREFIX$ELEVATION_ID-png"),
+        File(context.applicationContext.filesDir, "$TOPOGRAPHY_DIR/elevation-png"),
         ELEVATION_SUFFIX
     )
 
@@ -263,12 +274,24 @@ object TileServerHolder {
         val appContext = context.applicationContext
         val root = when (basemap) {
             Basemap.LINZ_AERIAL -> File(appContext.filesDir, TILES_DIR)
-            // Every drawn map is a cache of what has been looked at: see the comment above.
-            Basemap.OPENSTREETMAP, Basemap.TOPOGRAPHIC, Basemap.LINZ_TOPO_LIDAR_HILLSHADE ->
+            // The vector Topographic map is the one drawn map a walker can choose to download, so its
+            // tiles are kept with the imagery rather than in the cache: see [TOPOGRAPHY_DIR].
+            Basemap.LINZ_TOPO_LIDAR_HILLSHADE -> File(appContext.filesDir, TOPOGRAPHY_DIR)
+            // Every other drawn map is a cache of what has been looked at: see the comment above.
+            Basemap.OPENSTREETMAP, Basemap.TOPOGRAPHIC ->
                 File(appContext.cacheDir, "$CACHE_DIR_PREFIX${basemap.id}")
         }
         return OfflineTileStore(root, basemap.tileSuffix)
     }
+
+    /**
+     * The store the vector Topographic map's tiles are kept in, and downloaded into.
+     *
+     * Named rather than defaulted for the same reason [imageryStore] is: adding a basemap must not
+     * quietly change what an offline area downloads into.
+     */
+    fun topographyStore(context: Context): OfflineTileStore =
+        store(context, Basemap.LINZ_TOPO_LIDAR_HILLSHADE)
 
     /**
      * The store the offline imagery feature owns: the aerial one.
