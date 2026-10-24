@@ -44,6 +44,7 @@ enum class IconGlyph {
     SEARCH,
     CLOSE,
     PLUS,
+    MINUS,
     ALERT
 }
 
@@ -106,6 +107,12 @@ internal fun AppIcon(
             // A plus: the way into making a new place on the Places page.
             IconGlyph.PLUS -> {
                 line(0.50f, 0.22f, 0.50f, 0.78f)
+                line(0.22f, 0.50f, 0.78f, 0.50f)
+            }
+
+            // A minus: the other half of the zoom pair on a map that cannot be pinched. Its bar is
+            // the plus's own, at the same place on the grid, so the two read as one control.
+            IconGlyph.MINUS -> {
                 line(0.22f, 0.50f, 0.78f, 0.50f)
             }
 

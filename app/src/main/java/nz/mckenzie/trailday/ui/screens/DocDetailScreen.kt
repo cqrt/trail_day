@@ -29,7 +29,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -80,6 +83,15 @@ fun DocDetailScreen(
     val uriHandler = LocalUriHandler.current
 
     val bounds = remember(item) { docBounds(item) }
+    // The map at the top is a **preview**: it cannot be dragged or pinched, because a drag on it is
+    // how the walker moves the page under it and a pinch is a gesture on a picture. Looking closer at
+    // the line is still a fair thing to want, so it is given the two buttons instead.
+    var zoomStep by remember { mutableDoubleStateOf(0.0) }
+    var zoomCount by remember { mutableIntStateOf(0) }
+    val zoom = { step: Double ->
+        zoomStep = step
+        zoomCount += 1
+    }
     val geoJson = remember(item, bike) {
         DocGeoJson.build(
             items = listOf(item),
@@ -134,6 +146,11 @@ fun DocDetailScreen(
                     fitBoundsMaxZoom = 16.0,
                     // Room for the credit strip along the foot, so the line is never under it.
                     fitBoundsPaddingPx = 150,
+                    // A picture of one thing, not a place to explore: every gesture off, and the zoom
+                    // given to the buttons on the right instead.
+                    interactive = false,
+                    zoomStep = zoomStep,
+                    zoomCount = zoomCount,
                     modifier = Modifier.fillMaxSize()
                 )
                 DocBackPill(
@@ -141,6 +158,13 @@ fun DocDetailScreen(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(12.dp)
+                )
+                MapZoomButtons(
+                    onZoomIn = { zoom(ZOOM_STEP) },
+                    onZoomOut = { zoom(-ZOOM_STEP) },
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 12.dp)
                 )
                 AttributionStrip(
                     basemap = basemap,
@@ -245,6 +269,37 @@ private fun DocBackPill(onBack: () -> Unit, modifier: Modifier = Modifier) {
                 letterSpacing = 1.1.sp
             )
         }
+    }
+}
+
+/**
+ * How far one tap of the preview's zoom buttons moves the camera.
+ *
+ * A whole level, which is what the map's own double-tap gives: a line too small to read is legible
+ * after a tap or two rather than after ten, and a tap is still a nudge when the walker is close.
+ */
+private const val ZOOM_STEP = 1.0
+
+/**
+ * The two buttons a preview map is looked closer with.
+ *
+ * A preview cannot be dragged or pinched, so without these it could only be looked at from wherever it
+ * framed itself - which for a long track is a line too small to read, and for a track that is one
+ * straight leg is a line that runs off the screen. They are a step in and a step out, one tap at a
+ * time, in the part of the map the back pill and the credit strip leave free.
+ */
+@Composable
+private fun MapZoomButtons(
+    onZoomIn: () -> Unit,
+    onZoomOut: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        RoundIconButton(glyph = IconGlyph.PLUS, description = "Zoom in", onClick = onZoomIn)
+        RoundIconButton(glyph = IconGlyph.MINUS, description = "Zoom out", onClick = onZoomOut)
     }
 }
 

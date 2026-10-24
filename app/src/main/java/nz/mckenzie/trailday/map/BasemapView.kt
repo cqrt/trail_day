@@ -212,10 +212,22 @@ fun BasemapView(
      * Whether the walker may move this map.
      *
      * True on every map the work is read on. False for a **preview** - the thumbnail in a listing
-     * that says where a downloaded area is - where there is nothing to explore and a drag would only
-     * move the picture off the thing it is a picture of.
+     * that says where a downloaded area is, and the map at the top of one thing's own page - where
+     * there is nothing to explore and a drag would only move the picture off the thing it is a
+     * picture of. A preview that is worth looking closer at is given [zoomStep] and a pair of
+     * buttons instead, so the zoom is a control rather than a gesture on a picture.
      */
     interactive: Boolean = true,
+    /**
+     * A zoom the walker asked for with those buttons, as a number of levels: positive is closer.
+     *
+     * **A step rather than a level**, because the buttons are relative: a walker taps in until the
+     * line is legible and out until they can see where it goes, and neither of those is a request
+     * for zoom 14. [zoomCount] is what says a new request from the same one arriving twice - the
+     * same shape as [recentreCount], and for the same reason: a second tap on "in" has to zoom again.
+     */
+    zoomStep: Double = 0.0,
+    zoomCount: Int = 0,
     /**
      * Whether the phone's own dot is drawn on this map.
      *
@@ -571,6 +583,23 @@ fun BasemapView(
         if (boundsApplied) return@LaunchedEffect
 
         map.animateCamera(cameraFor(map, bounds, fitBoundsMaxZoom, fitBoundsPaddingPx))
+        boundsApplied = true
+    }
+
+    // A zoom the walker asked for by tapping the preview's own buttons. A preview takes no gestures,
+    // so this is the only thing that moves it - and the count served is remembered here rather than
+    // handed back the way a recentre is, because there is nothing outside this view that has to
+    // forget it: a map rebuilt under the same request (a basemap change, a tab change) must not zoom
+    // again for a tap that was already answered.
+    var zoomServed by remember { mutableStateOf(0) }
+    LaunchedEffect(zoomCount, mapState.value) {
+        val map = mapState.value ?: return@LaunchedEffect
+        if (zoomCount == zoomServed) return@LaunchedEffect
+        zoomServed = zoomCount
+
+        map.animateCamera(CameraUpdateFactory.zoomBy(zoomStep))
+        // The walker has taken the camera, so a framing that has not landed yet must not take it back
+        // - the same reasoning as an asked-for recentre.
         boundsApplied = true
     }
 
