@@ -128,18 +128,38 @@ class OfflineAreaManager(
         val downloader = TileDownloader(store = store, fetcher = fetcherFor(apiKey))
 
         var lastWrite = 0L
-        val progress = downloader.download(
-            bounds = LatLngBounds(row.minLat, row.minLng, row.maxLat, row.maxLng),
-            minZoom = row.minZoom,
-            maxZoom = row.maxZoom
-        ) { current ->
-            val at = now()
-            // The screen reads the database, so progress is written as it happens
-            // - but not once per chunk of four tiles.
-            if (at - lastWrite >= PROGRESS_WRITE_MS) {
-                lastWrite = at
-                dao.updateProgress(areaId, current.stored.toLong(), current.bytes)
+        val progress = try {
+            downloader.download(
+                bounds = LatLngBounds(row.minLat, row.minLng, row.maxLat, row.maxLng),
+                minZoom = row.minZoom,
+                maxZoom = row.maxZoom
+            ) { current ->
+                // What a walker watching this reads: one sentence, the same one the offline screen and the
+                // notification show, worked out from the downloader's own figures.
+                DownloadState.report(
+                    DownloadProgress(
+                        pack = DownloadPacks.IMAGERY,
+                        unit = TILE_UNIT,
+                        done = current.stored,
+                        total = current.total,
+                        bytes = current.bytes,
+                        elapsedMs = current.elapsedMs,
+                        unavailable = current.unavailable,
+                        failed = current.failed
+                    )
+                )
+                val at = now()
+                // The screen reads the database, so progress is written as it happens
+                // - but not once per chunk of four tiles.
+                if (at - lastWrite >= PROGRESS_WRITE_MS) {
+                    lastWrite = at
+                    dao.updateProgress(areaId, current.stored.toLong(), current.bytes)
+                }
             }
+        } finally {
+            // Finished, failed, or cancelled by the walker leaving: either way there is nothing left to
+            // watch, and a sentence left behind would outlive the download it describes.
+            DownloadState.clear()
         }
 
         if (progress.failed == 0) {
@@ -184,6 +204,9 @@ class OfflineAreaManager(
          * mis-typed zoom range cannot fill the device.
          */
         const val MAX_TILES_PER_AREA = 12_000L
+
+        /** What the download counts, as the live sentence reads it. */
+        private const val TILE_UNIT = "tiles"
 
         private const val PROGRESS_WRITE_MS = 1_000L
     }

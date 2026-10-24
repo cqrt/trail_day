@@ -38,8 +38,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.doc.DocSource
+import nz.mckenzie.trailday.offline.DownloadPacks
+import nz.mckenzie.trailday.offline.DownloadState
 import nz.mckenzie.trailday.offline.OfflineArea
 import nz.mckenzie.trailday.offline.docHeldWords
+import nz.mckenzie.trailday.offline.downloadProgressWords
 import nz.mckenzie.trailday.offline.pictureCountWords
 import nz.mckenzie.trailday.viewmodel.OfflineViewModel
 
@@ -71,6 +74,12 @@ fun OfflineScreen(
     val docCounts by viewModel.docCounts.collectAsStateWithLifecycle()
     val docPictures by viewModel.docPictures.collectAsStateWithLifecycle()
     val topoSummary by viewModel.topoSummary.collectAsStateWithLifecycle()
+    val download by DownloadState.current.collectAsStateWithLifecycle()
+
+    // What is downloading now, if it is this card's own pack: the same sentence the picker's card and the
+    // notification show, so the three cannot describe one download three ways.
+    val imageryLive = download?.takeIf { it.pack == DownloadPacks.IMAGERY }
+    val topoLive = download?.takeIf { it.pack == DownloadPacks.TOPOGRAPHY }
 
     var confirmingClearImagery by remember { mutableStateOf(false) }
     var confirmingClearDocData by remember { mutableStateOf(false) }
@@ -97,11 +106,18 @@ fun OfflineScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             DownloadCard(
-                title = "LINZ imagery",
+                title = DownloadPacks.IMAGERY,
                 icon = { AppIcon(glyph = IconGlyph.MAP, tint = MaterialTheme.colorScheme.primary) },
-                summary = imagerySummary(stored, summary.sizeLabel, summary.tiles),
-                progress = active?.let { it.percent / 100f },
-                progressLabel = active?.let { "Downloading\u2026 ${it.percent}%" },
+                // While it is downloading the card's own line is the live sentence: a count of what is
+                // held so far would be a second, staler number beside the one that matters.
+                summary = imageryLive?.let { downloadProgressWords(it) }
+                    ?: imagerySummary(stored, summary.sizeLabel, summary.tiles),
+                progress = imageryLive?.let { it.percent / 100f } ?: active?.let { it.percent / 100f },
+                progressLabel = if (imageryLive != null) {
+                    null
+                } else {
+                    active?.takeIf { !it.isComplete }?.let { "Downloading\u2026 ${it.percent}%" }
+                },
                 footnote = if (apiKey.isBlank()) {
                     "Add a LINZ Basemaps key in Settings to download imagery."
                 } else {
@@ -123,7 +139,7 @@ fun OfflineScreen(
             }
 
             DownloadCard(
-                title = "DOC assets",
+                title = DownloadPacks.DOC,
                 icon = { AssetKindIcon(kind = AssetKind.HUT, dimension = 24.dp) },
                 summary = if (docDataCount == 0) {
                     "Nothing downloaded yet"
@@ -147,14 +163,15 @@ fun OfflineScreen(
             // The drawn map: the other thing a walker can choose to keep, and the cheap one - vector
             // tiles are a fraction of imagery for the same ground, and it is what reads on a hillside.
             DownloadCard(
-                title = "Topographic map",
+                title = DownloadPacks.TOPOGRAPHY,
                 icon = { AppIcon(glyph = IconGlyph.LAYERS, tint = MaterialTheme.colorScheme.primary) },
-                summary = if (topoSummary.tiles == 0L) {
-                    "Nothing kept yet"
-                } else {
-                    "${topoSummary.tiles} tiles \u00b7 ${topoSummary.sizeLabel}"
-                },
-                progress = null,
+                summary = topoLive?.let { downloadProgressWords(it) }
+                    ?: if (topoSummary.tiles == 0L) {
+                        "Nothing kept yet"
+                    } else {
+                        "${topoSummary.tiles} ${tileWord(topoSummary.tiles)} \u00b7 ${topoSummary.sizeLabel}"
+                    },
+                progress = topoLive?.let { it.percent / 100f },
                 progressLabel = null,
                 footnote = "LINZ's drawn map, with the heights its hillshade is shaded from.",
                 error = null,
@@ -303,6 +320,9 @@ fun OfflineScreen(
         )
     }
 }
+
+/** "1 tile" rather than "1 tiles": a count is read at a glance, and the wrong word is what gets noticed. */
+private fun tileWord(count: Long): String = if (count == 1L) "tile" else "tiles"
 
 /**
  * One cache, as the mock screens draw it: **an icon, where it stands, a title, and a line saying what it holds**

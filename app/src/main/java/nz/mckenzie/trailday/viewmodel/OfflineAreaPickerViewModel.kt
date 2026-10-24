@@ -30,6 +30,9 @@ import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
+import nz.mckenzie.trailday.offline.DownloadPacks
+import nz.mckenzie.trailday.offline.DownloadProgress
+import nz.mckenzie.trailday.offline.DownloadState
 import nz.mckenzie.trailday.offline.LinzTileFetcher
 import nz.mckenzie.trailday.offline.OfflineArea
 import nz.mckenzie.trailday.offline.OfflineAreaDraft
@@ -436,7 +439,12 @@ class OfflineAreaPickerViewModel(
                         },
                         accept = "application/x-protobuf"
                     )
-                ).download(bounds = plan.bounds, minZoom = plan.minZoom, maxZoom = deepest)
+                ).download(
+                    bounds = plan.bounds,
+                    minZoom = plan.minZoom,
+                    maxZoom = deepest,
+                    onProgress = { reportTopography(MAP_PHASE, it) }
+                )
 
                 val heights = TileDownloader(
                     store = elevationStore,
@@ -446,7 +454,12 @@ class OfflineAreaPickerViewModel(
                         // The DEM endpoint answers PNG, and the renderer decodes it as PNG.
                         accept = "image/png"
                     )
-                ).download(bounds = plan.bounds, minZoom = plan.minZoom, maxZoom = deepest)
+                ).download(
+                    bounds = plan.bounds,
+                    minZoom = plan.minZoom,
+                    maxZoom = deepest,
+                    onProgress = { reportTopography(HEIGHTS_PHASE, it) }
+                )
 
                 _topoMessage.value = topoDownloadedMessage(map, heights)
                 // Leave for the offline screen when the box is as covered as it can be; stay when tiles
@@ -460,8 +473,33 @@ class OfflineAreaPickerViewModel(
                 _topoMessage.value = failure.message ?: "Download failed"
             } finally {
                 _working.value = false
+                // Nothing left to watch, whatever happened - see OfflineAreaManager.download.
+                DownloadState.clear()
             }
         }
+    }
+
+    /**
+     * What a walker watching the drawn map's download reads, one half at a time.
+     *
+     * The tiles and the heights are two downloads, and a single bar across both would appear to go
+     * backwards the moment the second one started. So the sentence names the half it is about and counts
+     * that half's own tiles.
+     */
+    private fun reportTopography(phase: String, progress: TileDownloader.Progress) {
+        DownloadState.report(
+            DownloadProgress(
+                pack = DownloadPacks.TOPOGRAPHY,
+                unit = TILE_UNIT,
+                phase = phase,
+                done = progress.stored,
+                total = progress.total,
+                bytes = progress.bytes,
+                elapsedMs = progress.elapsedMs,
+                unavailable = progress.unavailable,
+                failed = progress.failed
+            )
+        )
     }
 
     /**
@@ -517,6 +555,13 @@ class OfflineAreaPickerViewModel(
          * long enough that a corner being dragged does not ask once a frame.
          */
         private const val INVENTORY_PAUSE_MS = 400L
+
+        /** What the downloads count, as the live sentence reads it. */
+        private const val TILE_UNIT = "tiles"
+
+        /** The two halves of the drawn map's download, as the live sentence names them. */
+        private const val MAP_PHASE = "the map"
+        private const val HEIGHTS_PHASE = "the heights"
 
         private const val OUTLINE_ID = -1L
         private const val OUTLINE_COLOUR = "#FFFFFF"

@@ -53,7 +53,14 @@ class TileDownloader(
         /** Tiles the service has no imagery for (usually the edge of coverage). */
         val unavailable: Int,
         /** Tiles that failed after retries. */
-        val failed: Int
+        val failed: Int,
+        /**
+         * How long this download has been going.
+         *
+         * Reported rather than worked out by the caller because this is the only place that knows when it
+         * started, and a rate read off the wrong clock is a time-left nobody should act on.
+         */
+        val elapsedMs: Long = 0L
     ) {
         val percent: Int get() = if (total <= 0) 100 else ((stored * 100) / total).coerceIn(0, 100)
     }
@@ -82,6 +89,7 @@ class TileDownloader(
                 "Narrow the zoom range or the area."
         }
 
+        val startedAt = System.nanoTime()
         val present = planned.filter { store.contains(it.zoom, it.x, it.y) }
         var stored = present.size
         var bytes = present.sumOf { store.tileFile(it.zoom, it.x, it.y).length() }
@@ -89,7 +97,7 @@ class TileDownloader(
         var failed = 0
 
         val remaining = planned.filterNot { store.contains(it.zoom, it.x, it.y) }
-        onProgress(Progress(stored, planned.size, bytes, unavailable, failed))
+        onProgress(report(stored, planned.size, bytes, unavailable, failed, startedAt))
 
         remaining.chunked(concurrency).forEach { chunk ->
             chunk
@@ -107,11 +115,28 @@ class TileDownloader(
                     }
                     if (pacingDelayMs > 0L) delay(pacingDelayMs)
                 }
-            onProgress(Progress(stored, planned.size, bytes, unavailable, failed))
+            onProgress(report(stored, planned.size, bytes, unavailable, failed, startedAt))
         }
 
-        Progress(stored, planned.size, bytes, unavailable, failed)
+        report(stored, planned.size, bytes, unavailable, failed, startedAt)
     }
+
+    /** One report, with the clock read here so no caller has to guess when the run began. */
+    private fun report(
+        stored: Int,
+        total: Int,
+        bytes: Long,
+        unavailable: Int,
+        failed: Int,
+        startedAt: Long
+    ) = Progress(
+        stored = stored,
+        total = total,
+        bytes = bytes,
+        unavailable = unavailable,
+        failed = failed,
+        elapsedMs = (System.nanoTime() - startedAt) / 1_000_000
+    )
 
     private suspend fun fetchWithRetries(tile: TileRef): TileFetcher.Result {
         var last: TileFetcher.Result = TileFetcher.Result.Failed("not attempted")

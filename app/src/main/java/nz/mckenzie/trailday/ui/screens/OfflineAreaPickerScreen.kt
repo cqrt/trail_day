@@ -31,8 +31,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.doc.whatDocHasIn
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.map.BasemapView
+import nz.mckenzie.trailday.offline.DownloadState
 import nz.mckenzie.trailday.offline.OfflineAreaDraft
 import nz.mckenzie.trailday.offline.OfflinePickerMode
+import nz.mckenzie.trailday.offline.downloadProgressWords
 import nz.mckenzie.trailday.offline.formatBytes
 import nz.mckenzie.trailday.viewmodel.OfflineAreaPickerViewModel
 import kotlin.math.roundToInt
@@ -71,6 +73,11 @@ fun OfflineAreaPickerScreen(
     val topoMessage by viewModel.topoMessage.collectAsStateWithLifecycle()
     val docInventory by viewModel.docInventory.collectAsStateWithLifecycle()
     val docCounting by viewModel.docCounting.collectAsStateWithLifecycle()
+    val download by DownloadState.current.collectAsStateWithLifecycle()
+
+    // What a download in flight is doing, in the words the notification uses. One sentence, read here and
+    // there, so the card and the notification cannot describe one download two ways.
+    val live = download?.let { downloadProgressWords(it) }
 
     val imagery = viewModel.mode == OfflinePickerMode.IMAGERY
     val around = viewModel.mode == OfflinePickerMode.AROUND_TRACK
@@ -196,10 +203,15 @@ fun OfflineAreaPickerScreen(
                             },
                             style = MaterialTheme.typography.bodyMedium
                         )
-                        Text(
-                            text = "Each deeper level multiplies the download.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                        // The imagery keeps this: the difference between zoom 16 and 17 is the difference
+                        // between a minute and a quarter of an hour, and it is the one thing here a walker
+                        // can be caught out by. The drawn map stops at 15 and has nothing to warn about.
+                        if (keepsImagery) {
+                            Text(
+                                text = "Each deeper level multiplies the download.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
 
                         if (draft.isTooBig) {
                             Text(
@@ -210,14 +222,20 @@ fun OfflineAreaPickerScreen(
                         }
 
                         active?.let { area ->
-                            Text(
-                                text = if (area.isComplete) {
-                                    "Downloaded ${area.sizeLabel}"
-                                } else {
-                                    "Downloading ${area.percent}%"
-                                },
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                            // The area's own record, which outlives the live line below: it says what the
+                            // area came to, where the live line says how it is going. While it is going the
+                            // live line says it better, so this one stands aside.
+                            if (area.isComplete) {
+                                Text(
+                                    text = "Downloaded ${area.sizeLabel}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            } else if (live == null) {
+                                Text(
+                                    text = "Downloading ${area.percent}%",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
                         }
 
                         error?.let {
@@ -229,19 +247,9 @@ fun OfflineAreaPickerScreen(
                         }
                     }
 
-                    // The drawn map: LINZ's own cartography, and the heights its shade is drawn from.
+                    // The drawn map's own two questions are answered above - the zoom range, and how many
+                    // tiles it comes to - so there is nothing left to explain here but how it went.
                     if (topography) {
-                        Text(
-                            text = "LINZ's Topographic map - roads, tracks, contours and names - kept " +
-                                "with the heights its hillshade is shaded from.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text(
-                            text = "LINZ publishes this map to zoom " +
-                                "${Basemap.LINZ_TOPO_LIDAR_HILLSHADE.maxZoom}; deeper levels are drawn " +
-                                "from that one, so that is as deep as the download goes.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
                         topoMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                     }
 
@@ -281,6 +289,12 @@ fun OfflineAreaPickerScreen(
                         docMessage?.let {
                             Text(it, style = MaterialTheme.typography.bodySmall)
                         }
+                    }
+
+                    // What a download in flight is doing, in the same words the notification uses. One line
+                    // for every pack, in one place, so no mode can be the one that forgot to say.
+                    live?.let {
+                        Text(text = it, style = MaterialTheme.typography.bodySmall)
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
