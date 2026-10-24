@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -334,6 +335,9 @@ private fun DocControlsDeck(
                         // No tick: the filled segment is what says which one is chosen, and in a bar this
                         // narrow the tick was the difference between one line and two.
                         icon = {},
+                        // The same border the tools' pills carry, so the whole bar reads as one row of
+                        // controls rather than as two kinds of outline.
+                        border = ButtonDefaults.outlinedButtonBorder(enabled = true),
                         // The segments share the row's width, so this is what stands between a label and
                         // the ellipsis: "Camps" needs a few points more than Material's own padding leaves
                         // it on the narrowest screens.
@@ -390,15 +394,17 @@ private fun DocControlsDeck(
 }
 
 /** The distances the "near me" menu offers, in the round numbers a walker thinks in. */
-private val NearMeRadiusChoices = listOf(5, 10, 25, 50, 100)
+private val NearMeRadiusChoices = listOf(5, 10, 25, 50, 100, 150, 200)
 
 /**
  * The **Near me** control: one pill that is both the switch and the distance.
  *
- * Off, it says what it would do and turns itself on. On, it says how far it is looking and opens a menu of
- * distances - and the way back off. The distance used to sit in a text field of its own, which was taller
- * than the pill beside it and pushed the filter and the order onto a second line; the menu keeps the same
- * answer without costing the list a row, and the chevron is what says so. The locate glyph carries the
+ * **Tapping it opens the distances**, which is the question it is there to answer. It used to switch itself
+ * on at whatever distance was last set and leave the walker to tap again to change it, so the first tap
+ * always answered a question nobody had asked. Choosing a distance is what turns it on; the way back off is
+ * the last item, and only while it is on. The distance used to sit in a text field of its own, which was
+ * taller than the pill beside it and pushed the filter and the order onto a second line; the menu keeps the
+ * same answer without costing the list a row, and the chevron is what says so. The locate glyph carries the
  * "near me" part once the pill is green, so the pill has room to say the distance instead.
  */
 @Composable
@@ -412,7 +418,7 @@ private fun NearMeControl(
     Box {
         FilterChip(
             selected = nearMe,
-            onClick = { if (nearMe) open = true else onNearMeChange(true) },
+            onClick = { open = true },
             shape = CircleShape,
             // The locate glyph stands in for the words once it is on, so the pill can say how far it is
             // looking instead of repeating what its own green fill already says. "Near me" and "100 km"
@@ -425,30 +431,33 @@ private fun NearMeControl(
                     style = DenseControlLabel
                 )
             },
-            // Only when it is on: the chevron is what says the pill now opens a menu rather than switching.
-            trailingIcon = if (nearMe) {
-                { AppIcon(glyph = IconGlyph.CHEVRON, dimension = 10.dp, modifier = Modifier.rotate(90f)) }
-            } else {
-                null
+            // The chevron says the pill opens a menu rather than switching, which is true either way now.
+            trailingIcon = {
+                AppIcon(glyph = IconGlyph.CHEVRON, dimension = 10.dp, modifier = Modifier.rotate(90f))
             },
             modifier = Modifier.height(DenseControlHeight)
         )
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             MenuHeading("How far around the phone")
             NearMeRadiusChoices.forEach { km ->
-                MenuChoice("$km km", radiusKm.trim() == "$km") {
+                // No tick while it is off: the distances are what it would look, and one of them being
+                // ticked would say it is already looking.
+                MenuChoice("$km km", nearMe && radiusKm.trim() == "$km") {
                     onRadiusChange("$km")
+                    onNearMeChange(true)
                     open = false
                 }
             }
-            HorizontalDivider()
-            DropdownMenuItem(
-                text = { Text("Turn off Near me") },
-                onClick = {
-                    onNearMeChange(false)
-                    open = false
-                }
-            )
+            if (nearMe) {
+                HorizontalDivider()
+                DropdownMenuItem(
+                    text = { Text("Turn off Near me") },
+                    onClick = {
+                        onNearMeChange(false)
+                        open = false
+                    }
+                )
+            }
         }
     }
 }
