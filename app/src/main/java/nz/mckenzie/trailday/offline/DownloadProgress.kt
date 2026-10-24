@@ -96,7 +96,13 @@ data class DownloadProgress(
 fun downloadProgressWords(progress: DownloadProgress): String {
     val parts = mutableListOf<String>()
     val what = progress.phase?.let { "$it: " }.orEmpty()
-    parts += "$what${progress.done} of ${progress.total} ${progress.unit}"
+    // A pack whose total nobody knows - DOC's material before its inventory has been read - says how many
+    // it has rather than "412 of 0".
+    parts += if (progress.total > 0) {
+        "$what${progress.done} of ${progress.total} ${progress.unit}"
+    } else {
+        "$what${progress.done} ${progress.unit}"
+    }
     if (progress.bytes > 0L) parts += formatBytes(progress.bytes)
     progress.perSecond?.let { parts += "${it.roundToInt()} ${progress.unit} a second" }
     progress.remainingSeconds?.let { parts += "about ${remainingWords(it)} left" }

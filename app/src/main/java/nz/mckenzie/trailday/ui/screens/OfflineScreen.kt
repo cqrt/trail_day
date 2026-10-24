@@ -80,6 +80,7 @@ fun OfflineScreen(
     // notification show, so the three cannot describe one download three ways.
     val imageryLive = download?.takeIf { it.pack == DownloadPacks.IMAGERY }
     val topoLive = download?.takeIf { it.pack == DownloadPacks.TOPOGRAPHY }
+    val docLive = download?.takeIf { it.pack == DownloadPacks.DOC }
 
     var confirmingClearImagery by remember { mutableStateOf(false) }
     var confirmingClearDocData by remember { mutableStateOf(false) }
@@ -141,7 +142,7 @@ fun OfflineScreen(
             DownloadCard(
                 title = DownloadPacks.DOC,
                 icon = { AssetKindIcon(kind = AssetKind.HUT, dimension = 24.dp) },
-                summary = if (docDataCount == 0) {
+                summary = docLive?.let { downloadProgressWords(it) } ?: if (docDataCount == 0) {
                     "Nothing downloaded yet"
                 } else {
                     docHeldWords(docCounts) + docPictures
@@ -149,7 +150,7 @@ fun OfflineScreen(
                         ?.let { " \u00b7 ${pictureCountWords(it)}" }
                         .orEmpty()
                 },
-                progress = null,
+                progress = docLive?.let { it.percent / 100f },
                 progressLabel = null,
                 footnote = "Read offline by the map and the DOC browser.",
                 error = null,

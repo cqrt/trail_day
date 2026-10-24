@@ -7,6 +7,7 @@ import nz.mckenzie.trailday.doc.DocAreaDownload
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.doc.DocInventory
 import nz.mckenzie.trailday.doc.DocPictures
+import nz.mckenzie.trailday.doc.DocReadProgress
 import nz.mckenzie.trailday.domain.doc.DocBounds
 import nz.mckenzie.trailday.domain.doc.DocCache
 import nz.mckenzie.trailday.domain.doc.DocFactsJson
@@ -99,10 +100,20 @@ class OfflineDocStore(
      * that stopped short stores what arrived: the next attempt asks again rather than starting from a
      * blank cache, and what did arrive is already usable offline.
      */
-    suspend fun download(bounds: DocBounds): DocAreaDownload {
-        val result = downloader.downloadArea(bounds)
+    suspend fun download(
+        bounds: DocBounds,
+        /** How far through the act the phone is: the records being read, then the pictures being kept. */
+        onProgress: (DocReadProgress) -> Unit = {}
+    ): DocAreaDownload {
+        val result = downloader.downloadArea(bounds) { read ->
+            onProgress(DocReadProgress(pictures = false, done = read))
+        }
         store(result.items)
-        return result.copy(pictures = pictures.keep(result.items.mapNotNull { it.pictureUrl }))
+        return result.copy(
+            pictures = pictures.keep(result.items.mapNotNull { it.pictureUrl }) { kept ->
+                onProgress(DocReadProgress(pictures = true, done = kept))
+            }
+        )
     }
 
     /**

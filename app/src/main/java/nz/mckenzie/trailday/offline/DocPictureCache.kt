@@ -89,7 +89,11 @@ class DocPictureCache(
      * already held is counted but not fetched again, so re-downloading an area costs no traffic for what
      * it already has.
      */
-    suspend fun keep(urls: List<String>): DocPictures {
+    suspend fun keep(
+        urls: List<String>,
+        /** How many have been kept so far, called as each one is looked at. */
+        onProgress: (kept: Int) -> Unit = {}
+    ): DocPictures {
         val wanted = urls.filter { isPictureAddress(it) }.distinct()
         if (wanted.isEmpty()) return DocPictures.NONE
 
@@ -97,12 +101,14 @@ class DocPictureCache(
         for (url in wanted) {
             if (dao.picture(url) != null) {
                 kept++
+                onProgress(kept)
                 continue
             }
             val bytes = runCatching { fetch(url) }.getOrNull() ?: continue
             if (bytes.isEmpty() || bytes.size > maxBytes || !looksLikeImage(bytes)) continue
             dao.insertPicture(OfflineDocPictureEntity(url = url, bytes = bytes, fetchedAtEpochMs = now()))
             kept++
+            onProgress(kept)
         }
         return DocPictures(asked = wanted.size, kept = kept)
     }

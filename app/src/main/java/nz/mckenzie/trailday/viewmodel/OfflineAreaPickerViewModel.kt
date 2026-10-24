@@ -21,6 +21,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
+import nz.mckenzie.trailday.doc.DocReadProgress
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.doc.DocInventory
 import nz.mckenzie.trailday.domain.doc.DocBounds
@@ -374,7 +375,10 @@ class OfflineAreaPickerViewModel(
                 // The map's own ground is on the phone; now what DOC publishes on it. A failure here is
                 // said rather than thrown, and does not take the tiles away.
                 _docWorking.value = true
-                val download = docStore.download(plan.bounds.toDocBounds())
+                val docStartedAt = System.nanoTime()
+                val download = docStore.download(plan.bounds.toDocBounds()) {
+                    reportDoc(it, docStartedAt)
+                }
                 _docMessage.value = docDownloadedMessage(download)
                 // Leave for the offline screen when there is nothing to answer for; stay when a service
                 // could not be read, so the walker reads which one and why.
@@ -388,6 +392,7 @@ class OfflineAreaPickerViewModel(
             } finally {
                 _docWorking.value = false
                 _working.value = false
+                DownloadState.clear()
             }
         }
     }
@@ -523,8 +528,9 @@ class OfflineAreaPickerViewModel(
         viewModelScope.launch {
             _docWorking.value = true
             _docMessage.value = null
+            val startedAt = System.nanoTime()
             try {
-                val download = docStore.download(plan.bounds.toDocBounds())
+                val download = docStore.download(plan.bounds.toDocBounds()) { reportDoc(it, startedAt) }
                 // One sentence for the whole act: what arrived, and which of the four did not answer. A
                 // download that stopped short still kept what arrived, so the walker stays here and can
                 // read it rather than being sent back with half an answer.
@@ -537,8 +543,35 @@ class OfflineAreaPickerViewModel(
                 _docMessage.value = failure.message ?: "Download failed"
             } finally {
                 _docWorking.value = false
+                DownloadState.clear()
             }
         }
+    }
+
+    /**
+     * Reports how a DOC download is going, in the words the offline screen and the notification use.
+     *
+     * **The totals are the inventory's.** The downloader pages until DOC stops answering and never knows
+     * how many records the box holds; the picker asked that question when the box was drawn, which is the
+     * same answer - and a total of nothing simply leaves the sentence without one.
+     */
+    private fun reportDoc(progress: DocReadProgress, startedAt: Long) {
+        val expected = _docInventory.value
+        DownloadState.report(
+            DownloadProgress(
+                pack = DownloadPacks.DOC,
+                unit = if (progress.pictures) PICTURE_UNIT else RECORD_UNIT,
+                phase = if (progress.pictures) PICTURES_PHASE else null,
+                done = progress.done,
+                total = if (progress.pictures) {
+                    expected?.pictures ?: 0
+                } else {
+                    expected?.totalRecords ?: 0
+                },
+                bytes = 0L,
+                elapsedMs = (System.nanoTime() - startedAt) / 1_000_000
+            )
+        )
     }
 
     companion object {
@@ -558,10 +591,15 @@ class OfflineAreaPickerViewModel(
 
         /** What the downloads count, as the live sentence reads it. */
         private const val TILE_UNIT = "tiles"
+        private const val RECORD_UNIT = "records"
+        private const val PICTURE_UNIT = "pictures"
 
         /** The two halves of the drawn map's download, as the live sentence names them. */
         private const val MAP_PHASE = "the map"
         private const val HEIGHTS_PHASE = "the heights"
+
+        /** The second half of a DOC download, which counts pictures rather than records. */
+        private const val PICTURES_PHASE = "the pictures"
 
         private const val OUTLINE_ID = -1L
         private const val OUTLINE_COLOUR = "#FFFFFF"

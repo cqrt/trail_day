@@ -25,6 +25,20 @@ sealed interface DocDownloadResult {
 }
 
 /**
+ * How a DOC download is going: **which part of the act is running, and how far through it is.**
+ *
+ * Two shapes rather than one because the act has two parts that count different things - the records of
+ * DOC's services, then the pictures of what arrived - and the caller is the only place that knows how many
+ * the box holds. See [DocDownloader.downloadArea] and [DocPictureCache.keep], which count what they read.
+ */
+data class DocReadProgress(
+    /** True while the pictures of what arrived are being kept, false while the records are being read. */
+    val pictures: Boolean,
+    /** Records read, or pictures kept, so far in this part of the act. */
+    val done: Int
+)
+
+/**
  * How downloading a whole area's DOC data went: everything that arrived, and which of the four services
  * could not be read.
  *
@@ -79,22 +93,35 @@ class DocDownloader(
      * will answer with, and losing the huts because the bike service is down would be the app throwing
      * away the part that worked - so each is read on its own and the phone says which of them answered.
      */
-    suspend fun downloadArea(bounds: DocBounds): DocAreaDownload {
+    suspend fun downloadArea(
+        bounds: DocBounds,
+        /**
+         * How many records have been read for the whole act so far, called after each page.
+         *
+         * Cumulative across the four services, because one line for the whole act is what a walker reads -
+         * and reported from here because the paging is the only place that knows how far through a service
+         * it is. The caller knows how many the box holds, so the two meet outside.
+         */
+        onProgress: (read: Int) -> Unit = {}
+    ): DocAreaDownload {
         val items = mutableListOf<DocItem>()
         val counts = mutableMapOf<DocSource, Int>()
         val failed = mutableMapOf<DocSource, String>()
 
+        var readSoFar = 0
         for (source in DocSource.entries) {
-            when (val result = download(bounds, source)) {
+            when (val result = download(bounds, source) { read -> onProgress(readSoFar + read) }) {
                 is DocDownloadResult.Done -> {
                     counts[source] = result.items.size
                     items += result.items
+                    readSoFar += result.items.size
                 }
 
                 is DocDownloadResult.Failed -> {
                     // The pages that did arrive are kept: half a service's answer is still worth having.
                     counts[source] = result.items.size
                     items += result.items
+                    readSoFar += result.items.size
                     failed[source] = result.message
                 }
             }
@@ -172,7 +199,12 @@ class DocDownloader(
         return DocInventory(records = records, pictures = pictures, failed = failed)
     }
 
-    suspend fun download(bounds: DocBounds, source: DocSource): DocDownloadResult {
+    suspend fun download(
+        bounds: DocBounds,
+        source: DocSource,
+        /** How many have been read for this service so far, called after each page. */
+        onProgress: (read: Int) -> Unit = {}
+    ): DocDownloadResult {
         val all = mutableListOf<DocItem>()
         var offset = 0
         while (true) {
@@ -183,6 +215,7 @@ class DocDownloader(
                 is DocReadResult.Failed -> return DocDownloadResult.Failed(page.message, all)
                 is DocReadResult.Found -> {
                     all += page.items
+                    onProgress(all.size)
                     // A short page is the last one; a full one means there is more behind it.
                     if (page.items.size < pageSize || all.size >= MAX_ITEMS) break
                     offset += page.items.size

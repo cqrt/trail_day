@@ -50,6 +50,25 @@ class DocDownloaderTest {
     }
 
     @Test
+    fun `a download says how far through the whole act it is`() = runBlocking {
+        // Two pages for the service asked, then a short page for each of the others. The figures are
+        // cumulative across the four, because one line for the whole act is what a walker reads.
+        val source = PagingSource(
+            listOf(
+                List(DocDownloader.PAGE) { track(it.toLong()) },
+                listOf(track(9999))
+            )
+        )
+        val seen = mutableListOf<Int>()
+
+        DocDownloader(source).downloadArea(box) { seen += it }
+
+        assertTrue("progress was reported at all", seen.isNotEmpty())
+        assertEquals("and it never goes backwards", seen.sorted(), seen)
+        assertEquals("the last figure is everything that was read", 2001, seen.last())
+    }
+
+    @Test
     fun `a full page is followed by the next, until a short one ends it`() {
         val source = PagingSource(
             listOf(
