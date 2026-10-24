@@ -29,6 +29,69 @@ fun DocItem.distanceM(point: GeoPoint): Double? =
 /** The kinds of thing these rows are, in DOC's own words, for a filter. */
 fun List<DocItem>.kindsPresent(): List<String> = mapNotNull { it.kind }.distinct().sorted()
 
+/**
+ * DOC's rows with the same thing said twice removed.
+ *
+ * **DOC publishes some of its huts more than once.** Measured against the live service, 500 of its 1,429
+ * huts are a second row for a hut already in the list: the same name, the same place, the same region and
+ * the same coordinate to five decimal places, under a different number a few hundred away. A walker
+ * browsing the huts list sees the same hut twice, the map draws two markers on one spot, and a download
+ * spends its time on the copies.
+ *
+ * **The rule is a place, not a name.** DOC really does publish a Crow Hut in the Ruahine Forest Park,
+ * another in Arthur's Pass and a third in Kahurangi, and a Hurunui Hut in two different regions; merging on
+ * the name alone would take those away. What is duplicated is the same *row*, so it takes the same name,
+ * the same place, the same region **and the same point** - and the pairs DOC publishes today are all at zero
+ * metres, so the allowance below cannot reach a hut that is genuinely another.
+ *
+ * **The lowest DOC number of a repeated group is the one kept**, so a page, a download and a cache row agree
+ * about which row a thing is however the answer happened to be ordered.
+ */
+fun List<DocItem>.withoutRepeats(): List<DocItem> {
+    // Grouped by name first: only rows that share one can be the same thing, and a national list is a few
+    // thousand rows, which is not worth comparing every pair of.
+    val byName = mutableMapOf<String, MutableList<Int>>()
+    forEachIndexed { index, item ->
+        byName.getOrPut(item.name.trim().lowercase()) { mutableListOf() } += index
+    }
+
+    val dropped = mutableSetOf<Int>()
+    byName.values.forEach { indices ->
+        indices.forEach { index ->
+            val item = this[index]
+            val repeated = indices.any { other ->
+                other != index && this[other].objectId < item.objectId && this[other].isTheSameThingAs(item)
+            }
+            if (repeated) dropped += index
+        }
+    }
+
+    return filterIndexed { index, _ -> index !in dropped }
+}
+
+/**
+ * Whether two of DOC's rows are the same thing said twice: the same service, the same name, the same place
+ * and region, and the same point on the ground.
+ */
+private fun DocItem.isTheSameThingAs(other: DocItem): Boolean {
+    if (source != other.source) return false
+    if (!name.trim().equals(other.name.trim(), ignoreCase = true)) return false
+    if (place?.trim() != other.place?.trim()) return false
+    if (region?.trim() != other.region?.trim()) return false
+
+    val here = paths.firstOrNull()?.firstOrNull() ?: return false
+    val there = other.paths.firstOrNull()?.firstOrNull() ?: return false
+    return haversineMeters(here.lat, here.lng, there.lat, there.lng) <= SAME_THING_M
+}
+
+/**
+ * How far apart two rows may be and still be one thing.
+ *
+ * Twenty metres, against pairs that DOC publishes at zero: room for a re-survey to move one copy a little
+ * without bringing the duplicate back, and far short of the nearest two genuinely different huts.
+ */
+private const val SAME_THING_M = 20.0
+
 /** How they are walked - one way, a loop, a return - which is the tracks' own filter. */
 fun List<DocItem>.typesPresent(): List<String> = mapNotNull { it.trackType }.distinct().sorted()
 

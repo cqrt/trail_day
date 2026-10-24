@@ -16,6 +16,67 @@ import org.junit.Test
  */
 class DocListTest {
 
+    @Test
+    fun `a hut DOC publishes twice is one hut`() {
+        // The live service does exactly this: the same hut, the same place, the same point to five decimal
+        // places, under two numbers a few hundred apart. 500 of its 1,429 huts are one of these.
+        val huts = listOf(
+            hutAt(621583, "Crow Hut", "Ruahine Forest Park", "Manawatu/Whanganui", -39.76697, 176.08515),
+            hutAt(622512, "Crow Hut", "Ruahine Forest Park", "Manawatu/Whanganui", -39.76697, 176.08515)
+        )
+
+        val kept = huts.withoutRepeats()
+
+        assertEquals("one hut", 1, kept.size)
+        assertEquals("and it is the lower DOC number", 621583L, kept.single().objectId)
+    }
+
+    @Test
+    fun `huts that share a name but not a place are all kept`() {
+        // DOC really does publish a Crow Hut in the Ruahine, another in Arthur's Pass and a third in
+        // Kahurangi. A rule that merged on the name alone would take two of them away.
+        val huts = listOf(
+            hutAt(1, "Crow Hut", "Ruahine Forest Park", "Manawatu/Whanganui", -39.76697, 176.08515),
+            hutAt(2, "Crow Hut", "Arthur's Pass National Park", "Canterbury", -42.94343, 171.51701),
+            hutAt(3, "Crow Hut", "Kahurangi National Park", "Nelson/Tasman", -41.29258, 172.46863)
+        )
+
+        assertEquals("three huts", 3, huts.withoutRepeats().size)
+    }
+
+    @Test
+    fun `huts with one name and one place but two points are both kept`() {
+        val huts = listOf(
+            hutAt(1, "Boundary Hut", "Some Forest Park", "Canterbury", -42.0, 172.0),
+            hutAt(2, "Boundary Hut", "Some Forest Park", "Canterbury", -42.05, 172.05)
+        )
+
+        assertEquals("five kilometres apart is not the same hut", 2, huts.withoutRepeats().size)
+    }
+
+    @Test
+    fun `nothing is dropped when nothing is repeated`() {
+        val huts = listOf(hutAt(1, "One Hut", "A Park", "A Region", -42.0, 172.0))
+
+        assertEquals(huts, huts.withoutRepeats())
+    }
+
+    /** A hut at a chosen point, because the duplicate rule is about where a hut is. */
+    private fun hutAt(
+        id: Long,
+        name: String,
+        place: String,
+        region: String,
+        lat: Double,
+        lng: Double
+    ) = DocItem(
+        source = DocSource.HUTS,
+        objectId = id,
+        name = name,
+        paths = listOf(listOf(GeoPoint(lat, lng))),
+        facts = mapOf("place" to place, "region" to region)
+    )
+
     private fun track(id: Long, name: String, kind: String?, at: GeoPoint, type: String? = null) = DocItem(
         source = DocSource.TRACKS,
         objectId = id,

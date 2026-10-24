@@ -15,6 +15,7 @@ import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocPathsJson
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.bounds
+import nz.mckenzie.trailday.domain.doc.withoutRepeats
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 
 /**
@@ -39,8 +40,15 @@ class OfflineDocStore(
     private val now: () -> Long = System::currentTimeMillis
 ) : DocCache {
 
+    /**
+     * Everything held of [source], **with the same thing said twice removed**.
+     *
+     * The rule is applied on the way out as well as on the way in, because the copies were being stored
+     * before the app knew to drop them: a cache filled by an older build holds both of DOC's rows for a
+     * hut, and a map or a list drawn from it would show that hut twice.
+     */
     override suspend fun cached(source: DocSource): List<DocItem> =
-        dao.getAll(source.id).mapNotNull { it.toItem() }
+        dao.getAll(source.id).mapNotNull { it.toItem() }.withoutRepeats()
 
     override suspend fun count(): Int = dao.count()
 
@@ -59,9 +67,16 @@ class OfflineDocStore(
     /** A live count, for the offline screen to say what is stored, and for the map to redraw on. */
     override fun observeCount(): Flow<Int> = dao.observeCount()
 
-    /** How many are held of each service, for the offline screen to say what is on the phone. */
-    suspend fun counts(): Map<DocSource, Int> = dao.counts().mapNotNull { row ->
-        DocSource.known(row.source)?.let { source -> source to row.count }
+    /**
+     * How many are held of each service, for the offline screen to say what is on the phone.
+     *
+     * Counted through [cached], so the figure is the number of *things* held rather than the number of
+     * rows: a hut DOC publishes twice is one hut on the phone, and a line that said two would have the
+     * walker's own list disagreeing with their own screen.
+     */
+    suspend fun counts(): Map<DocSource, Int> = DocSource.entries.mapNotNull { source ->
+        val held = cached(source).size
+        if (held == 0) null else source to held
     }.toMap()
 
     /** How many pictures of DOC's material are held, for the offline screen's own line. */

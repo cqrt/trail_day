@@ -9,6 +9,7 @@ import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocJson
 import nz.mckenzie.trailday.domain.doc.DocQuery
 import nz.mckenzie.trailday.domain.doc.DocUrl
+import nz.mckenzie.trailday.domain.doc.withoutRepeats
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -114,7 +115,10 @@ class ArcGisDoc(
                     )
                 }
                 val body = connection.inputStream.use { it.readBytes().decodeToString() }
-                DocReadResult.Found(DocJson.parse(query.source, body))
+                // **DOC publishes some of its huts twice** - see [withoutRepeats] - so the copies are
+                // dropped at the one door every surface reads DOC's answer through: the browser's list, the
+                // cache, the map's own layer and a download all see one row for one hut.
+                DocReadResult.Found(DocJson.parse(query.source, body).withoutRepeats())
             } finally {
                 connection.disconnect()
             }
