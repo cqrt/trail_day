@@ -102,6 +102,18 @@ fun OfflineAreaPickerScreen(
     // the walker finds again later. DOC's material is one cache with no rows, so there is nothing to name.
     val keepsAreas = keepsImagery || topography
 
+    /**
+     * The map the box is drawn on: **the pack's own, where it has one.**
+     *
+     * Choosing what to keep for a hillside while looking at a photograph of it is choosing blind - the two
+     * maps do not agree about where the tracks are, and the drawn one is what is being kept. Everything
+     * else is drawn on the imagery, which is the app's own default and a fine thing to draw a DOC box on.
+     */
+    val mapBasemap = when (viewModel.mode) {
+        OfflinePickerMode.TOPOGRAPHY -> Basemap.LINZ_TOPO_LIDAR_HILLSHADE
+        else -> Basemap.LINZ_AERIAL
+    }
+
     LaunchedEffect(saved) {
         if (saved) {
             // Consume before leaving, so a reused view model does not bounce the
@@ -133,10 +145,9 @@ fun OfflineAreaPickerScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Aerial imagery, whichever basemap the walker reads their own maps on: it is what an
-            // imagery area downloads, and it is a fine thing to draw a DOC area on besides.
+            // The pack's own map, so a box drawn for the drawn map is drawn on the drawn map.
             BasemapView(
-                basemap = Basemap.LINZ_AERIAL,
+                basemap = mapBasemap,
                 apiKey = apiKey,
                 assetGeoJson = previewGeoJson,
                 fitBounds = startBounds,
@@ -145,7 +156,7 @@ fun OfflineAreaPickerScreen(
             )
 
             AttributionStrip(
-                basemap = Basemap.LINZ_AERIAL,
+                basemap = mapBasemap,
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(bottom = 6.dp)
