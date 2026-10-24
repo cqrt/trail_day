@@ -37,7 +37,8 @@ class LocalTileServerTest {
     private fun startServer(
         upstream: TileFetcher? = null,
         osmUpstream: TileFetcher? = null,
-        readFont: (String) -> ByteArray? = { null }
+        readFont: (String) -> ByteArray? = { null },
+        readSprite: (String) -> ByteArray? = { null }
     ) {
         imagery = OfflineTileStore(temp.root.resolve("imagery"), ".webp")
         drawn = OfflineTileStore(temp.root.resolve("drawn"), ".png")
@@ -58,7 +59,8 @@ class LocalTileServerTest {
                     upstream = { osmUpstream }
                 )
             ),
-            readFont = readFont
+            readFont = readFont,
+            readSprite = readSprite
         )
         port = server.start()
     }
@@ -144,6 +146,75 @@ class LocalTileServerTest {
         assertEquals(404, get("/fonts/Another%20Lettering/0-255.pbf").code)
         assertEquals(404, get("/fonts/Noto%20Sans%20Regular/900-1023.pbf").code)
         assertEquals(404, get("/fonts/Noto%20Sans%20Regular/0-255.json").code)
+    }
+
+    @Test
+    fun `the icons a hosted style draws are served out of the app`() {
+        val asked = mutableListOf<String>()
+        server.stop()
+        startServer(readSprite = { path ->
+            asked += path
+            byteArrayOf(3, 3)
+        })
+
+        val index = get("/sprites/linz-topo-lidar-hillshade/sprite.json")
+        val image = get("/sprites/linz-topo-lidar-hillshade/sprite@2x.png")
+
+        assertEquals(200, index.code)
+        assertEquals("application/json", index.contentType)
+        assertEquals(200, image.code)
+        assertEquals("image/png", image.contentType)
+        assertEquals(
+            listOf(
+                "linz-topo-lidar-hillshade/sprite.json",
+                "linz-topo-lidar-hillshade/sprite@2x.png"
+            ),
+            asked
+        )
+    }
+
+    @Test
+    fun `a sprite the app does not keep is a 404 rather than an error`() {
+        server.stop()
+        startServer(readSprite = { null })
+
+        assertEquals(404, get("/sprites/linz-topo-lidar-hillshade/sprite.json").code)
+    }
+
+    @Test
+    fun `sprite paths parse only for the four files a renderer asks for`() {
+        assertEquals(
+            "linz-topo-lidar-hillshade/sprite.json",
+            LocalTileServer.spritePathFor("/sprites/linz-topo-lidar-hillshade/sprite.json")
+        )
+        assertEquals(
+            "osm/sprite@2x.png",
+            LocalTileServer.spritePathFor("/sprites/osm/sprite@2x.png")
+        )
+        assertNull("another file is not a sprite", LocalTileServer.spritePathFor("/sprites/osm/sprite.svg"))
+        assertNull(LocalTileServer.spritePathFor("/sprites/osm/style.json"))
+        assertNull(LocalTileServer.spritePathFor("/sprites/osm/sprite.json/extra"))
+        assertNull(LocalTileServer.spritePathFor("/sprites/osm/"))
+        assertNull(LocalTileServer.spritePathFor("/sprites/osm"))
+        assertNull("no climbing out of the folder", LocalTileServer.spritePathFor("/sprites/../style.json"))
+        assertNull(LocalTileServer.spritePathFor("/tiles/osm/14/1017/660.png"))
+    }
+
+    @Test
+    fun `the sprite address is what the server answers`() {
+        server.stop()
+        startServer(readSprite = { byteArrayOf(4) })
+
+        val template = server.spriteUrl(Basemap.LINZ_TOPO_LIDAR_HILLSHADE.id)
+        assertEquals(
+            "http://127.0.0.1:$port/sprites/linz-topo-lidar-hillshade/sprite",
+            template
+        )
+        // What a renderer asks for, from that stem: the four names, and nothing else.
+        val path = template.removePrefix("http://127.0.0.1:$port")
+        assertEquals(200, get("${path}.json").code)
+        assertEquals(200, get("${path}@2x.png").code)
+        assertEquals(404, get("${path}.svg").code)
     }
 
     @Test

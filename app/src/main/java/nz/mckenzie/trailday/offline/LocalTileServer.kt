@@ -1,6 +1,7 @@
 package nz.mckenzie.trailday.offline
 
 import nz.mckenzie.trailday.map.GlyphFonts
+import nz.mckenzie.trailday.map.HostedStyleStore
 
 /**
  * A tiny HTTP tile server on loopback, so the map has **one** tile path whether or not there is
@@ -39,6 +40,14 @@ class LocalTileServer(
      * decides which of them a request names. Null for the tests that have no app behind them.
      */
     private val readFont: (String) -> ByteArray? = { null },
+    /**
+     * The icon sheet a hosted style draws its symbols from, read out of the app's own files by the path
+     * this server is asked for - or null when the app has no such file.
+     *
+     * Handed in for the same reason the letters are: this file knows about tiles, and the sprite is one
+     * of the things a style reaches for. See [nz.mckenzie.trailday.map.HostedStyleStore].
+     */
+    private val readSprite: (String) -> ByteArray? = { null },
     host: String = LOOPBACK
 ) {
 
@@ -49,6 +58,9 @@ class LocalTileServer(
             // The letters the map writes track names with, on the same server as the tiles so that a
             // style needs one address rather than two - see GlyphFonts.
             fontRoute(readFont),
+            // The icons a hosted style draws, on the same server for the same reason: one address for
+            // everything a style reaches for, and a copy on disk when there is no network.
+            spriteRoute(readSprite),
             // A tile path is claimed by its prefix and judged inside the route rather than matched
             // by the tile pattern here: a path that begins like a tile but is not one has always
             // been answered with the same 404 as a path that is nothing at all, so claiming it
@@ -76,6 +88,16 @@ class LocalTileServer(
         return "http://${http.authority}/tiles/$sourceId/{z}/{x}/{y}${source.suffix}"
     }
 
+    /**
+     * Where a style should look for [basemapId]'s sprite, e.g.
+     * `http://127.0.0.1:41234/sprites/osm/sprite`.
+     *
+     * The name is a stem rather than a file: a renderer appends `.json`, `.png` or the doubled-resolution
+     * pair of either, and asks this server for each.
+     */
+    fun spriteUrl(basemapId: String): String =
+        "http://${http.authority}$SPRITES_PREFIX$basemapId/$SPRITE_STEM"
+
     private fun sourceFor(id: String): TileSource? = sources.firstOrNull { it.id == id }
 
     companion object {
@@ -85,8 +107,18 @@ class LocalTileServer(
         /** Every tile path starts here; [parseTilePath] is what says whether one really is a tile. */
         private const val TILES_PREFIX = "/tiles/"
 
+        /** Every sprite path starts here: `/sprites/<basemap>/<file>`. */
+        const val SPRITES_PREFIX = "/sprites/"
+
+        /** The stem a sprite's four files share, as a style's `sprite` value names it. */
+        private const val SPRITE_STEM = "sprite"
+
         /** What a letter file travels as: a protobuf, the shape MapLibre reads glyphs from. */
         private const val FONT_CONTENT_TYPE = "application/x-protobuf"
+
+        /** What a sprite's two kinds of file travel as. */
+        private const val SPRITE_INDEX_CONTENT_TYPE = "application/json"
+        private const val SPRITE_IMAGE_CONTENT_TYPE = "image/png"
 
         /** `/tiles/{source}/{z}/{x}/{y}<suffix>` - the suffix is checked against the source. */
         private val TILE_PATH = Regex(
@@ -129,6 +161,51 @@ class LocalTileServer(
                 }
             }
         )
+
+        /**
+         * `/sprites/<basemap>/<file>`: the icon sheet a hosted style draws its symbols from.
+         *
+         * Judged by [HostedStyleStore.spriteNameFor], which is a table of the four names a renderer asks
+         * for rather than the path being checked against the filesystem - so a fifth name, or a path that
+         * tries to climb out of the folder, is a path nothing serves. The bytes come from the app, handed
+         * in by whoever started this server: see [TileServerHolder].
+         *
+         * Served rather than left to LINZ because the renderer reaches for this with no network too, and
+         * because a request straight to LINZ would carry the key out of the app.
+         */
+        fun spriteRoute(readSprite: (String) -> ByteArray?): HttpRoute = HttpRoute(
+            claims = { it.path.startsWith(SPRITES_PREFIX) },
+            handler = { request ->
+                val bytes = spritePathFor(request.path)?.let { readSprite(it) }
+                if (bytes == null) {
+                    HttpServer.NOT_FOUND
+                } else {
+                    HttpResponse.bytes(200, spriteContentType(request.path), bytes)
+                }
+            }
+        )
+
+        /**
+         * `/sprites/<basemap>/<file>` as the pair the app's store is addressed by, or null when the path
+         * is not one of the four files a renderer asks for.
+         *
+         * A pure function of the path, like [parseTilePath], which is what makes it worth testing on its
+         * own - and the basemap's name is judged here so that no request can name a file outside the
+         * sprite folder.
+         */
+        fun spritePathFor(path: String): String? {
+            val tail = path.removePrefix(SPRITES_PREFIX)
+            if (tail == path) return null
+            val parts = tail.split('/')
+            if (parts.size != 2) return null
+            val basemap = parts[0]
+            if (basemap.isEmpty() || basemap.any { !it.isLetterOrDigit() && it != '-' }) return null
+            if (HostedStyleStore.spriteNameFor(parts[1]) == null) return null
+            return tail
+        }
+
+        private fun spriteContentType(path: String): String =
+            if (path.endsWith(".json")) SPRITE_INDEX_CONTENT_TYPE else SPRITE_IMAGE_CONTENT_TYPE
 
         fun tileRoute(sources: List<TileSource>): HttpRoute = HttpRoute(
             claims = { it.path.startsWith(TILES_PREFIX) },

@@ -10,6 +10,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -292,12 +293,23 @@ fun BasemapView(
     // block is dropped, its fonts and sprites get the key, and its two sources are pointed at the
     // app's tile server. Null until it has arrived, and null forever for every other basemap.
     var hostedStyleJson by remember(basemap, apiKey) { mutableStateOf<String?>(null) }
+    // The document, the sprite and the letters are all kept or served by the app itself, so a phone
+    // that has looked at this basemap once can draw it again with no reception at all.
+    val context = LocalContext.current
     LaunchedEffect(basemap, apiKey, tileUrlTemplate) {
         hostedStyleJson = if (basemap.usesHostedStyle && apiKey.isNotBlank()) {
             LinzVectorStyle.load(
                 apiKey = apiKey,
                 basemap = basemap,
-                vectorTileTemplate = tileUrlTemplate
+                vectorTileTemplate = tileUrlTemplate,
+                // Through the app's own server when it is up, so the heights the shade is drawn from are
+                // in a store the app keeps - which is what lets an offline area cover them.
+                elevationTileTemplate = TileServerHolder.elevationTemplateUrl(),
+                // The letters the app ships, rather than LINZ's: already on the phone, so a name costs
+                // nothing to keep and draws with no reception.
+                glyphsUrl = tileUrlTemplate?.let { GlyphFonts.urlTemplateFrom(it) },
+                spriteUrl = TileServerHolder.spriteUrl(basemap),
+                store = HostedStyleStore.on(context)
             )
         } else {
             null

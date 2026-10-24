@@ -10,6 +10,7 @@ import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.map.GlyphFonts
+import nz.mckenzie.trailday.map.HostedStyleStore
 import java.io.File
 
 /**
@@ -66,6 +67,15 @@ object TileServerHolder {
     fun hillshadeTemplateUrl(): String? =
         server?.takeIf { it.isRunning }?.tileUrlTemplate(HILLSHADE_ID)
 
+    /**
+     * Where a hosted style should look for [basemap]'s sprite, or null if the server is not up yet.
+     *
+     * A style's `sprite` key wants a stem: the renderer appends `.json`, `.png` and their doubled
+     * resolutions to it and asks this server for each. See [LocalTileServer.spriteUrl].
+     */
+    fun spriteUrl(basemap: Basemap): String? =
+        server?.takeIf { it.isRunning }?.spriteUrl(basemap.id)
+
     /** Safe to ask for twice: the second ask finds the server up - the app and the tests both ask. */
     fun start(context: Context, initialKey: String = BuildConfig.LINZ_API_KEY) {
         if (server != null) return
@@ -77,7 +87,9 @@ object TileServerHolder {
         // server itself knows nothing about where they live - see GlyphFonts.
         val started = LocalTileServer(
             sources = sources(appContext),
-            readFont = { path -> GlyphFonts.read(appContext, path) }
+            readFont = { path -> GlyphFonts.read(appContext, path) },
+            // The icons a hosted style draws, out of the same store the style document is kept in.
+            readSprite = { path -> sprite(appContext, path) }
         )
         started.start()
         server = started
@@ -264,6 +276,21 @@ object TileServerHolder {
      * Named rather than defaulted so that adding a basemap cannot quietly change what an offline
      * area downloads into.
      */
+    /**
+     * One file of a basemap's sprite, by the `/sprites/<basemap>/<name>` path the map asked for.
+     *
+     * Judged against the table of basemaps rather than by taking the request's word for it, so a path
+     * cannot name a file outside the folder it is kept in - the same rule the letters and the tiles are
+     * judged by, and [LocalTileServer.spritePathFor] has already refused anything that is not one of the
+     * four files a renderer asks for.
+     */
+    private fun sprite(context: Context, path: String): ByteArray? {
+        val parts = path.split('/')
+        if (parts.size != 2) return null
+        val basemap = Basemap.entries.firstOrNull { it.id == parts[0] } ?: return null
+        return HostedStyleStore.on(context).readSprite(basemap, parts[1])
+    }
+
     fun imageryStore(context: Context): OfflineTileStore = store(context, Basemap.LINZ_AERIAL)
 
     internal fun stopForTest() {
