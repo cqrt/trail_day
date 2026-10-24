@@ -366,7 +366,8 @@ private fun DocControlsDeck(
                     nearMe = nearMe,
                     radiusKm = radiusKm,
                     onNearMeChange = onNearMeChange,
-                    onRadiusChange = onRadiusChange
+                    onRadiusChange = onRadiusChange,
+                    onSearch = onSearch
                 )
                 FilterMenu(
                     choices = filterChoices,
@@ -406,13 +407,19 @@ private val NearMeRadiusChoices = listOf(5, 10, 25, 50, 100, 150, 200)
  * taller than the pill beside it and pushed the filter and the order onto a second line; the menu keeps the
  * same answer without costing the list a row, and the chevron is what says so. The locate glyph carries the
  * "near me" part once the pill is green, so the pill has room to say the distance instead.
+ *
+ * **Choosing a distance asks again.** It used to set the answer and leave the list alone until the walker
+ * went back to the search field and pressed enter - so a radius changed under a page of huts from 200 km
+ * went on showing the huts 200 km away, and with no name typed at all there was nothing to press enter on
+ * and the page stayed empty. The distance *is* the question, so it is asked.
  */
 @Composable
 private fun NearMeControl(
     nearMe: Boolean,
     radiusKm: String,
     onNearMeChange: (Boolean) -> Unit,
-    onRadiusChange: (String) -> Unit
+    onRadiusChange: (String) -> Unit,
+    onSearch: () -> Unit
 ) {
     var open by remember { mutableStateOf(false) }
     Box {
@@ -446,6 +453,8 @@ private fun NearMeControl(
                     onRadiusChange("$km")
                     onNearMeChange(true)
                     open = false
+                    // Asked with the distance that was just chosen, so the page shows what it says.
+                    onSearch()
                 }
             }
             if (nearMe) {
@@ -455,6 +464,9 @@ private fun NearMeControl(
                     onClick = {
                         onNearMeChange(false)
                         open = false
+                        // The page was about the phone's own ground; with that gone it is a name search
+                        // again, or nothing to search for at all - and either way it is not the old list.
+                        onSearch()
                     }
                 )
             }
