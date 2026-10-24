@@ -49,6 +49,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import nz.mckenzie.trailday.ui.theme.TrailDayElevation
@@ -166,9 +167,19 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
-        permissionGranted = results[Manifest.permission.ACCESS_FINE_LOCATION] == true
-        if (!permissionGranted) viewModel.onPermissionDenied()
+        // **Only the answer it was asked about is acted on.** The same launcher asks for two different
+        // things at two different moments - location to record, and the notification a recording puts in the
+        // shade - so a result that does not mention location is not a refusal of it.
+        results[Manifest.permission.ACCESS_FINE_LOCATION]?.let { granted ->
+            permissionGranted = granted
+            if (!granted) viewModel.onPermissionDenied()
+        }
     }
+
+    // Asked when a walk is started, not on the way in: the notification is what says the app is still
+    // tracking, and that is the moment it starts to matter.
+    val notifications = rememberNotificationPermission()
+    val context = LocalContext.current
 
     // Tick once a second so the elapsed time moves while recording.
     var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -259,6 +270,22 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
+                // A walker who expects a notification and sees none should not be left wondering whether the
+                // app is still recording. Said while a pass is being driven, and only when the app has been
+                // told it may not post - and tappable, because the app cannot ask again once it has been
+                // told no, so the only way back is its own notification settings.
+                if (state.status == RecordingStatus.RECORDING && !notifications.allowed) {
+                    Text(
+                        text = "Notifications are off, so this walk will not show in the shade. " +
+                            "Tap to turn them on.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable {
+                            context.startActivity(notificationSettingsIntent(context))
+                        }
+                    )
+                }
             }
 
             // Which place this pass is for, and the way to change it: a pill rather than a line inside the
@@ -318,6 +345,10 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                         else -> MapPill(
                             label = "Start recording",
                             onClick = {
+                                // Asked here, and the walk goes ahead either way: a walker who says no to
+                                // the notification still gets their walk, and one who says yes gets told
+                                // the app is still tracking while their phone is in a pocket.
+                                notifications.ask()
                                 if (followingMode && assetName == null) pickingTrack = true else viewModel.start()
                             },
                             enabled = !followingMode || assetName != null,

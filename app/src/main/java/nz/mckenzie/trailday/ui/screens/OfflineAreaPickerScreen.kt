@@ -82,10 +82,15 @@ fun OfflineAreaPickerScreen(
     val live = download?.let { downloadProgressWords(it) }
 
     // A download outlives the screen that began it, so it is reported where a walker already looks for
-    // things that are still happening.
+    // things that are still happening - and the permission to report it is asked for here, where that is
+    // about to matter.
     val context = LocalContext.current
+    val notifications = rememberNotificationPermission()
     LaunchedEffect(download != null) {
-        if (download != null) DownloadService.start(context)
+        if (download != null) {
+            notifications.ask()
+            DownloadService.start(context)
+        }
     }
 
     val imagery = viewModel.mode == OfflinePickerMode.IMAGERY
