@@ -193,8 +193,7 @@ fun OfflineScreen(
                 // tiles are a fraction of imagery for the same ground, so a walker keeps several small ones
                 // - and several small ones need names to be told apart.
                 //
-                // A row's own Delete frees nothing: the tiles are shared between areas and with ordinary map
-                // browsing. "Clear the map" is what reclaims the space.
+                // A row's own Delete takes the tiles no other piece needs; "Clear the map" takes the rest.
                 topoAreas.forEachIndexed { index, area ->
                     if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     AreaRow(

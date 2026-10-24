@@ -181,7 +181,7 @@ class OfflineViewModel(
         }
     }
 
-    /** Forgets an imagery area. The tiles stay: they are shared, and this frees no space. */
+    /** Forgets an imagery area, and the tiles of it that no other area needs. */
     fun delete(areaId: Long) {
         viewModelScope.launch {
             runCatching { manager.deleteArea(areaId) }
@@ -224,7 +224,7 @@ class OfflineViewModel(
         }
     }
 
-    /** Forgets one named piece of the drawn map. The tiles stay; clearing the card frees those. */
+    /** Forgets one named piece of the drawn map, and the tiles of it that no other piece needs. */
     fun deleteTopoArea(areaId: Long) {
         viewModelScope.launch {
             runCatching { topography.deleteArea(areaId) }

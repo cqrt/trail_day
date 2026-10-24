@@ -25,6 +25,29 @@ class OfflineAreaTest {
         assertTrue("and what it came to", said.contains("KB"))
     }
 
+    @Test
+    fun `forgetting an area takes only the tiles no other area needs`() {
+        val shared = TileRef(14, 100, 200)
+        val mine = listOf(shared, TileRef(14, 101, 200), TileRef(14, 102, 200))
+        val other = listOf(shared, TileRef(14, 105, 200))
+
+        val free = tilesToFree(mine, other)
+
+        assertEquals(
+            "the two only this area asked for",
+            listOf(TileRef(14, 101, 200), TileRef(14, 102, 200)),
+            free
+        )
+        assertFalse("and not the one the two of them share", shared in free)
+    }
+
+    @Test
+    fun `an area nothing else describes gives up every tile of its own`() {
+        val mine = listOf(TileRef(14, 1, 1), TileRef(14, 2, 1))
+
+        assertEquals(mine, tilesToFree(mine, emptyList()))
+    }
+
     private fun area(
         planned: Int = 100,
         stored: Int = 0,

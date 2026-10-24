@@ -1,9 +1,32 @@
 package nz.mckenzie.trailday.offline
 
+import nz.mckenzie.trailday.domain.tiles.LatLngBounds
+import nz.mckenzie.trailday.domain.tiles.TileMath
 import java.io.File
 
 /** One aerial tile in the XYZ scheme. */
 data class TileRef(val zoom: Int, val x: Int, val y: Int)
+
+/**
+ * Every tile covering [bounds] across the inclusive zoom range.
+ *
+ * A free function rather than a method on the downloader, because **two things need it and only one of them
+ * downloads**: the downloader asks for exactly these tiles, and forgetting an area has to know which tiles
+ * were its own before it can work out which of them nothing else needs.
+ */
+fun plannedTiles(bounds: LatLngBounds, minZoom: Int, maxZoom: Int): List<TileRef> {
+    if (maxZoom < minZoom) return emptyList()
+    val tiles = ArrayList<TileRef>(TileMath.tileCount(bounds, minZoom, maxZoom).toInt().coerceAtLeast(0))
+    for (zoom in minZoom..maxZoom) {
+        val range = TileMath.tileRange(bounds, zoom)
+        for (x in range.minX..range.maxX) {
+            for (y in range.minY..range.maxY) {
+                tiles += TileRef(zoom, x, y)
+            }
+        }
+    }
+    return tiles
+}
 
 /**
  * Imagery tiles on disk, laid out as `{z}/{x}/{y}.webp` under a root directory.
@@ -41,6 +64,21 @@ class OfflineTileStore(
         file.parentFile?.mkdirs()
         file.writeBytes(bytes)
         return bytes.size
+    }
+
+    /**
+     * Removes one tile, and the directories it leaves empty. True when there was a file to remove.
+     *
+     * The directories matter: a store of ten thousand tiles is a tree of small folders, and forgetting an
+     * area that leaves its whole skeleton behind is a tidier list and no more disk. Only the folder the tile
+     * was in is looked at - a parent shared with a tile that is still held is not empty, so it stays.
+     */
+    fun delete(zoom: Int, x: Int, y: Int): Boolean {
+        val file = tileFile(zoom, x, y)
+        if (!file.isFile) return false
+        val removed = file.delete()
+        file.parentFile?.takeIf { it.listFiles()?.isEmpty() == true }?.delete()
+        return removed
     }
 
     /** Tiles currently held, by walking the tree (used for reporting on launch). */

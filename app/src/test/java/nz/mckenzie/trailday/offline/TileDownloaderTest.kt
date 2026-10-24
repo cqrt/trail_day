@@ -48,7 +48,7 @@ class TileDownloaderTest {
         })
 
         val progress = downloader.download(bounds, 14, 14)
-        val planned = downloader.plannedTiles(bounds, 14, 14)
+        val planned = plannedTiles(bounds, 14, 14)
 
         assertTrue("the area should need some tiles", planned.isNotEmpty())
         assertEquals(planned.size, progress.total)
@@ -163,6 +163,6 @@ class TileDownloaderTest {
     fun `an inverted zoom range plans nothing`() {
         val downloader = downloader(store(), TileFetcher { _, _, _ -> TileFetcher.Result.NotFound })
 
-        assertTrue(downloader.plannedTiles(bounds, 16, 12).isEmpty())
+        assertTrue(plannedTiles(bounds, 16, 12).isEmpty())
     }
 }

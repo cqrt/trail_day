@@ -90,8 +90,8 @@ data class PackPass(
  * drawn map - are two managers reading two sets of rows out of one table.
  *
  * The Room row is the *record* for the screen. The tiles are shared between
- * areas and with ordinary map browsing, so deleting a record frees no disk
- * space - which is why [clearTiles] exists as a separate, explicit action.
+ * areas and with ordinary map browsing, so forgetting a row takes only the tiles no other area of the
+ * pack needs - see [deleteArea] - and [clearTiles] is the action that takes the rest.
  */
 class OfflineAreaManager(
     /** Which pack's areas this manager records and downloads. */
@@ -216,9 +216,28 @@ class OfflineAreaManager(
         return area(areaId) ?: error("area $areaId vanished during download")
     }
 
-    /** Forgets an area. The tiles stay: they are shared, and this frees no space. */
-    suspend fun deleteArea(areaId: Long) {
+    /**
+     * Forgets an area, **and frees the tiles of it that nothing else needs.**
+     *
+     * A tile is shared: two overlapping areas hold one copy between them, and a tile the walker browsed past
+     * sits in the same store. So what goes is this area's own plan minus every other area's of the same pack
+     * - exact, and the reason this is a subtraction rather than a delete of the box. Tiles merely looked at
+     * are left alone: they were never this area's to take.
+     *
+     * Returns how many files went, so a screen can say what was reclaimed.
+     */
+    suspend fun deleteArea(areaId: Long): Int {
+        val row = dao.getById(areaId) ?: return 0
+        val mine = plannedTiles(row.bounds(), row.minZoom, row.maxZoom)
+        val others = dao.byPack(pack.id)
+            .filter { it.id != areaId }
+            .flatMap { plannedTiles(it.bounds(), it.minZoom, it.maxZoom) }
+
+        val removed = tilesToFree(mine, others).sumOf { tile ->
+            passes.count { pass -> pass.store.delete(tile.zoom, tile.x, tile.y) }
+        }
         dao.delete(areaId)
+        return removed
     }
 
     /**
@@ -302,6 +321,23 @@ class OfflineAreaManager(
         )
     }
 }
+
+/**
+ * The tiles of one area that **no other area of the pack needs.**
+ *
+ * A tile is shared: two overlapping areas hold one copy between them, so forgetting an area takes its own
+ * plan minus every other area's - which is why this is a subtraction rather than a delete of the box. A
+ * tile that only this area asked for goes; a tile another area still describes stays, and its own row is
+ * still an honest description of what is on disk.
+ */
+internal fun tilesToFree(mine: Collection<TileRef>, others: Collection<TileRef>): List<TileRef> {
+    val held = others.toHashSet()
+    return mine.filterNot { it in held }
+}
+
+/** A stored row's box, as the tile maths wants it. */
+private fun OfflineAreaEntity.bounds() =
+    LatLngBounds(minLat = minLat, minLng = minLng, maxLat = maxLat, maxLng = maxLng)
 
 /**
  * The sentence a Topographic download earns: **what came of the map, and of the heights it is shaded

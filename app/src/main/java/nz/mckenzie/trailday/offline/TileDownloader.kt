@@ -149,21 +149,6 @@ class TileDownloader(
         return last
     }
 
-    /** Every tile covering [bounds] across the inclusive zoom range. */
-    fun plannedTiles(bounds: LatLngBounds, minZoom: Int, maxZoom: Int): List<TileRef> {
-        if (maxZoom < minZoom) return emptyList()
-        val tiles = ArrayList<TileRef>(TileMath.tileCount(bounds, minZoom, maxZoom).toInt().coerceAtLeast(0))
-        for (zoom in minZoom..maxZoom) {
-            val range = TileMath.tileRange(bounds, zoom)
-            for (x in range.minX..range.maxX) {
-                for (y in range.minY..range.maxY) {
-                    tiles += TileRef(zoom, x, y)
-                }
-            }
-        }
-        return tiles
-    }
-
     private companion object {
         const val BACKOFF_MS = 250L
     }

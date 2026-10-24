@@ -94,6 +94,44 @@ class OfflineAreaManagerTest {
     )
 
     @Test
+    fun forgettingAnAreaTakesOnlyTheTilesNothingElseNeeds() = runBlocking {
+        val manager = manager { _, _, _ -> TileFetcher.Result.Tile(ByteArray(64)) }
+
+        // Two boxes that overlap by part of a column of tiles, as a walker's would: a ridge kept, then the
+        // valley beside it. At zoom 16 a tile is about 600 m, so these are several tiles wide.
+        val ridge = OfflineAreaPlan(
+            name = "Ridge",
+            bounds = LatLngBounds(minLat = -41.52, minLng = 173.950, maxLat = -41.50, maxLng = 173.960),
+            minZoom = 16,
+            maxZoom = 16
+        )
+        val valley = OfflineAreaPlan(
+            name = "Valley",
+            bounds = LatLngBounds(minLat = -41.52, minLng = 173.955, maxLat = -41.50, maxLng = 173.965),
+            minZoom = 16,
+            maxZoom = 16
+        )
+        val first = manager.createArea(ridge)
+        val second = manager.createArea(valley)
+        manager.download(first.id, "key")
+        manager.download(second.id, "key")
+
+        val ridgeTiles = plannedTiles(ridge.bounds, 16, 16)
+        val valleyTiles = plannedTiles(valley.bounds, 16, 16)
+        val shared = ridgeTiles.filter { it in valleyTiles }
+        val own = ridgeTiles.filterNot { it in valleyTiles }
+        assertTrue("the two boxes share tiles", shared.isNotEmpty())
+        assertTrue("and each has tiles of its own", own.isNotEmpty())
+
+        manager.deleteArea(first.id)
+
+        shared.forEach { assertTrue("a shared tile stays", store.contains(it.zoom, it.x, it.y)) }
+        own.forEach { assertFalse("a tile of its own goes", store.contains(it.zoom, it.x, it.y)) }
+        assertNull("and the area is forgotten", manager.area(first.id))
+        assertTrue("while the other one is still there", manager.area(second.id) != null)
+    }
+
+    @Test
     fun downloadsExactlyThePlannedTilesAndNothingMore() = runBlocking {
         val plan = smallPlan("Test block")
         val manager = manager { _, _, _ -> TileFetcher.Result.Tile(ByteArray(64)) }
@@ -177,18 +215,37 @@ class OfflineAreaManagerTest {
     }
 
     @Test
-    fun deletingAnAreaForgetsItButKeepsTheSharedTiles() = runBlocking {
+    fun deletingAnAreaForgetsItAndFreesTheTilesNothingElseNeeds() = runBlocking {
         val plan = smallPlan("Deletable")
         val manager = manager { _, _, _ -> TileFetcher.Result.Tile(ByteArray(8)) }
 
         val created = manager.createArea(plan)
         manager.download(created.id, "test-key")
-        manager.deleteArea(created.id)
+
+        val removed = manager.deleteArea(created.id)
 
         assertTrue("the record should be gone", manager.listAreas().isEmpty())
-        // Tiles are shared between areas and with ordinary map browsing, so
-        // deleting a record cannot safely free them. Pricing that is clearTiles.
-        assertEquals(plan.tileCount, store.storedTileCount())
+        // Nothing else describes this ground, so every tile it asked for goes with it - and only those:
+        // a tile the walker merely browsed past was never this area's to take.
+        assertEquals(plan.tileCount.toInt(), removed)
+        assertEquals(0, store.storedTileCount())
+    }
+
+    @Test
+    fun deletingAnAreaKeepsTheTilesAnotherAreaStillDescribes() = runBlocking {
+        val manager = manager { _, _, _ -> TileFetcher.Result.Tile(ByteArray(8)) }
+        // Two areas over the same ground, as a walker's would be after keeping a block twice.
+        val plan = smallPlan("Shared")
+        val first = manager.createArea(plan)
+        val second = manager.createArea(plan.copy(name = "Shared again"))
+        manager.download(first.id, "test-key")
+        manager.download(second.id, "test-key")
+
+        val removed = manager.deleteArea(first.id)
+
+        assertEquals("no tile of that ground was this area's alone", 0, removed)
+        assertEquals("so the tiles stay", plan.tileCount, store.storedTileCount())
+        assertEquals("and the other area still describes them", 1, manager.listAreas().size)
     }
 
     @Test
