@@ -78,14 +78,19 @@ class OfflineAreaManagerTest {
     private fun manager(
         fetch: (zoom: Int, x: Int, y: Int) -> TileFetcher.Result
     ) = OfflineAreaManager(
-        store = store,
-        dao = database.offlineAreaDao(),
-        fetcherFor = {
-            TileFetcher { zoom, x, y ->
-                fetches.incrementAndGet()
-                fetch(zoom, x, y)
-            }
-        }
+        pack = OfflinePack.IMAGERY,
+        passes = listOf(
+            PackPass(
+                store = store,
+                fetcherFor = {
+                    TileFetcher { zoom, x, y ->
+                        fetches.incrementAndGet()
+                        fetch(zoom, x, y)
+                    }
+                }
+            )
+        ),
+        dao = database.offlineAreaDao()
     )
 
     @Test
@@ -285,7 +290,15 @@ class OfflineAreaManagerTest {
             minZoom = 13,
             maxZoom = 14
         )
-        val manager = OfflineAreaManager(store = store, dao = database.offlineAreaDao())
+        val manager = OfflineAreaManager(
+            pack = OfflinePack.IMAGERY,
+            passes = listOf(
+                // The app's own fetcher, against the real service: this is the one test that checks a
+                // real area's real bytes against the estimate the screen shows.
+                PackPass(store = store, fetcherFor = { key -> LinzTileFetcher(key) })
+            ),
+            dao = database.offlineAreaDao()
+        )
 
         val created = manager.createArea(plan)
         val finished = manager.download(created.id, key)

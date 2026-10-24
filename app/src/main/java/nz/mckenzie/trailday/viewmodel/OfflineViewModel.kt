@@ -34,12 +34,12 @@ import nz.mckenzie.trailday.offline.TileStoreSummary
  * screen shows one tab each.
  */
 class OfflineViewModel(
+    /** The imagery pack: the areas a walker downloaded of the aerial tiles. */
     private val manager: OfflineAreaManager,
+    /** The drawn map's pack: its own areas, listed on its own card. */
+    private val topography: OfflineAreaManager,
     private val settings: SettingsRepository,
-    private val docStore: OfflineDocStore,
-    /** The drawn map's tiles, and the heights its hillshade is drawn from, so the screen can count them. */
-    private val topographyStore: OfflineTileStore,
-    private val elevationStore: OfflineTileStore
+    private val docStore: OfflineDocStore
 ) : ViewModel() {
 
     val apiKey: StateFlow<String> = settings.linzApiKey
@@ -47,6 +47,15 @@ class OfflineViewModel(
 
     /** The imagery areas on the device. Chosen elsewhere; managed here. */
     val stored: StateFlow<List<OfflineArea>> = manager.observeAreas()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
+    /**
+     * The drawn map's areas on the device: **the named pieces a walker keeps of it.**
+     *
+     * Listed rather than counted, because that is what the pack is for: its tiles are a fraction of imagery
+     * for the same ground, so a walker keeps several small ones - and several small ones need names.
+     */
+    val topoAreas: StateFlow<List<OfflineArea>> = topography.observeAreas()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     private val _working = MutableStateFlow(false)
@@ -133,7 +142,19 @@ class OfflineViewModel(
     }
 
     /** Continues an imagery area that stopped short; tiles already held are skipped. */
-    fun resume(areaId: Long) {
+    fun resume(areaId: Long) = continueArea(manager, areaId)
+
+    /** Continues a named piece of the drawn map that stopped short. */
+    fun resumeTopography(areaId: Long) = continueArea(topography, areaId)
+
+    /**
+     * Continues an area of [pack], from the tiles already on disk.
+     *
+     * The pack is named by the caller rather than looked up, because the card a walker pressed Resume on is
+     * already the answer: the drawn map's areas resume through its own manager, which fetches the two
+     * halves imagery knows nothing about.
+     */
+    private fun continueArea(pack: OfflineAreaManager, areaId: Long) {
         if (_working.value) return
         viewModelScope.launch {
             _working.value = true
@@ -146,7 +167,7 @@ class OfflineViewModel(
                     _error.value = "Add a LINZ Basemaps key before downloading an area."
                     return@launch
                 }
-                manager.download(areaId, key)
+                pack.download(areaId, key)
             } catch (cancelled: CancellationException) {
                 // Leaving the screen is not a failure; the download resumes later.
                 throw cancelled
@@ -155,6 +176,7 @@ class OfflineViewModel(
             } finally {
                 _working.value = false
                 refreshSummary()
+                refreshTopography()
             }
         }
     }
@@ -197,22 +219,23 @@ class OfflineViewModel(
      */
     fun refreshTopography() {
         viewModelScope.launch {
-            _topoSummary.value = runCatching {
-                TileStoreSummary(
-                    tiles = topographyStore.storedTileCount() + elevationStore.storedTileCount(),
-                    bytes = topographyStore.storedBytes() + elevationStore.storedBytes()
-                )
-            }.getOrDefault(TileStoreSummary(0, 0))
+            _topoSummary.value = runCatching { topography.summary() }
+                .getOrDefault(TileStoreSummary(0, 0))
         }
     }
 
-    /** Reclaims the space the drawn map holds. It is fetched again as the map is looked at. */
+    /** Forgets one named piece of the drawn map. The tiles stay; clearing the card frees those. */
+    fun deleteTopoArea(areaId: Long) {
+        viewModelScope.launch {
+            runCatching { topography.deleteArea(areaId) }
+            refreshTopography()
+        }
+    }
+
+    /** Reclaims the space the drawn map holds, and the records of its areas with it. */
     fun clearTopography() {
         viewModelScope.launch {
-            runCatching {
-                topographyStore.deleteAll()
-                elevationStore.deleteAll()
-            }
+            runCatching { topography.clearTiles() }
             refreshTopography()
         }
     }
@@ -226,22 +249,17 @@ class OfflineViewModel(
                 initializer {
                     val database = TrailDayDatabase.get(appContext)
                     OfflineViewModel(
-                        manager = OfflineAreaManager(
-                            // The same store the tile server serves from, so what
-                            // is downloaded here is what the map reads offline.
-                            store = TileServerHolder.imageryStore(appContext),
-                            dao = database.offlineAreaDao()
-                        ),
+                        // One manager per pack: the same stores the tile server serves from, so what is
+                        // downloaded here is what the map reads offline.
+                        manager = OfflineAreaManager.imagery(appContext, database.offlineAreaDao()),
+                        topography = OfflineAreaManager.topography(appContext, database.offlineAreaDao()),
                         settings = SettingsRepository(appContext),
                         // DOC's tracks, downloaded by the picker into the same cache the browsers
                         // fall back to when the service cannot be reached.
                         docStore = OfflineDocStore(
                             dao = database.offlineDocItemDao(),
                             downloader = DocDownloader.online()
-                        ),
-                        // The drawn map's two stores, counted by the screen's own card.
-                        topographyStore = TileServerHolder.topographyStore(appContext),
-                        elevationStore = TileServerHolder.elevationStore(appContext)
+                        )
                     )
                 }
             }

@@ -98,6 +98,9 @@ fun OfflineAreaPickerScreen(
     val keepsDocData = viewModel.mode == OfflinePickerMode.DOC_DATA || around
     // A zoom range is what any pack of tiles is asked, and the imagery and the drawn map are both that.
     val keepsZooms = keepsImagery || topography
+    // A name belongs to a pack that keeps **areas** - imagery, and the drawn map - because an area is a row
+    // the walker finds again later. DOC's material is one cache with no rows, so there is nothing to name.
+    val keepsAreas = keepsImagery || topography
 
     LaunchedEffect(saved) {
         if (saved) {
@@ -174,9 +177,10 @@ fun OfflineAreaPickerScreen(
                         style = MaterialTheme.typography.titleSmall
                     )
 
-                    // A name belongs to an imagery area, because an area is a row the walker finds again
-                    // later. The other packs are one cache each, so there is nothing to name.
-                    if (keepsImagery) {
+                    // A name belongs to a pack that keeps areas, because an area is a row the walker finds
+                    // again later: "the Tararuas", "the Routeburn". DOC's material is one cache with no
+                    // rows, so there is nothing to name.
+                    if (keepsAreas) {
                         OutlinedTextField(
                             value = draft.name,
                             onValueChange = viewModel::setName,

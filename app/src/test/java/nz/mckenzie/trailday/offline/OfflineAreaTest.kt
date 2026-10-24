@@ -16,41 +16,30 @@ class OfflineAreaTest {
     @Test
     fun `a Topographic download says what it kept of the map and of the heights`() {
         val said = topoDownloadedMessage(
-            map = TileDownloader.Progress(
-                stored = 13,
-                total = 13,
-                bytes = 571_000,
-                unavailable = 0,
-                failed = 0
-            ),
-            heights = TileDownloader.Progress(
-                stored = 8,
-                total = 8,
-                bytes = 240_000,
-                unavailable = 0,
-                failed = 0
-            )
+            area(stored = 92, bytes = 811_000, complete = true, pack = OfflinePack.TOPOGRAPHY)
         )
 
-        // Both halves, because they are two different things to a walker: the map is what they read, and
-        // the heights are what tells them the shape of the ground.
-        assertTrue("the map's own tiles are said", said.contains("13 map tiles"))
-        assertTrue("and the heights beside them", said.contains("8 height tiles"))
-        assertTrue("and what the two came to together", said.contains("792 KB"))
+        // One figure for the two halves together, because they are one thing to a walker: the map either
+        // draws this ground or it does not - and the record is where the two have already been added up.
+        assertTrue("how much came", said.contains("92 tiles"))
+        assertTrue("and what it came to", said.contains("KB"))
     }
 
     private fun area(
         planned: Int = 100,
         stored: Int = 0,
-        complete: Boolean = false
+        bytes: Long = 0L,
+        complete: Boolean = false,
+        pack: OfflinePack = OfflinePack.IMAGERY
     ) = OfflineArea(
         id = 1L,
         name = "Block",
         bounds = LatLngBounds(minLat = -41.6, minLng = 173.9, maxLat = -41.4, maxLng = 174.1),
         plannedTiles = planned,
         storedTiles = stored,
-        bytes = 0L,
-        isComplete = complete
+        bytes = bytes,
+        isComplete = complete,
+        pack = pack
     )
 
     @Test

@@ -148,3 +148,18 @@ internal val MIGRATION_5_6 = object : Migration(5, 6) {
         db.execSQL("DELETE FROM offline_doc_items WHERE source = 'tracks'")
     }
 }
+
+/**
+ * Where an area's row says which pack of tiles it is.
+ *
+ * The drawn Topographic map became something a walker can download in named pieces, and those pieces want
+ * the same list, size and state an imagery area has always had - so one table serves both, and this is the
+ * column that says which is which. **Every row that exists was imagery**, because that was the only pack
+ * with areas until now, so that is what they are given.
+ */
+internal val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE offline_areas ADD COLUMN pack TEXT NOT NULL DEFAULT 'imagery'")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_offline_areas_pack ON offline_areas (pack)")
+    }
+}

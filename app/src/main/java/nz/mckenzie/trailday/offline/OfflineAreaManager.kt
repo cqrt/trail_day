@@ -1,13 +1,16 @@
 package nz.mckenzie.trailday.offline
 
+import android.content.Context
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import nz.mckenzie.trailday.data.db.OfflineAreaDao
 import nz.mckenzie.trailday.data.db.OfflineAreaEntity
+import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 
 /**
- * A downloaded offline imagery area, as the screen shows it.
+ * A downloaded offline area, as the screen shows it: **one named box a walker chose, with a size and a
+ * state.**
  *
  * [storedTiles] counts the plan's tiles that are on disk, which is not the same
  * as "tiles this download fetched": tiles browsed on the map beforehand count
@@ -24,6 +27,8 @@ data class OfflineArea(
     val storedTiles: Int,
     val bytes: Long,
     val isComplete: Boolean,
+    /** Which pack's tiles it is, for a screen that shows more than one list. */
+    val pack: OfflinePack = OfflinePack.IMAGERY,
     /** Why the last attempt stopped early, if it did. Only real failures. */
     val lastError: String? = null
 ) {
@@ -55,7 +60,22 @@ data class TileStoreSummary(val tiles: Long, val bytes: Long) {
 }
 
 /**
- * Downloads and records offline imagery areas.
+ * One pass of a pack's download: **where its tiles go, and where they come from.**
+ *
+ * A pack with one source has one pass; the drawn map has two - its tiles, then the heights its hillshade is
+ * drawn from - which are the same z/x/y fetched from two places into two stores. Saying it as a list is what
+ * lets one manager download either pack, and what gives the live sentence its "the map" and "the heights".
+ */
+data class PackPass(
+    val store: OfflineTileStore,
+    /** What this pass is, in the walker's words, when a pack has more than one. */
+    val phase: String? = null,
+    /** Built per download rather than held, so a key pasted into Settings takes effect on the next tile. */
+    val fetcherFor: (apiKey: String) -> TileFetcher
+)
+
+/**
+ * Downloads and records offline areas **for one pack.**
  *
  * Tiles come straight from LINZ into [OfflineTileStore] - the same store the
  * map's own tile server reads - so a downloaded area is usable the moment it
@@ -65,37 +85,48 @@ data class TileStoreSummary(val tiles: Long, val bytes: Long) {
  * because that style declares two terrain sources its own layers never use and
  * MapLibre walks every source in a style.
  *
+ * **One manager per pack**, rather than one manager with a mode: what a pack is fetched from and where it
+ * lands is fixed when the manager is built (see the companion), and a walker's two lists - imagery and the
+ * drawn map - are two managers reading two sets of rows out of one table.
+ *
  * The Room row is the *record* for the screen. The tiles are shared between
  * areas and with ordinary map browsing, so deleting a record frees no disk
  * space - which is why [clearTiles] exists as a separate, explicit action.
  */
 class OfflineAreaManager(
-    private val store: OfflineTileStore,
+    /** Which pack's areas this manager records and downloads. */
+    val pack: OfflinePack,
+    /** What fetching that pack means: one pass, or several. */
+    private val passes: List<PackPass>,
     private val dao: OfflineAreaDao,
-    /** Injected so tests never reach LINZ. */
-    private val fetcherFor: (apiKey: String) -> TileFetcher = { key -> LinzTileFetcher(key) },
     private val now: () -> Long = System::currentTimeMillis
 ) {
 
-    /** The screen's list, straight from the database, updating as progress lands. */
+    /** The screen's list for this pack, straight from the database, updating as progress lands. */
     fun observeAreas(): Flow<List<OfflineArea>> =
-        dao.observeAll().map { rows -> rows.map { it.toOfflineArea() } }
+        dao.observePack(pack.id).map { rows -> rows.map { it.toOfflineArea() } }
 
-    suspend fun listAreas(): List<OfflineArea> = dao.getAll().map { it.toOfflineArea() }
+    suspend fun listAreas(): List<OfflineArea> = dao.byPack(pack.id).map { it.toOfflineArea() }
 
     suspend fun area(id: Long): OfflineArea? = dao.getById(id)?.toOfflineArea()
 
-    /** Tiles and bytes actually on disk, covering every area and map browsing. */
-    suspend fun summary(): TileStoreSummary =
-        TileStoreSummary(store.storedTileCount(), store.storedBytes())
+    /** Tiles and bytes actually on disk for this pack, covering every area and map browsing. */
+    suspend fun summary(): TileStoreSummary = TileStoreSummary(
+        tiles = passes.sumOf { it.store.storedTileCount() },
+        bytes = passes.sumOf { it.store.storedBytes() }
+    )
 
     /**
      * Validates the plan and records it, so progress has somewhere to be written
      * before the first tile arrives. Throws [IllegalArgumentException] for a plan
      * too large to be a sensible offline pack.
+     *
+     * The count is **every pass's tiles**, because that is what the download will fetch and what the
+     * progress beside it has to be a fraction of: a two-pass pack counting one pass would sit at 50% when
+     * it had finished.
      */
     suspend fun createArea(plan: OfflineAreaPlan): OfflineArea {
-        val planned = plan.tileCount
+        val planned = plan.tileCount * passes.size
         require(planned <= MAX_TILES_PER_AREA) {
             "That area needs $planned tiles, more than the $MAX_TILES_PER_AREA limit. " +
                 "Narrow the zoom range or the area."
@@ -103,6 +134,7 @@ class OfflineAreaManager(
         val id = dao.insert(
             OfflineAreaEntity(
                 name = plan.name,
+                pack = pack.id,
                 minLat = plan.bounds.minLat,
                 minLng = plan.bounds.minLng,
                 maxLat = plan.bounds.maxLat,
@@ -119,42 +151,53 @@ class OfflineAreaManager(
     /**
      * Downloads a recorded area, resuming from the tiles already on disk.
      *
-     * Cancelling is safe and cheap to resume: tiles land on disk as they arrive
-     * and progress is written to the database as it goes, so a second call picks
-     * up where this one stopped rather than starting over.
+     * Every pass in turn, each one resuming from what it already has. Cancelling is safe and cheap to
+     * resume: tiles land on disk as they arrive and progress is written to the database as it goes, so a
+     * second call picks up where this one stopped rather than starting over.
      */
     suspend fun download(areaId: Long, apiKey: String): OfflineArea {
         val row = dao.getById(areaId) ?: error("no offline area with id $areaId")
-        val downloader = TileDownloader(store = store, fetcher = fetcherFor(apiKey))
+        val bounds = LatLngBounds(row.minLat, row.minLng, row.maxLat, row.maxLng)
 
         var lastWrite = 0L
-        val progress = try {
-            downloader.download(
-                bounds = LatLngBounds(row.minLat, row.minLng, row.maxLat, row.maxLng),
-                minZoom = row.minZoom,
-                maxZoom = row.maxZoom
-            ) { current ->
-                // What a walker watching this reads: one sentence, the same one the offline screen and the
-                // notification show, worked out from the downloader's own figures.
-                DownloadState.report(
-                    DownloadProgress(
-                        pack = DownloadPacks.IMAGERY,
-                        unit = TILE_UNIT,
-                        done = current.stored,
-                        total = current.total,
-                        bytes = current.bytes,
-                        elapsedMs = current.elapsedMs,
-                        unavailable = current.unavailable,
-                        failed = current.failed
+        var downloaded = 0L
+        var bytes = 0L
+        var failures = 0
+        try {
+            passes.forEach { pass ->
+                val downloader = TileDownloader(store = pass.store, fetcher = pass.fetcherFor(apiKey))
+                val progress = downloader.download(bounds, row.minZoom, row.maxZoom) { current ->
+                    // What a walker watching this reads: one sentence, the same one the offline screen and
+                    // the notification show, and per pass - a single bar across two passes would appear to
+                    // go backwards when the second one started.
+                    DownloadState.report(
+                        DownloadProgress(
+                            pack = pack,
+                            unit = TILE_UNIT,
+                            phase = pass.phase,
+                            done = current.stored,
+                            total = current.total,
+                            bytes = current.bytes,
+                            elapsedMs = current.elapsedMs,
+                            unavailable = current.unavailable,
+                            failed = current.failed
+                        )
                     )
-                )
-                val at = now()
-                // The screen reads the database, so progress is written as it happens
-                // - but not once per chunk of four tiles.
-                if (at - lastWrite >= PROGRESS_WRITE_MS) {
-                    lastWrite = at
-                    dao.updateProgress(areaId, current.stored.toLong(), current.bytes)
+                    val at = now()
+                    // The screen reads the database, so progress is written as it happens
+                    // - but not once per chunk of four tiles.
+                    if (at - lastWrite >= PROGRESS_WRITE_MS) {
+                        lastWrite = at
+                        dao.updateProgress(
+                            areaId,
+                            downloaded + current.stored,
+                            bytes + current.bytes
+                        )
+                    }
                 }
+                downloaded += progress.stored
+                bytes += progress.bytes
+                failures += progress.failed
             }
         } finally {
             // Finished, failed, or cancelled by the walker leaving: either way there is nothing left to
@@ -162,22 +205,13 @@ class OfflineAreaManager(
             DownloadState.clear()
         }
 
-        if (progress.failed == 0) {
-            // Tiles LINZ serves no imagery for - the edge of coverage, offshore -
-            // will never arrive. The area is as complete as it can be: mark it
-            // finished and let missingTiles report the shortfall.
-            dao.markComplete(
-                id = areaId,
-                completedAtEpochMs = now(),
-                downloaded = progress.stored.toLong(),
-                bytes = progress.bytes
-            )
+        if (failures == 0) {
+            // Tiles LINZ serves nothing for - the edge of coverage, offshore - will never arrive. The area
+            // is as complete as it can be: mark it finished and let missingTiles report the shortfall.
+            dao.markComplete(areaId, now(), downloaded, bytes)
         } else {
-            dao.updateProgress(areaId, progress.stored.toLong(), progress.bytes)
-            dao.recordError(
-                areaId,
-                "${progress.failed} of ${progress.total} tiles failed to download."
-            )
+            dao.updateProgress(areaId, downloaded, bytes)
+            dao.recordError(areaId, "$failures of the tiles failed to download.")
         }
         return area(areaId) ?: error("area $areaId vanished during download")
     }
@@ -188,12 +222,12 @@ class OfflineAreaManager(
     }
 
     /**
-     * Removes every downloaded tile and every area record, returning how many
-     * files went. The only action that actually reclaims disk space.
+     * Removes every downloaded tile of this pack and every one of its records, returning how many files
+     * went. The only action that actually reclaims the pack's disk space.
      */
     suspend fun clearTiles(): Int {
-        val removed = store.deleteAll()
-        dao.deleteAll()
+        val removed = passes.sumOf { it.store.deleteAll() }
+        dao.deletePack(pack.id)
         return removed
     }
 
@@ -205,31 +239,88 @@ class OfflineAreaManager(
          */
         const val MAX_TILES_PER_AREA = 12_000L
 
-        /** What the download counts, as the live sentence reads it. */
+        /** What the downloads count, as the live sentence reads it. */
         private const val TILE_UNIT = "tiles"
 
         private const val PROGRESS_WRITE_MS = 1_000L
+
+        /** The two halves of the drawn map's download, as the live sentence names them. */
+        const val MAP_PHASE = "the map"
+        const val HEIGHTS_PHASE = "the heights"
+
+        /**
+         * The imagery pack: LINZ's aerial tiles, into the store an offline area is downloaded into.
+         */
+        fun imagery(context: Context, dao: OfflineAreaDao): OfflineAreaManager = OfflineAreaManager(
+            pack = OfflinePack.IMAGERY,
+            passes = listOf(
+                PackPass(
+                    store = TileServerHolder.imageryStore(context),
+                    fetcherFor = { key -> LinzTileFetcher(key) }
+                )
+            ),
+            dao = dao
+        )
+
+        /**
+         * The drawn map's pack: its tiles, then the heights its hillshade is drawn from.
+         *
+         * Two passes rather than one, and both are what the map needs to draw a hillside: the tiles say
+         * where the roads and the contours are, and the heights say what shape the ground is. A box with
+         * one and not the other is a map with no relief.
+         */
+        fun topography(context: Context, dao: OfflineAreaDao): OfflineAreaManager = OfflineAreaManager(
+            pack = OfflinePack.TOPOGRAPHY,
+            passes = listOf(
+                PackPass(
+                    store = TileServerHolder.topographyStore(context),
+                    phase = MAP_PHASE,
+                    fetcherFor = { key ->
+                        LinzTileFetcher(
+                            key,
+                            urlFor = { zoom, x, y ->
+                                Basemap.LINZ_TOPO_LIDAR_HILLSHADE.tileUrl(key, zoom, x, y)
+                            },
+                            accept = "application/x-protobuf"
+                        )
+                    }
+                ),
+                PackPass(
+                    store = TileServerHolder.elevationStore(context),
+                    phase = HEIGHTS_PHASE,
+                    fetcherFor = { key ->
+                        LinzTileFetcher(
+                            key,
+                            urlFor = { zoom, x, y -> Basemap.elevationUrl(key, zoom, x, y) },
+                            // The DEM endpoint answers PNG, and the renderer decodes it as PNG.
+                            accept = "image/png"
+                        )
+                    }
+                )
+            ),
+            dao = dao
+        )
     }
 }
 
-private fun OfflineAreaEntity.toOfflineArea() = OfflineArea(    id = id,
+/**
+ * The sentence a Topographic download earns: **what came of the map, and of the heights it is shaded
+ * from.**
+ *
+ * One figure for the two together, because they are one thing to a walker - the map either draws this
+ * ground or it does not - and the record is where the two have already been added up.
+ */
+fun topoDownloadedMessage(area: OfflineArea): String =
+    "Kept ${area.storedTiles} tiles of the map and its heights, about ${area.sizeLabel}."
+
+private fun OfflineAreaEntity.toOfflineArea() = OfflineArea(
+    id = id,
     name = name,
     bounds = LatLngBounds(minLat = minLat, minLng = minLng, maxLat = maxLat, maxLng = maxLng),
     plannedTiles = plannedTiles.toInt(),
     storedTiles = downloadedTiles.toInt(),
     bytes = bytes,
     isComplete = isComplete,
+    pack = OfflinePack.fromStorage(pack),
     lastError = lastError
 )
-
-/**
- * The sentence a Topographic download earns: what was kept of the map, and of the heights it is shaded
- * from.
- *
- * **Two numbers rather than one**, because they are two different things to a walker: the map is what
- * they read - roads, contours, names - and the heights are what tells them the shape of the ground. A
- * box with one and not the other is a map with no relief, which is the half that matters on a hillside.
- */
-fun topoDownloadedMessage(map: TileDownloader.Progress, heights: TileDownloader.Progress): String =
-    "Kept ${map.stored} map tiles and ${heights.stored} height tiles, " +
-        "about ${formatBytes(map.bytes + heights.bytes)}."

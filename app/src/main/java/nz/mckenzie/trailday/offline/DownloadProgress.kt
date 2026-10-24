@@ -4,19 +4,6 @@ import kotlin.math.roundToInt
 import nz.mckenzie.trailday.ui.formatEstimate
 
 /**
- * What a download is for, in the walker's words - **the same words the offline screen's cards carry.**
- *
- * Named once because they are read in three places (a card's title, the live sentence, the notification),
- * and a pack called "LINZ imagery" on one and "Imagery" on another is how a walker comes to think there
- * are two of them.
- */
-object DownloadPacks {
-    const val IMAGERY = "LINZ imagery"
-    const val TOPOGRAPHY = "Topographic map"
-    const val DOC = "DOC assets"
-}
-
-/**
  * How a download is going, as **one shape for every pack.**
  *
  * Imagery, the drawn map and DOC's material are three different things fetched three different ways, and a
@@ -29,8 +16,8 @@ object DownloadPacks {
  * all - so both answer null until there is something honest to say, and the sentence simply leaves them out.
  */
 data class DownloadProgress(
-    /** Which pack, from [DownloadPacks]. */
-    val pack: String,
+    /** Which pack: see [OfflinePack], which is also where its title lives. */
+    val pack: OfflinePack,
     /** What is counted, as it reads in the sentence: "tiles", "records". */
     val unit: String,
     val done: Int,

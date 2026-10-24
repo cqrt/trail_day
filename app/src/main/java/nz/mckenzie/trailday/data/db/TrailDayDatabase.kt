@@ -17,7 +17,7 @@ import androidx.room.RoomDatabase
         OfflineDocItemEntity::class,
         OfflineDocPictureEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 abstract class TrailDayDatabase : RoomDatabase() {
@@ -58,7 +58,8 @@ abstract class TrailDayDatabase : RoomDatabase() {
                         MIGRATION_2_3,
                         MIGRATION_3_4,
                         MIGRATION_4_5,
-                        MIGRATION_5_6
+                        MIGRATION_5_6,
+                        MIGRATION_6_7
                     )
                     .build().also { instance = it }
             }

@@ -183,6 +183,39 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun areasAlreadyDownloadedBecomeImageryAreas() {
+        // Version 6 had one pack with areas, and every row in the table was one of its. The column that says
+        // which pack a row belongs to has to answer "imagery" for all of them, or a season of downloaded
+        // imagery would vanish from the list that describes it.
+        helper.createDatabase(TEST_DATABASE_AREAS, 6).apply {
+            execSQL(
+                """
+                INSERT INTO offline_areas
+                    (name, minLat, minLng, maxLat, maxLng, minZoom, maxZoom,
+                     plannedTiles, downloadedTiles, bytes, createdAtEpochMs)
+                VALUES
+                    ('Tararuas', -41.0, 175.0, -40.8, 175.3, 10, 16, 300, 300, 12000000, 1)
+                """.trimIndent()
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(
+            TEST_DATABASE_AREAS,
+            7,
+            true,
+            MIGRATION_6_7
+        )
+
+        migrated.query("SELECT name, pack, downloadedTiles FROM offline_areas").use { rows ->
+            assertTrue("the area is still there", rows.moveToFirst())
+            assertEquals("Tararuas", rows.getString(0))
+            assertEquals("and it is an imagery area", "imagery", rows.getString(1))
+            assertEquals("with everything else it had", 300L, rows.getLong(2))
+        }
+    }
+
     private companion object {
         /** Names of this test's own: the real database is never opened by a test. */
         const val TEST_DATABASE = "migration-test.db"
@@ -201,5 +234,8 @@ class MigrationTest {
 
         /** And a fifth, for the version 5 to 6 change. */
         const val TEST_DATABASE_TRACKS = "migration-test-tracks.db"
+
+        /** And a sixth, for the version 6 to 7 change. */
+        const val TEST_DATABASE_AREAS = "migration-test-areas.db"
     }
 }

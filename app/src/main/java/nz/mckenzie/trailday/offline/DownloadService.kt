@@ -131,7 +131,7 @@ class DownloadService : Service() {
         }
 
         return builder
-            .setContentTitle(getString(R.string.download_notification_title, progress.pack))
+            .setContentTitle(getString(R.string.download_notification_title, progress.pack.title))
             .setContentText(downloadProgressWords(progress))
             .setProgress(100, progress.percent, progress.total <= 0)
             .build()

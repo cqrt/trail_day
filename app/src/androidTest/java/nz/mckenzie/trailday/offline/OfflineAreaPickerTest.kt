@@ -59,9 +59,14 @@ class OfflineAreaPickerTest {
         // A fixed fetcher: this test is about what the picker stores and asks for, not
         // about the network.
         manager = OfflineAreaManager(
-            store = store,
-            dao = db.offlineAreaDao(),
-            fetcherFor = { TileFetcher { _, _, _ -> TileFetcher.Result.Tile(ByteArray(20)) } }
+            pack = OfflinePack.IMAGERY,
+            passes = listOf(
+                PackPass(
+                    store = store,
+                    fetcherFor = { TileFetcher { _, _, _ -> TileFetcher.Result.Tile(ByteArray(20)) } }
+                )
+            ),
+            dao = db.offlineAreaDao()
         )
         SettingsRepository(context).setLinzApiKey("test-key")
     }
@@ -84,9 +89,18 @@ class OfflineAreaPickerTest {
             dao = db.offlineDocItemDao(),
             downloader = DocDownloader(ArcGisDoc())
         ),
-        // Nor are the drawn map's two stores: wired for the same reason.
-        topographyStore = OfflineTileStore(File(temp.root, "topography"), ".pbf"),
-        elevationStore = OfflineTileStore(File(temp.root, "elevation"), ".png"),
+        // Nor is the drawn map's pack: wired for the same reason, into a store of its own.
+        topography = OfflineAreaManager(
+            pack = OfflinePack.TOPOGRAPHY,
+            passes = listOf(
+                PackPass(
+                    store = OfflineTileStore(File(temp.root, "topography"), ".pbf"),
+                    phase = OfflineAreaManager.MAP_PHASE,
+                    fetcherFor = { TileFetcher { _, _, _ -> TileFetcher.Result.Tile(ByteArray(20)) } }
+                )
+            ),
+            dao = db.offlineAreaDao()
+        ),
         // This test is about the imagery area the picker stores.
         mode = OfflinePickerMode.IMAGERY
     )
@@ -107,7 +121,7 @@ class OfflineAreaPickerTest {
         viewModel.download()
         withTimeout(20_000) { viewModel.saved.first { it } }
 
-        val row = db.offlineAreaDao().getAll().single()
+        val row = db.offlineAreaDao().byPack(OfflinePack.IMAGERY.id).single()
         assertEquals("Bottom flat", row.name)
         assertEquals(13, row.minZoom)
         assertEquals(14, row.maxZoom)
@@ -130,7 +144,7 @@ class OfflineAreaPickerTest {
         viewModel.download()
         withTimeout(20_000) { viewModel.saved.first { it } }
 
-        val row = db.offlineAreaDao().getAll().single()
+        val row = db.offlineAreaDao().byPack(OfflinePack.IMAGERY.id).single()
         assertTrue("expected a dated default, got \"${row.name}\"", row.name.startsWith("Area "))
     }
 
@@ -155,7 +169,7 @@ class OfflineAreaPickerTest {
 
         assertTrue("the draft should know it is too big", viewModel.draft.value.isTooBig)
         assertNotNull("and the screen should be told why", viewModel.error.value)
-        assertTrue("nothing should be stored", db.offlineAreaDao().getAll().isEmpty())
+        assertTrue("nothing should be stored", db.offlineAreaDao().byPack(OfflinePack.IMAGERY.id).isEmpty())
         assertEquals("and no tiles fetched", 0, store.storedTileCount())
     }
 
@@ -170,6 +184,6 @@ class OfflineAreaPickerTest {
             "the walker should be told what is missing: ${viewModel.error.value}",
             viewModel.error.value?.contains("two opposite corners") == true
         )
-        assertTrue(db.offlineAreaDao().getAll().isEmpty())
+        assertTrue(db.offlineAreaDao().byPack(OfflinePack.IMAGERY.id).isEmpty())
     }
 }

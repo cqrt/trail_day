@@ -8,11 +8,17 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 abstract class OfflineAreaDao {
 
-    @Query("SELECT * FROM offline_areas ORDER BY createdAtEpochMs DESC")
-    abstract fun observeAll(): Flow<List<OfflineAreaEntity>>
+    /**
+     * One pack's areas, newest first.
+     *
+     * Every read is by pack: an imagery area and an area of the drawn map are two different lists on two
+     * different cards, and a query that returned both would be one screen showing the other's rows.
+     */
+    @Query("SELECT * FROM offline_areas WHERE pack = :pack ORDER BY createdAtEpochMs DESC")
+    abstract fun observePack(pack: String): Flow<List<OfflineAreaEntity>>
 
-    @Query("SELECT * FROM offline_areas ORDER BY createdAtEpochMs DESC")
-    abstract suspend fun getAll(): List<OfflineAreaEntity>
+    @Query("SELECT * FROM offline_areas WHERE pack = :pack ORDER BY createdAtEpochMs DESC")
+    abstract suspend fun byPack(pack: String): List<OfflineAreaEntity>
 
     @Query("SELECT * FROM offline_areas WHERE id = :id")
     abstract suspend fun getById(id: Long): OfflineAreaEntity?
@@ -47,7 +53,7 @@ abstract class OfflineAreaDao {
     @Query("DELETE FROM offline_areas WHERE id = :id")
     abstract suspend fun delete(id: Long)
 
-    /** Used when the tiles themselves are cleared: the records describe nothing then. */
-    @Query("DELETE FROM offline_areas")
-    abstract suspend fun deleteAll()
+    /** Used when a pack's tiles are cleared: its records describe nothing then. */
+    @Query("DELETE FROM offline_areas WHERE pack = :pack")
+    abstract suspend fun deletePack(pack: String)
 }

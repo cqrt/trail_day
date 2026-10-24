@@ -20,7 +20,7 @@ class DownloadProgressTest {
         bytes: Long = 0L,
         elapsedMs: Long = 0L
     ) = DownloadProgress(
-        pack = DownloadPacks.IMAGERY,
+        pack = OfflinePack.IMAGERY,
         unit = "tiles",
         done = done,
         total = total,

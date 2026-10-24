@@ -39,10 +39,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.doc.DocSource
-import nz.mckenzie.trailday.offline.DownloadPacks
 import nz.mckenzie.trailday.offline.DownloadService
 import nz.mckenzie.trailday.offline.DownloadState
 import nz.mckenzie.trailday.offline.OfflineArea
+import nz.mckenzie.trailday.offline.OfflinePack
 import nz.mckenzie.trailday.offline.docHeldWords
 import nz.mckenzie.trailday.offline.downloadProgressWords
 import nz.mckenzie.trailday.offline.pictureCountWords
@@ -76,13 +76,14 @@ fun OfflineScreen(
     val docCounts by viewModel.docCounts.collectAsStateWithLifecycle()
     val docPictures by viewModel.docPictures.collectAsStateWithLifecycle()
     val topoSummary by viewModel.topoSummary.collectAsStateWithLifecycle()
+    val topoAreas by viewModel.topoAreas.collectAsStateWithLifecycle()
     val download by DownloadState.current.collectAsStateWithLifecycle()
 
     // What is downloading now, if it is this card's own pack: the same sentence the picker's card and the
     // notification show, so the three cannot describe one download three ways.
-    val imageryLive = download?.takeIf { it.pack == DownloadPacks.IMAGERY }
-    val topoLive = download?.takeIf { it.pack == DownloadPacks.TOPOGRAPHY }
-    val docLive = download?.takeIf { it.pack == DownloadPacks.DOC }
+    val imageryLive = download?.takeIf { it.pack == OfflinePack.IMAGERY }
+    val topoLive = download?.takeIf { it.pack == OfflinePack.TOPOGRAPHY }
+    val docLive = download?.takeIf { it.pack == OfflinePack.DOC }
 
     var confirmingClearImagery by remember { mutableStateOf(false) }
     var confirmingClearDocData by remember { mutableStateOf(false) }
@@ -116,7 +117,7 @@ fun OfflineScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             DownloadCard(
-                title = DownloadPacks.IMAGERY,
+                title = OfflinePack.IMAGERY.title,
                 icon = { AppIcon(glyph = IconGlyph.MAP, tint = MaterialTheme.colorScheme.primary) },
                 // While it is downloading the card's own line is the live sentence: a count of what is
                 // held so far would be a second, staler number beside the one that matters.
@@ -149,7 +150,7 @@ fun OfflineScreen(
             }
 
             DownloadCard(
-                title = DownloadPacks.DOC,
+                title = OfflinePack.DOC.title,
                 icon = { AssetKindIcon(kind = AssetKind.HUT, dimension = 24.dp) },
                 summary = docLive?.let { downloadProgressWords(it) } ?: if (docDataCount == 0) {
                     "Nothing downloaded yet"
@@ -173,7 +174,7 @@ fun OfflineScreen(
             // The drawn map: the other thing a walker can choose to keep, and the cheap one - vector
             // tiles are a fraction of imagery for the same ground, and it is what reads on a hillside.
             DownloadCard(
-                title = DownloadPacks.TOPOGRAPHY,
+                title = OfflinePack.TOPOGRAPHY.title,
                 icon = { AppIcon(glyph = IconGlyph.LAYERS, tint = MaterialTheme.colorScheme.primary) },
                 summary = topoLive?.let { downloadProgressWords(it) }
                     ?: if (topoSummary.tiles == 0L) {
@@ -188,8 +189,21 @@ fun OfflineScreen(
                 clearLabel = "Clear the map".takeIf { topoSummary.tiles > 0L },
                 onClear = { confirmingClearTopo = true }
             ) {
-                // No rows: the drawn map is one cache the whole app reads, wherever it is drawn - so
-                // there is nothing per-area to list, only what is held in total.
+                // **The named pieces of the drawn map**, each one a row. This is what the pack is for: its
+                // tiles are a fraction of imagery for the same ground, so a walker keeps several small ones
+                // - and several small ones need names to be told apart.
+                //
+                // A row's own Delete frees nothing: the tiles are shared between areas and with ordinary map
+                // browsing. "Clear the map" is what reclaims the space.
+                topoAreas.forEachIndexed { index, area ->
+                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    AreaRow(
+                        area = area,
+                        working = working,
+                        onResume = { viewModel.resumeTopography(area.id) },
+                        onDelete = { viewModel.deleteTopoArea(area.id) }
+                    )
+                }
             }
 
             Button(

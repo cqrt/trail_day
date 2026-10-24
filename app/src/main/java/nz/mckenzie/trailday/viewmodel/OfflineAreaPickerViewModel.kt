@@ -31,7 +31,6 @@ import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
-import nz.mckenzie.trailday.offline.DownloadPacks
 import nz.mckenzie.trailday.offline.DownloadProgress
 import nz.mckenzie.trailday.offline.DownloadState
 import nz.mckenzie.trailday.offline.LinzTileFetcher
@@ -39,9 +38,8 @@ import nz.mckenzie.trailday.offline.OfflineArea
 import nz.mckenzie.trailday.offline.OfflineAreaDraft
 import nz.mckenzie.trailday.offline.OfflineAreaManager
 import nz.mckenzie.trailday.offline.OfflineDocStore
+import nz.mckenzie.trailday.offline.OfflinePack
 import nz.mckenzie.trailday.offline.OfflinePickerMode
-import nz.mckenzie.trailday.offline.OfflineTileStore
-import nz.mckenzie.trailday.offline.TileDownloader
 import nz.mckenzie.trailday.offline.TileServerHolder
 import nz.mckenzie.trailday.offline.docDownloadedMessage
 import nz.mckenzie.trailday.offline.groundAround
@@ -65,10 +63,8 @@ class OfflineAreaPickerViewModel(
     private val settings: SettingsRepository,
     /** The DOC tracks kept for offline use, downloaded for the box drawn here. */
     private val docStore: OfflineDocStore,
-    /** The vector Topographic map's own tiles, downloaded for the box drawn here. */
-    private val topographyStore: OfflineTileStore,
-    /** The heights its hillshade is shaded from, downloaded for the same box. */
-    private val elevationStore: OfflineTileStore,
+    /** The drawn map's own pack: its areas are named, listed and downloaded through it. */
+    private val topography: OfflineAreaManager,
     /** Which pack this run is choosing an area for. */
     val mode: OfflinePickerMode,
     /**
@@ -400,17 +396,15 @@ class OfflineAreaPickerViewModel(
     private fun defaultName(): String = "Area " + formatShortDate(System.currentTimeMillis())
 
     /**
-     * Keeps LINZ's vector Topographic map for the box drawn here: its tiles, and the heights its
-     * hillshade is shaded from.
+     * Keeps LINZ's vector Topographic map for the box drawn here: **a named piece of it.**
      *
-     * **Both halves, or the map does not draw.** The tiles say where the roads, the contours and the
-     * names are; the heights say what shape the ground is, and the style draws its shade from them. A
-     * box with one and not the other is a map with no relief - which on a hillside is the half a walker
-     * is looking at.
+     * Its tiles are a fraction of imagery for the same ground, which is what makes several small pieces
+     * worth keeping rather than one large one - and several small pieces need names, so this is an area
+     * record like an imagery area, listed on its own card and downloadable again if it stopped short.
      *
-     * No area record and no name, unlike imagery: these tiles are one cache the whole app reads, wherever
-     * the map is drawn, so there is nothing per-area to list or to resume. What is held is counted by the
-     * offline screen's own card, which reads the store.
+     * Both halves are fetched by the pack's own manager: the tiles that say where the roads and the
+     * contours are, and the heights the hillshade is drawn from. A box with one and not the other is a map
+     * with no relief, which on a hillside is the half a walker is looking at.
      */
     private fun downloadTopography() {
         if (_working.value) return
@@ -421,9 +415,6 @@ class OfflineAreaPickerViewModel(
             _topoMessage.value = "Tap two opposite corners on the map to choose the area."
             return
         }
-        // The draft is already capped at what this pack fetches - see [deepestZoom] - so the plan's own
-        // range is the range to ask for.
-        val deepest = plan.maxZoom
 
         viewModelScope.launch {
             _working.value = true
@@ -435,76 +426,25 @@ class OfflineAreaPickerViewModel(
                     return@launch
                 }
 
-                val map = TileDownloader(
-                    store = topographyStore,
-                    fetcher = LinzTileFetcher(
-                        key,
-                        urlFor = { zoom, x, y ->
-                            Basemap.LINZ_TOPO_LIDAR_HILLSHADE.tileUrl(key, zoom, x, y)
-                        },
-                        accept = "application/x-protobuf"
-                    )
-                ).download(
-                    bounds = plan.bounds,
-                    minZoom = plan.minZoom,
-                    maxZoom = deepest,
-                    onProgress = { reportTopography(MAP_PHASE, it) }
-                )
+                // Recorded before a tile is fetched, so the area is on the list - and resumable - from the
+                // moment it is asked for.
+                val area = topography.createArea(plan)
+                val downloaded = topography.download(area.id, key)
 
-                val heights = TileDownloader(
-                    store = elevationStore,
-                    fetcher = LinzTileFetcher(
-                        key,
-                        urlFor = { zoom, x, y -> Basemap.elevationUrl(key, zoom, x, y) },
-                        // The DEM endpoint answers PNG, and the renderer decodes it as PNG.
-                        accept = "image/png"
-                    )
-                ).download(
-                    bounds = plan.bounds,
-                    minZoom = plan.minZoom,
-                    maxZoom = deepest,
-                    onProgress = { reportTopography(HEIGHTS_PHASE, it) }
-                )
-
-                _topoMessage.value = topoDownloadedMessage(map, heights)
+                _topoMessage.value = topoDownloadedMessage(downloaded)
                 // Leave for the offline screen when the box is as covered as it can be; stay when tiles
                 // failed, so the walker reads what went wrong rather than finding out on the hill.
-                _saved.value = map.failed == 0 && heights.failed == 0
+                _saved.value = downloaded.isComplete
             } catch (cancelled: CancellationException) {
-                // Leaving the screen is not a failure; what already arrived is kept, and a second run
-                // picks up from it rather than starting over.
+                // Leaving the screen is not a failure; what already arrived is kept, and the area's own row
+                // remembers how far it got, so a second run picks up rather than starting over.
                 throw cancelled
             } catch (failure: Throwable) {
                 _topoMessage.value = failure.message ?: "Download failed"
             } finally {
                 _working.value = false
-                // Nothing left to watch, whatever happened - see OfflineAreaManager.download.
-                DownloadState.clear()
             }
         }
-    }
-
-    /**
-     * What a walker watching the drawn map's download reads, one half at a time.
-     *
-     * The tiles and the heights are two downloads, and a single bar across both would appear to go
-     * backwards the moment the second one started. So the sentence names the half it is about and counts
-     * that half's own tiles.
-     */
-    private fun reportTopography(phase: String, progress: TileDownloader.Progress) {
-        DownloadState.report(
-            DownloadProgress(
-                pack = DownloadPacks.TOPOGRAPHY,
-                unit = TILE_UNIT,
-                phase = phase,
-                done = progress.stored,
-                total = progress.total,
-                bytes = progress.bytes,
-                elapsedMs = progress.elapsedMs,
-                unavailable = progress.unavailable,
-                failed = progress.failed
-            )
-        )
     }
 
     /**
@@ -559,7 +499,7 @@ class OfflineAreaPickerViewModel(
         val expected = _docInventory.value
         DownloadState.report(
             DownloadProgress(
-                pack = DownloadPacks.DOC,
+                pack = OfflinePack.DOC,
                 unit = if (progress.pictures) PICTURE_UNIT else RECORD_UNIT,
                 phase = if (progress.pictures) PICTURES_PHASE else null,
                 done = progress.done,
@@ -590,13 +530,8 @@ class OfflineAreaPickerViewModel(
         private const val INVENTORY_PAUSE_MS = 400L
 
         /** What the downloads count, as the live sentence reads it. */
-        private const val TILE_UNIT = "tiles"
         private const val RECORD_UNIT = "records"
         private const val PICTURE_UNIT = "pictures"
-
-        /** The two halves of the drawn map's download, as the live sentence names them. */
-        private const val MAP_PHASE = "the map"
-        private const val HEIGHTS_PHASE = "the heights"
 
         /** The second half of a DOC download, which counts pictures rather than records. */
         private const val PICTURES_PHASE = "the pictures"
@@ -633,10 +568,7 @@ class OfflineAreaPickerViewModel(
                 initializer {
                     val database = TrailDayDatabase.get(appContext)
                     OfflineAreaPickerViewModel(
-                        manager = OfflineAreaManager(
-                            store = TileServerHolder.imageryStore(appContext),
-                            dao = database.offlineAreaDao()
-                        ),
+                        manager = OfflineAreaManager.imagery(appContext, database.offlineAreaDao()),
                         assetRepository = AssetRepository(database),
                         locationSource = FusedLocationSource(appContext),
                         settings = SettingsRepository(appContext),
@@ -645,10 +577,9 @@ class OfflineAreaPickerViewModel(
                             dao = database.offlineDocItemDao(),
                             downloader = DocDownloader.online()
                         ),
-                        // The vector map's tiles and the heights its shade is drawn from: the same stores
-                        // the tile server serves from, so what is downloaded here is what the map reads.
-                        topographyStore = TileServerHolder.topographyStore(appContext),
-                        elevationStore = TileServerHolder.elevationStore(appContext),
+                        // The drawn map's own pack: its areas are named, listed and downloaded through the
+                        // same manager imagery uses, which is what makes them resumable and countable.
+                        topography = OfflineAreaManager.topography(appContext, database.offlineAreaDao()),
                         mode = mode,
                         aroundAssetId = aroundAssetId
                     )
