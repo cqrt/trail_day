@@ -5,50 +5,61 @@ import org.w3c.dom.Document
 import org.w3c.dom.Element
 
 /**
- * Minimal GPX reader: pulls every track point out of a GPX 1.1 (or 1.0) file, either as the segments
- * the file itself is in or flattened into one line.
+ * Minimal GPX reader: pulls every track out of a GPX 1.1 (or 1.0) file, each as the paths the file
+ * itself is in.
+ *
+ * **A `<trk>` is a track and a `<trkseg>` is a segment of it.** The difference matters: the Te Araroa
+ * Trust's own export of the trail is **466 `<trk>` elements**, one per section, sorted by name rather
+ * than by the trail - and reading the whole document as one track joined 465 section ends to 465
+ * section starts, 424 of those joins over a kilometre and the longest 1,331 km, which is a spider's web
+ * over the country rather than a trail. So a track is read where the format says a track is, and a
+ * segment where the format says a segment is, and what a track's own segments mean is left to
+ * [TrackInterchange], which is the one place that rule lives.
  *
  * Namespace-agnostic lookups are used because GPX files in the wild appear both
  * with and without a default `xmlns`, and with various prefixes.
- *
- * **A track on the ground is a line and its side tracks** (see
- * [nz.mckenzie.trailday.domain.geo.AssetGeometry]), and GPX's own model for that is several `<trkseg>`
- * elements in one `<trk>`. So this reads the segments as paths and lets the caller decide what they
- * are: whether the later ones join the first is a question about the ground, and it is answered where
- * the file is turned into a track rather than here, where the file is only read.
  */
 object GpxParser {
 
     /**
-     * The file's own track segments, in document order, each a path.
+     * Every track the file holds, in document order: what the file calls it, and its own segments.
      *
-     * A file that never says where one segment ends - every `trkpt` loose under its `<trk>`, which is
-     * what some tools write - is one path, which is what the app has always read those as. Empty
-     * segments are dropped rather than returned: a `<trkseg>` with nothing in it is not a path.
+     * A `<trk>` with no `<trkseg>` is one path of its own points - every point loose under the track,
+     * which some tools write - and a file with no `<trk>` at all is one unnamed track of every point in
+     * it, which is what this reader has always made of those. A `<trk>` with nothing in it at all is
+     * dropped rather than handed back as a track of no points.
      */
-    fun parseSegments(xml: String): List<List<GeoPoint>> = segmentsOf(xmlDocument(xml))
-
-    /**
-     * The same segments, from a document already parsed.
-     *
-     * [nz.mckenzie.trailday.domain.track.TrackInterchange] parses once and then asks the format's
-     * reader for the paths, so a file is never read off disk twice to work out which format it is.
-     */
-    internal fun segmentsOf(document: Document): List<List<GeoPoint>> {
-        val segments = elementsOf(document, "trkseg")
-        val paths = if (segments.isEmpty()) {
-            listOf(document.documentElement)
-        } else {
-            segments
+    internal fun tracksOf(document: Document): List<FileTrack> {
+        val tracks = elementsOf(document, "trk")
+        if (tracks.isEmpty()) {
+            val loose = pointsOf(document.documentElement)
+            return if (loose.isEmpty()) emptyList() else listOf(FileTrack(null, listOf(loose)))
         }
-        return paths.map { element -> pointsOf(element) }.filter { it.isNotEmpty() }
+        return tracks.mapNotNull { track ->
+            val segments = elementsOf(track, "trkseg").map { pointsOf(it) }.filter { it.isNotEmpty() }
+            val paths = segments.ifEmpty { listOf(pointsOf(track)).filter { it.isNotEmpty() } }
+            if (paths.isEmpty()) null else FileTrack(childText(track, "name"), paths)
+        }
     }
 
     /**
-     * Every track point in the file, in document order, as one line.
+     * The paths of the file's **first** track, each as the file's own segment.
      *
-     * What a file's segments are joined into when they are not a track with side tracks - and what an
-     * import has always produced for every file, which is why it survives here beside [parseSegments].
+     * The one-track reading, for a caller that wants a file's points and nothing else. An import wants
+     * [tracksOf], because a file of several tracks is several tracks.
+     */
+    fun parseSegments(xml: String): List<List<GeoPoint>> = segmentsOf(xmlDocument(xml))
+
+    /** The same paths, from a document already parsed. */
+    internal fun segmentsOf(document: Document): List<List<GeoPoint>> =
+        tracksOf(document).firstOrNull()?.paths.orEmpty()
+
+    /**
+     * Every point of the file's **first** track, in document order, as one line.
+     *
+     * The flattening a single track's segments get when they are not a track with side tracks. Kept
+     * beside [parseSegments] because the two answer different questions about the same file - "where
+     * does the file say one path ends" and "what are all its points" - and the tests use both.
      */
     fun parse(xml: String): List<GeoPoint> = parseSegments(xml).flatten()
 

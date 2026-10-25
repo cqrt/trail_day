@@ -18,9 +18,12 @@ import nz.mckenzie.trailday.domain.geo.GeoPoint
  * It decides nothing itself: the paths it hands back are the paths to store, and what to say about
  * the file is left to the caller, whose words are the ones the walker is looking at.
  *
- * **A file may hold more than one track.** A GeoJSON FeatureCollection is a set of named tracks, and
- * each feature becomes its own asset rather than being flattened with the rest - see [readFile]. A
- * GPX or KML file is one track, so [readFile] hands back one.
+ * **A file may hold more than one track.** A GeoJSON FeatureCollection, a GPX of several `<trk>`
+ * elements and a KML of several `<Placemark>`s are each a set of named tracks, and each of those
+ * becomes its own asset rather than being flattened with the rest - see [readFile]. Flattening them is
+ * not a small thing: the Te Araroa Trust's own export of the trail is 466 `<trk>` elements sorted by
+ * name, and reading that as one track drew 424 joins over a kilometre long, the longest 1,331 km, which
+ * is a spider's web over the country rather than a trail.
  */
 object TrackInterchange {
 
@@ -109,8 +112,11 @@ object TrackInterchange {
      * The file's text read by whichever format it is.
      *
      * GeoJSON announces itself with a `{` or `[`; anything else is XML, read by [KmlParser] or
-     * [GpxParser] according to its root element. A document that is neither is refused in one place,
-     * so what a file that is not a track reads as is decided once.
+     * [GpxParser] according to its root element. **Every format is read as the tracks it holds** - a
+     * GeoJSON feature, a GPX `<trk>`, a KML `<Placemark>` - and each of those goes through the join
+     * rule below, so what a file's tracks mean is one answer whichever format wrote them. A document
+     * that is neither is refused in one place, so what a file that is not a track reads as is decided
+     * once.
      */
     private fun readText(text: String): FileOutcome {
         val trimmed = text.trimStart('\uFEFF', ' ', '\t', '\n', '\r')
@@ -119,31 +125,37 @@ object TrackInterchange {
         val document = runCatching { xmlDocument(text) }.getOrElse { return FileOutcome.Invalid(MALFORMED) }
         val root = document.documentElement
         val name = root?.localName ?: root?.nodeName?.substringAfterLast(':')
-        val segments = if (name.equals("kml", ignoreCase = true)) {
-            KmlParser.segmentsOf(document)
+        val tracks = if (name.equals("kml", ignoreCase = true)) {
+            KmlParser.tracksOf(document)
         } else {
-            GpxParser.segmentsOf(document)
+            GpxParser.tracksOf(document)
         }
-        return when (val outcome = readingOf(segments)) {
-            is Outcome.Read -> FileOutcome.Read(listOf(Track(null, outcome.reading)))
-            is Outcome.Invalid -> FileOutcome.Invalid(outcome.message)
-        }
+        return fromTracks(tracks)
     }
 
     /** A GeoJSON FeatureCollection read as one track per feature, each under its own name. */
     private fun geoJson(text: String): FileOutcome {
         val features = runCatching { GeoJsonParser.parse(text) }
             .getOrElse { return FileOutcome.Invalid(MALFORMED) }
-        // A feature that is not a line at all - a Point, or a stray single vertex - is dropped rather
-        // than refusing the whole file: a set of tracks with one odd member is still a set of tracks.
-        val tracks = features.mapNotNull { feature ->
-            when (val outcome = readingOf(feature.paths)) {
-                is Outcome.Read -> Track(feature.name, outcome.reading)
+        return fromTracks(features.map { FileTrack(it.name, it.paths) })
+    }
+
+    /**
+     * One track per track the file holds, each read by the join rule, or why the file holds none.
+     *
+     * A track that is not a line at all - one point, or a stray single vertex - is dropped rather than
+     * refusing the whole file: a file of tracks with one odd member is still a file of tracks. A file
+     * whose every track was dropped is not a track file, and is refused in the app's own words.
+     */
+    private fun fromTracks(tracks: List<FileTrack>): FileOutcome {
+        val read = tracks.mapNotNull { track ->
+            when (val outcome = readingOf(track.paths)) {
+                is Outcome.Read -> Track(track.name, outcome.reading)
                 is Outcome.Invalid -> null
             }
         }
-        if (tracks.isEmpty()) return FileOutcome.Invalid(TOO_SHORT)
-        return FileOutcome.Read(tracks)
+        if (read.isEmpty()) return FileOutcome.Invalid(TOO_SHORT)
+        return FileOutcome.Read(read)
     }
 
     private fun firstOf(outcome: FileOutcome): Outcome = when (outcome) {

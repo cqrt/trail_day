@@ -299,10 +299,12 @@ class AssetRepository(
     /**
      * Imports a GPX, KML, KMZ or GeoJSON file as one or more new tracks, and says what it held.
      *
-     * A file that names its own tracks - a GeoJSON FeatureCollection - becomes one asset per track,
-     * named from the feature where it has a name and from the file where it does not. Every other
-     * format is one track, imported under the file's own name as it always was. Throws when the file
-     * is not a line at all - one point, or no readable track in it - in the app's own words.
+     * A file that names its own tracks becomes one asset per track - a GeoJSON FeatureCollection, a GPX
+     * of several `<trk>` elements, a KML of several `<Placemark>`s - each named from the track where it
+     * has a name and from the file where it does not. The Te Araroa Trust's own export of the trail is
+     * 466 of those, so importing it is 466 named sections rather than one line drawn across the
+     * country. Throws when the file is not a line at all - one point, or no readable track in it - in
+     * the app's own words.
      */
     suspend fun importAssetTracks(
         fileName: String,

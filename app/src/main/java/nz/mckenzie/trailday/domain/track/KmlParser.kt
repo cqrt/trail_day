@@ -6,12 +6,13 @@ import org.w3c.dom.Element
 import org.w3c.dom.Node
 
 /**
- * Minimal KML reader: pulls every line a KML 2.2 (or Google Earth 1.0) file holds, as the paths the
- * file itself is in.
+ * Minimal KML reader: pulls every track a KML 2.2 (or Google Earth 1.0) file holds, each as the paths
+ * the file itself is in.
  *
- * KML writes a place's shape in a `<Placemark>`: a `<LineString>` for a path, the `<LinearRing>` of
- * a `<Polygon>` for ground with an edge, and - in Google's extension - a `<gx:Track>` for a GPS
- * track. Each of those carries its vertices differently:
+ * **A `<Placemark>` is a track and the geometry inside it is that track's paths**, the same shape GPX
+ * has with `<trk>` and `<trkseg>`. KML writes a place's shape as a `<LineString>` for a path, the
+ * `<LinearRing>` of a `<Polygon>` for ground with an edge, and - in Google's extension - a `<gx:Track>`
+ * for a GPS track. Each of those carries its vertices differently:
  *
  * - `<coordinates>` is one whitespace-separated run of `lon,lat[,alt]` tuples, **longitude first**
  *   (the reverse of GPX's `lat`/`lon` attributes, and the trap this reader exists to get right).
@@ -21,30 +22,64 @@ import org.w3c.dom.Node
  * edge, which is what every other tool reads a KML polygon as. `<Point>` is deliberately not read:
  * an imported line is a track, and a file of points is not one.
  *
- * Paths are collected in **document order**, not grouped by kind, because the caller's own rule
- * decides which path is the line and which are its side tracks from the order it meets them in.
+ * Within one track, paths are collected in **document order**, not grouped by kind, because the
+ * caller's own rule decides which path is the line and which are its side tracks from the order it
+ * meets them in.
  */
 object KmlParser {
 
     /**
-     * The file's own lines, in document order, each a path.
+     * Every track the file holds, in document order: one per `<Placemark>`, under its own name.
      *
-     * A `<LineString>`, a `<LinearRing>` and a `<gx:Track>` are each one path, and one is read
-     * wherever it appears - inside a `<Placemark>`, a `<MultiGeometry>`, or loose under the document.
-     * A geometry element is not descended into once it has been read, so a nest of them cannot hand
-     * the same vertices back twice.
+     * A file of several placemarks is a file of several tracks, and reading the whole document as one
+     * track would join each placemark's end to the next one's start - which for the Te Araroa Trust's
+     * own Google Earth file is a line from one end of the country to the other and back, hundreds of
+     * times. A `<Placemark>` with no line in it - a `<Point>`, or nothing at all - is dropped rather
+     * than handed back as a track, because a file of tracks with one odd member is still a file of
+     * tracks.
+     *
+     * A file with no `<Placemark>` at all - geometry loose under the document, which is what a
+     * hand-written KML often is - is one unnamed track of everything in it, as this reader has always
+     * read those.
+     */
+    internal fun tracksOf(document: Document): List<FileTrack> {
+        val placemarks = elementsOf(document, "Placemark")
+        if (placemarks.isEmpty()) {
+            val loose = pathsUnder(document)
+            return if (loose.isEmpty()) emptyList() else listOf(FileTrack(null, loose))
+        }
+        return placemarks.mapNotNull { placemark ->
+            val paths = pathsUnder(placemark)
+            if (paths.isEmpty()) null else FileTrack(childText(placemark, "name"), paths)
+        }
+    }
+
+    /**
+     * The paths of the file's **first** track, each as the file's own line.
+     *
+     * The one-track reading, for a caller that wants a file's points and nothing else. An import wants
+     * [tracksOf], because a file of several tracks is several tracks.
      */
     fun parseSegments(xml: String): List<List<GeoPoint>> = segmentsOf(xmlDocument(xml))
 
+    /** The same paths, from a document already parsed. */
+    internal fun segmentsOf(document: Document): List<List<GeoPoint>> =
+        tracksOf(document).firstOrNull()?.paths.orEmpty()
+
+    /** Every point of the file's **first** track, in document order, as one line. */
+    fun parse(xml: String): List<GeoPoint> = parseSegments(xml).flatten()
+
     /**
-     * The same paths, from a document already parsed.
+     * Every line under [node], in document order, each a path.
      *
-     * [nz.mckenzie.trailday.domain.track.TrackInterchange] parses once and then asks the format's
-     * reader for the paths, so a file is never read off disk twice to work out which format it is.
+     * A `<LineString>`, a `<LinearRing>` and a `<gx:Track>` are each one path, and one is read
+     * wherever it appears - inside a `<MultiGeometry>`, or loose under the element being read. A
+     * geometry element is not descended into once it has been read, so a nest of them cannot hand the
+     * same vertices back twice.
      */
-    internal fun segmentsOf(document: Document): List<List<GeoPoint>> {
+    private fun pathsUnder(node: Node): List<List<GeoPoint>> {
         val paths = mutableListOf<List<GeoPoint>>()
-        visit(document) { element ->
+        visit(node) { element ->
             val name = localNameOf(element)
             when {
                 name.equals("LineString", ignoreCase = true) -> paths += coordinatesOf(element)
@@ -56,9 +91,6 @@ object KmlParser {
         }
         return paths.filter { it.isNotEmpty() }
     }
-
-    /** Every point of the file, in document order, as one line - the same flattening GPX has. */
-    fun parse(xml: String): List<GeoPoint> = parseSegments(xml).flatten()
 
     /**
      * Walks the document, handing [onElement] every element and descending only where it says so.

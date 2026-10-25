@@ -29,6 +29,10 @@ class TrackInterchangeTest {
 
     private fun read(xml: String) = (TrackInterchange.read(xml) as TrackInterchange.Outcome.Read).reading
 
+    private fun tracks(xml: String) = (
+        TrackInterchange.readFile(xml.toByteArray(Charsets.UTF_8)) as TrackInterchange.FileOutcome.Read
+        ).tracks
+
     @Test
     fun `one segment is one line and nothing else`() {
         val reading = read(gpx(listOf(listOf(-41.0 to 174.0, -41.1 to 174.1))))
@@ -125,8 +129,38 @@ class TrackInterchangeTest {
     }
 
     @Test
-    fun `a file with one point in it is not a line`() {
-        val outcome = TrackInterchange.read(gpx(listOf(listOf(-41.0 to 174.0))))
+    fun `a file of several tracks is several tracks, not one line joining them up`() {
+        // The operator's own file, in miniature: the Te Araroa Trust's export is 466 `<trk>` elements,
+        // one per section, sorted by name rather than by the trail. Read as one track, the 465 joins
+        // between them came to 168,924 km of straight line drawn across the country.
+        val xml = """
+            <?xml version="1.0"?>
+            <gpx version="1.1">
+              <trk><name>Ahuriri River Crossing</name><trkseg>
+                <trkpt lat="-44.2" lon="169.7"/><trkpt lat="-44.4" lon="169.8"/></trkseg></trk>
+              <trk><name>Tararua Ranges</name><trkseg>
+                <trkpt lat="-40.9" lon="175.0"/><trkpt lat="-41.0" lon="175.1"/></trkseg></trk>
+            </gpx>
+        """.trimIndent()
+
+        val tracks = tracks(xml)
+
+        assertEquals("two tracks in the file, two tracks read", 2, tracks.size)
+        assertEquals(listOf("Ahuriri River Crossing", "Tararua Ranges"), tracks.map { it.name })
+        assertEquals(
+            "and each is its own line, with nothing joining it to the other",
+            2,
+            tracks[0].reading.paths.single().size
+        )
+        assertEquals(
+            "no join was made, so nothing says the paths did not meet",
+            false,
+            tracks[1].reading.segmentsDidNotMeet
+        )
+    }
+
+    @Test
+    fun `a file with one point in it is not a line`() {        val outcome = TrackInterchange.read(gpx(listOf(listOf(-41.0 to 174.0))))
 
         assertEquals(
             "the app's own sentence, word for word, from the repository's own import",

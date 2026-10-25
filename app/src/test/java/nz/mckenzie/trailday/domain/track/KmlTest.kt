@@ -20,6 +20,10 @@ class KmlTest {
 
     private fun read(xml: String) = (TrackInterchange.read(xml) as TrackInterchange.Outcome.Read).reading
 
+    private fun tracks(xml: String) = (
+        TrackInterchange.readFile(xml.toByteArray(Charsets.UTF_8)) as TrackInterchange.FileOutcome.Read
+        ).tracks
+
     @Test
     fun `a linestring's coordinates are lon lat, so the point is not flipped`() {
         val xml = """
@@ -78,14 +82,15 @@ class KmlTest {
 
     @Test
     fun `a second line starting on the first becomes a side track, exactly as GPX would`() {
+        // One placemark, two lines in it: a placemark is a track and its geometry is that track's
+        // paths, which is what a `<trk>` and its `<trkseg>`s are in GPX. A `<MultiGeometry>` is how
+        // KML writes more than one shape for one place.
         val xml = """
             <kml xmlns="http://www.opengis.net/kml/2.2"><Document>
-              <Placemark><LineString><coordinates>
-                174.0,-41.0 174.1,-41.1
-              </coordinates></LineString></Placemark>
-              <Placemark><LineString><coordinates>
-                174.1,-41.1 174.2,-41.1
-              </coordinates></LineString></Placemark>
+              <Placemark><name>Fence</name><MultiGeometry>
+                <LineString><coordinates>174.0,-41.0 174.1,-41.1</coordinates></LineString>
+                <LineString><coordinates>174.1,-41.1 174.2,-41.1</coordinates></LineString>
+              </MultiGeometry></Placemark>
             </Document></kml>
         """.trimIndent()
 
@@ -105,8 +110,10 @@ class KmlTest {
     fun `lines that do not meet are joined into one line and said so`() {
         val xml = """
             <kml xmlns="http://www.opengis.net/kml/2.2"><Document>
-              <Placemark><LineString><coordinates>174.0,-41.0 174.1,-41.1</coordinates></LineString></Placemark>
-              <Placemark><LineString><coordinates>175.0,-42.0 175.1,-42.1</coordinates></LineString></Placemark>
+              <Placemark><MultiGeometry>
+                <LineString><coordinates>174.0,-41.0 174.1,-41.1</coordinates></LineString>
+                <LineString><coordinates>175.0,-42.0 175.1,-42.1</coordinates></LineString>
+              </MultiGeometry></Placemark>
             </Document></kml>
         """.trimIndent()
 
@@ -116,6 +123,35 @@ class KmlTest {
         assertEquals(4, reading.paths[0].size)
         assertEquals(0, reading.sideTracks)
         assertTrue(reading.segmentsDidNotMeet)
+    }
+
+    @Test
+    fun `a file of several placemarks is several tracks, not one line joining them up`() {
+        // The shape the Te Araroa Trust's own Google Earth file has: a named placemark per section,
+        // and the sections nowhere near each other. Read as one track, the line ran from one end of
+        // the country to the other and back again, hundreds of times. A placemark is a track.
+        val xml = """
+            <kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+              <Placemark><name>Tararua Ranges</name>
+                <LineString><coordinates>175.0,-40.9 175.1,-41.0</coordinates></LineString></Placemark>
+              <Placemark><name>Ahuriri River Crossing</name>
+                <LineString><coordinates>169.7,-44.2 169.8,-44.4</coordinates></LineString></Placemark>
+            </Document></kml>
+        """.trimIndent()
+
+        val tracks = tracks(xml)
+
+        assertEquals("two placemarks, two tracks", 2, tracks.size)
+        assertEquals(
+            listOf("Tararua Ranges", "Ahuriri River Crossing"),
+            tracks.map { it.name }
+        )
+        assertEquals(
+            "and each is its own line, with nothing joining it to the other",
+            2,
+            tracks[0].reading.paths.single().size
+        )
+        assertFalse("neither was joined up, because neither had a second path", tracks[1].reading.segmentsDidNotMeet)
     }
 
     @Test
