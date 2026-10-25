@@ -1223,7 +1223,7 @@ style's background colour and the work draws on top of it.
       **Not proven here:** that it fixes the operator's own phone, which needs their phone — the check
       is step 5 of the list above, with the switch off and then on. Unit suite, JS tests, lint and
       assemble are green; the instrumented test is CI's to run, and was not run here.
-- [x] **A long trail's GPX can be imported from the desk. v0.6.97** — reported by the operator: *"I'm
+- [x] **A long trail's GPX can be imported from the desk. v0.3.84** — reported by the operator: *"I'm
       trying to import a 7.6mb file of the Te Araroa trail, increase the maximum file size to 10mb."*
       v0.6.86 had raised the desk's track-file limit to two megabytes; the whole of a long trail is
       several, so the file was refused by the page before it was ever sent. The limit the page judges a
@@ -1233,7 +1233,11 @@ style's background colour and the work draws on top of it.
       base64-encoded at about 13.3 MB, and the cap has to sit above that or the refusal would be about
       the request rather than about the track. Proven by a body carrying a full ten-megabyte file
       arriving whole rather than as a 413, by a body over the new cap still being refused, and by the
-      page's own size tests. Unit suite, JS tests, lint and assemble are green.
+      page's own size tests. Measured against the running app on the emulator over `adb forward`: the
+      state document states **10485760** bytes, a body carrying the whole ten megabytes (13.33 MB)
+      arrives whole and is read as **249,659 points**, a five-megabyte file's 6.67 MB of body - past
+      the old four-megabyte cap - arrives too, and a body of 17.33 MB is still refused with a **413**.
+      Unit suite, JS tests, lint and assemble are green.
 - [ ] **Nothing is queued as a phase.** The three jobs the plan had left are done as of v0.6.70, and
       v0.6.71 was a fault reported from the field. What remains is one wording job riding with the next
       code change — the word "farm" in the code's comments and in a handful of names, written out in
