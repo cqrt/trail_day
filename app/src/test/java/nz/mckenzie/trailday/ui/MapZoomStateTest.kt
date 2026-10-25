@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.ui
 
 import nz.mckenzie.trailday.ui.screens.MapZoomState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
@@ -43,5 +44,31 @@ class MapZoomStateTest {
 
         assertEquals("no request", 0, zoom.count)
         assertEquals("and no step to take", 0.0, zoom.step, 0.0)
+    }
+
+    @Test
+    fun `the level is the map's own answer, rounded to a whole level`() {
+        val zoom = MapZoomState()
+
+        assertNull("nothing until the map says where it is", zoom.level)
+
+        // A fit lands where it lands, and a walker thinks in levels: 13.7 is the level they call 14.
+        zoom.reported(13.72)
+        assertEquals("a fractional fit reads as the level it is at", 14, zoom.level ?: -1)
+
+        zoom.reported(15.0)
+        assertEquals("and a whole one reads as itself", 15, zoom.level ?: -1)
+    }
+
+    @Test
+    fun `the level the map reports is not the step the keys asked for`() {
+        val zoom = MapZoomState()
+
+        // The map moved on its own - a pinch, a recentre, a fit - with no key touched.
+        zoom.reported(11.0)
+
+        assertEquals("the level follows the map", 11, zoom.level ?: -1)
+        assertEquals("and no key has been tapped", 0, zoom.count)
+        assertEquals("so nothing is asked of the map", 0.0, zoom.step, 0.0)
     }
 }

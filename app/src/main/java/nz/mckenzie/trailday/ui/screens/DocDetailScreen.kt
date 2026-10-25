@@ -143,6 +143,9 @@ fun DocDetailScreen(
                     interactive = false,
                     zoomStep = zoom.step,
                     zoomCount = zoom.count,
+                    // Where the map settled, which is the only thing that knows what level the keys have
+                    // brought it to. The fit's own level arrives the same way, a moment after it opens.
+                    onCameraIdle = { _, _, level -> zoom.reported(level) },
                     modifier = Modifier.fillMaxSize()
                 )
                 DocBackPill(
@@ -155,7 +158,7 @@ fun DocDetailScreen(
                     zoom = zoom,
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .padding(end = 12.dp)
+                        .padding(end = KEY_EDGE_PADDING)
                 )
                 AttributionStrip(
                     basemap = basemap,

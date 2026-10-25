@@ -124,6 +124,10 @@ fun MapScreen(
     var layersOpen by remember { mutableStateOf(false) }
     val mapScope = rememberCoroutineScope()
 
+    // The zoom keys under the map's own controls, and the level between them. The level is the map's own
+    // answer, so it is filled in by the camera-idle callback below rather than kept here.
+    val zoom = rememberMapZoomState()
+
     val context = LocalContext.current
 
     // A track chosen from a list is asked for here, when the map is the screen in front of the walker:
@@ -207,7 +211,16 @@ fun MapScreen(
                 initialTarget = camera?.let { LatLng(it.lat, it.lng) } ?: DEFAULT_CAMERA_TARGET,
                 initialZoom = camera?.zoom ?: DEFAULT_CAMERA_ZOOM,
                 restoreCamera = camera != null,
-                onCameraIdle = viewModel::rememberCamera,
+                onCameraIdle = { lat, lng, level ->
+                    viewModel.rememberCamera(lat, lng, level)
+                    // The same callback carries the level the keys show: on this map the walker can also
+                    // pinch, so the number is where the camera ended up rather than where a key put it.
+                    zoom.reported(level)
+                },
+                // The zoom keys, which on this map are the second way to do what a pinch does - the first
+                // being the pinch itself. **The step and the count go to the map**: the keys only ask.
+                zoomStep = zoom.step,
+                zoomCount = zoom.count,
                 // A tap lands on something: a line of the walker's own or a thing DOC publishes. Either
                 // way the card below says what it is, and the card's own tap opens the place. The radius
                 // comes from the map's zoom, so the tap works at country scale as well as at paddock
@@ -271,6 +284,17 @@ fun MapScreen(
                 )
                 RoundIconButton(glyph = IconGlyph.LOCATE, description = "Show where I am", onClick = locate)
             }
+
+            // The zoom keys and the level, **halfway down the right-hand edge** - where they are on every
+            // preview map, and where a walker who has met them once will look for them again. Not in the
+            // corner with the buttons above: those are what the map is set up with, and this is what the
+            // map is *read* with, so it belongs beside the ground rather than in a stack of settings.
+            MapZoomButtons(
+                zoom = zoom,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = KEY_EDGE_PADDING)
+            )
 
             // Only when the chosen basemap needs a key and none is set. OpenStreetMap needs none,
             // which is the whole reason it is in the app: the day a LINZ key expires, the map is
