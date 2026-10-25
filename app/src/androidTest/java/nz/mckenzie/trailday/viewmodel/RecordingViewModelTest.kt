@@ -210,6 +210,34 @@ class RecordingViewModelTest {
     }
 
     @Test
+    fun discardingThrowsTheWalkAwayInsteadOfSavingIt() = runBlocking {
+        val viewModel = viewModel()
+        val sessionId = recordingSession()
+
+        viewModel.finish()
+        withTimeout(5_000) { viewModel.pendingTrackName.first { it != null } }
+
+        viewModel.discard()
+
+        val message = withTimeout(5_000) {
+            viewModel.message.first { it?.contains("discarded") == true }
+        }
+        assertEquals("Recording discarded", message)
+        assertNull(
+            "the session is gone, so Activities has nothing to show",
+            recordings.getSession(sessionId)
+        )
+        assertTrue(
+            "and the fixes went with it",
+            recordings.getPoints(sessionId).isEmpty()
+        )
+        assertTrue(
+            "and no place was made of it",
+            assetRepository.observeActiveAssets().first().isEmpty()
+        )
+    }
+
+    @Test
     fun aLineTooShortToBeATrackIsStillSavedAsARecording() = runBlocking {
         val viewModel = viewModel()
         val sessionId = recordings.startRecording(name = "Recording")

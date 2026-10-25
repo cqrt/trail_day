@@ -710,6 +710,32 @@ class RecordingViewModel(
         _pendingTrackName.value = null
     }
 
+    /**
+     * Throws the walk away, which is the naming dialog's third answer.
+     *
+     * Nothing is saved: no place is made, no trip is kept, and the fixes the service has been storing
+     * go with the session - so a walk started by mistake, or one that should never have been started,
+     * leaves nothing on the Activities page to be tidied up afterwards. The service is stopped before
+     * the row it is writing to goes, or it would go on appending fixes to a recording that is not
+     * there any more, and the tracking state is cleared so the drawing empties with the session.
+     */
+    fun discard() {
+        val sessionId = sessionIdOrNull() ?: return
+        viewModelScope.launch {
+            _pendingTrackName.value = null
+
+            TrackingService.stop(context)
+            val failure = runCatching { recordings.deleteRecording(sessionId) }.exceptionOrNull()
+
+            TrackingState.clear()
+            _finished.value = null
+            _selectedAssetId.value = null
+            _selectedDoc.value = null
+            _message.value = failure?.let { it.message ?: "Could not discard the recording" }
+                ?: "Recording discarded"
+        }
+    }
+
     private fun completeFinish(
         newTrackName: String?,
         newTrackKind: AssetKind = AssetKind.TRACK

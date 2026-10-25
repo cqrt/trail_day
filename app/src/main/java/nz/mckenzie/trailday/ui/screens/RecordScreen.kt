@@ -114,6 +114,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
 
     var permissionGranted by remember { mutableStateOf(viewModel.hasLocationPermission()) }
     var pickingTrack by remember { mutableStateOf(false) }
+    var confirmingDiscard by remember { mutableStateOf(false) }
     var assetNameDraft by remember { mutableStateOf("") }
     var assetKindDraft by remember { mutableStateOf(AssetKind.TRACK) }
 
@@ -447,7 +448,41 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                 ) { Text("Save") }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.cancelFinish() }) { Text("Cancel") }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // The third answer, and the only irreversible one: the walk goes and nothing is saved.
+                    // It sits at the far end of the row from Save, and is asked about again before it happens.
+                    DestructiveTextButton(
+                        text = "Discard",
+                        onClick = { confirmingDiscard = true }
+                    )
+                    TextButton(onClick = { viewModel.cancelFinish() }) { Text("Cancel") }
+                }
+            }
+        )
+    }
+
+    // The discard, asked about again: it is the one tap on this screen that cannot be undone.
+    if (confirmingDiscard) {
+        AlertDialog(
+            onDismissRequest = { confirmingDiscard = false },
+            title = { Text("Discard this recording?") },
+            text = {
+                Text(
+                    "Nothing is saved, and the points recorded so far go with it. " +
+                        "This cannot be undone."
+                )
+            },
+            confirmButton = {
+                DestructiveTextButton(
+                    text = "Discard",
+                    onClick = {
+                        confirmingDiscard = false
+                        viewModel.discard()
+                    }
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingDiscard = false }) { Text("Cancel") }
             }
         )
     }
