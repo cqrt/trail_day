@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -525,17 +526,31 @@ private fun RecordDock(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = when (summary.status) {
-                            RecordingStatus.RECORDING -> "RECORDING"
-                            RecordingStatus.PAUSED -> "PAUSED"
-                            RecordingStatus.FINISHED -> "FINISHED"
-                            null -> "READY TO RECORD"
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        letterSpacing = 1.1.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // A live dot while the walk is being written, as the mock screen draws it: the one
+                        // mark on the panel that says the phone is still recording without having to be read.
+                        if (summary.status == RecordingStatus.RECORDING) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(MaterialTheme.colorScheme.error, CircleShape)
+                            )
+                        }
+                        Text(
+                            text = when (summary.status) {
+                                RecordingStatus.RECORDING -> "RECORDING"
+                                RecordingStatus.PAUSED -> "PAUSED"
+                                RecordingStatus.FINISHED -> "FINISHED"
+                                null -> "READY TO RECORD"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            letterSpacing = 1.1.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
 
                     // The distance as the one big figure, with its unit beside it rather than inside the number.
                     val distance = formatDistance(summary.distanceM).split(" ", limit = 2)
