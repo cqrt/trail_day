@@ -127,6 +127,10 @@ fun AssetDetailScreen(
     var confirmingDelete by remember { mutableStateOf(false) }
     var actionsOpen by remember { mutableStateOf(false) }
 
+    // The map at the top is a **preview** of one place: every gesture off, so a drag cannot slide the
+    // place off the page, and the two buttons on the right for the looking closer.
+    val zoom = rememberMapZoomState()
+
     val lengthM = track?.lengthM ?: 0.0
     val lengthText = formatLengthOf(shape, lengthM)
 
@@ -150,6 +154,11 @@ fun AssetDetailScreen(
                     // view the walker asked for - a paddock with the place in it. A place too big to fit at
                     // 15 still gets its whole self on the page, because that is the fit it always had.
                     fitBoundsMaxZoom = ASSET_PAGE_MAX_ZOOM,
+                    // A picture of one place, not a place to explore: every gesture off, and the zoom
+                    // given to the buttons on the right instead.
+                    interactive = false,
+                    zoomStep = zoom.step,
+                    zoomCount = zoom.count,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(MAP_HEIGHT)
@@ -170,6 +179,12 @@ fun AssetDetailScreen(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(12.dp)
+                )
+                MapZoomButtons(
+                    zoom = zoom,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 12.dp)
                 )
 
                 AttributionStrip(

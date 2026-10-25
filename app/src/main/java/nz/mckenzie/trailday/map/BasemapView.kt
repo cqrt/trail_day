@@ -211,11 +211,14 @@ fun BasemapView(
     /**
      * Whether the walker may move this map.
      *
-     * True on every map the work is read on. False for a **preview** - the thumbnail in a listing
-     * that says where a downloaded area is, and the map at the top of one thing's own page - where
-     * there is nothing to explore and a drag would only move the picture off the thing it is a
-     * picture of. A preview that is worth looking closer at is given [zoomStep] and a pair of
-     * buttons instead, so the zoom is a control rather than a gesture on a picture.
+     * True on every map the work is read on, and on every map the walker is working *with* - the map tab,
+     * the picker that draws a download's box, the map a spot is chosen on - because there the map is the
+     * instrument.
+     *
+     * False for a **preview**: the map at the top of one thing's own page, where the page is about that one
+     * track, place or trip and a drag would only slide it off the picture. A preview that is worth looking
+     * closer at is given [zoomStep] and a pair of buttons instead, so the zoom is a control rather than a
+     * gesture on a picture.
      */
     interactive: Boolean = true,
     /**

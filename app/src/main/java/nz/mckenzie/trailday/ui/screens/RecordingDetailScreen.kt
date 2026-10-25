@@ -84,6 +84,10 @@ fun RecordingDetailScreen(
 
     val elevation = remember(detail) { detail?.points?.let { ElevationProfile.of(it) } }
 
+    // The map at the top is a **preview** of one trip: every gesture off, so a drag cannot slide the
+    // trip's line off the page, and the two buttons on the right for the looking closer.
+    val zoom = rememberMapZoomState()
+
     Scaffold { innerPadding ->
         Column(
             modifier = Modifier
@@ -99,6 +103,11 @@ fun RecordingDetailScreen(
                     apiKey = apiKey,
                     assetGeoJson = geoJson,
                     fitBounds = remember(detail) { boundsOf(detail) },
+                    // A picture of one trip, not a place to explore: every gesture off, and the zoom given
+                    // to the buttons on the right instead.
+                    interactive = false,
+                    zoomStep = zoom.step,
+                    zoomCount = zoom.count,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(MAP_HEIGHT)
@@ -110,6 +119,12 @@ fun RecordingDetailScreen(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(12.dp)
+                )
+                MapZoomButtons(
+                    zoom = zoom,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 12.dp)
                 )
                 AttributionStrip(
                     basemap = basemap,
