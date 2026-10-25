@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -27,8 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -40,7 +37,6 @@ import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.ui.formatDate
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.formatDuration
-import nz.mckenzie.trailday.ui.theme.TrailDayElevation
 import nz.mckenzie.trailday.viewmodel.RecordingDetail
 import nz.mckenzie.trailday.viewmodel.RecordingDetailViewModel
 import java.util.Locale
@@ -137,17 +133,13 @@ fun RecordingDetailScreen(
                 )
             }
 
-            // The sheet, lifted over the foot of the map so the two read as one screen - and lifted off it
-            // with the same shadow every other thing floating over a map wears.
+            // The sheet, lifted over the foot of the map so the two read as one screen. Its top edge is
+            // square, as it is on a place's page and a DOC thing's page: a rounded one reads as a slider to
+            // pull, which this is not.
             Column(
                 modifier = Modifier
                     .offset(y = -SHEET_LIFT)
                     .fillMaxWidth()
-                    .shadow(
-                        elevation = TrailDayElevation.floating,
-                        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-                    )
-                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                     .background(MaterialTheme.colorScheme.surface)
                     .padding(horizontal = 20.dp)
                     .padding(top = 20.dp, bottom = 32.dp),

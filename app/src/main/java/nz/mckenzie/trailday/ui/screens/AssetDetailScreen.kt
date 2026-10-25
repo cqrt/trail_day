@@ -198,13 +198,12 @@ fun AssetDetailScreen(
                 )
             }
 
-            // The sheet: white, its top corners round, lifted over the foot of the map so the two read as one
-            // screen rather than a picture above a list.
+            // The sheet: white, lifted over the foot of the map so the two read as one screen rather than a
+            // picture above a list. Its top edge is square, as on a trip's page and a DOC thing's page.
             Column(
                 modifier = Modifier
                     .offset(y = -SHEET_LIFT)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                     .background(MaterialTheme.colorScheme.surface)
                     .padding(horizontal = 20.dp)
                     .padding(top = 20.dp, bottom = 32.dp),

@@ -56,7 +56,7 @@ import nz.mckenzie.trailday.viewmodel.DocDetailViewModel
 /**
  * One of DOC's things, on its own page.
  *
- * The design is the chosen mockup: the map at the top, a labelled back pill over it, and a white
+ * The design is the chosen mockup: the map at the top, a round back button over it, and a white
  * sheet below with the area, the name, a row of coloured chips, the introduction, the at-a-glance
  * grid and whatever prose DOC actually publishes. A track gets **Follow this track** and every item
  * with a page link gets **DOC**.
@@ -148,8 +148,10 @@ fun DocDetailScreen(
                     onCameraIdle = { _, _, level -> zoom.reported(level) },
                     modifier = Modifier.fillMaxSize()
                 )
-                DocBackPill(
-                    onBack = onBack,
+                RoundIconButton(
+                    glyph = IconGlyph.BACK,
+                    description = "Back",
+                    onClick = onBack,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(12.dp)
@@ -168,12 +170,12 @@ fun DocDetailScreen(
                 )
             }
 
-            // The information scrolls inside its own viewport, under the map.
+            // The information scrolls inside its own viewport, under the map. Its top edge is square, as on
+            // a place's page and a trip's page.
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
                     .background(MaterialTheme.colorScheme.surface)
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp)
@@ -238,30 +240,6 @@ fun DocDetailScreen(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun DocBackPill(onBack: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        onClick = onBack,
-        modifier = modifier,
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 2.dp
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-            AppIcon(glyph = IconGlyph.BACK, dimension = 16.dp)
-            Text(
-                text = "BACK",
-                style = MaterialTheme.typography.labelSmall,
-                letterSpacing = 1.1.sp
-            )
         }
     }
 }
