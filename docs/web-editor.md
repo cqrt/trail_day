@@ -305,7 +305,7 @@ that never saw the move rather than silently undoing it.
   file whose segments could not be joined are both one line, and only the second is worth saying. Answers
   **200** with the reading, **400 `invalid`** for anything that is not a line at all — a file with one
   point in it, a file that will not parse, a body carrying no file — in the app's own words. The largest
-  file is the phone's own **2 MB**, which the state document states so the page can say so before
+  file is the phone's own **10 MB**, which the state document states so the page can say so before
   anything is sent; a **GET** of the path is nobody's and falls through to the page route's 404.
 - `POST /api/assets/together` — the same edit on several assets, judged whole (v0.6.69). The body is
   `{"assets":[{"id":7,"version":"…"},…],"fields":{…}}`: the rows with the fingerprint each was read at,
@@ -435,7 +435,7 @@ while the phone's own import makes one asset per feature.
 The page's half is the part only a browser can know, and it is `track.mjs`, pure and tested under node like
 `wire.mjs`: whether the thing dropped is a file this desk should send (a name ending `.gpx`, `.kml`, `.kmz`,
 `.geojson` or `.json` - the type a computer reports for a track file is whatever the computer that wrote it
-decided - and no more than the phone's own 2 MB), what to offer as the track's name (the file's, without
+decided - and no more than the phone's own 10 MB), what to offer as the track's name (the file's, without
 its extension, which is what the phone's own importer does with a chosen file), the file's bytes as base64
 (because a KMZ is a zip and not text), and how to word the answer. The file's meaning is not in it. The two
 ways in - the **Import a GPX, KML, KMZ or GeoJSON file** button and a drop on the map - lead to the same
@@ -1223,6 +1223,17 @@ style's background colour and the work draws on top of it.
       **Not proven here:** that it fixes the operator's own phone, which needs their phone — the check
       is step 5 of the list above, with the switch off and then on. Unit suite, JS tests, lint and
       assemble are green; the instrumented test is CI's to run, and was not run here.
+- [x] **A long trail's GPX can be imported from the desk. v0.6.97** — reported by the operator: *"I'm
+      trying to import a 7.6mb file of the Te Araroa trail, increase the maximum file size to 10mb."*
+      v0.6.86 had raised the desk's track-file limit to two megabytes; the whole of a long trail is
+      several, so the file was refused by the page before it was ever sent. The limit the page judges a
+      file against - the phone's own stated one (`WebEditorServer.MAX_GPX_BYTES`) - is now **ten
+      megabytes**, the page's own fallback (`track.mjs`'s `TRACK_LIMIT`) moved with it, and the socket's
+      body cap (`HttpServer.MAX_BODY_BYTES`) is **sixteen megabytes**: a ten-megabyte file travels
+      base64-encoded at about 13.3 MB, and the cap has to sit above that or the refusal would be about
+      the request rather than about the track. Proven by a body carrying a full ten-megabyte file
+      arriving whole rather than as a 413, by a body over the new cap still being refused, and by the
+      page's own size tests. Unit suite, JS tests, lint and assemble are green.
 - [ ] **Nothing is queued as a phase.** The three jobs the plan had left are done as of v0.6.70, and
       v0.6.71 was a fault reported from the field. What remains is one wording job riding with the next
       code change — the word "farm" in the code's comments and in a handful of names, written out in

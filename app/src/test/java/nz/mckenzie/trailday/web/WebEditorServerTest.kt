@@ -741,17 +741,19 @@ class WebEditorServerTest {
     }
 
     @Test
-    fun `a track file past the old quarter-megabyte limit still arrives whole`() {
+    fun `the largest track file the page will state arrives whole`() {
         start()
 
-        // The walker's own long ride is the case: a GPX of a few hundred kilobytes, sent
-        // base64-encoded, is past the half megabyte the socket used to take. The largest file the page
-        // will now state is two megabytes, so a body carrying one is about 2.7 MB - comfortably under
-        // the socket's own cap, and comfortably over what used to be a wall about the request rather
-        // than about the track.
+        // The walker's own long trail is the case: a GPX of several megabytes, sent base64-encoded, is
+        // about 13.3 MB on the wire. The largest file the page will state is ten megabytes, and a body
+        // carrying one has to arrive whole rather than as a 413 - which is a wall about the request
+        // rather than about the track.
         val file = ByteArray(WebEditorServer.MAX_GPX_BYTES) { 'x'.code.toByte() }
         val body = """{"gpx":"${java.util.Base64.getEncoder().encodeToString(file)}"}"""
-        assertTrue("this test is pointless unless the body is past the old cap", body.length > 512 * 1024)
+        assertTrue(
+            "this test is pointless unless the body is past the old socket cap",
+            body.length > 4 * 1024 * 1024
+        )
 
         val response = send(WebEditorServer.GPX_PATH, "POST", body)
 

@@ -21,7 +21,7 @@
  * about the file. Kept to the same number so the message here and the wall there are the same wall;
  * `app.js` takes it from the phone's state document, and this is only what a test can stand on.
  */
-export const TRACK_LIMIT = 2 * 1024 * 1024;
+export const TRACK_LIMIT = 10 * 1024 * 1024;
 
 /** What a track file is allowed to be called, on every computer. */
 const TRACK_EXTENSIONS = ['.gpx', '.kml', '.kmz', '.geojson', '.json'];

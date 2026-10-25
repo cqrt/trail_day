@@ -389,11 +389,12 @@ class WebEditorServer(
          * encoding room. Stated here so the page can say the limit in words, in the walker's own
          * term, before a file is sent.
          *
-         * Two megabytes, raised from a quarter of one because a walker's own GPS export was
-         * refused: a long ride's GPX is commonly past half a megabyte, and a file that is refused
-         * for its size alone is a track somebody has to trim before it can be brought in.
+         * Ten megabytes, raised from two because the trail itself was refused: a long trail's GPX -
+         * the whole of the Te Araroa, say - is several megabytes, and a file that is refused for its
+         * size alone is a track somebody has to cut up before it can be brought in. A GPX is text and
+         * a long one is mostly coordinates, so ten megabytes is a very long line indeed.
          */
-        const val MAX_GPX_BYTES = 2 * 1024 * 1024
+        const val MAX_GPX_BYTES = 10 * 1024 * 1024
 
         /**
          * What a track file is called in a body: one base64 JSON string - the file's own bytes.
