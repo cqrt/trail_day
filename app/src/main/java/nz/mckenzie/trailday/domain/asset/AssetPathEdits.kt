@@ -38,12 +38,16 @@ object AssetPathEdits {
      * thousand, and the walker's own export of a twelve-kilometre ride was 3,282. So this is a
      * bound on what the phone will draw and measure from one desk write, set well above what a real
      * track holds rather than around a small one: a file the phone's own import would take must not
-     * be refused here for its size. Twenty thousand vertices is about 800 KB of wire - a fifth of
-     * what the socket's own body limit carries (`HttpServer.MAX_BODY_BYTES`) - so a path refused
-     * here is refused with the phone's own sentence about the path, not with a refusal about the
-     * size of a request that never reached these rules.
+     * be refused here for its size.
+     *
+     * **Thirty thousand, raised from twenty for the long trails.** The operator's own export of the
+     * Te Araroa is 27,990 vertices, which is what three thousand kilometres of trail comes to, and it
+     * was refused at the old cap. Thirty thousand vertices is about 1.2 MB of wire - well under what
+     * the socket's own body limit carries (`HttpServer.MAX_BODY_BYTES`, sixteen megabytes) - so a path
+     * refused here is refused with the phone's own sentence about the path, not with a refusal about
+     * the size of a request that never reached these rules.
      */
-    const val MAX_POINTS = 20000
+    const val MAX_POINTS = 30000
 
     /**
      * The paths to store for a shape, or why these ones will not do.

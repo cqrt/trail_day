@@ -121,15 +121,24 @@ class AssetPathEditsTest {
 
     @Test
     fun `the cap is more than a real track holds, and is pinned here`() {
-        // A drawn track is tens of points, and a GPS export of a long ride is a few thousand. The
-        // number is pinned so that a later change to it is a decision somebody makes here rather than
-        // a constant nobody looks at again.
-        assertEquals(20000, AssetPathEdits.MAX_POINTS)
+        // A drawn track is tens of points, a GPS export of a long ride is a few thousand, and the whole
+        // of the Te Araroa is 27,990. The number is pinned so that a later change to it is a decision
+        // somebody makes here rather than a constant nobody looks at again.
+        assertEquals(30000, AssetPathEdits.MAX_POINTS)
         assertEquals(
             "and a path at the cap is still one vertex per point, in order",
-            20000,
-            ok(AssetShape.LINE, (0 until 20000).map { GeoPoint(-41.5, 173.8 + it * 0.0001) }).size
+            AssetPathEdits.MAX_POINTS,
+            ok(AssetShape.LINE, (0 until AssetPathEdits.MAX_POINTS).map { GeoPoint(-41.5, 173.8 + it * 0.0001) }).size
         )
+    }
+
+    @Test
+    fun `the whole of the Te Araroa fits, which is what the cap was raised for`() {
+        // The operator's own export of the trail: 27,990 vertices, which the desk refused at a cap of
+        // 20,000. It is the case the number exists for, so it is held here rather than only in a comment.
+        val trail = (0 until 27990).map { GeoPoint(-41.5, 173.8 + it * 0.00001) }
+
+        assertEquals(27990, ok(AssetShape.LINE, trail).size)
     }
 
     @Test
