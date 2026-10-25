@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,26 +18,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -50,6 +48,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import nz.mckenzie.trailday.ui.theme.TrailDayElevation
@@ -196,7 +196,10 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
         ?: 0L
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Record") }) },
+        // **No title bar while a pass is being driven, or has just been.** The map is the top of the screen
+        // then - which is the whole point of the panel at the foot - and the tab bar already says where the
+        // walker is. Kept while nothing is being recorded, as every other tab keeps its own.
+        topBar = { if (summary.status == null) TopAppBar(title = { Text("Record") }) },
         // No back arrow: recording is a tab, and the bar below is how you leave it.
         bottomBar = { TrailDayNavBar(current = Tab.RECORD, onSelect = onOpenTab) }
     ) { innerPadding ->
@@ -235,128 +238,54 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                 )
             }
 
-            // What the pass has done, at the top of the map: the mock screens' card, with the distance as the
-            // one big figure and the rest divided into cells under it.
-            Column(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .padding(start = 12.dp, end = 12.dp, top = 68.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                PassCard(
-                    summary = summary,
-                    elapsedMs = elapsedMs,
-                    elapsing = state.status == RecordingStatus.RECORDING,
-                    follow = follow,
-                    drift = drift,
-                    heading = heading,
-                    passElevation = passElevation,
-                    followMode = followingMode,
-                    targetName = assetName,
-                    onFollowMode = { following ->
-                        followingMode = following
-                        // A new line is a line of the walker's own: whatever was chosen before is let go,
-                        // so what is recorded is not quietly linked to a track nobody is following.
-                        if (!following) viewModel.selectTrack(null) else if (assetName == null) pickingTrack = true
-                    },
-                    onChooseTarget = { pickingTrack = true }
-                )
-
-                message?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // A walker who expects a notification and sees none should not be left wondering whether the
-                // app is still recording. Said while a pass is being driven, and only when the app has been
-                // told it may not post - and tappable, because the app cannot ask again once it has been
-                // told no, so the only way back is its own notification settings.
-                if (state.status == RecordingStatus.RECORDING && !notifications.allowed) {
-                    Text(
-                        text = "Notifications are off, so this walk will not show in the shade. " +
-                            "Tap to turn them on.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable {
-                            context.startActivity(notificationSettingsIntent(context))
-                        }
-                    )
-                }
-            }
-
-            // Which place this pass is for, and the way to change it: a pill rather than a line inside the
-            // card, because it is a choice rather than a figure.
-            if (state.status != null) {
-                TargetPill(
-                    name = assetName,
-                    onClick = { pickingTrack = true },
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(start = 12.dp, bottom = 104.dp)
-                )
-            }
-
-            AttributionStrip(
+            // Everything the recorder has to say, in one panel at the foot of the map: the figures, the line
+            // being followed, which place the pass is for, and the actions. Nothing floats over the map but
+            // the follow control, so the line being walked is never underneath a card.
+            RecordDock(
+                summary = summary,
+                elapsedMs = elapsedMs,
                 basemap = basemap,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(bottom = 78.dp)
-            )
-
-            // The actions, as the mock screens float them over the map: one big pill and one small, white on
-            // the imagery, with the shadow saying they are above it.
-            Row(
+                follow = follow,
+                drift = drift,
+                heading = heading,
+                passElevation = passElevation,
+                followMode = followingMode,
+                targetName = assetName,
+                permissionGranted = permissionGranted,
+                notificationsAllowed = notifications.allowed,
+                message = message,
+                onFollowMode = { following ->
+                    followingMode = following
+                    // A new line is a line of the walker's own: whatever was chosen before is let go,
+                    // so what is recorded is not quietly linked to a track nobody is following.
+                    if (!following) viewModel.selectTrack(null) else if (assetName == null) pickingTrack = true
+                },
+                onChooseTarget = { pickingTrack = true },
+                onAllowLocation = {
+                    permissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.POST_NOTIFICATIONS
+                        )
+                    )
+                },
+                onStart = {
+                    // Asked here, and the walk goes ahead either way: a walker who says no to the
+                    // notification still gets their walk, and one who says yes gets told the app is
+                    // still tracking while their phone is in a pocket.
+                    notifications.ask()
+                    if (followingMode && assetName == null) pickingTrack = true else viewModel.start()
+                },
+                onPause = viewModel::pause,
+                onResume = viewModel::resume,
+                onFinish = viewModel::finish,
+                onOpenNotificationSettings = {
+                    context.startActivity(notificationSettingsIntent(context))
+                },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(start = 12.dp, end = 12.dp, bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (!permissionGranted) {
-                    MapPill(
-                        label = "Allow location to record",
-                        onClick = {
-                            permissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.POST_NOTIFICATIONS
-                                )
-                            )
-                        },
-                        modifier = Modifier.weight(1.6f)
-                    )
-                } else {
-                    when (state.status) {
-                        RecordingStatus.RECORDING -> {
-                            MapPill(label = "Pause", onClick = viewModel::pause, modifier = Modifier.weight(1.6f))
-                            MapPill(label = "Finish", onClick = viewModel::finish, modifier = Modifier.weight(1f))
-                        }
-
-                        RecordingStatus.PAUSED -> {
-                            MapPill(label = "Resume", onClick = viewModel::resume, modifier = Modifier.weight(1.6f))
-                            MapPill(label = "Finish", onClick = viewModel::finish, modifier = Modifier.weight(1f))
-                        }
-
-                        else -> MapPill(
-                            label = "Start recording",
-                            onClick = {
-                                // Asked here, and the walk goes ahead either way: a walker who says no to
-                                // the notification still gets their walk, and one who says yes gets told
-                                // the app is still tracking while their phone is in a pocket.
-                                notifications.ask()
-                                if (followingMode && assetName == null) pickingTrack = true else viewModel.start()
-                            },
-                            enabled = !followingMode || assetName != null,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
+                    .padding(horizontal = 12.dp, vertical = 12.dp)
+            )
         }
     }
     if (pickingTrack) {
@@ -546,122 +475,131 @@ private fun GroupLabel(text: String) {
 private val PICKER_LIST_MAX_HEIGHT = 400.dp
 
 /**
- * The pass, as the mock screens put it at the top of the recorder: **the distance as one big figure**, and the
- * rest divided into cells under it - the time, the pace, and what the walker is following.
+ * Everything the recorder has to say, in one panel at the foot of the map.
  *
- * The time is the pass's own clock and the pace is its own arithmetic (minutes for a kilometre); the follow
- * readout is only there when there is a line or a point to follow, and it says the off-distance once, by the
- * quiet word when the walker has properly drifted and by the row when they have not.
+ * **The figures and the buttons in one place**, as the chosen mock screen draws it: the map is the top of the
+ * screen and this is what the walker's thumb reaches. The state and the distance lead, the time and the pace
+ * sit beside them, and under those the credit, how good the fixes are, the line being followed, and which
+ * place the pass is for. The actions are the last row, where the thumb already is.
+ *
+ * Nothing floats over the map but the follow control, so the line being walked is never underneath a card.
  */
 @Composable
-private fun PassCard(
+private fun RecordDock(
     summary: RecordingViewModel.PassSummary,
     elapsedMs: Long,
-    elapsing: Boolean,
+    basemap: Basemap,
     follow: FollowProgress?,
     drift: Double?,
     heading: FollowPoint?,
     passElevation: ElevationProfile?,
     followMode: Boolean,
     targetName: String?,
+    permissionGranted: Boolean,
+    notificationsAllowed: Boolean,
+    message: String?,
     onFollowMode: (Boolean) -> Unit,
-    onChooseTarget: () -> Unit
+    onChooseTarget: () -> Unit,
+    onAllowLocation: () -> Unit,
+    onStart: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onFinish: () -> Unit,
+    onOpenNotificationSettings: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    // The one card over the recording map, lifted off the imagery like the map's other floating things.
-    Card(
-        elevation = CardDefaults.cardElevation(defaultElevation = TrailDayElevation.floating),
-        modifier = Modifier.fillMaxWidth()
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = TrailDayElevation.floating,
+        modifier = modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(vertical = 14.dp)) {
-            Text(
-                text = when (summary.status) {
-                    RecordingStatus.RECORDING -> "RECORDING"
-                    RecordingStatus.PAUSED -> "PAUSED"
-                    RecordingStatus.FINISHED -> "FINISHED"
-                    null -> "READY TO RECORD"
-                },
-                style = MaterialTheme.typography.labelSmall,
-                letterSpacing = 1.1.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-
-            // Nothing being recorded yet: what kind of recording is about to start, then - if it is a
-            // line to follow - which line. Two words rather than a paragraph, as everywhere in the app.
-            if (summary.status == null) {
-                Row(
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    ChoiceChip(
-                        selected = followMode,
-                        label = "Follow a track",
-                        onClick = { onFollowMode(true) }
-                    )
-                    ChoiceChip(
-                        selected = !followMode,
-                        label = "Record New Track",
-                        onClick = { onFollowMode(false) }
-                    )
-                }
-                if (followMode) {
-                    Text(
-                        text = targetName ?: "Choose a track",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (targetName == null) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            MaterialTheme.colorScheme.primary
-                        },
-                        modifier = Modifier
-                            .padding(start = 16.dp, end = 16.dp, top = 12.dp)
-                            .clickable(onClick = onChooseTarget)
-                    )
-                }
-            }
-
-            // The distance as the one big figure, with its unit beside it rather than inside the number.
-            val distance = formatDistance(summary.distanceM).split(" ", limit = 2)
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // What the pass has come to: the state over the distance, and the time and the pace beside them.
             Row(
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 2.dp),
-                verticalAlignment = Alignment.Bottom
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(text = distance.first(), style = MaterialTheme.typography.displaySmall)
-                distance.getOrNull(1)?.let { unit ->
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = unit,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 6.dp, bottom = 6.dp)
+                        text = when (summary.status) {
+                            RecordingStatus.RECORDING -> "RECORDING"
+                            RecordingStatus.PAUSED -> "PAUSED"
+                            RecordingStatus.FINISHED -> "FINISHED"
+                            null -> "READY TO RECORD"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        letterSpacing = 1.1.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+
+                    // The distance as the one big figure, with its unit beside it rather than inside the number.
+                    val distance = formatDistance(summary.distanceM).split(" ", limit = 2)
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(text = distance.first(), style = MaterialTheme.typography.displaySmall)
+                        distance.getOrNull(1)?.let { unit ->
+                            Text(
+                                text = unit,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 6.dp, bottom = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    DockFigure(label = "Time", value = formatDuration(elapsedMs))
+                    VerticalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        modifier = Modifier.height(32.dp)
+                    )
+                    DockFigure(label = "Pace", value = paceOf(summary.distanceM, elapsedMs))
                 }
             }
 
-            HorizontalDivider(
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp),
-                color = MaterialTheme.colorScheme.outlineVariant
-            )
-            FigureCells(
-                figures = listOf(
-                    Figure(label = "Time", value = formatDuration(elapsedMs)),
-                    Figure(label = "Pace", value = paceOf(summary.distanceM, elapsedMs))
-                )
-            )
+            // How good the fixes are, and whose map this is: the panel's two quietest lines, sharing a row so
+            // neither costs one of its own. The credit is the one that never gives way - it is what the
+            // licence asks to be shown - so the accuracy is what shortens when the row runs out.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                summary.accuracyM?.let { accuracy ->
+                    Text(
+                        text = "Accuracy \u00b1${accuracy.toInt()} m" +
+                            if (summary.rejectedFixes > 0) {
+                                " \u00b7 ${summary.rejectedFixes} fixes rejected"
+                            } else {
+                                ""
+                            },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                } ?: Spacer(modifier = Modifier.weight(1f))
 
-            // The quiet word and the readout, when something is being followed.
+                DockCredit(basemap = basemap)
+            }
+
+            // The line being followed, in the phone's own words: the quiet word when the walker has properly
+            // drifted, then how far along they are, and which way the place they are heading for lies.
             if (drift != null || follow != null || heading != null) {
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     drift?.let { offM ->
                         Text(
                             text = "You are ${formatDistance(offM)} off the track.",
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
                     follow?.let { progress ->
@@ -677,14 +615,14 @@ private fun PassCard(
                                 val toGo = progress.toGoSeconds(TravelMode.WALKING)
                                 if (toGo >= ONE_MINUTE_S) append(" \u00b7 about ${formatEstimate(toGo)} to go")
                             },
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
                     heading?.let { point ->
                         Text(
                             text = "${formatDistance(point.distanceM)} to the ${point.compass} \u00b7 " +
                                 "about ${formatEstimate(point.toGoSeconds())} on foot",
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
@@ -693,14 +631,7 @@ private fun PassCard(
             // The pass just saved, as the ground it climbed: the range in words and the shape under it. A pass
             // with no heights says nothing at all.
             if (passElevation != null) {
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     ElevationPhrase.range(passElevation)?.let { range ->
                         Text(text = range, style = MaterialTheme.typography.bodySmall)
                     }
@@ -713,21 +644,143 @@ private fun PassCard(
                 }
             }
 
-            summary.accuracyM?.let { accuracy ->
+            // The kind of recording being set up: a choice, so only while nothing is being driven - by the
+            // time a pass is running, what it is has stopped being a question.
+            if (summary.status == null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ChoiceChip(
+                        selected = followMode,
+                        label = "Follow a track",
+                        onClick = { onFollowMode(true) }
+                    )
+                    ChoiceChip(
+                        selected = !followMode,
+                        label = "Record New Track",
+                        onClick = { onFollowMode(false) }
+                    )
+                }
+            }
+
+            // Which place this pass is for, and the way to change it. A chip rather than a line among the
+            // figures, because it is a choice rather than a reading.
+            if (summary.status != null || followMode) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TargetChip(name = targetName, onClick = onChooseTarget)
+                }
+            }
+
+            message?.let {
                 Text(
-                    text = "Accuracy \u00b1${accuracy.toInt()} m" +
-                        if (summary.rejectedFixes > 0) {
-                            " \u00b7 ${summary.rejectedFixes} fixes rejected"
-                        } else {
-                            ""
-                        },
+                    text = it,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            // A walker who expects a notification and sees none should not be left wondering whether the app
+            // is still recording. Said while a pass is being driven, and only when the app has been told it
+            // may not post - and tappable, because the app cannot ask again once it has been told no, so the
+            // only way back is its own notification settings.
+            if (summary.status == RecordingStatus.RECORDING && !notificationsAllowed) {
+                Text(
+                    text = "Notifications are off, so this walk will not show in the shade. " +
+                        "Tap to turn them on.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable(onClick = onOpenNotificationSettings)
+                )
+            }
+
+            // The actions, in the panel the thumb is already on.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (!permissionGranted) {
+                    Button(
+                        onClick = onAllowLocation,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp)
+                    ) {
+                        Text("Allow location to record")
+                    }
+                } else {
+                    when (summary.status) {
+                        RecordingStatus.RECORDING -> {
+                            Button(
+                                onClick = onPause,
+                                modifier = Modifier
+                                    .weight(1.7f)
+                                    .height(52.dp)
+                            ) { Text("Pause") }
+                            FilledTonalButton(
+                                onClick = onFinish,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp)
+                            ) { Text("Finish") }
+                        }
+
+                        RecordingStatus.PAUSED -> {
+                            Button(
+                                onClick = onResume,
+                                modifier = Modifier
+                                    .weight(1.7f)
+                                    .height(52.dp)
+                            ) { Text("Resume") }
+                            FilledTonalButton(
+                                onClick = onFinish,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp)
+                            ) { Text("Finish") }
+                        }
+
+                        else -> Button(
+                            onClick = onStart,
+                            enabled = !followMode || targetName != null,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(52.dp)
+                        ) { Text("Start recording") }
+                    }
+                }
             }
         }
     }
+}
+
+/** One of the panel's two cells: a small capital label over its value, both against the right edge. */
+@Composable
+private fun DockFigure(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            letterSpacing = 1.1.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(text = value, style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+/**
+ * The basemap's credit, in the panel's own quiet ink rather than the dark strip the map wears.
+ *
+ * Still a link to the basemap's own credit page, which is what makes it satisfy the licence rather than
+ * merely mention it.
+ */
+@Composable
+private fun DockCredit(basemap: Basemap) {
+    val uriHandler = LocalUriHandler.current
+    Text(
+        text = basemap.attribution,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.clickable { uriHandler.openUri(basemap.attributionLink) }
+    )
 }
 
 /** How many minutes a kilometre took, or nothing while there is no distance to divide by. */
@@ -774,62 +827,39 @@ private fun FollowPhonePill(following: Boolean, onToggle: () -> Unit, modifier: 
     }
 }
 
-/** Which place this pass is for, and the way to change it. */
+/**
+ * Which place this pass is for, and the way to change it.
+ *
+ * A chip in the panel rather than a pill over the map: on white it needs no shadow to be found, and the
+ * chevron is what says it opens something.
+ */
 @Composable
-private fun TargetPill(name: String?, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun TargetChip(name: String?, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onClick,
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = TrailDayElevation.floating,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = modifier
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            modifier = Modifier.padding(start = 12.dp, end = 8.dp, top = 9.dp, bottom = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            AppIcon(glyph = IconGlyph.MAP, dimension = 18.dp, tint = MaterialTheme.colorScheme.primary)
+            AppIcon(glyph = IconGlyph.MAP, dimension = 16.dp, tint = MaterialTheme.colorScheme.primary)
             Text(
                 text = name?.let { "Following: $it" } ?: "Choose a place to follow",
                 style = MaterialTheme.typography.labelLarge
+            )
+            AppIcon(
+                glyph = IconGlyph.CHEVRON,
+                dimension = 16.dp,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
 }
 
-/** One action over the map: a white pill, as the mock screens float Pause and Finish. */
-@Composable
-private fun MapPill(
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true
-) {
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surface,
-        shadowElevation = TrailDayElevation.floating,
-        modifier = modifier
-    ) {
-        Box(
-            modifier = Modifier.padding(vertical = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.titleMedium,
-                color = if (enabled) {
-                    MaterialTheme.colorScheme.onSurface
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
-            )
-        }
-    }
-}
 /** Within this of the line is on it, as far as a phone's own accuracy can say. */
 private const val ALONGSIDE_M = 30.0
 
