@@ -40,6 +40,7 @@ import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.asset.YourPlaceLayer
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
+import nz.mckenzie.trailday.domain.tiles.TeAraroa
 
 /**
  * Where the map opens when there is nothing better to show: the whole country, at a
@@ -80,6 +81,35 @@ private const val BIKE_BADGE_IMAGE = "trailday-bike-badge"
 
 /** How big that badge is, in density-independent pixels: smaller than a place marker. */
 private const val BIKE_BADGE_DP = 18f
+
+/**
+ * The Te Araroa trail, in its own source and layers so a national route can be drawn **under
+ * everything else** without ever being read as somebody's work. See
+ * [nz.mckenzie.trailday.domain.tiles.TeAraroa].
+ */
+internal const val TRAIL_SOURCE = "trailday-te-araroa"
+
+/** The soft edge under the trail, so the line reads over pale imagery and dark alike. */
+internal const val TRAIL_CASING_LAYER = "trailday-te-araroa-casing"
+
+/** The trail itself. */
+internal const val TRAIL_LAYER = "trailday-te-araroa-line"
+
+/**
+ * The trail's own colour: the rust a long-distance route is drawn in on a paper map, and the one strong
+ * colour on the map that is nobody's kind - a track is blue, a bike track purple, a hut orange, a
+ * campsite teal, a waypoint slate, and a line that was actually walked is green with a gold edge.
+ */
+private const val TRAIL_COLOR = "#C1440E"
+
+/** The trail's edge: white, for the reason the position dot's ring is - imagery is pale or dark. */
+private const val TRAIL_CASING_COLOR = "#FFFFFF"
+
+/** Narrower than the walker's own lines, so the trail is the ground they sit on rather than a rival. */
+private const val TRAIL_WIDTH = 4f
+
+/** Its casing, wider than the line by the same margin the recorded line's gold edge wears. */
+private const val TRAIL_CASING_WIDTH = 7f
 
 // The layers of the work are named in [AssetLayerIds], which is also where the map's own switches
 // find them: the layer that is created and the layer a switch hides are the same name by
@@ -269,6 +299,18 @@ fun BasemapView(
      */
     placeNames: Boolean = false,
     /**
+     * Whether the Te Araroa trail is drawn under everything else - the map's own "Te Araroa trail"
+     * switch. See [TeAraroa].
+     *
+     * Off by default, and off for every map that is not the walker's home map, for the same reason
+     * [hiddenLayers] is empty there: a map that is *about* one asset is about that asset. Unlike the
+     * place names this changes nothing about the style - the trail is a source the app already holds -
+     * so switching it is a property of one layer rather than a style reload.
+     */
+    showTeAraroa: Boolean = false,
+    /** The trail itself, as the GeoJSON to draw: empty where there is none to draw. */
+    teAraroaGeoJson: String = AssetGeoJson.build(emptyList()),
+    /**
      * A camera move the walker asked for. The bounds say where; [recentreCount] is what says
      * it is a new request rather than the same one arriving twice, so the second tap on
      * "where am I" moves the map again.
@@ -455,7 +497,9 @@ fun BasemapView(
                         density = density,
                         hiddenLayers = hiddenLayers,
                         hiddenYourPlaces = hiddenYourPlaces,
-                        placeNames = placeNames
+                        placeNames = placeNames,
+                        teAraroaGeoJson = teAraroaGeoJson,
+                        showTeAraroa = showTeAraroa
                     ) { style ->
                         styleLoadedOnce = true
                         styleState.value = style
@@ -493,7 +537,9 @@ fun BasemapView(
                 density = density,
                 hiddenLayers = hiddenLayers,
                 hiddenYourPlaces = hiddenYourPlaces,
-                placeNames = placeNames
+                placeNames = placeNames,
+                teAraroaGeoJson = teAraroaGeoJson,
+                showTeAraroa = showTeAraroa
             ) { style ->
                 styleLoadedOnce = true
                 styleState.value = style
@@ -513,6 +559,12 @@ fun BasemapView(
         styleState.value?.getSourceAs<GeoJsonSource>(DOC_SOURCE)?.setGeoJson(docGeoJson)
     }
 
+    // The trail is read from the app's own assets when the layer is first switched on, and handed over
+    // here when it arrives: a walker who has switched it off never pays for the read at all.
+    LaunchedEffect(teAraroaGeoJson, styleState.value) {
+        styleState.value?.getSourceAs<GeoJsonSource>(TRAIL_SOURCE)?.setGeoJson(teAraroaGeoJson)
+    }
+
     LaunchedEffect(docBikeBadgesGeoJson, styleState.value) {
         styleState.value
             ?.getSourceAs<GeoJsonSource>(DOC_BIKE_BADGES_SOURCE)
@@ -529,9 +581,9 @@ fun BasemapView(
     // property of a layer rather than a new style, so the camera, the tiles and the zoom are all
     // left exactly where they were - which is what makes the switch usable while reading the map
     // rather than something that sends you back to the start every time you touch it.
-    LaunchedEffect(hiddenLayers, hiddenYourPlaces, styleState.value) {
+    LaunchedEffect(hiddenLayers, hiddenYourPlaces, showTeAraroa, styleState.value) {
         val style = styleState.value ?: return@LaunchedEffect
-        applyLayerVisibility(style, hiddenLayers, hiddenYourPlaces)
+        applyLayerVisibility(style, hiddenLayers, hiddenYourPlaces, showTeAraroa)
     }
 
     // The marker follows the fixes. Setting the GeoJSON on one source rather than rebuilding
@@ -660,6 +712,9 @@ internal fun MapLibreMap.loadTrailDayStyle(
     hiddenLayers: Set<AssetLayer>,
     hiddenYourPlaces: Set<YourPlaceLayer> = emptySet(),
     placeNames: Boolean,
+    /** The trail's own GeoJSON, and whether it is drawn: see [BasemapView.showTeAraroa]. */
+    teAraroaGeoJson: String = AssetGeoJson.build(emptyList()),
+    showTeAraroa: Boolean = false,
     onLoaded: (Style) -> Unit
 ) {
     val json = when {
@@ -697,7 +752,34 @@ internal fun MapLibreMap.loadTrailDayStyle(
 
     setStyle(Style.Builder().fromJson(json)) { style ->
         preservedCamera?.let { cameraPosition = it }
-        // DOC's material first, so it lies **under** the walker's own work: what you made is what you
+        // The trail first of all, so it lies under **everything**: a national route is the ground the
+        // rest of the map is read against, and it must never be taken for the walker's own work.
+        if (style.getSource(TRAIL_SOURCE) == null) {
+            style.addSource(GeoJsonSource(TRAIL_SOURCE, teAraroaGeoJson))
+        }
+        if (style.getLayer(TRAIL_CASING_LAYER) == null) {
+            style.addLayer(
+                LineLayer(TRAIL_CASING_LAYER, TRAIL_SOURCE)
+                    .withProperties(
+                        PropertyFactory.lineColor(Expression.literal(TRAIL_CASING_COLOR)),
+                        PropertyFactory.lineWidth(Expression.literal(TRAIL_CASING_WIDTH)),
+                        PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                        PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
+                    )
+            )
+        }
+        if (style.getLayer(TRAIL_LAYER) == null) {
+            style.addLayer(
+                LineLayer(TRAIL_LAYER, TRAIL_SOURCE)
+                    .withProperties(
+                        PropertyFactory.lineColor(Expression.literal(TRAIL_COLOR)),
+                        PropertyFactory.lineWidth(Expression.literal(TRAIL_WIDTH)),
+                        PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                        PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
+                    )
+            )
+        }
+        // Then DOC's material, so it lies **under** the walker's own work: what you made is what you
         // are reading, and the reference is the ground it sits on.
         if (style.getSource(DOC_SOURCE) == null) {
             style.addSource(GeoJsonSource(DOC_SOURCE, docGeoJson))
@@ -818,7 +900,7 @@ internal fun MapLibreMap.loadTrailDayStyle(
         // The switches, applied to the style that has just been built, so that the first frame is
         // already the map the walker asked for rather than one that flashes everything and then
         // hides half of it.
-        applyLayerVisibility(style, hiddenLayers, hiddenYourPlaces)
+        applyLayerVisibility(style, hiddenLayers, hiddenYourPlaces, showTeAraroa)
         onLoaded(style)
     }
 }
@@ -853,12 +935,21 @@ private fun addRecordedCasing(style: Style, id: String, kind: AssetKind) {
  * The sheet has two halves: DOC's reference material, and the walker's own work. They are separate
  * because the same word - "tracks", "bike tracks" - names one of each, and hiding one must not take
  * the other with it. A layer that is not in the style is skipped.
+ *
+ * The trail is the exception that proves the rule: it is nobody's kind, it has a switch of its own, and
+ * it is drawn under both halves rather than in either.
  */
 private fun applyLayerVisibility(
     style: Style,
     hidden: Set<AssetLayer>,
-    hiddenYourPlaces: Set<YourPlaceLayer> = emptySet()
+    hiddenYourPlaces: Set<YourPlaceLayer> = emptySet(),
+    showTeAraroa: Boolean = false
 ) {
+    // The trail is in neither set: it is the app's own route rather than a kind of the walker's or of
+    // DOC's, so it has a switch of its own. Both its layers go together, or the edge is a ghost.
+    val trailVisibility = if (showTeAraroa) Property.VISIBLE else Property.NONE
+    style.getLayer(TRAIL_CASING_LAYER)?.setProperties(PropertyFactory.visibility(trailVisibility))
+    style.getLayer(TRAIL_LAYER)?.setProperties(PropertyFactory.visibility(trailVisibility))
     val tracksShown = AssetLayer.TRACKS !in hidden
     val bikeTrailsShown = AssetLayer.BIKE_TRACKS !in hidden
 

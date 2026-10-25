@@ -45,7 +45,8 @@ enum class IconGlyph {
     CLOSE,
     PLUS,
     MINUS,
-    ALERT
+    ALERT,
+    TRAIL
 }
 
 /**
@@ -133,6 +134,18 @@ internal fun AppIcon(
                 line(0.22f, 0.50f, 0.80f, 0.50f)
                 line(0.44f, 0.26f, 0.20f, 0.50f)
                 line(0.20f, 0.50f, 0.44f, 0.74f)
+            }
+
+            // The long pathway: a route that bends its way up the grid, with a mark at either end. The
+            // one glyph in the app that is a journey rather than a place or a thing on the map - which is
+            // what Te Araroa is, and why it has a mark of its own rather than a kind's tile.
+            IconGlyph.TRAIL -> {
+                line(0.24f, 0.80f, 0.42f, 0.64f)
+                line(0.42f, 0.64f, 0.34f, 0.44f)
+                line(0.34f, 0.44f, 0.56f, 0.32f)
+                line(0.56f, 0.32f, 0.76f, 0.20f)
+                bobble(0.24f, 0.80f, radius = dot * 1.3f)
+                bobble(0.76f, 0.20f, radius = dot * 1.3f)
             }
 
             // A place on the map, which is the thing this app is about.

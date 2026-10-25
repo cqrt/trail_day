@@ -44,6 +44,7 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     /** The old "Your Tracks" switch: read once to seed [hiddenYourPlaces], never written again. */
     private val legacyYourTracksHiddenPref = booleanPreferencesKey("your_tracks_hidden")
     private val placeNamesPref = booleanPreferencesKey("place_names")
+    private val teAraroaPref = booleanPreferencesKey("te_araroa")
     private val webEditorTokenRequiredPref = booleanPreferencesKey("web_editor_token_required")
 
     /**
@@ -241,6 +242,25 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
 
     suspend fun setPlaceNames(shown: Boolean) {
         context.settingsDataStore.edit { prefs -> prefs[placeNamesPref] = shown }
+    }
+
+    /**
+     * Whether the Te Araroa trail is drawn - the map's own "Te Araroa trail" switch.
+     *
+     * **On when unset**, and the argument is the opposite of the place names': the trail is what this
+     * app is about, it is already on the phone (it is bundled, not fetched), and a walker who has never
+     * heard of it is exactly the walker the line is worth drawing for. Nobody has to ask for the thing
+     * they came for, and the switch is there for the walker who is looking at their own paddock.
+     *
+     * Stored, because it is a property of the map rather than of a visit. See
+     * [nz.mckenzie.trailday.domain.tiles.TeAraroa] for where the line comes from and whose licence it is.
+     */
+    val teAraroa: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[teAraroaPref] ?: true
+    }
+
+    suspend fun setTeAraroa(shown: Boolean) {
+        context.settingsDataStore.edit { prefs -> prefs[teAraroaPref] = shown }
     }
 
     /**

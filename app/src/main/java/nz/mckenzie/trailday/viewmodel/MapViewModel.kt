@@ -51,6 +51,7 @@ import nz.mckenzie.trailday.domain.doc.DocPick
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetStretch
 import nz.mckenzie.trailday.map.DocGeoJson
+import nz.mckenzie.trailday.map.TeAraroaGeoJson
 import nz.mckenzie.trailday.map.DocTrackVisibility
 import nz.mckenzie.trailday.map.drawingKind
 import nz.mckenzie.trailday.offline.OfflineDocStore
@@ -104,6 +105,15 @@ class MapViewModel(
      * why it draws in the hills with no reception at all. See [DocGeoJson].
      */
     private val docStore: DocCache = EmptyDocCache,
+    /**
+     * The Te Araroa trail, bundled: the map's other reference layer, under DOC's.
+     *
+     * Read from the app's own assets rather than fetched, because the trail is a feature of the app -
+     * there with no reception and with nothing to download first - and read **lazily**, so a walker who
+     * has switched the layer off never pays for it. Injected so a test can build a map without assets;
+     * see [nz.mckenzie.trailday.map.TeAraroaGeoJson].
+     */
+    private val trailGeoJson: () -> String = { TeAraroaGeoJson.EMPTY },
     /**
      * The live DOC alert check for a card.
      *
@@ -886,6 +896,33 @@ class MapViewModel(
         viewModelScope.launch { settingsRepository.setPlaceNames(shown) }
     }
 
+    /**
+     * Whether the Te Araroa trail is drawn - the map's own "Te Araroa trail" switch.
+     *
+     * Eagerly, like the basemap: a switch read after the first draw would show a map with no trail on it
+     * and then grow one. On when unset, which is the setting's own default.
+     */
+    val teAraroa: StateFlow<Boolean> = settingsRepository.teAraroa
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /**
+     * The trail's own GeoJSON, or the empty collection while the layer is switched off.
+     *
+     * **Read the first time the layer is switched on**, off the main thread: 700 KB of assets is not
+     * something a map's first frame should wait for, and a walker who never wants the trail should never
+     * pay for the read. The reader holds what it read, so switching the layer on and off again is free.
+     */
+    val teAraroaGeoJson: StateFlow<String> = teAraroa
+        .map { shown ->
+            if (shown) withContext(Dispatchers.Default) { trailGeoJson() } else TeAraroaGeoJson.EMPTY
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TeAraroaGeoJson.EMPTY)
+
+    /** Shows or hides the trail, written straight through like the layer switches. */
+    fun setTeAraroa(shown: Boolean) {
+        viewModelScope.launch { settingsRepository.setTeAraroa(shown) }
+    }
+
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L
 
@@ -906,7 +943,8 @@ class MapViewModel(
                         // puts its line back to what it was, with nothing to remember on the place.
                         recordedFor = recordings.observeSessions()
                             .map { sessions -> sessions.mapNotNull { it.assetId }.toSet() },
-                        recordingRepository = recordings
+                        recordingRepository = recordings,
+                        trailGeoJson = TeAraroaGeoJson.reader(appContext)
                     )
                 }
             }

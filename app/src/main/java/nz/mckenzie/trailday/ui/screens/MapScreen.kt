@@ -75,6 +75,7 @@ import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.viewmodel.PendingFollow
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
+import nz.mckenzie.trailday.domain.tiles.TeAraroa
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.map.DEFAULT_CAMERA_TARGET
 import nz.mckenzie.trailday.map.DEFAULT_CAMERA_ZOOM
@@ -105,6 +106,8 @@ fun MapScreen(
     val camera by viewModel.camera.collectAsStateWithLifecycle()
     val geoJson by viewModel.assetGeoJson.collectAsStateWithLifecycle()
     val docGeoJson by viewModel.docGeoJson.collectAsStateWithLifecycle()
+    val teAraroa by viewModel.teAraroa.collectAsStateWithLifecycle()
+    val teAraroaGeoJson by viewModel.teAraroaGeoJson.collectAsStateWithLifecycle()
     val docBikeBadgesGeoJson by viewModel.docBikeBadgesGeoJson.collectAsStateWithLifecycle()
     val initialFrame by viewModel.initialFrame.collectAsStateWithLifecycle()
     val selectionFrame by viewModel.selectionFrame.collectAsStateWithLifecycle()
@@ -192,6 +195,11 @@ fun MapScreen(
                 // they read the map on, and "which town is that" is asked here rather than on a
                 // screen that is about one place.
                 placeNames = placeNames,
+                // The trail, under everything including DOC's material: a national route is the ground
+                // the rest of the map is read against, and it is the app's own feature rather than
+                // anything the walker has to find and import.
+                showTeAraroa = teAraroa,
+                teAraroaGeoJson = teAraroaGeoJson,
                 // The marker for the phone is the map's own business now, so this screen
                 // says nothing about it: it draws where you are wherever a map is drawn.
                 // The walker's own tracks first; failing that, where the device is;
@@ -345,7 +353,7 @@ fun MapScreen(
                     )
                 }
 
-                AttributionStrip(basemap = basemap, placeNames = placeNames)
+                AttributionStrip(basemap = basemap, placeNames = placeNames, teAraroa = teAraroa)
             }
         }
     }
@@ -361,6 +369,8 @@ fun MapScreen(
             yourPlaceCounts = yourPlaceCounts,
             placeNames = placeNames,
             onPlaceNames = viewModel::setPlaceNames,
+            teAraroa = teAraroa,
+            onTeAraroa = viewModel::setTeAraroa,
             onDismiss = { layersOpen = false }
         )
     }
@@ -400,6 +410,8 @@ private fun LayersSheet(
     yourPlaceCounts: YourPlaceCounts,
     placeNames: Boolean,
     onPlaceNames: (show: Boolean) -> Unit,
+    teAraroa: Boolean,
+    onTeAraroa: (show: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -538,6 +550,22 @@ private fun LayersSheet(
                             subtitle = "Fetched names over the imagery",
                             checked = placeNames,
                             onToggle = onPlaceNames
+                        )
+                        LayerDivider()
+                        LayerSwitchRow(
+                            icon = {
+                                GlyphTile(
+                                    glyph = IconGlyph.TRAIL,
+                                    background = MaterialTheme.colorScheme.secondaryContainer,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            },
+                            title = "Te Araroa trail",
+                            // The Trust's own route, named with the Trust: the layer is drawn under a
+                            // licence that asks for exactly this.
+                            subtitle = "The whole route, Te Araroa Trust",
+                            checked = teAraroa,
+                            onToggle = onTeAraroa
                         )
                     }
                 }
@@ -803,22 +831,37 @@ private fun MissingKeyCard(onOpenSettings: () -> Unit, modifier: Modifier = Modi
 internal fun AttributionStrip(
     basemap: Basemap,
     modifier: Modifier = Modifier,
-    placeNames: Boolean = false
+    placeNames: Boolean = false,
+    teAraroa: Boolean = false
 ) {
     val uriHandler = LocalUriHandler.current
-    Text(
-        text = if (placeNames) {
-            "${basemap.attribution} \u00b7 ${PlaceLabels.SHORT_ATTRIBUTION}"
-        } else {
-            basemap.attribution
-        },
-        style = MaterialTheme.typography.labelSmall,
-        color = Color.White,
+    Row(
         modifier = modifier
             .background(Color(0x99000000), RoundedCornerShape(4.dp))
-            .clickable { uriHandler.openUri(basemap.attributionLink) }
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-    )
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = if (placeNames) {
+                "${basemap.attribution} \u00b7 ${PlaceLabels.SHORT_ATTRIBUTION}"
+            } else {
+                basemap.attribution
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
+            modifier = Modifier.clickable { uriHandler.openUri(basemap.attributionLink) }
+        )
+        // The trail is a different publisher with a licence of its own, so it wears its own link rather
+        // than borrowing LINZ's: a credit that opens somebody else's page is not a credit.
+        if (teAraroa) {
+            Text(
+                text = " \u00b7 ${TeAraroa.SHORT_ATTRIBUTION}",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White,
+                modifier = Modifier.clickable { uriHandler.openUri(TeAraroa.ATTRIBUTION_LINK) }
+            )
+        }
+    }
 }
 
 

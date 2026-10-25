@@ -1,0 +1,21 @@
+te-araroa.geojson - the Te Araroa trail
+=======================================
+
+The whole route of Te Araroa, one LineString per section (466 of them), as the GeoJSON the map draws.
+
+  Source     Te Araroa Trust, "Tracks GPX", https://www.teararoa.org.nz/notes-and-maps/
+             the 2026-27 season, file `TeAraroaTrail_2026_27.gpx` (7.59 MB, GPX 1.1)
+  Copyright  Te Araroa Trust, 2026
+  Licence    Creative Commons Attribution 4.0 New Zealand (CC BY 4.0)
+             https://creativecommons.org/licenses/by/4.0/
+
+The app credits the Trust wherever the layer is drawn: the map's credit strip carries
+"(c) Te Araroa Trust" linked to the Trust's own page while the layer is switched on, and the
+Layers sheet's row names the Trust and the licence.
+
+What was done to it, and nothing else: each `<trk>` became one LineString under the name the file
+gives it, the `<wpt>` kilometre markers were dropped (the layer is the route, not 3,058 markers), and
+the coordinates were rounded from the file's 15 decimal places to 6 - about 10 cm, against a trail the
+Trust describes as mostly generalised. 466 tracks and 28,027 points in, the same out.
+
+docs/te-araroa.md has the command that produces this file from that GPX.
