@@ -90,16 +90,13 @@ object PlaceLabels {
     /**
      * The credit the licence requires.
      *
-     * The same provider and the same licence as the imagery, so a map that already carries the imagery's
-     * credit carries this one too - see `Basemap.LINZ_AERIAL.attribution`. This is the whole of it, for
-     * a source that has to speak for itself in a style document; [SHORT_ATTRIBUTION] is what the map's
-     * own strip adds when the names are on, because there the licence and the publisher are already
-     * named by the imagery's credit.
+     * The same provider and the same licence as the imagery. This is the whole of it, and it is drawn
+     * by the style document the names are served in - see [nz.mckenzie.trailday.map.BasemapStyles] -
+     * because a source in a style document has to speak for itself. The map's own strip adds nothing:
+     * the imagery's credit there already names the publisher and the licence, so a second one was a
+     * third more strip for a fact the walker had already read.
      */
     const val ATTRIBUTION = "LINZ CC BY 4.0 \u00a9 Topographic data"
-
-    /** What the map's credit strip adds when the names are drawn - see [ATTRIBUTION]. */
-    const val SHORT_ATTRIBUTION = "\u00a9 Topographic data"
 
     /**
      * How sharply a letter may turn, for the one band whose name is drawn along a line.

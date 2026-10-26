@@ -362,7 +362,7 @@ fun MapScreen(
                     )
                 }
 
-                AttributionStrip(basemap = basemap, placeNames = placeNames, teAraroa = teAraroa)
+                AttributionStrip(basemap = basemap, teAraroa = teAraroa)
             }
         }
     }
@@ -852,10 +852,11 @@ private fun LocationNoticeCard(message: String, onDismiss: () -> Unit, modifier:
  * links to that basemap's own credit page - which is what makes it satisfy the licence rather than
  * merely mention it.
  *
- * [placeNames] adds the second credit where a second set of LINZ data is being drawn: the imagery's
- * own credit already names the publisher and the licence, so what it adds is the part that is new -
- * that topographic data is on the map as well. It stays *inside* the imagery's credit because it is
- * the same publisher's, and is separated by a middle dot rather than by a line break.
+ * [placeNames] is deliberately **not** part of this. The names come from LINZ's topographic tileset, and
+ * the credit for that - `LINZ CC BY 4.0 (c) Topographic data` - is drawn by the style document the
+ * names are served in, which is where a source has to speak for itself. On the strip there is nothing
+ * for it to add: the imagery's own credit already names the publisher and the licence, and the strip
+ * grew by a third for a fact the walker had already read. See [nz.mckenzie.trailday.domain.tiles.PlaceLabels].
  *
  * **A `FlowRow`, not a `Row`, and that is the whole of a bug this once had.** A `Row` lays its
  * children out side by side and squeezes them to fit, so with three credits - the imagery's, the
@@ -873,7 +874,6 @@ private fun LocationNoticeCard(message: String, onDismiss: () -> Unit, modifier:
 internal fun AttributionStrip(
     basemap: Basemap,
     modifier: Modifier = Modifier,
-    placeNames: Boolean = false,
     teAraroa: Boolean = false
 ) {
     val uriHandler = LocalUriHandler.current
@@ -885,11 +885,7 @@ internal fun AttributionStrip(
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text(
-            text = if (placeNames) {
-                "${basemap.attribution} \u00b7 ${PlaceLabels.SHORT_ATTRIBUTION}"
-            } else {
-                basemap.attribution
-            },
+            text = basemap.attribution,
             style = MaterialTheme.typography.labelSmall,
             color = Color.White,
             modifier = Modifier.clickable { uriHandler.openUri(basemap.attributionLink) }
