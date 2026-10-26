@@ -108,6 +108,14 @@ a documentation-only change is not a release.
 `worker/` is the Cloudflare Worker that holds the DOC API key so it is not in the APK. It is deployed
 on its own: `cd worker`, then `npm run deploy`.
 
+`worker-linz/` is the same idea for the **LINZ Basemaps key**, and it is a second Worker on purpose: a
+flood of map tiles cannot then eat into DOC's rate limit. Every LINZ URL in the app is a LINZ *path* on
+this Worker's host, so `Basemap.LINZ_TILES_HOST` is the whole of the app's side of it. Deployed on its
+own: `cd worker-linz`, `npx wrangler secret put LINZ_API_KEY`, then `npm run deploy`. **It must be
+answering before a release goes out** — `curl https://<worker>/health` — or every map in that release
+is blank. The key is a secret there, so rotating one is a command rather than a release, which is the
+point: LINZ's standard-access keys expire every 90 days.
+
 ## The house voice
 
 - **Comments say why, and what was rejected.** A comment that restates the code is worse than none; a
@@ -129,8 +137,13 @@ than assuming it is a bug:
 - The map's small DOC card is unreachable dead code: `DocCard`, `docPick`/`DocPick`, `focusDoc` and
   `MapFocus.Doc`.
 - "Clear all imagery" does not say "LINZ imagery", which is what that pack is called everywhere else.
-- The desk reaches LINZ directly for its sprite, its glyphs and its elevation, where the phone serves
-  its own.
+- The desk reaches the LINZ proxy directly for its sprite, its glyphs and its elevation, where the
+  phone serves its own.
+- **The map says nothing when the basemap stops answering.** A blank map with no explanation is the
+  one failure the proxy arrangement can produce, and the plan's last piece is a notice after a run of
+  tile failures: say that the source is not answering, offer the keyless drawn maps in one tap, and
+  ask the Worker's `GET /health` so the words distinguish "the proxy is down" from "LINZ refused the
+  key". `worker-linz/` answers that route already; the app does not ask it yet.
 - The drawn Topographic map's size estimate uses the imagery's arithmetic (about 45 KB a tile) and
   reads high for vector tiles.
 - The recording notification refreshes every five accepted fixes, so it sits at "0 m · 0 points" while

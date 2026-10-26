@@ -10,8 +10,9 @@ when you want a bigger screen.
 
 ## What it does
 
-- **Basemaps of your choice** — LINZ aerial imagery (New Zealand) by default, or OpenStreetMap for
-  roads, tracks and names, which needs no key and keeps working the day a LINZ key expires.
+- **Basemaps of your choice** - LINZ aerial imagery (New Zealand) by default, or OpenStreetMap for
+  roads, tracks and names. Neither asks you for anything: LINZ's tiles come through the app's own
+  proxy, which holds the key, so there is no key to enter and nothing that expires on your phone.
   Whichever is chosen, the credit its licence requires is shown permanently on every map, and
   **offline areas** download imagery so the map still works where there is no reception. **Where you
   are** is a dot on **every** map, ringed by the accuracy the fix was actually good to: a fix under
@@ -62,11 +63,18 @@ Two maps can be drawn under the work, chosen in **Settings** and used everywhere
 
 | Basemap | What it is | Key | Offline |
 | --- | --- | --- | --- |
-| **Aerial imagery** (LINZ) | A photograph of the ground — what a route decision is made from | LINZ Basemaps key | downloadable |
+| **Aerial imagery** (LINZ) | A photograph of the ground - what a route decision is made from | none: the proxy holds it | downloadable |
 | **OpenStreetMap** | A drawn map: roads, tracks, gates and names | none | browsed as you look at it |
 
-OpenStreetMap is in the app for one reason above all: the day a LINZ key expires, the map is still a
-map. It also shows the gates and the roads somebody else has already written down.
+**No map asks you for a key.** LINZ's tiles are fetched through the app's own Cloudflare Worker
+(`worker-linz/`), which holds the LINZ Basemaps API key as a secret and adds it on the way past. The
+app used to carry one, and **LINZ's standard-access keys expire every 90 days** - so a shipped app
+was one rotation away from a blank map, with the walker the one who had to fix it. Rotating it now
+is `npx wrangler secret put LINZ_API_KEY` and no release at all.
+
+OpenStreetMap is in the app because a drawn map is the other half of the picture - gates, roads and
+names that a photograph does not show - and because its tiles may be looked at with no key, no
+account and nothing to configure.
 
 ### Names over the imagery
 
@@ -110,9 +118,11 @@ keeps two licences, two suffixes and two caches apart:
   which Android may reclaim under storage pressure.
 
 Everything that differs between basemaps — the tile URL, the suffix on disk, the content type, the
-zoom the source publishes to, whether a key is needed, whether it may be fetched ahead of time, and
-the credit its licence requires — is one entry in
-[`domain/tiles/Basemap.kt`](app/src/main/java/nz/mckenzie/trailday/domain/tiles/Basemap.kt).
+zoom the source publishes to, whether it may be fetched ahead of time, and the credit its licence
+requires — is one entry in
+[`domain/tiles/Basemap.kt`](app/src/main/java/nz/mckenzie/trailday/domain/tiles/Basemap.kt). None of
+them carries a key: every LINZ URL in the app is a LINZ *path* on the app's own proxy host, so the
+whole of the key is one Worker secret.
 
 ## How offline imagery works
 
@@ -121,7 +131,8 @@ HTTP server inside the app, bound to `127.0.0.1`, which:
 
 - serves a tile from that source's on-disk store when it is held, so downloaded areas — and imagery
   you have simply browsed — work with no reception;
-- otherwise fetches it from LINZ (using the key in Settings) and stores it on the way through;
+- otherwise fetches it — from LINZ through the app's proxy for imagery, or from the drawn map's own
+  host — and stores it on the way through;
 - answers 404 for a tile that is neither held nor available, so the map shows its background colour
   rather than an error.
 
@@ -137,11 +148,15 @@ is available.
 
 ### What a dead key actually looks like
 
-LINZ serves tiles through a CDN that keys its cache on the path alone, so a tile anyone has already
-fetched keeps coming back `HTTP 200` whatever key is sent with it. So an expired key shows up as
-imagery that still works where you have already been and is blank somewhere new, rather than as an
-obviously broken map. That is why **Check** in Settings probes LINZ's hosted *style* document
-instead of a tile: the style is enforced per key even on a path everyone requests.
+It is worth knowing, because it is why the health check is what it is. LINZ serves tiles through a CDN
+that keys its cache on the path alone, so a tile anyone has already fetched keeps coming back `HTTP
+200` whatever key is sent with it. A dead key therefore shows up as imagery that still works where you
+have already been and is blank somewhere new, rather than as an obviously broken map — and no probe of
+a tile can tell the difference.
+
+The **style** document is enforced per key even on a path everyone requests, so that is what
+`GET /health` on the Worker asks for: `400` means the key has expired, `200` means it works, and the
+Worker says which in one sentence. See [`worker-linz/README.md`](worker-linz/README.md).
 
 ## The kinds of place
 
@@ -232,8 +247,8 @@ is not a state to discover on a hill. It runs in a single transaction, so an int
 leaves the previous data untouched.
 
 Downloaded offline imagery is deliberately absent: it describes tiles on one phone, and the tiles can
-be fetched again. The switches travel, but the LINZ key and the GitHub token do not, because both are
-credentials rather than records.
+be fetched again. The switches travel, but the GitHub token does not, because it is a credential
+rather than a record.
 
 Files are versioned (`"format": "trail-day-backup"`, `"version": 1`).
 
@@ -254,17 +269,16 @@ copy**. Unattended, the copy is written once a week.
 
 Requires JDK 17–23 and the Android SDK with platform 36 and build-tools 36.0.0.
 
-Add your LINZ Basemaps key to `local.properties` (gitignored):
+Add your Android SDK path to `local.properties` (gitignored):
 
 ```properties
 sdk.dir=/path/to/Android/Sdk
-LINZ_API_KEY=your_key_here
 ```
 
-Get a free standard-access key from <https://basemaps.linz.govt.nz> (no registration; note that
-standard keys **expire every 90 days**). The key in `local.properties` is only the default: the app
-takes a key entered at runtime under **Settings**, so an expired key is fixed on the hill, and the
-same screen will tell you whether LINZ accepts it.
+There is no key to add. The LINZ Basemaps API key lives in the `worker-linz/` Cloudflare Worker as a
+secret, and the app reaches LINZ through it - so building the app needs nothing but the SDK. To run
+that Worker, or to rotate the key, see [`worker-linz/README.md`](worker-linz/README.md): it is
+`npx wrangler secret put LINZ_API_KEY` and `npm run deploy`, and no release at all.
 
 ```bash
 ./gradlew assembleDebug testDebugUnitTest lint        # CI runs exactly this
@@ -283,7 +297,10 @@ Signing comes from repository secrets:
 | `KEYSTORE_PASSWORD` | keystore password |
 | `KEY_ALIAS` | key alias inside the keystore |
 | `KEY_PASSWORD` | key password |
-| `LINZ_API_KEY` | baked into the release build as the default key |
+
+No key is baked into a release any more: the LINZ Basemaps key is a secret on the `worker-linz/`
+Worker, which is deployed on its own (`cd worker-linz && npm run deploy`). **The Worker must be
+answering before a release goes out** - `curl https://<worker>/health` - or every map in it is blank.
 
 Each release carries one APK per architecture plus a universal one, so a phone downloads ~17 MB
 (arm64) rather than ~53 MB of native libraries for four architectures it will never use.
