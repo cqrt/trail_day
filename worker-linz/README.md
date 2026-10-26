@@ -140,6 +140,28 @@ real limit.
 map would trip, so there is none; the daily cap and the key's own limits are what guard it. The DOC
 proxy's `ratelimits` block is the pattern if one is wanted anyway.
 
+## Running it locally
+
+`npm run dev` starts a server on `127.0.0.1` and reads the key from a `.dev.vars` file in this
+directory — gitignored, and never the deployed one:
+
+```text
+LINZ_API_KEY=your_key_here
+```
+
+Two things that bite, both learned the hard way:
+
+- **Kill the whole tree, not the process holding the port.** `wrangler dev` supervises its runtime, so
+  killing the `workerd` child makes wrangler log *"The Workers runtime crashed unexpectedly and is being
+  restarted"* and start a new one on the same port. The command that started it is still running, and
+  nothing about it looks wrong — it sat in a terminal for ten hours once. Stop the top-level
+  `npx wrangler dev` process (on Windows, `taskkill /PID <pid> /T /F`) and the whole tree goes with it.
+- **A local run writes the key into `.wrangler/`.** `observability.enabled` is on in `wrangler.jsonc`,
+  so miniflare keeps a trace of each request — and a LINZ URL carries `?api=<key>`, so the key ends up
+  in `.wrangler/state/v3/observability/…`. Delete `.wrangler/` after a local run. It is gitignored
+  either way, and it is the same reason the key belongs on the Worker rather than in the app: the only
+  log it can land in is one you control.
+
 ## Tests
 
 ```text
