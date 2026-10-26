@@ -144,8 +144,9 @@ before changing it back. That rule joins paths that do not meet into one line â€
 tool cut a track up into, wrong for a service that publishes a track in pieces. "Breast Hill Track" is
 four paths, one of them 18 km away near the Timaru River, and joining them drew a straight line across
 the lake; `AssetGeometry.lengthM` counts every metre of every path, so the join was counted as distance
-the track does not have. Sampled against the live service: **4 of 12 tracks have more than one path and
-every one of them flattened**, with jumps of 116 m, 244 m, 1,487 m and 18 km. Fixed in 0.3.93.
+the track does not have. Sampled against the live service: **13 tracks fetched, 4 of them with more than
+one path, and every one of those 4 flattened** â€” with jumps of 116 m, 244 m, 1,487 m and 18 km. Fixed in
+0.3.93.
 
 A **cached** track keeps whatever the reader produced, so an offline area downloaded before 0.3.93
 still holds the flattened line until it is downloaded again.
