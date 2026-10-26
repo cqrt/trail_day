@@ -1,3 +1,6 @@
 node_modules/
 .wrangler/
 dist/
+
+# Local secrets for `wrangler dev`. Never committed, and never the deployed one.
+.dev.vars

@@ -16,11 +16,19 @@ Separate from the DOC proxy on purpose: a flood of tiles cannot then eat into DO
 | `GET /health` | the **aerial style document** - see below | 1 min |
 | `GET /v1/tiles/{tileset}/WebMercatorQuad/{z}/{x}/{y}.{ext}` | the same path at LINZ | 7 days |
 | `GET /v1/tiles/{tileset}/WebMercatorQuad/style/…` | the hosted style | 1 day |
-| `GET /v1/tiles/{tileset}/WebMercatorQuad/sprite/…` | the sprite the style names | 1 day |
-| `GET /v1/tiles/{tileset}/WebMercatorQuad/fonts/…` | the letters the style names | 1 day |
+| `GET /v1/sprites/{name}.{json,png}` | the sprite a style names | 1 day |
+| `GET /v1/fonts/{stack}/{range}.pbf` | the letters a style names | 1 day |
 
 Allowed tilesets: `aerial`, `topographic-v2`, `topo-raster`, `elevation`, `hillshade`. Nothing else is
 reachable, so the key cannot be spent on another of LINZ's services.
+
+**The sprite and the letters are not under `/v1/tiles/`**, and that is worth knowing before changing
+this allowlist: LINZ's hosted style names them at `/v1/sprites/topographic` and
+`/v1/fonts/Open Sans Regular/0-255.pbf`. The first version of this proxy assumed every path the app
+asked for was a tile and answered **404** for both, which cost the Topographic basemap every icon - 70
+of its 287 layers name one - and every patterned fill and line, 30 more that draw nothing at all
+without the image. On the phone *and* on the desk: the desk fetches LINZ's own sprite and letters
+rather than the phone's. Fixed in 0.3.92.
 
 The path is LINZ's own, unchanged - which is why the app's side of this is one constant: it swaps
 `basemaps.linz.govt.nz` for this Worker's URL and everything else about a URL stays as it was. The

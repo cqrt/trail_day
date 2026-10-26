@@ -26,6 +26,43 @@ export const LINZ_TILESETS = new Set([
 ]);
 
 /**
+ * The two LINZ paths a **style** names outside `/v1/tiles/`, and the only others this proxy will reach.
+ *
+ * A hosted style names its sprite and its letters at LINZ's own paths - `/v1/sprites/topographic` and
+ * `/v1/fonts/Open Sans Regular/0-255.pbf` - and neither is under `/v1/tiles/`. The first version of
+ * this proxy assumed everything the app asked for was a tile and answered **404** for both, which cost
+ * the Topographic basemap every icon (70 of its 287 layers name one) and every patterned fill and line
+ * (30 more, which draw nothing at all without the image) - on the phone *and* on the desk, because the
+ * desk fetches LINZ's own sprite and letters rather than the phone's.
+ */
+const LINZ_STYLE_PATHS = ["/v1/sprites/", "/v1/fonts/"];
+
+/** What a path stands for at LINZ, or null when it is not one this proxy serves. */
+export function tileTarget(pathname, search, apiKey) {
+  // No going upwards. The URL parser has already resolved `..` and `%2e` by the time a request
+  // reaches the worker, so this is the second lock rather than the first - but it is the one that
+  // holds if this function is ever handed a path from somewhere other than a request.
+  if (pathname.includes("..") || pathname.toLowerCase().includes("%2e")) return null;
+
+  const query = new URLSearchParams(search ?? "");
+  query.set("api", apiKey);
+
+  if (LINZ_STYLE_PATHS.some((path) => pathname.startsWith(path) && pathname.length > path.length)) {
+    return `${LINZ_ORIGIN}${pathname}?${query.toString()}`;
+  }
+
+  if (!pathname.startsWith("/v1/tiles/")) return null;
+
+  const rest = pathname.slice("/v1/tiles/".length);
+  const slash = rest.indexOf("/");
+  if (slash < 0) return null;
+
+  if (!LINZ_TILESETS.has(rest.slice(0, slash))) return null;
+
+  return `${LINZ_ORIGIN}/v1/tiles/${rest}?${query.toString()}`;
+}
+
+/**
  * The document the health check asks for, and why it is a style rather than a tile.
  *
  * **A tile cannot answer the question.** LINZ serves tiles through a CDN that keys its cache on the
@@ -35,26 +72,6 @@ export const LINZ_TILESETS = new Set([
  * service, and the same trap applies here, one hop further out.
  */
 export const PROBE_PATH = "/v1/tiles/aerial/WebMercatorQuad/style/aerial.json";
-
-/** What a `/v1/tiles/...` path stands for at LINZ, or null when it is not one this proxy serves. */
-export function tileTarget(pathname, search, apiKey) {
-  if (!pathname.startsWith("/v1/tiles/")) return null;
-
-  // No going upwards. The URL parser has already resolved `..` and `%2e` by the time a request
-  // reaches the worker, so this is the second lock rather than the first - but it is the one that
-  // holds if this function is ever handed a path from somewhere other than a request.
-  if (pathname.includes("..") || pathname.toLowerCase().includes("%2e")) return null;
-
-  const rest = pathname.slice("/v1/tiles/".length);
-  const slash = rest.indexOf("/");
-  if (slash < 0) return null;
-
-  if (!LINZ_TILESETS.has(rest.slice(0, slash))) return null;
-
-  const query = new URLSearchParams(search ?? "");
-  query.set("api", apiKey);
-  return `${LINZ_ORIGIN}/v1/tiles/${rest}?${query.toString()}`;
-}
 
 /** What a status code means about the key, in the same words the app used to say it in. */
 export function keyStatus(status) {

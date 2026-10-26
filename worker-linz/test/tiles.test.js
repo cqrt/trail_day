@@ -56,6 +56,32 @@ test("every tileset the app uses is allowed", () => {
   }
 });
 
+test("the style's own sprite and letters are fetched too, outside /v1/tiles/", () => {
+  // A hosted style names these at LINZ's *own* paths - `/v1/sprites/...` and `/v1/fonts/...` - and
+  // neither is a tile. The first version of this proxy assumed every path was one and answered 404
+  // for both, which cost the Topographic basemap its 70 icons and its 30 patterned fills and lines.
+  assert.equal(
+    tileTarget("/v1/sprites/topographic.json", "", "k"),
+    `${LINZ_ORIGIN}/v1/sprites/topographic.json?api=k`
+  );
+  assert.equal(
+    tileTarget("/v1/sprites/topographic@2x.png", "", "k"),
+    `${LINZ_ORIGIN}/v1/sprites/topographic@2x.png?api=k`
+  );
+  assert.equal(
+    tileTarget("/v1/fonts/Open%20Sans%20Regular/0-255.pbf", "", "k"),
+    `${LINZ_ORIGIN}/v1/fonts/Open%20Sans%20Regular/0-255.pbf?api=k`
+  );
+});
+
+test("a bare style path is not a path", () => {
+  // The allowlist is two prefixes, not "anything under /v1/".
+  assert.equal(tileTarget("/v1/sprites/", "", "k"), null);
+  assert.equal(tileTarget("/v1/fonts/", "", "k"), null);
+  assert.equal(tileTarget("/v1/sprites", "", "k"), null);
+  assert.equal(tileTarget("/v1/", "", "k"), null);
+});
+
 test("nothing else is reachable, so the key cannot be spent on another service", () => {
   // LINZ's other services, another tileset, a path that escapes upwards, and its own API root.
   assert.equal(tileTarget("/v1/tiles/some-other-tileset/WebMercatorQuad/0/0/0", "", "k"), null);
