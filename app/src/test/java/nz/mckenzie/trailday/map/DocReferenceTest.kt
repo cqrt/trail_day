@@ -1,5 +1,9 @@
 package nz.mckenzie.trailday.map
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.doc.DocItem
@@ -72,6 +76,40 @@ class DocReferenceTest {
         assertTrue(
             "no id: nothing on the map can act on a DOC row, so nothing may look like one of the walker's",
             json.contains("\"id\":0")
+        )
+    }
+
+    @Test
+    fun `a DOC track in more than one piece is drawn as more than one line`() {
+        // "Breast Hill Track" is four paths with one of them 18 km away. What the reader keeps apart,
+        // the map must draw apart: one feature per path, with no line joining them.
+        val split = DocItem(
+            source = DocSource.TRACKS,
+            objectId = 7L,
+            name = "Breast Hill Track",
+            paths = listOf(
+                listOf(GeoPoint(-44.448507, 169.582669), GeoPoint(-44.449097, 169.584333)),
+                listOf(GeoPoint(-44.580960, 169.360818), GeoPoint(-44.581000, 169.361000))
+            )
+        )
+
+        val json = DocGeoJson.build(listOf(split))
+
+        // Parsed rather than counted as text: the name rides on a stretch of its own, so the feature
+        // count is not the answer. What matters is that no line holds both pieces.
+        val lines = Json.parseToJsonElement(json).jsonObject["features"]!!.jsonArray
+            .map { it.jsonObject["geometry"]!!.jsonObject }
+            .filter { it["type"]!!.jsonPrimitive.content == "LineString" }
+
+        assertEquals("two pieces, two lines, and the one the name rides on", 3, lines.size)
+        assertEquals(
+            "and no line holds both pieces",
+            2,
+            lines.maxOf { it["coordinates"]!!.jsonArray.size }
+        )
+        assertTrue(
+            "the far piece is on the map",
+            json.contains("169.360818")
         )
     }
 

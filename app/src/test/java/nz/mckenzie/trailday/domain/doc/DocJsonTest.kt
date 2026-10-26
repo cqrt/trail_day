@@ -63,6 +63,30 @@ class DocJsonTest {
     }
 
     @Test
+    fun `a track DOC publishes in pieces keeps the pieces, not one line across the gaps`() {
+        // The shape DOC gives for "Breast Hill Track": more than one path, with one of them 18 km away
+        // near the Timaru River. Read through the file rule - which joins paths that do not meet into
+        // one line - that drew a straight line across the lake and counted the 18 km as distance.
+        val answer = """
+            {"type":"FeatureCollection","features":[
+              {"type":"Feature","geometry":{"type":"MultiLineString","coordinates":[
+                  [[169.582669,-44.448507],[169.584333,-44.449097]],
+                  [[169.360818,-44.580960],[169.361000,-44.581000]]
+              ]},"properties":{"OBJECTID":7,"TechObjectName":"Breast Hill Track"}}
+            ]}
+        """.trimIndent()
+
+        val track = DocJson.parse(DocSource.TRACKS, answer).single()
+
+        assertEquals("the two pieces are two paths", 2, track.paths.size)
+        assertEquals("four vertices between them", 4, track.pointCount)
+        assertTrue(
+            "and the 18 km between them is not counted as track: ${track.lengthM} m",
+            track.lengthM < 1_000.0
+        )
+    }
+
+    @Test
     fun `a place reads as one coordinate, with what DOC says about it`() {
         val hut = DocJson.parse(DocSource.HUTS, hutsAnswer).single()
 

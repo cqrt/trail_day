@@ -5,7 +5,6 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import nz.mckenzie.trailday.domain.track.GeoJsonParser
-import nz.mckenzie.trailday.domain.track.TrackInterchange
 
 /**
  * What one of DOC's services answered, read into the app's own record of it.
@@ -43,13 +42,16 @@ object DocJson {
             // A place is one coordinate, held as the path of one point the rest of the app speaks in.
             DocShape.POINT -> listOfNotNull(feature.point).map { point -> listOf(point) }
 
-            // A line goes through the app's own rule for what a line is: every path whole, side tracks
-            // joined to the track they hang off. A service that sends something else is saying it is not
-            // a track, and the app leaves it out rather than drawing it wrongly.
-            DocShape.LINE -> when (val outcome = TrackInterchange.reading(feature.paths)) {
-                is TrackInterchange.Outcome.Read -> outcome.reading.paths
-                is TrackInterchange.Outcome.Invalid -> emptyList()
-            }
+            // A line keeps DOC's own paths: whole, and **apart**.
+            //
+            // Deliberately not read through [TrackInterchange]'s file rule. That rule joins paths that do
+            // not meet into one line, which is right for a file a tool cut a track up into and wrong for a
+            // service that publishes a track in pieces: DOC's own `line` is a multi-path polyline, and
+            // every renderer draws one as separate lines. "Breast Hill Track" is four paths, one of them
+            // 18 km away near the Timaru River, and joining them drew a straight line across the lake -
+            // and `AssetGeometry.lengthM` counts every metre of every path, so the join was counted as
+            // distance the track does not have. A path of one point is not a line and is left out.
+            DocShape.LINE -> feature.paths.filter { it.size >= 2 }
         }
         if (paths.isEmpty()) return null
 
