@@ -39,7 +39,7 @@ class SettingsViewModelTest {
     private lateinit var store: OfflineTileStore
 
     @Before
-    fun setUp() = runBlocking {
+    fun setUp(): Unit = runBlocking {
         context = ApplicationProvider.getApplicationContext()
         store = OfflineTileStore(File(context.cacheDir, "settings-test-tiles"))
         store.deleteAll()
@@ -88,7 +88,8 @@ class SettingsViewModelTest {
     // `: Unit` throughout: JUnit4 only runs methods that return void, and a
     // `= runBlocking { ... }` whose last statement has a value does not. Two of these
     // were not void when first written, and the run failed as "invalid test class"
-    // rather than as a test failure.
+    // rather than as a test failure - and `setUp` joined them when the key's own
+    // teardown line came out of it and left `store.deleteAll()` as the last statement.
 
     /**
      * The off-site fields are seeded from the same repository, and the seeding has to survive a read
