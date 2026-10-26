@@ -1179,7 +1179,7 @@ style's background colour and the work draws on top of it.
       the phone goes to sleep, the desktop linz imagery fails to load as I browse around the map."*
       The desk has no imagery of its own: its style points every tile at the phone, and the phone's
       own tile route answers a tile it holds from disk and a tile it does not by **fetching it from
-      LINZ at that moment** — a 404 with no key, a 502 if the fetch fails. The editor's foreground
+      LINZ at that moment** — a 404 when the source has none, a 502 if the fetch fails. The editor's foreground
       service keeps the *process* alive, which is why the page, the documents and the ground already
       looked at went on working; nothing held the *device* awake, and `WAKE_LOCK` was not even in the
       manifest. A suspended CPU can answer with a disk read but cannot finish an outbound fetch, so
