@@ -12,6 +12,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -786,8 +788,21 @@ private fun LocationNoticeCard(message: String, onDismiss: () -> Unit, modifier:
  *
  * [placeNames] adds the second credit where a second set of LINZ data is being drawn: the imagery's
  * own credit already names the publisher and the licence, so what it adds is the part that is new -
- * that topographic data is on the map as well.
+ * that topographic data is on the map as well. It stays *inside* the imagery's credit because it is
+ * the same publisher's, and is separated by a middle dot rather than by a line break.
+ *
+ * **A `FlowRow`, not a `Row`, and that is the whole of a bug this once had.** A `Row` lays its
+ * children out side by side and squeezes them to fit, so with three credits - the imagery's, the
+ * topographic data's, and the trail's - the last one was given **102 px of the screen's 1080** and
+ * wrapped to one letter per line. Measured on the emulator with all three on: that credit was
+ * **378 px tall of 2400**, the strip's box **399 px**, a dark band across the foot of the map - and
+ * the credit it was drawing was unreadable at the same time, which is the worse half of it. A
+ * `FlowRow` moves a credit that does not fit onto the next line instead: the same three credits are
+ * **158 px** in all, both readable, the trail's on a line of its own.
+ * The trail's credit carries no leading separator for the same reason: on a line of its own, a dot
+ * at the start reads as a mistake.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun AttributionStrip(
     basemap: Basemap,
@@ -796,11 +811,12 @@ internal fun AttributionStrip(
     teAraroa: Boolean = false
 ) {
     val uriHandler = LocalUriHandler.current
-    Row(
+    FlowRow(
         modifier = modifier
             .background(Color(0x99000000), RoundedCornerShape(4.dp))
             .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text(
             text = if (placeNames) {
@@ -816,7 +832,7 @@ internal fun AttributionStrip(
         // than borrowing LINZ's: a credit that opens somebody else's page is not a credit.
         if (teAraroa) {
             Text(
-                text = " \u00b7 ${TeAraroa.SHORT_ATTRIBUTION}",
+                text = TeAraroa.SHORT_ATTRIBUTION,
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White,
                 modifier = Modifier.clickable { uriHandler.openUri(TeAraroa.ATTRIBUTION_LINK) }
