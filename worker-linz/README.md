@@ -92,20 +92,41 @@ proxy is down" from "the key was rejected" and can only repeat what this says.
    A custom domain can replace the `workers.dev` URL later by adding a `routes` block to
    `wrangler.jsonc`.
 
-## What this costs, and what it is worth watching
+## What this costs, and what is worth watching
 
-Cloudflare's free plan allows **100,000 requests a day**. Over it nothing is charged - the Worker
-answers `429` and the map is blank for whoever asks, until the reset - so the failure is availability,
-not a bill. The paid plan is roughly $5/month for 10 million requests a month.
+Cloudflare's free plan allows **100,000 requests a day**, and over it nothing is charged: Cloudflare
+answers an **error 1027** page instead of reaching the Worker, so the map is blank for whoever asks
+until midnight UTC. The failure is availability, not a bill. The paid plan is roughly $5/month for 10
+million requests a month.
 
-What counts is **unique** tiles: the phone keeps every tile it has looked at and every downloaded area
-on disk, so this Worker only sees tiles no phone holds. A screenful is 9-20 tiles, an afternoon of
-panning a few hundred, a downloaded area hundreds to a few thousand.
+**Both ceilings are account-wide, and neither can be configured.** The 100,000 a day is the whole
+account's, so the DOC proxy shares it; and a free account is also held to a **burst rate of 1,000
+requests a minute**, which is about 17 tiles a second. There is no "daily cap" setting in the
+dashboard to lower either one - the free plan's own limit is the cap, and it fails closed on its own.
 
-Two things worth doing rather than guessing: set a daily request cap in the Cloudflare dashboard so it
-is known rather than discovered, and watch the error rate. And the ceiling that is not Cloudflare's:
-**LINZ's limits now apply to one key across all your users**, so if LINZ rate-limits this key, every
-user gets the `429` at once. The developer key's quota is the real limit.
+What keeps you under it is the phone: it keeps every tile it has looked at and every downloaded area
+on disk, so this Worker is only asked for tiles no phone holds. A screenful is 9-20 tiles, an afternoon
+of panning a few hundred, a downloaded area hundreds to a few thousand. Note that **a cached response
+still counts** - the Worker is invoked either way - so this Worker's own edge cache saves the trip to
+LINZ, not the request.
+
+What to do rather than guess:
+
+- **Watch the Worker's own metrics**: Workers & Pages → `trailday-linz-proxy` → Metrics. The Requests
+  graph splits success from error, and **Invocation Statuses** is where a 1027 (`Exceeded resources`)
+  shows up. A dead key shows as a rise in errors too, because LINZ's own status is passed through
+  unchanged.
+- **Turn on the Workers usage notification** (Notifications → the Workers category → Weekly Summary):
+  request counts, duration, egress and your busiest Workers, by email. It is a roll-up rather than an
+  alarm, and it does not know anything about your LINZ key.
+- **For an alarm on the key**, nothing in Cloudflare knows it expired. `curl .../health` is the check,
+  and if it wants doing for you, this Worker can grow a cron trigger (free plan: up to 3 per Worker, a
+  minute apart) that probes `/health` and shouts at a webhook when it stops saying `ok`. Scheduled
+  invocations count against the same daily 100,000.
+
+And the ceiling that is not Cloudflare's: **LINZ's limits now apply to one key across all your users**,
+so if LINZ rate-limits this key, every user gets the `429` at once. The developer key's quota is the
+real limit.
 
 **Tiles are not rate limited here.** A limiter tight enough to stop abuse is one a walker panning the
 map would trip, so there is none; the daily cap and the key's own limits are what guard it. The DOC
