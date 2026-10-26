@@ -1,0 +1,15 @@
+{
+  "name": "trailday-linz-proxy",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A small Cloudflare Worker that holds the LINZ Basemaps API key for Trail Day.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "wrangler": "^4.151.3"
+  }
+}
