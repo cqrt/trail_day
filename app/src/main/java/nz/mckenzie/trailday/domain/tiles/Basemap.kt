@@ -104,7 +104,7 @@ enum class Basemap(
         contentType = "application/x-protobuf",
         maxZoom = 15,
         prefetchable = false,
-        attribution = "LINZ CC BY 4.0 \u00a9 Topographic data and LiDAR hillshade",
+        attribution = "LINZ CC BY 4.0 \u00a9 Topographic data",
         attributionLink = "https://www.linz.govt.nz/products-services/data/licensing-and-using-" +
             "data/attributing-linz-basemaps-data"
     );
