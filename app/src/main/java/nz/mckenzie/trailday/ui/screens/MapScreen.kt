@@ -104,6 +104,7 @@ fun MapScreen(
     onOpenDocDetail: (DocItem, DocItem?) -> Unit = { _, _ -> }
 ) {
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
+    val basemapTrouble by viewModel.basemapTrouble.collectAsStateWithLifecycle()
     val camera by viewModel.camera.collectAsStateWithLifecycle()
     val geoJson by viewModel.assetGeoJson.collectAsStateWithLifecycle()
     val docGeoJson by viewModel.docGeoJson.collectAsStateWithLifecycle()
@@ -303,6 +304,26 @@ fun MapScreen(
                     .align(Alignment.CenterEnd)
                     .padding(end = KEY_EDGE_PADDING)
             )
+
+            // What to say when the imagery has stopped arriving, with the way out of it. Only ever shown
+            // after a run of tiles has failed, and only for a basemap that has a drawn alternative - see
+            // [TileTrouble] and [nz.mckenzie.trailday.offline.ProxyHealthCheck].
+            basemapTrouble?.let { trouble ->
+                BasemapTroubleCard(
+                    message = trouble,
+                    // Nothing better to offer a walker who is already on a drawn map: this notice is about
+                    // LINZ's tiles, and LINZ's tiles are not what they are drawing.
+                    onUseDrawnMap = if (basemap == Basemap.OPENSTREETMAP) {
+                        null
+                    } else {
+                        { viewModel.useBasemap(Basemap.OPENSTREETMAP) }
+                    },
+                    onDismiss = viewModel::answerTrouble,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(24.dp)
+                )
+            }
 
             // The card and the licence line share one column at the foot of the map, so the card sits *above*
             // the line rather than on top of it - whatever the line's height is, with place names and without.
@@ -752,6 +773,51 @@ private fun GlyphTile(glyph: IconGlyph, background: Color, tint: Color) {
         contentAlignment = Alignment.Center
     ) {
         AppIcon(glyph = glyph, dimension = 20.dp, tint = tint)
+    }
+}
+
+/**
+ * What to say when the basemap has stopped answering, and the way out of it.
+ *
+ * The app cannot tell a dead key from a Worker that is down - see [TileTrouble] - so the sentence in
+ * the middle is the Worker's own, asked for once and repeated as it was given. What the card adds is
+ * the thing the walker can actually do about it: the drawn maps need no key, no account and nothing
+ * configured, so they work on the day the imagery does not, and one tap puts them under the walker's
+ * work rather than sending them into Settings to find a switch.
+ *
+ * A card rather than a toast, and at the middle of the map rather than in a corner: a map that is not
+ * drawing is what the walker is looking at, so this is where their eyes already are.
+ */
+@Composable
+private fun BasemapTroubleCard(
+    message: String,
+    /** Null when the map already *is* a drawn map: there is then nothing better to offer. */
+    onUseDrawnMap: (() -> Unit)?,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        elevation = CardDefaults.cardElevation(defaultElevation = TrailDayElevation.floating),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(text = "This map is not drawing", style = MaterialTheme.typography.titleMedium)
+            Text(text = message, style = MaterialTheme.typography.bodySmall)
+            Text(
+                text = "The drawn maps - OpenStreetMap and Topographic - need no key, so they work " +
+                    "whatever this is.",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                onUseDrawnMap?.let { use ->
+                    Button(onClick = use) { Text("Use OpenStreetMap") }
+                }
+                TextButton(onClick = onDismiss) { Text("Dismiss") }
+            }
+        }
     }
 }
 

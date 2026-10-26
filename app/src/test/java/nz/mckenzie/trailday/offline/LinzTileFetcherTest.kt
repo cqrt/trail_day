@@ -50,6 +50,9 @@ class LinzTileFetcherTest {
     fun tearDown() {
         // Some tests in this class need no server at all.
         if (::server.isInitialized) server.stop()
+        // Every fetch through this fetcher is counted, so a test that left a run of failures behind
+        // would be handing it to the next one.
+        TileTrouble.reset()
     }
 
     /** A fetcher that talks to the local server instead of LINZ. */
@@ -100,6 +103,46 @@ class LinzTileFetcherTest {
         val result = offline.fetch(14, 1017, 660)
 
         assertTrue("expected a failure, got $result", result is TileFetcher.Result.Failed)
+    }
+
+    @Test
+    fun `a tile that arrives clears the run of failures`() = runBlocking {
+        startServer()
+        store.write(14, 1017, 660, byteArrayOf(4, 5, 6))
+
+        repeat(TileTrouble.RUN) { TileTrouble.failed() }
+        assertEquals(TileTrouble.RUN, TileTrouble.consecutiveFailures.value)
+
+        fetcher().fetch(14, 1017, 660)
+
+        assertEquals(
+            "the map is not in trouble once a tile has come back",
+            0,
+            TileTrouble.consecutiveFailures.value
+        )
+    }
+
+    @Test
+    fun `a 404 is the source answering, not a failure`() = runBlocking {
+        // A walker panning over the sea gets these by the dozen. Counting them would put the notice on
+        // screen over water with nothing wrong at all.
+        startServer(upstream = TileFetcher { _, _, _ -> TileFetcher.Result.NotFound })
+
+        repeat(TileTrouble.RUN) { TileTrouble.failed() }
+
+        fetcher().fetch(14, 1017, 660)
+
+        assertEquals(0, TileTrouble.consecutiveFailures.value)
+    }
+
+    @Test
+    fun `a failure counts towards the run the notice waits for`() = runBlocking {
+        startServer(upstream = TileFetcher { _, _, _ -> TileFetcher.Result.Failed("upstream down") })
+
+        repeat(TileTrouble.RUN) { fetcher().fetch(14, 1017, 660) }
+
+        assertEquals(TileTrouble.RUN, TileTrouble.consecutiveFailures.value)
+        assertTrue(isTrouble(TileTrouble.consecutiveFailures.value, answered = false))
     }
 
     @Test

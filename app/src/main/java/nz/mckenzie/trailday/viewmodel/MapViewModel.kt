@@ -55,6 +55,9 @@ import nz.mckenzie.trailday.map.TeAraroaGeoJson
 import nz.mckenzie.trailday.map.DocTrackVisibility
 import nz.mckenzie.trailday.map.drawingKind
 import nz.mckenzie.trailday.offline.OfflineDocStore
+import nz.mckenzie.trailday.offline.ProxyHealth
+import nz.mckenzie.trailday.offline.ProxyHealthCheck
+import nz.mckenzie.trailday.offline.TileTrouble
 import nz.mckenzie.trailday.map.AssetHitTest
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.tracking.DevicePosition
@@ -137,12 +140,26 @@ class MapViewModel(
      */
     private val recordingRepository: RecordingRepository? = null,
     /** Injected so a test can count how often a line is re-read from the database. */
-    private val loadGeometry: suspend (Long) -> AssetGeometry = assetRepository::getAssetGeometry
+    private val loadGeometry: suspend (Long) -> AssetGeometry = assetRepository::getAssetGeometry,
+    /** Injected so a test can say what the app's own proxy answers without reaching it. */
+    private val proxyHealth: ProxyHealthCheck = ProxyHealthCheck()
 ) : ViewModel() {
 
     /** Which map to draw under the work: the walker's choice in Settings. */
     val basemap: StateFlow<Basemap> = settingsRepository.basemap
         .stateIn(viewModelScope, SharingStarted.Eagerly, Basemap.DEFAULT)
+
+    /**
+     * What to say when the basemap has stopped answering, or null when there is nothing to say.
+     *
+     * A run of tiles has to fail first - see [TileTrouble] - and only then is the app's own proxy asked,
+     * so a map that is working never makes the call. What is shown is the Worker's own sentence about the
+     * key rather than a guess made here, which is the whole reason the call is made: this phone cannot
+     * tell a dead key from a Worker that is down, and the Worker can.
+     */
+    val basemapTrouble: StateFlow<String?> = TileTrouble.showing
+        .map { showing -> if (showing) askProxy() else null }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     /**
      * The layers of the work this map is not drawing.
@@ -918,6 +935,34 @@ class MapViewModel(
     /** Shows or hides the trail, written straight through like the layer switches. */
     fun setTeAraroa(shown: Boolean) {
         viewModelScope.launch { settingsRepository.setTeAraroa(shown) }
+    }
+
+    /**
+     * Switches the basemap from the map itself, which is what the trouble notice offers.
+     *
+     * Written to the preference rather than held here, so it is the same choice the Settings screen
+     * offers and the walker can switch back from there. The trouble counted about the source being left
+     * is forgotten with it: a map that never asks LINZ anything cannot be told it is not answering.
+     */
+    fun useBasemap(choice: Basemap) {
+        TileTrouble.reset()
+        viewModelScope.launch { settingsRepository.setBasemap(choice) }
+    }
+
+    /** The walker has read the trouble notice. It stays away until tiles start arriving again. */
+    fun answerTrouble() {
+        TileTrouble.answered()
+    }
+
+    /**
+     * Asks the app's own proxy what it makes of the key.
+     *
+     * Best-effort: a phone with no reception cannot ask, and "the map service could not be reached" is
+     * then the honest answer rather than a claim about the key.
+     */
+    private suspend fun askProxy(): String = when (val answer = proxyHealth.check()) {
+        is ProxyHealth.Answered -> answer.message
+        ProxyHealth.Unreachable -> "The map service could not be reached."
     }
 
     companion object {

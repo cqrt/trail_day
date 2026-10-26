@@ -38,7 +38,7 @@ class LinzTileFetcher(
         withContext(Dispatchers.IO) {
             val url = URL(urlFor(zoom, x, y))
 
-            runCatching {
+            val result = runCatching {
                 val connection = (url.openConnection() as HttpURLConnection).apply {
                     requestMethod = "GET"
                     connectTimeout = connectTimeoutMs
@@ -73,6 +73,16 @@ class LinzTileFetcher(
             }.getOrElse { error ->
                 TileFetcher.Result.Failed(error.message ?: error::class.java.simpleName)
             }
+
+            // Every LINZ tile this app fetches comes through here - the map's own, the place names', the
+            // heights, and a download's - so this is where "nothing is coming" can be told from "one
+            // tile did not". See [TileTrouble].
+            when (result) {
+                is TileFetcher.Result.Tile, TileFetcher.Result.NotFound -> TileTrouble.arrived()
+                is TileFetcher.Result.Failed -> TileTrouble.failed()
+            }
+
+            result
         }
 
     private companion object {
