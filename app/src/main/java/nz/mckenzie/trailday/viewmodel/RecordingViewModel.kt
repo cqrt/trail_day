@@ -141,7 +141,6 @@ class RecordingViewModel(
 
     /** The line of DOC's being followed, when the target is DOC's rather than the walker's own. */
     private val _selectedDoc = MutableStateFlow<DocTarget?>(null)
-    val selectedDoc: StateFlow<DocTarget?> = _selectedDoc
 
     val selectedTrackName: StateFlow<String?> =
         combine(_selectedAssetId, assets, _selectedDoc) { id, list, doc ->

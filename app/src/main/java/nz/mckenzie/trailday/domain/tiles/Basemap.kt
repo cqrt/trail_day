@@ -237,14 +237,6 @@ enum class Basemap(
          */
         const val OSM_HOST = "https://tile.openstreetmap.org"
 
-        /**
-         * The LINZ topographic vector basemap only goes to zoom 15.
-         *
-         * Named here for the day it is offered as a basemap of its own; this build does not have
-         * it in the table, so nothing draws from it yet.
-         */
-        const val LINZ_TOPOGRAPHIC_MAX_ZOOM = 15
-
         /** LINZ's own attribution page, as the table has it. */
         val LINZ_ATTRIBUTION_LINK: String get() = LINZ_AERIAL.attributionLink
 

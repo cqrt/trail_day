@@ -44,10 +44,6 @@ class DocBikeLinks private constructor(val pairs: List<DocBikeLink>) {
     fun bikeFor(track: DocItem): DocItem? =
         byTrackRef[track.sourceRef]?.minByOrNull { it.distanceM }?.bike
 
-    /** Every bike point paired with [track], nearest to the line first. */
-    fun bikesFor(track: DocItem): List<DocItem> =
-        byTrackRef[track.sourceRef].orEmpty().sortedBy { it.distanceM }.map { it.bike }
-
     /** The tracks that can be ridden, by reference: the ones with at least one bike point. */
     val linkedTrackRefs: Set<String> get() = byTrackRef.keys
 

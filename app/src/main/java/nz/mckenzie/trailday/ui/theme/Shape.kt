@@ -22,8 +22,5 @@ internal val TrailDayShapes = Shapes(
     extraLarge = RoundedCornerShape(32.dp)
 )
 
-/** The radius of the tile a kind's glyph sits in, and of the figure tiles: the mock screens' twelve. */
-val TileCorner = RoundedCornerShape(14.dp)
-
 /** How big that tile is: a gloved finger's target, and the mock screens' own measure. */
 val TileSize = 44.dp

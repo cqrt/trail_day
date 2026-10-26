@@ -46,3 +46,6 @@ captures/
 
 # Local test builds staged for a device
 dist/
+
+# OpenChamber's own captures and scratch, made while working on the app
+.openchamber/

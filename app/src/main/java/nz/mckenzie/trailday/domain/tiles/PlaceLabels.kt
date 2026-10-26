@@ -327,14 +327,6 @@ object PlaceLabels {
         tilesUrlTemplate.substringBefore(TILES_MARK) + "/tiles/$ID/{z}/{x}/{y}$TILE_SUFFIX"
 
     /**
-     * The XYZ template for a style that fetches from the proxy itself, for the tests and for a preview
-     * that has the app's own server to hand.
-     */
-    fun urlTemplate(): String =
-        "${Basemap.LINZ_TILES_HOST}/v1/tiles/$TILESET/${Basemap.LINZ_TILE_MATRIX}/{z}/{x}/{y}" +
-            TILE_SUFFIX
-
-    /**
      * The tileset's name inside LINZ's service.
      *
      * **`topographic-v2`, and the `-v2` is not decoration**: the earlier `topographic` tileset answers

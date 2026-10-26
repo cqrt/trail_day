@@ -31,12 +31,6 @@ object WebEditorState {
 
     val isOn: Boolean get() = _url.value != null
 
-    /** What a dropped track file is called in the body the page sends: see [WebEditorServer.GPX_FIELD]. */
-    val gpxField: String get() = WebEditorServer.GPX_FIELD
-
-    /** How large a track file the phone will take: see [WebEditorServer.MAX_GPX_BYTES]. */
-    val maxGpxBytes: Int get() = WebEditorServer.MAX_GPX_BYTES
-
     internal fun servingAt(url: String) {
         _url.value = url
     }

@@ -55,34 +55,6 @@ fun KindTile(
     }
 }
 
-/**
- * One figure in a tile: a big number, with its own label underneath it.
- *
- * The mock screens say a pass's distance, its time and its points this way rather than as one line of
- * figures: each figure gets its own label, and each is big enough to read at arm's length with the phone
- * still in a pocket.
- */
-@Composable
-fun FigureTile(
-    value: String,
-    label: String,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(horizontal = 12.dp, vertical = 10.dp)
-    ) {
-        Text(text = value, style = MaterialTheme.typography.titleLarge)
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
 /** The kind's colour for the screen it is on: the light set, or the derived dark one. */
 @Composable
 internal fun kindColour(kind: AssetKind, dark: Boolean = isSystemInDarkTheme()): Color {

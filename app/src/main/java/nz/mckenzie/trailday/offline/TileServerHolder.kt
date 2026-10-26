@@ -63,10 +63,6 @@ object TileServerHolder {
     fun elevationTemplateUrl(): String? =
         server?.takeIf { it.isRunning }?.tileUrlTemplate(ELEVATION_ID)
 
-    /** The XYZ template for the hidden DEM hillshade, or null if the server is not up yet. */
-    fun hillshadeTemplateUrl(): String? =
-        server?.takeIf { it.isRunning }?.tileUrlTemplate(HILLSHADE_ID)
-
     /**
      * Where a hosted style should look for [basemap]'s sprite, or null if the server is not up yet.
      *
@@ -280,10 +276,5 @@ object TileServerHolder {
     }
 
     fun imageryStore(context: Context): OfflineTileStore = store(context, Basemap.LINZ_AERIAL)
-
-    internal fun stopForTest() {
-        server?.stop()
-        server = null
-    }
 }
 
