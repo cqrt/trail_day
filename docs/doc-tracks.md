@@ -136,8 +136,21 @@ the wire to the desk, and in the offline cache (schema **v10**, `MIGRATION_9_10`
 ## What it reads, and what it writes
 
 `DocTracksJson` reads the answer with `GeoJsonParser` — the same reader a GeoJSON file gets — and
-turns each feature's paths into a track with `TrackInterchange.reading`, so a DOC track is a line
-with side tracks exactly as a file's is. It keeps what the browser needs beyond the name: `OBJECTID`
+keeps **each feature's own paths**: DOC's `line` is a multi-path polyline, which every renderer draws
+as separate lines, so a track published in pieces is drawn in pieces.
+
+It is deliberately **not** read through `TrackInterchange`'s file rule, and that is worth knowing
+before changing it back. That rule joins paths that do not meet into one line — right for a file a
+tool cut a track up into, wrong for a service that publishes a track in pieces. "Breast Hill Track" is
+four paths, one of them 18 km away near the Timaru River, and joining them drew a straight line across
+the lake; `AssetGeometry.lengthM` counts every metre of every path, so the join was counted as distance
+the track does not have. Sampled against the live service: **4 of 12 tracks have more than one path and
+every one of them flattened**, with jumps of 116 m, 244 m, 1,487 m and 18 km. Fixed in 0.3.93.
+
+A **cached** track keeps whatever the reader produced, so an offline area downloaded before 0.3.93
+still holds the flattened line until it is downloaded again.
+
+It keeps what the browser needs beyond the name: `OBJECTID`
 (its key), `SubObjectType` (its kind), `FlocID` (its site), and its **track type**; `DocTrack.sourceRef`
 is `doc:<OBJECTID>`.
 
