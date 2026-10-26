@@ -158,6 +158,13 @@ The **style** document is enforced per key even on a path everyone requests, so 
 `GET /health` on the Worker asks for: `400` means the key has expired, `200` means it works, and the
 Worker says which in one sentence. See [`worker-linz/README.md`](worker-linz/README.md).
 
+**The app says so too, rather than leaving you with a blank map.** It counts tiles that fail in a row,
+and after five it asks the Worker and puts what it says on the map — "LINZ rejected the key (HTTP 403):
+it may have expired", or "The map service could not be reached" when the Worker itself is not
+answering — with a one-tap **Use OpenStreetMap** under it, because the drawn maps need no key and work
+whatever the imagery is doing. One failed tile is not news: panning over the sea gets `404`s by the
+dozen, and those count as the source answering.
+
 ## The kinds of place
 
 There are five, and **the kind decides the shape**: a **track** and a **bike track** are lines you

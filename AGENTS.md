@@ -139,11 +139,6 @@ than assuming it is a bug:
 - "Clear all imagery" does not say "LINZ imagery", which is what that pack is called everywhere else.
 - The desk reaches the LINZ proxy directly for its sprite, its glyphs and its elevation, where the
   phone serves its own.
-- **The map says nothing when the basemap stops answering.** A blank map with no explanation is the
-  one failure the proxy arrangement can produce, and the plan's last piece is a notice after a run of
-  tile failures: say that the source is not answering, offer the keyless drawn maps in one tap, and
-  ask the Worker's `GET /health` so the words distinguish "the proxy is down" from "LINZ refused the
-  key". `worker-linz/` answers that route already; the app does not ask it yet.
 - The drawn Topographic map's size estimate uses the imagery's arithmetic (about 45 KB a tile) and
   reads high for vector tiles.
 - The recording notification refreshes every five accepted fixes, so it sits at "0 m · 0 points" while
