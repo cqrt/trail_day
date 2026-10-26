@@ -333,7 +333,9 @@ APK, and an APK signed with a different key is refused by the installer.
 Basemap imagery is licensed **CC BY 4.0** and provided by LINZ. Every map screen shows
 `LINZ CC BY 4.0 © Imagery Basemap contributors`, linking to LINZ's
 [attribution page](https://www.linz.govt.nz/products-services/data/licensing-and-using-data/attributing-linz-basemaps-data).
-With **place names** switched on, the same strip adds `© Topographic data`.
+That one credit covers every LINZ basemap. **Place names** are LINZ's too and draw their own credit,
+`LINZ CC BY 4.0 © Topographic data`, in the style document they are served in — but not on the strip,
+where the credit above has already named the publisher and the licence.
 
 DOC data is **CC BY 4.0**, Crown copyright: the tracks shown as searched or imported are DOC's, not
 the app's.

@@ -129,16 +129,19 @@ is not done yet.
 | `offline/TileServerHolder.kt` | The source in the app's tile server: the LINZ fetcher with the vector URL, the store in the cache directory, the content type. No key, no names. |
 | `data/SettingsRepository.kt` | `place_names`, **off** when unset, with the reasoning on the preference. |
 | `viewmodel/MapViewModel.kt` | The switch, written straight through like the layer switches. |
-| `ui/screens/MapScreen.kt` | The row in "What the map draws", and the second credit in the attribution strip. |
+| `ui/screens/MapScreen.kt` | The row in "What the map draws". |
 | `map/BasemapView.kt` | `placeNames`, which reloads the style rather than hiding a layer - the names are a source. |
 | `web/WebEditorDocuments.kt` | Reads the switch when the desk asks for its style, so a page reload is enough for a change to take effect. |
 | `app/src/test/.../PlaceLabelsTest.kt` | The tileset, the URLs and the bands, held by a test. |
 
 ## Notes and limits
 
-- **The dataset is LINZ's**, under CC BY 4.0, the same as the imagery: the credit strip adds
-  `© Topographic data` when the names are on, because the imagery's own credit already names the
-  publisher and the licence.
+- **The dataset is LINZ's**, under CC BY 4.0, the same as the imagery. Its credit,
+  `LINZ CC BY 4.0 © Topographic data`, is drawn by the **style document** the names are served in -
+  the one place a source has to speak for itself. The map's own credit strip does **not** add it: the
+  imagery's credit there already names the publisher and the licence, so a second credit was a third
+  more strip for a fact the walker had already read, and the strip was made smaller by dropping it
+  (0.3.91). The strip's only second credit is the trail's, which is a different publisher's.
 - **Names are only as current as the tiles**, which are LINZ's own and updated by them.
 - **A town name is furniture, not work.** Nothing here is stored against an asset, nothing is imported,
   and switching the names off changes nothing but the picture.
