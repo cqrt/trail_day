@@ -101,7 +101,6 @@ fun MapScreen(
     onOpenAsset: (Long) -> Unit = {},
     onOpenDocDetail: (DocItem, DocItem?) -> Unit = { _, _ -> }
 ) {
-    val apiKey by viewModel.linzApiKey.collectAsStateWithLifecycle()
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
     val camera by viewModel.camera.collectAsStateWithLifecycle()
     val geoJson by viewModel.assetGeoJson.collectAsStateWithLifecycle()
@@ -178,7 +177,6 @@ fun MapScreen(
         ) {
             BasemapView(
                 basemap = basemap,
-                apiKey = apiKey,
                 assetGeoJson = geoJson,
                 yourTracksGeoJson = yourTracksGeoJson,
                 // DOC's material, under the walker's own work: the tracks, huts, campsites and bike
@@ -303,18 +301,6 @@ fun MapScreen(
                     .align(Alignment.CenterEnd)
                     .padding(end = KEY_EDGE_PADDING)
             )
-
-            // Only when the chosen basemap needs a key and none is set. OpenStreetMap needs none,
-            // which is the whole reason it is in the app: the day a LINZ key expires, the map is
-            // still a map.
-            if (basemap.needsKey && apiKey.isBlank()) {
-                MissingKeyCard(
-                    onOpenSettings = onOpenSettings,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(24.dp)
-                )
-            }
 
             // The card and the licence line share one column at the foot of the map, so the card sits *above*
             // the line rather than on top of it - whatever the line's height is, with place names and without.
@@ -785,31 +771,6 @@ private fun LocationNoticeCard(message: String, onDismiss: () -> Unit, modifier:
         ) {
             Text(text = message, style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = onDismiss) { Text("Dismiss") }
-        }
-    }
-}
-
-@Composable
-private fun MissingKeyCard(onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
-    Card(
-        elevation = CardDefaults.cardElevation(defaultElevation = TrailDayElevation.floating),
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.linz_key_title),
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                text = stringResource(R.string.linz_key_missing),
-                style = MaterialTheme.typography.bodySmall
-            )
-            // The one place where the missing key is the walker's problem, so the fix
-            // is a tap away rather than buried in another screen.
-            TextButton(onClick = onOpenSettings) { Text("Open settings") }
         }
     }
 }

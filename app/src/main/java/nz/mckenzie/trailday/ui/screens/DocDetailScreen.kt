@@ -75,7 +75,6 @@ fun DocDetailScreen(
     val alertState by viewModel.alerts.collectAsStateWithLifecycle()
     val picture by viewModel.picture.collectAsStateWithLifecycle()
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
-    val apiKey by viewModel.apiKey.collectAsStateWithLifecycle()
     val bike = viewModel.bike
     val uriHandler = LocalUriHandler.current
 
@@ -130,7 +129,6 @@ fun DocDetailScreen(
             ) {
                 BasemapView(
                     basemap = basemap,
-                    apiKey = apiKey,
                     assetGeoJson = AssetGeoJson.build(emptyList()),
                     docGeoJson = geoJson,
                     docBikeBadgesGeoJson = badgeGeoJson,

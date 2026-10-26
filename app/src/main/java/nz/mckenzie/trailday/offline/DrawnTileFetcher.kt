@@ -40,7 +40,7 @@ class DrawnTileFetcher(
     private val appVersion: String = BuildConfig.VERSION_NAME,
     /** Overridden in tests, so the mapping can be asserted without the live service. */
     private val urlFor: (zoom: Int, x: Int, y: Int) -> String =
-        { zoom, x, y -> Basemap.OPENSTREETMAP.tileUrl("", zoom, x, y) },
+        { zoom, x, y -> Basemap.OPENSTREETMAP.tileUrl(zoom, x, y) },
     private val connectTimeoutMs: Int = 10_000,
     private val readTimeoutMs: Int = 20_000
 ) : TileFetcher {

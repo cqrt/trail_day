@@ -44,7 +44,6 @@ import nz.mckenzie.trailday.viewmodel.AddSpotViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddSpotScreen(viewModel: AddSpotViewModel, onBack: () -> Unit) {
-    val apiKey by viewModel.apiKey.collectAsStateWithLifecycle()
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
     val geoJson by viewModel.draftGeoJson.collectAsStateWithLifecycle()
     val initialFrame by viewModel.initialFrame.collectAsStateWithLifecycle()
@@ -84,7 +83,6 @@ fun AddSpotScreen(viewModel: AddSpotViewModel, onBack: () -> Unit) {
         ) {
             BasemapView(
                 basemap = basemap,
-                apiKey = apiKey,
                 assetGeoJson = geoJson,
                 // A spot is dropped where the walker is standing, so that is the frame.
                 fitBounds = initialFrame,

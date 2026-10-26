@@ -140,9 +140,6 @@ class MapViewModel(
     private val loadGeometry: suspend (Long) -> AssetGeometry = assetRepository::getAssetGeometry
 ) : ViewModel() {
 
-    val linzApiKey: StateFlow<String> = settingsRepository.linzApiKey
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), "")
-
     /** Which map to draw under the work: the walker's choice in Settings. */
     val basemap: StateFlow<Basemap> = settingsRepository.basemap
         .stateIn(viewModelScope, SharingStarted.Eagerly, Basemap.DEFAULT)

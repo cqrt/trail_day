@@ -9,20 +9,6 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// LINZ Basemaps API key.
-// Supplied locally through local.properties (gitignored) for debug builds, or
-// through the LINZ_API_KEY environment variable in CI release builds.
-// It is only used as a *default*: the app also accepts a key entered at runtime.
-val linzApiKey: String = run {
-    val propsFile = rootProject.file("local.properties")
-    val fromFile = if (propsFile.exists()) {
-        Properties().apply { propsFile.inputStream().use { load(it) } }.getProperty("LINZ_API_KEY")
-    } else {
-        null
-    }
-    (fromFile ?: System.getenv("LINZ_API_KEY") ?: "").trim()
-}
-
 // Release signing is driven by environment variables (CI) or by a local
 // keystore.properties (gitignored). No key material is ever committed, and a
 // machine without either simply produces an unsigned release build.
@@ -60,8 +46,6 @@ android {
         // version from the git tag and the run number.
         versionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
         versionName = (project.findProperty("versionName") as String?) ?: "0.1.0"
-
-        buildConfigField("String", "LINZ_API_KEY", "\"$linzApiKey\"")
     }
 
     signingConfigs {

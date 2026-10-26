@@ -49,10 +49,6 @@ class AddSpotViewModel(
     private val locationSource: LocationSource
 ) : ViewModel() {
 
-    /** Needed to render the basemap behind the tap. */
-    val apiKey: StateFlow<String> = settingsRepository.linzApiKey
-        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
-
     /** Which map to drop the spot on: the walker's choice in Settings. */
     val basemap: StateFlow<Basemap> = settingsRepository.basemap
         .stateIn(viewModelScope, SharingStarted.Eagerly, Basemap.DEFAULT)

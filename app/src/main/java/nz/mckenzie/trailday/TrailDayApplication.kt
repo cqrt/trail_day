@@ -44,7 +44,7 @@ class TrailDayApplication : Application() {
         // The basemap picker's example tiles, fetched once at launch: one small tile each, so the
         // pictures are there the moment Settings is opened rather than arriving while it is read.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            BasemapPreviewCache.loadAll(settings.linzApiKey.first())
+            BasemapPreviewCache.loadAll()
         }
 
         // The same for the update check: the switch that turns it off has to actually

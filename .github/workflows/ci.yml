@@ -33,8 +33,6 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build, unit test and lint
-        env:
-          LINZ_API_KEY: ${{ secrets.LINZ_API_KEY }}
         run: ./gradlew --no-daemon assembleDebug testDebugUnitTest lint
 
       # The desk's own pure code, tested without a browser. `geometry.mjs`, `glow.mjs`, `doc.mjs`,
@@ -97,8 +95,6 @@ jobs:
 
       - name: Run the instrumented tests
         uses: reactivecircus/android-emulator-runner@v2
-        env:
-          LINZ_API_KEY: ${{ secrets.LINZ_API_KEY }}
         with:
           api-level: 36
           arch: x86_64

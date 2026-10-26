@@ -42,9 +42,6 @@ class OfflineViewModel(
     private val docStore: OfflineDocStore
 ) : ViewModel() {
 
-    val apiKey: StateFlow<String> = settings.linzApiKey
-        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
-
     /** The imagery areas on the device. Chosen elsewhere; managed here. */
     val stored: StateFlow<List<OfflineArea>> = manager.observeAreas()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
@@ -160,14 +157,7 @@ class OfflineViewModel(
             _working.value = true
             _error.value = null
             try {
-                // Read the key now rather than from a cached flow: the button can be tapped before
-                // the first read has landed.
-                val key = settings.linzApiKey.first()
-                if (key.isBlank()) {
-                    _error.value = "Add a LINZ Basemaps key before downloading an area."
-                    return@launch
-                }
-                pack.download(areaId, key)
+                pack.download(areaId)
             } catch (cancelled: CancellationException) {
                 // Leaving the screen is not a failure; the download resumes later.
                 throw cancelled

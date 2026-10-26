@@ -27,26 +27,24 @@ object BasemapPreviewCache {
     private val cache = ConcurrentHashMap<String, ImageBitmap>()
 
     /** The tile for [basemap], fetched once and remembered. */
-    suspend fun load(basemap: Basemap, apiKey: String): ImageBitmap? {
-        cache[cacheKey(basemap, apiKey)]?.let { return it }
-        val picture = fetch(basemap, apiKey) ?: return null
-        cache[cacheKey(basemap, apiKey)] = picture
+    suspend fun load(basemap: Basemap): ImageBitmap? {
+        cache[cacheKey(basemap)]?.let { return it }
+        val picture = fetch(basemap) ?: return null
+        cache[cacheKey(basemap)] = picture
         return picture
     }
 
     /** Fetches every basemap's tile, so the picker has nothing left to wait for. */
-    suspend fun loadAll(apiKey: String) {
-        Basemap.entries.forEach { basemap -> load(basemap, apiKey) }
+    suspend fun loadAll() {
+        Basemap.entries.forEach { basemap -> load(basemap) }
     }
 
-    private fun cacheKey(basemap: Basemap, apiKey: String): String = "${basemap.id}:$apiKey"
+    private fun cacheKey(basemap: Basemap): String = basemap.id
 
-    private suspend fun fetch(basemap: Basemap, apiKey: String): ImageBitmap? =
+    private suspend fun fetch(basemap: Basemap): ImageBitmap? =
         withContext(Dispatchers.IO) {
-            if (basemap.needsKey && apiKey.isBlank()) return@withContext null
-
             val (x, y) = tile(PREVIEW_LAT, PREVIEW_LNG, PREVIEW_ZOOM)
-            val url = basemap.previewTileUrl(apiKey, PREVIEW_ZOOM, x, y)
+            val url = basemap.previewTileUrl(PREVIEW_ZOOM, x, y)
             val connection = runCatching {
                 (URL(url).openConnection() as HttpURLConnection).apply {
                     requestMethod = "GET"

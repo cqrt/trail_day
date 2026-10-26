@@ -62,9 +62,6 @@ class RecordingDetailViewModel(
     settingsRepository: SettingsRepository
 ) : ViewModel() {
 
-    val apiKey: StateFlow<String> = settingsRepository.linzApiKey
-        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
-
     /** Which map to draw the pass on: the walker's choice in Settings. */
     val basemap: StateFlow<Basemap> = settingsRepository.basemap
         .stateIn(viewModelScope, SharingStarted.Eagerly, Basemap.DEFAULT)

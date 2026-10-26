@@ -67,7 +67,6 @@ fun OfflineScreen(
     onChooseDocArea: () -> Unit,
     onChooseTopoArea: () -> Unit
 ) {
-    val apiKey by viewModel.apiKey.collectAsStateWithLifecycle()
     val stored by viewModel.stored.collectAsStateWithLifecycle()
     val working by viewModel.working.collectAsStateWithLifecycle()
     val summary by viewModel.summary.collectAsStateWithLifecycle()
@@ -129,11 +128,7 @@ fun OfflineScreen(
                 } else {
                     active?.takeIf { !it.isComplete }?.let { "Downloading\u2026 ${it.percent}%" }
                 },
-                footnote = if (apiKey.isBlank()) {
-                    "Add a LINZ Basemaps key in Settings to download imagery."
-                } else {
-                    null
-                },
+                footnote = "LINZ's aerial photographs, kept on the phone.",
                 error = error,
                 clearLabel = "Clear all imagery".takeIf { summary.tiles > 0L },
                 onClear = { confirmingClearImagery = true }

@@ -40,17 +40,17 @@ import java.net.URL
 object LinzVectorStyle {
 
     /**
-     * The adapted style for [basemap], or null when LINZ cannot be read and nothing has been kept.
+     * The adapted style for [basemap], or null when the proxy cannot be read and nothing has been kept.
      *
      * [vectorTileTemplate] and [elevationTileTemplate] are the app's own tile-server templates when it
-     * is running; a null elevation template falls back to LINZ directly. [glyphsUrl] and [spriteUrl] are
-     * the app's own addresses for the letters and the icons, and [store] is what earlier loads kept.
+     * is running; a null elevation template falls back to the proxy directly. [glyphsUrl] and
+     * [spriteUrl] are the app's own addresses for the letters and the icons, and [store] is what
+     * earlier loads kept.
      */
     suspend fun load(
-        apiKey: String,
         basemap: Basemap,
         vectorTileTemplate: String?,
-        /** The app's own elevation route, when its tile server is up; null reaches LINZ directly. */
+        /** The app's own elevation route, when its tile server is up; null reaches the proxy directly. */
         elevationTileTemplate: String? = null,
         /** The app's own letters, when its tile server is up; null keeps LINZ's own. */
         glyphsUrl: String? = null,
@@ -59,9 +59,9 @@ object LinzVectorStyle {
         /** What earlier loads kept, so this one can be answered with no network at all. */
         store: HostedStyleStore? = null
     ): String? = withContext(Dispatchers.IO) {
-        val url = basemap.hostedStyleUrl(apiKey) ?: return@withContext null
-        // LINZ first, what was kept second: a phone with no reception still has the document from the
-        // last time it had one, which is the whole point of keeping it.
+        val url = basemap.hostedStyleUrl() ?: return@withContext null
+        // The proxy first, what was kept second: a phone with no reception still has the document from
+        // the last time it had one, which is the whole point of keeping it.
         val body = readText(url)?.also { store?.writeStyle(basemap, it) }
             ?: store?.readStyle(basemap)
             ?: return@withContext null
@@ -70,7 +70,7 @@ object LinzVectorStyle {
 
         // The sprite is fetched here rather than left to the renderer, because the renderer asks the
         // app's own server for it and that server has nothing to answer with until something has.
-        if (store != null) keepSprite(basemap, root, apiKey, store)
+        if (store != null) keepSprite(basemap, root, store)
 
         val sources = buildJsonObject {
             put(
@@ -79,7 +79,7 @@ object LinzVectorStyle {
                     put("type", "vector")
                     put(
                         "tiles",
-                        buildJsonArray { add(vectorTileTemplate ?: basemap.tileTemplate(apiKey)) }
+                        buildJsonArray { add(vectorTileTemplate ?: basemap.tileTemplate()) }
                     )
                     put("minzoom", 0)
                     put("maxzoom", basemap.maxZoom)
@@ -90,12 +90,12 @@ object LinzVectorStyle {
                 buildJsonObject {
                     put("type", "raster-dem")
                     // Through the app's own server when it is up, so the heights it shades are in a
-                    // store the app keeps and an offline area can cover them. Straight from LINZ
+                    // store the app keeps and an offline area can cover them. Straight from the proxy
                     // otherwise, which is what LINZ's own style does.
                     put(
                         "tiles",
                         buildJsonArray {
-                            add(elevationTileTemplate ?: Basemap.elevationTemplate(apiKey))
+                            add(elevationTileTemplate ?: Basemap.elevationTemplate())
                         }
                     )
                     put("tileSize", 256)
@@ -117,15 +117,16 @@ object LinzVectorStyle {
                 put("layers", layersWithStrongerHillshade(root, appFonts = glyphsUrl != null))
                 // The letters the app ships rather than LINZ's, when the app's server is up: they are
                 // already on the phone, so a name draws with no reception and for no extra bytes. See
-                // [GlyphFonts]. LINZ's own address, key and all, is the fallback.
+                // [GlyphFonts]. LINZ's own address, through the proxy, is the fallback.
                 val glyphs = glyphsUrl ?: root["glyphs"]?.jsonPrimitive?.contentOrNull?.let {
-                    withKey(it, apiKey)
+                    throughProxy(it)
                 }
                 glyphs?.let { put("glyphs", JsonPrimitive(it)) }
                 // The app's own server for the sprite, which is where the copy kept above is served
-                // from; LINZ's own address is the fallback for a load with no server behind it.
+                // from; LINZ's own address, through the proxy, is the fallback for a load with no
+                // server behind it.
                 val sprite = spriteUrl ?: root["sprite"]?.jsonPrimitive?.contentOrNull?.let {
-                    withKey(it, apiKey)
+                    throughProxy(it)
                 }
                 sprite?.let { put("sprite", JsonPrimitive(it)) }
             }
@@ -213,7 +214,6 @@ object LinzVectorStyle {
     private fun keepSprite(
         basemap: Basemap,
         root: JsonObject,
-        apiKey: String,
         store: HostedStyleStore
     ) {
         val base = root["sprite"]?.jsonPrimitive?.contentOrNull ?: return
@@ -222,13 +222,20 @@ object LinzVectorStyle {
             // "sprite.json" asks for `<base>.json`: the "sprite" part of the name is the app's, not
             // LINZ's, and is what the app's own route is addressed by.
             val wanted = base + name.removePrefix(SPRITE_PREFIX)
-            readBytes(withKey(wanted, apiKey))?.let { store.writeSprite(basemap, name, it) }
+            readBytes(throughProxy(wanted))?.let { store.writeSprite(basemap, name, it) }
         }
     }
 
-    /** A LINZ asset URL with the key added, whichever separator it already needs. */
-    private fun withKey(url: String, apiKey: String): String =
-        url + (if (url.contains('?')) '&' else '?') + "api=" + Basemap.sanitiseKey(apiKey)
+    /**
+     * A LINZ asset URL, fetched through the app's proxy.
+     *
+     * LINZ's style document names its own sprite and its own letters at LINZ's host, and the app no
+     * longer talks to LINZ at all: everything goes through the proxy, which is the only thing holding
+     * the key. The rewrite is the host and nothing else - the path is LINZ's, which is what the proxy
+     * answers on.
+     */
+    private fun throughProxy(url: String): String =
+        url.replace(Basemap.LINZ_ORIGIN, Basemap.LINZ_TILES_HOST)
 
     private fun readText(url: String): String? = readBytes(url)?.decodeToString()
 

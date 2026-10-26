@@ -13,19 +13,17 @@ import org.junit.Test
  */
 class BasemapStylesTest {
 
-    private val key = "c01abcDEF123"
-
     @Test
     fun `aerial style is a version 8 document with the raster source`() {
         val json = BasemapStyles.rasterStyleJson(
             Basemap.LINZ_AERIAL,
-            Basemap.LINZ_AERIAL.tileTemplate(key)
+            Basemap.LINZ_AERIAL.tileTemplate()
         )
 
         assertTrue(json.trimStart().startsWith("{"))
         assertTrue(json.contains("\"version\": 8"))
         assertTrue(json.contains("\"type\": \"raster\""))
-        assertTrue(json.contains(Basemap.LINZ_AERIAL.tileTemplate(key)))
+        assertTrue(json.contains(Basemap.LINZ_AERIAL.tileTemplate()))
         assertTrue(json.contains("\"maxzoom\": 22"))
         assertTrue(json.contains("\"id\": \"linz-aerial\""))
     }
@@ -34,7 +32,7 @@ class BasemapStylesTest {
     fun `aerial style carries the required attribution`() {
         val json = BasemapStyles.rasterStyleJson(
             Basemap.LINZ_AERIAL,
-            Basemap.LINZ_AERIAL.tileTemplate(key)
+            Basemap.LINZ_AERIAL.tileTemplate()
         )
 
         assertTrue(json.contains("LINZ CC BY 4.0"))
@@ -139,7 +137,7 @@ class BasemapStylesTest {
     @Test
     fun `every basemap builds a style with its own zoom and credit`() {
         Basemap.entries.forEach { basemap ->
-            val json = BasemapStyles.rasterStyleJson(basemap, basemap.tileTemplate(key))
+            val json = BasemapStyles.rasterStyleJson(basemap, basemap.tileTemplate())
 
             assertTrue(json.contains("\"maxzoom\": ${basemap.maxZoom}"))
             assertTrue(json.contains(basemap.attribution))

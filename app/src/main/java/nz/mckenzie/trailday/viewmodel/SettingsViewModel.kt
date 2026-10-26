@@ -31,25 +31,11 @@ import nz.mckenzie.trailday.domain.backup.OffsiteBackupRules
 import nz.mckenzie.trailday.domain.backup.StoredBackup
 import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.domain.tiles.Basemap
-import nz.mckenzie.trailday.offline.KeyCheck
-import nz.mckenzie.trailday.offline.LinzKeyProbe
 import nz.mckenzie.trailday.offline.OfflineTileStore
 import nz.mckenzie.trailday.offline.TileServerHolder
 import nz.mckenzie.trailday.offline.TileStoreSummary
-import nz.mckenzie.trailday.offline.maskKey
 import nz.mckenzie.trailday.web.WebEditorService
 import nz.mckenzie.trailday.web.WebEditorState
-
-/** Where the key currently in use came from. */
-enum class KeySource { BUILT_IN, ENTERED, NONE }
-
-/** What the "check the key" button is doing. */
-sealed interface KeyCheckState {
-    data object Idle : KeyCheckState
-    data object Checking : KeyCheckState
-    data object Worked : KeyCheckState
-    data class Failed(val message: String) : KeyCheckState
-}
 
 /**
  * The editor's switch: the two things it does.
@@ -84,18 +70,11 @@ sealed interface OffsiteCheckState {
 }
 
 /**
- * The app's settings: the LINZ Basemaps key, the update checks and the backups.
- *
- * The key matters because a standard-access key expires every 90 days and the failure
- * is silent: the map just stops drawing. Before this screen there was no way to enter
- * a new key at all, so an expired key meant waiting for a new build.
+ * The app's settings: the basemap, the update checks and the backups.
  */
 class SettingsViewModel(
     private val settings: SettingsRepository,
     private val store: OfflineTileStore,
-    private val probe: LinzKeyProbe = LinzKeyProbe(),
-    /** Injected so tests never reach LINZ. */
-    private val checkKey: suspend (String) -> KeyCheck = { probe.check(it) },
     /** Backup files: chosen by the walker, read and written by the app. */
     private val backup: BackupController? = null,
     /**
@@ -119,56 +98,12 @@ class SettingsViewModel(
     private val isEditorServing: () -> Boolean = { WebEditorState.isOn }
 ) : ViewModel() {
 
-    /** The key as typed, seeded from what is stored rather than from the default. */
-    private val _keyText = MutableStateFlow("")
-    val keyText: StateFlow<String> = _keyText
-
-    /**
-     * True once the walker has touched the field, so the seeding read below cannot
-     * land late and wipe a key that is half typed. This is a real race, not a
-     * theoretical one: the field is seeded from DataStore, and on a slow device the
-     * read can take longer than it takes to start typing.
-     */
-    private var typed = false
-
-    val keySource: StateFlow<KeySource> = settings.storedLinzApiKey
-        .map { stored ->
-            when {
-                stored.isNotBlank() -> KeySource.ENTERED
-                BuildConfig.LINZ_API_KEY.isNotBlank() -> KeySource.BUILT_IN
-                else -> KeySource.NONE
-            }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), initialSource())
-
-    /**
-     * The LINZ key itself, for the basemap picker's preview tiles.
-     *
-     * Not shown anywhere: it is handed to the preview composable so each basemap can fetch one real
-     * tile. The masked [activeKeyLabel] stays the only form the walker ever reads.
-     */
-    val linzKey: StateFlow<String> = settings.linzApiKey
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-            BuildConfig.LINZ_API_KEY
-        )
-
-    /** The key actually in force, masked: enough to tell two keys apart, no more. */
-    val activeKeyLabel: StateFlow<String> = settings.linzApiKey
-        .map { key -> if (key.isBlank()) "" else maskKey(key) }
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-            maskKey(BuildConfig.LINZ_API_KEY)
-        )
-
     /**
      * Which basemap the walker has chosen for their maps.
      *
-     * Seeded with the default rather than left empty, like the key label above: DataStore answers
-     * in a frame, and a card whose selection is briefly wrong is better than one that is briefly
-     * blank.
+     * Seeded with the default rather than left empty, like every other preference here: DataStore
+     * answers in a frame, and a card whose selection is briefly wrong is better than one that is
+     * briefly blank.
      */
     val basemap: StateFlow<Basemap> = settings.basemap
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), Basemap.DEFAULT)
@@ -271,12 +206,6 @@ class SettingsViewModel(
         }
     }
 
-    private val _check = MutableStateFlow<KeyCheckState>(KeyCheckState.Idle)
-    val check: StateFlow<KeyCheckState> = _check
-
-    private val _message = MutableStateFlow<String?>(null)
-    val message: StateFlow<String?> = _message
-
     private val _storedTiles = MutableStateFlow(TileStoreSummary(0, 0))
     val storedTiles: StateFlow<TileStoreSummary> = _storedTiles
 
@@ -333,55 +262,6 @@ class SettingsViewModel(
     }
 
     val versionLabel: String = "version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
-
-    fun setKeyText(text: String) {
-        typed = true
-        _keyText.value = text
-        // Any edit invalidates a previous verdict.
-        _check.value = KeyCheckState.Idle
-        _message.value = null
-    }
-
-    fun save() {
-        viewModelScope.launch {
-            val value = _keyText.value.trim()
-            settings.setLinzApiKey(value)
-            _message.value = if (value.isBlank()) {
-                "Cleared: the key built into this build is in use again"
-            } else {
-                "Saved. Press Check to make sure LINZ accepts it."
-            }
-        }
-    }
-
-    /** Falls back to the key shipped in the build, if there is one. */
-    fun clearEnteredKey() {
-        viewModelScope.launch {
-            typed = true
-            _keyText.value = ""
-            settings.setLinzApiKey("")
-            _check.value = KeyCheckState.Idle
-            _message.value = "Cleared: the key built into this build is in use again"
-        }
-    }
-
-    /** Asks LINZ whether it accepts the key, which is the only honest answer. */
-    fun check() {
-        viewModelScope.launch {
-            _check.value = KeyCheckState.Checking
-            _message.value = null
-            val key = settings.linzApiKey.first()
-            _check.value = when {
-                key.isBlank() -> KeyCheckState.Failed("There is no key to check")
-                else -> when (val result = runCatching { checkKey(key) }.getOrElse { failure ->
-                    KeyCheck.Failed(failure.message ?: "the check could not run")
-                }) {
-                    KeyCheck.Works -> KeyCheckState.Worked
-                    is KeyCheck.Failed -> KeyCheckState.Failed(result.message)
-                }
-            }
-        }
-    }
 
     /** "trail-day-backup-2026-09-14.json" - offered as the file name in the picker. */
     fun backupFileName(): String = backup?.suggestedFileName() ?: "trail-day-backup.json"
@@ -514,8 +394,6 @@ class SettingsViewModel(
      */
     init {
         viewModelScope.launch {
-            val stored = settings.storedLinzApiKey.first()
-            if (!typed) _keyText.value = stored
             _storedTiles.value = TileStoreSummary(store.storedTileCount(), store.storedBytes())
         }
 
@@ -782,14 +660,6 @@ class SettingsViewModel(
 
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L
-
-        /**
-         * Until the stored setting has been read, the key baked into the build is the
-         * one in force, so the screen says so at once instead of flashing "no key" on a
-         * slow device and correcting itself a moment later.
-         */
-        private fun initialSource(): KeySource =
-            if (BuildConfig.LINZ_API_KEY.isNotBlank()) KeySource.BUILT_IN else KeySource.NONE
 
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext

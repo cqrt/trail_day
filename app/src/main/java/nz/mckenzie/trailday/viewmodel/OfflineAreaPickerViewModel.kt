@@ -96,9 +96,6 @@ class OfflineAreaPickerViewModel(
             OfflineAreaDraft.MAX_ZOOM
         }
 
-    val apiKey: StateFlow<String> = settings.linzApiKey
-        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
-
     /** Where the picker's map should open, so nobody starts on the wrong island. */
     private val _startBounds = MutableStateFlow<LatLngBounds?>(null)
     val startBounds: StateFlow<LatLngBounds?> = _startBounds
@@ -303,18 +300,9 @@ class OfflineAreaPickerViewModel(
             _working.value = true
             _error.value = null
             try {
-                // Read the key from settings now rather than trusting a cached flow:
-                // tapping Download the instant the screen opens must not claim there
-                // is no key.
-                val key = settings.linzApiKey.first()
-                if (key.isBlank()) {
-                    _error.value = "Add a LINZ Basemaps key before downloading an area."
-                    return@launch
-                }
-
                 val area = manager.createArea(plan)
                 _activeId.value = area.id
-                manager.download(area.id, key)
+                manager.download(area.id)
                 _saved.value = true
             } catch (cancelled: CancellationException) {
                 // Leaving the screen is not a failure: the tiles already fetched stay,
@@ -358,15 +346,9 @@ class OfflineAreaPickerViewModel(
             _error.value = null
             _docMessage.value = null
             try {
-                val key = settings.linzApiKey.first()
-                if (key.isBlank()) {
-                    _error.value = "Add a LINZ Basemaps key before downloading an area."
-                    return@launch
-                }
-
                 val area = manager.createArea(plan)
                 _activeId.value = area.id
-                manager.download(area.id, key)
+                manager.download(area.id)
 
                 // The map's own ground is on the phone; now what DOC publishes on it. A failure here is
                 // said rather than thrown, and does not take the tiles away.
@@ -420,16 +402,10 @@ class OfflineAreaPickerViewModel(
             _working.value = true
             _topoMessage.value = null
             try {
-                val key = settings.linzApiKey.first()
-                if (key.isBlank()) {
-                    _topoMessage.value = "Add a LINZ Basemaps key before downloading an area."
-                    return@launch
-                }
-
                 // Recorded before a tile is fetched, so the area is on the list - and resumable - from the
                 // moment it is asked for.
                 val area = topography.createArea(plan)
-                val downloaded = topography.download(area.id, key)
+                val downloaded = topography.download(area.id)
 
                 _topoMessage.value = topoDownloadedMessage(downloaded)
                 // Leave for the offline screen when the box is as covered as it can be; stay when tiles

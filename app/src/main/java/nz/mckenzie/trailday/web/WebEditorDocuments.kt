@@ -62,8 +62,6 @@ class WebEditorDocuments(
      * is asked for on every page load and the walker may have changed their mind in between.
      */
     private val placeNames: suspend () -> Boolean = { false },
-    /** The LINZ key, for a basemap whose style has to be fetched and adapted. */
-    private val apiKey: suspend () -> String = { "" },
     /** One file of the page, from the APK's own assets, or null when it ships no such file. */
     private val readPageFile: (String) -> ByteArray?,
     /**
@@ -400,11 +398,11 @@ class WebEditorDocuments(
     override suspend fun style(authority: String): String {
         val chosen = basemap()
         // The vector Topographic basemap is LINZ's own 287-layer style. It is fetched and adapted so
-        // its `sky` block is dropped, its fonts get the key, and both of its sources come from this
-        // phone rather than from LINZ. The desk then draws the work over LINZ's own cartography.
+        // its `sky` block is dropped, its sprite and its letters come from the app's proxy, and both
+        // of its sources come from this phone rather than from LINZ. The desk then draws the work over
+        // LINZ's own cartography.
         val baseStyle = if (chosen.usesHostedStyle) {
             LinzVectorStyle.load(
-                apiKey = apiKey(),
                 basemap = chosen,
                 vectorTileTemplate = "http://$authority/tiles/${chosen.id}/{z}/{x}/{y}" +
                     "${chosen.tileSuffix}$tokenQuery"

@@ -12,10 +12,12 @@ import org.junit.Test
  * else's service, or the thing that keeps two sources' tiles apart on disk. A change here that
  * looks harmless - a suffix, a zoom, an attribution string - is the sort of change that is
  * noticed by a licence holder rather than by a compiler, so they are pinned.
+ *
+ * The LINZ entries are pinned to the app's own proxy rather than to LINZ's host, because that is
+ * where they are fetched from now: the key lives in the Worker, so a URL that named LINZ directly
+ * would be a URL with no key on it. See `worker-linz/README.md`.
  */
 class BasemapTest {
-
-    private val key = "c01abcDEF123"
 
     /** The one the tests have always named, so the aerial facts are pinned to their own values. */
     private val aerial = Basemap.LINZ_AERIAL
@@ -25,13 +27,9 @@ class BasemapTest {
     private val topo = Basemap.TOPOGRAPHIC
 
     @Test
-    fun `the topographic map is fetched from their host over https and needs no key`() {
-        assertEquals("https://tile.opentopomap.org/{z}/{x}/{y}.png", topo.tileTemplate(""))
-        assertEquals("https://tile.opentopomap.org/14/1017/660.png", topo.tileUrl("", 14, 1017, 660))
-        assertFalse(
-            "a key must not be smuggled into a source that needs none",
-            topo.tileTemplate(key).contains(key)
-        )
+    fun `the topographic map is fetched from their host over https`() {
+        assertEquals("https://tile.opentopomap.org/{z}/{x}/{y}.png", topo.tileTemplate())
+        assertEquals("https://tile.opentopomap.org/14/1017/660.png", topo.tileUrl(14, 1017, 660))
     }
 
     @Test
@@ -46,61 +44,72 @@ class BasemapTest {
     }
 
     @Test
-    fun `aerial tile template uses the linz xyz path and api parameter`() {
+    fun `aerial tile template is the linz xyz path on the app's own proxy`() {
         assertEquals(
-            "https://basemaps.linz.govt.nz/v1/tiles/aerial/WebMercatorQuad/{z}/{x}/{y}.webp?api=$key",
-            aerial.tileTemplate(key)
+            "https://trailday-linz-proxy.le-mckenzies.workers.dev/v1/tiles/aerial/" +
+                "WebMercatorQuad/{z}/{x}/{y}.webp",
+            aerial.tileTemplate()
         )
     }
 
     @Test
     fun `aerial tile url is one tile of the same path`() {
         assertEquals(
-            "https://basemaps.linz.govt.nz/v1/tiles/aerial/WebMercatorQuad/14/1017/660.webp?api=$key",
-            aerial.tileUrl(key, 14, 1017, 660)
+            "https://trailday-linz-proxy.le-mckenzies.workers.dev/v1/tiles/aerial/" +
+                "WebMercatorQuad/14/1017/660.webp",
+            aerial.tileUrl(14, 1017, 660)
         )
     }
 
     @Test
     fun `topographic style url points at the hosted style json`() {
-        assertTrue(
-            Basemap.linzTopographicStyleUrl(key).endsWith("style/topographic.json?api=$key")
-        )
+        assertTrue(Basemap.linzTopographicStyleUrl().endsWith("style/topographic.json"))
     }
 
     @Test
-    fun `the key probe asks for linz aerial imagery`() {
-        assertTrue(Basemap.linzStyleUrl(key).endsWith("style/aerial.json?api=$key"))
+    fun `no url anywhere in the app carries a key`() {
+        // The whole point of the proxy: if a key ever appears in one of these, it has been
+        // smuggled back into the APK, where it would expire on every phone at once.
+        Basemap.entries.forEach { basemap ->
+            assertFalse(
+                "${basemap.id}'s tile template must not carry a key",
+                basemap.tileTemplate().contains("api=")
+            )
+            assertFalse(
+                "${basemap.id}'s tile url must not carry a key",
+                basemap.tileUrl(14, 1017, 660).contains("api=")
+            )
+        }
+        assertFalse(Basemap.elevationTemplate().contains("api="))
+        assertFalse(Basemap.elevationUrl(14, 1017, 660).contains("api="))
+        assertFalse(Basemap.demHillshadeTemplate().contains("api="))
+        assertFalse(Basemap.demHillshadeUrl(14, 1017, 660).contains("api="))
+        assertFalse(Basemap.linzTopographicStyleUrl().contains("api="))
     }
 
     @Test
-    fun `keys are sanitised for url and json safety`() {
-        assertEquals("abc123", Basemap.sanitiseKey("  abc123  "))
-        assertEquals("abc123", Basemap.sanitiseKey("\"abc123\""))
-        assertEquals("abc-123_XY", Basemap.sanitiseKey("abc-123_XY\n"))
-        assertEquals("", Basemap.sanitiseKey("  "))
-    }
+    fun `every linz url is fetched from the app's proxy, not from linz`() {
+        val host = Basemap.LINZ_TILES_HOST
 
-    @Test
-    fun `a key pasted with quotes or newlines still produces a clean url`() {
-        val messy = "  \"$key\"\n"
-
-        val url = aerial.tileUrl(messy, 14, 1017, 660)
-
-        assertTrue(url.contains("?api=$key"))
-        assertFalse(url.contains("\"$key"))
-    }
-
-    @Test
-    fun `the drawn map is fetched from their host over https and needs no key`() {
-        val template = osm.tileTemplate("")
-
-        assertEquals("https://tile.openstreetmap.org/{z}/{x}/{y}.png", template)
-        assertEquals("https://tile.openstreetmap.org/14/1017/660.png", osm.tileUrl("", 14, 1017, 660))
+        assertTrue(aerial.tileTemplate().startsWith("$host/"))
+        assertTrue(Basemap.elevationTemplate().startsWith("$host/"))
+        assertTrue(Basemap.demHillshadeTemplate().startsWith("$host/"))
+        assertTrue(Basemap.linzTopographicStyleUrl().startsWith("$host/"))
         assertFalse(
-            "a key must not be smuggled into a source that needs none",
-            osm.tileTemplate(key).contains(key)
+            "and the drawn maps are still fetched from their own hosts",
+            osm.tileTemplate().startsWith(host)
         )
+        assertEquals(
+            "linz's own host is named only for the style rewrite",
+            "https://basemaps.linz.govt.nz",
+            Basemap.LINZ_ORIGIN
+        )
+    }
+
+    @Test
+    fun `the drawn map is fetched from their host over https`() {
+        assertEquals("https://tile.openstreetmap.org/{z}/{x}/{y}.png", osm.tileTemplate())
+        assertEquals("https://tile.openstreetmap.org/14/1017/660.png", osm.tileUrl(14, 1017, 660))
     }
 
     @Test
@@ -136,7 +145,7 @@ class BasemapTest {
             topo.prefetchable
         )
         assertFalse(
-            "and the LiDAR hillshade is a hosted style, which cannot be pointed at the tile server",
+            "and the LiDAR hillshade is downloaded as a pack of its own rather than as a basemap",
             Basemap.LINZ_TOPO_LIDAR_HILLSHADE.prefetchable
         )
     }
@@ -161,62 +170,67 @@ class BasemapTest {
     }
 
     @Test
-    fun `only the LINZ basemaps need a key`() {
-        assertTrue(aerial.needsKey)
-        assertFalse(osm.needsKey)
-        assertFalse(topo.needsKey)
-        assertTrue(Basemap.LINZ_TOPO_LIDAR_HILLSHADE.needsKey)
+    fun `every basemap says in the picker what it is, without mentioning a key`() {
+        // The walker used to be told which maps needed a key they had to go and get. None does now,
+        // so a summary that still said so would be telling them to fetch something they cannot use.
+        Basemap.entries.forEach { basemap ->
+            assertTrue("${basemap.id} should say something", basemap.summary.isNotBlank())
+            assertFalse(
+                "${basemap.id}'s summary must not mention a key",
+                basemap.summary.contains("key", ignoreCase = true)
+            )
+        }
     }
 
     @Test
-    fun `the LiDAR hillshade basemap loads LINZ's own vector style with the key in it`() {
+    fun `the LiDAR hillshade basemap loads LINZ's own vector style through the proxy`() {
         val hillshade = Basemap.LINZ_TOPO_LIDAR_HILLSHADE
 
         assertEquals(
-            "https://basemaps.linz.govt.nz/v1/tiles/topographic-v2/WebMercatorQuad/" +
-                "style/topographic-v2.json?api=$key",
-            hillshade.hostedStyleUrl(key)
+            "https://trailday-linz-proxy.le-mckenzies.workers.dev/v1/tiles/topographic-v2/" +
+                "WebMercatorQuad/style/topographic-v2.json",
+            hillshade.hostedStyleUrl()
         )
         assertTrue(hillshade.usesHostedStyle)
         assertFalse(aerial.usesHostedStyle)
     }
 
     @Test
-    fun `the LiDAR hillshade elevation is LINZ terrain-rgb, keyed`() {
+    fun `the LiDAR hillshade elevation is LINZ terrain-rgb, through the proxy`() {
         assertEquals(
-            "https://basemaps.linz.govt.nz/v1/tiles/elevation/WebMercatorQuad/14/1017/660.png" +
-                "?pipeline=terrain-rgb&api=$key",
-            Basemap.elevationUrl(key, 14, 1017, 660)
+            "https://trailday-linz-proxy.le-mckenzies.workers.dev/v1/tiles/elevation/" +
+                "WebMercatorQuad/14/1017/660.png?pipeline=terrain-rgb",
+            Basemap.elevationUrl(14, 1017, 660)
         )
         assertEquals(
-            "https://basemaps.linz.govt.nz/v1/tiles/elevation/WebMercatorQuad/{z}/{x}/{y}.png" +
-                "?pipeline=terrain-rgb&api=$key",
-            Basemap.elevationTemplate(key)
+            "https://trailday-linz-proxy.le-mckenzies.workers.dev/v1/tiles/elevation/" +
+                "WebMercatorQuad/{z}/{x}/{y}.png?pipeline=terrain-rgb",
+            Basemap.elevationTemplate()
         )
     }
 
     @Test
     fun `each basemap has a real preview tile of its own`() {
-        assertTrue(aerial.previewTileUrl(key, 12, 2015, 1280).contains("/aerial/"))
-        assertTrue(osm.previewTileUrl("", 12, 2015, 1280).contains("tile.openstreetmap.org"))
-        assertTrue(topo.previewTileUrl("", 12, 2015, 1280).contains("tile.opentopomap.org"))
+        assertTrue(aerial.previewTileUrl(12, 2015, 1280).contains("/aerial/"))
+        assertTrue(osm.previewTileUrl(12, 2015, 1280).contains("tile.openstreetmap.org"))
+        assertTrue(topo.previewTileUrl(12, 2015, 1280).contains("tile.opentopomap.org"))
         assertTrue(
-            Basemap.LINZ_TOPO_LIDAR_HILLSHADE.previewTileUrl(key, 12, 2015, 1280)
+            Basemap.LINZ_TOPO_LIDAR_HILLSHADE.previewTileUrl(12, 2015, 1280)
                 .contains("/topo-raster/")
         )
     }
 
     @Test
-    fun `the DEM hillshade is LINZ's own pre-rendered layer, keyed`() {
+    fun `the DEM hillshade is LINZ's own pre-rendered layer, through the proxy`() {
         assertEquals(
-            "https://basemaps.linz.govt.nz/v1/tiles/hillshade/WebMercatorQuad/14/1017/660.webp" +
-                "?api=$key",
-            Basemap.demHillshadeUrl(key, 14, 1017, 660)
+            "https://trailday-linz-proxy.le-mckenzies.workers.dev/v1/tiles/hillshade/" +
+                "WebMercatorQuad/14/1017/660.webp",
+            Basemap.demHillshadeUrl(14, 1017, 660)
         )
         assertEquals(
-            "https://basemaps.linz.govt.nz/v1/tiles/hillshade/WebMercatorQuad/{z}/{x}/{y}.webp" +
-                "?api=$key",
-            Basemap.demHillshadeTemplate(key)
+            "https://trailday-linz-proxy.le-mckenzies.workers.dev/v1/tiles/hillshade/" +
+                "WebMercatorQuad/{z}/{x}/{y}.webp",
+            Basemap.demHillshadeTemplate()
         )
     }
 
@@ -225,9 +239,9 @@ class BasemapTest {
         val hillshade = Basemap.LINZ_TOPO_LIDAR_HILLSHADE
 
         assertEquals(
-            "https://basemaps.linz.govt.nz/v1/tiles/topographic-v2/WebMercatorQuad/" +
-                "14/1017/660.pbf?api=$key",
-            hillshade.tileUrl(key, 14, 1017, 660)
+            "https://trailday-linz-proxy.le-mckenzies.workers.dev/v1/tiles/topographic-v2/" +
+                "WebMercatorQuad/14/1017/660.pbf",
+            hillshade.tileUrl(14, 1017, 660)
         )
         assertEquals(".pbf", hillshade.tileSuffix)
         assertEquals("application/x-protobuf", hillshade.contentType)

@@ -62,7 +62,6 @@ fun OfflineAreaPickerScreen(
     onBack: () -> Unit,
     onSaved: () -> Unit
 ) {
-    val apiKey by viewModel.apiKey.collectAsStateWithLifecycle()
     val draft by viewModel.draft.collectAsStateWithLifecycle()
     val previewGeoJson by viewModel.previewGeoJson.collectAsStateWithLifecycle()
     val startBounds by viewModel.startBounds.collectAsStateWithLifecycle()
@@ -153,7 +152,6 @@ fun OfflineAreaPickerScreen(
             // The pack's own map, so a box drawn for the drawn map is drawn on the drawn map.
             BasemapView(
                 basemap = mapBasemap,
-                apiKey = apiKey,
                 assetGeoJson = previewGeoJson,
                 fitBounds = startBounds,
                 onMapClick = { latitude, longitude, _ -> viewModel.tapAt(latitude, longitude) },
@@ -334,11 +332,10 @@ fun OfflineAreaPickerScreen(
                         Button(
                             onClick = viewModel::download,
                             enabled = when {
-                                keepsImagery -> apiKey.isNotBlank() && draft.isComplete &&
+                                keepsImagery -> draft.isComplete &&
                                     !draft.isTooBig && !working && !docWorking
 
-                                topography -> apiKey.isNotBlank() && draft.isComplete &&
-                                    !draft.isTooBig && !working
+                                topography -> draft.isComplete && !draft.isTooBig && !working
 
                                 else -> draft.isComplete && !docWorking
                             }

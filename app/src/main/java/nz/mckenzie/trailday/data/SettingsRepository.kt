@@ -12,7 +12,6 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import nz.mckenzie.trailday.BuildConfig
 import nz.mckenzie.trailday.domain.asset.AssetLayer
 import nz.mckenzie.trailday.domain.asset.YourPlaceLayer
 import nz.mckenzie.trailday.domain.backup.BackupDestination
@@ -36,7 +35,6 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
  */
 class SettingsRepository(private val context: Context) : BackupSwitches {
 
-    private val linzKeyPref = stringPreferencesKey("linz_api_key")
     private val basemapPref = stringPreferencesKey("basemap")
     private val themeChoicePref = stringPreferencesKey("theme_choice")
     private val hiddenMapLayersPref = stringSetPreferencesKey("hidden_map_layers")
@@ -73,25 +71,6 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     private val backUpAutomaticallyPref = booleanPreferencesKey("backup_automatically")
     private val lastOffsiteBackupAtPref = longPreferencesKey("last_offsite_backup_at")
     private val lastOffsiteFailureNotifiedAtPref = longPreferencesKey("last_offsite_failure_notified_at")
-
-    /** What the user has entered, empty when unset. */
-    val storedLinzApiKey: Flow<String> =
-        context.settingsDataStore.data.map { it[linzKeyPref].orEmpty() }
-
-    /** Stored key if the user has set one, otherwise the build-time default. */
-    val linzApiKey: Flow<String> = storedLinzApiKey.map { stored ->
-        if (stored.isBlank()) BuildConfig.LINZ_API_KEY else stored
-    }
-
-    suspend fun setLinzApiKey(value: String) {
-        context.settingsDataStore.edit { prefs ->
-            val trimmed = value.trim()
-            if (trimmed.isEmpty()) prefs.remove(linzKeyPref) else prefs[linzKeyPref] = trimmed
-        }
-    }
-
-    /** True when a key was supplied at build time (local.properties or CI secret). */
-    fun hasBuildTimeKey(): Boolean = BuildConfig.LINZ_API_KEY.isNotBlank()
 
     /**
      * Which map the walker draws under the work.

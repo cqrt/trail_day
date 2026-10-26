@@ -36,9 +36,6 @@ class AssetDetailViewModel(
     private val context: Context
 ) : ViewModel() {
 
-    val apiKey: StateFlow<String> = settingsRepository.linzApiKey
-        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
-
     /**
      * Which map to draw under the work: the walker's choice in Settings.
      *

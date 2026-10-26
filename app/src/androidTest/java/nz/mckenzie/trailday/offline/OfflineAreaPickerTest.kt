@@ -68,12 +68,10 @@ class OfflineAreaPickerTest {
             ),
             dao = db.offlineAreaDao()
         )
-        SettingsRepository(context).setLinzApiKey("test-key")
     }
 
     @After
     fun tearDown() = runBlocking {
-        SettingsRepository(context).setLinzApiKey("")
         // No db.close() here: the view model observes the areas table for as long as
         // it lives, and closing the database underneath it takes the whole test
         // process down with it.

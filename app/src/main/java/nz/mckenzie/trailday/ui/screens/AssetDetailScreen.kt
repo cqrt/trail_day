@@ -98,7 +98,6 @@ fun AssetDetailScreen(
     val recordings by viewModel.recordings.collectAsStateWithLifecycle()
     val photo by viewModel.photo.collectAsStateWithLifecycle()
     val photoImage = remember(photo) { photo?.let(WaypointPhotos::bitmap)?.asImageBitmap() }
-    val apiKey by viewModel.apiKey.collectAsStateWithLifecycle()
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
@@ -146,7 +145,6 @@ fun AssetDetailScreen(
             Box {
                 BasemapView(
                     basemap = basemap,
-                    apiKey = apiKey,
                     assetGeoJson = geoJson,
                     fitBounds = bounds,
                     // How close this map is allowed to sit. Asked for in as many words: the page was

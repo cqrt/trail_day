@@ -80,7 +80,6 @@ jobs:
       # splits by ABI itself.
       - name: Build the signed APKs
         env:
-          LINZ_API_KEY: ${{ secrets.LINZ_API_KEY }}
           KEYSTORE_FILE: ${{ runner.temp }}/release.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -92,7 +91,6 @@ jobs:
 
       - name: Build the app bundle
         env:
-          LINZ_API_KEY: ${{ secrets.LINZ_API_KEY }}
           KEYSTORE_FILE: ${{ runner.temp }}/release.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}

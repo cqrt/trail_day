@@ -309,14 +309,14 @@ object PlaceLabels {
     const val HALO_WIDTH = 1.4f
 
     /**
-     * The one tile [zoom], [x], [y], as LINZ serves it.
+     * The one tile [zoom], [x], [y], as the app's proxy serves it.
      *
      * The fetcher takes this rather than building it, so the URL is one decision in one place - the
      * same arrangement `Basemap.tileUrl` has for the imagery.
      */
-    fun tileUrl(apiKey: String, zoom: Int, x: Int, y: Int): String =
-        "${Basemap.LINZ_HOST}/v1/tiles/$TILESET/${Basemap.LINZ_TILE_MATRIX}/$zoom/$x/$y$TILE_SUFFIX" +
-            "?api=${Basemap.sanitiseKey(apiKey)}"
+    fun tileUrl(zoom: Int, x: Int, y: Int): String =
+        "${Basemap.LINZ_TILES_HOST}/v1/tiles/$TILESET/${Basemap.LINZ_TILE_MATRIX}/$zoom/$x/$y" +
+            TILE_SUFFIX
 
     /**
      * The XYZ template for a style, given the address the app's tile server hands out.
@@ -330,12 +330,12 @@ object PlaceLabels {
         tilesUrlTemplate.substringBefore(TILES_MARK) + "/tiles/$ID/{z}/{x}/{y}$TILE_SUFFIX"
 
     /**
-     * The XYZ template for a style that talks to LINZ itself, for the tests and for a preview that has
-     * the app's own server to hand.
+     * The XYZ template for a style that fetches from the proxy itself, for the tests and for a preview
+     * that has the app's own server to hand.
      */
-    fun urlTemplate(apiKey: String): String =
-        "${Basemap.LINZ_HOST}/v1/tiles/$TILESET/${Basemap.LINZ_TILE_MATRIX}/{z}/{x}/{y}$TILE_SUFFIX" +
-            "?api=${Basemap.sanitiseKey(apiKey)}"
+    fun urlTemplate(): String =
+        "${Basemap.LINZ_TILES_HOST}/v1/tiles/$TILESET/${Basemap.LINZ_TILE_MATRIX}/{z}/{x}/{y}" +
+            TILE_SUFFIX
 
     /**
      * The tileset's name inside LINZ's service.

@@ -90,7 +90,6 @@ import nz.mckenzie.trailday.viewmodel.RecordingViewModel
 @Composable
 fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
     val state by viewModel.tracking.collectAsStateWithLifecycle()
-    val apiKey by viewModel.apiKey.collectAsStateWithLifecycle()
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
     val geoJson by viewModel.recordedGeoJson.collectAsStateWithLifecycle()
     val targetGeoJson by viewModel.targetGeoJson.collectAsStateWithLifecycle()
@@ -212,7 +211,6 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
         ) {
             BasemapView(
                 basemap = basemap,
-                apiKey = apiKey,
                 assetGeoJson = geoJson,
                 // The line being followed, drawn wide over the work: while a walk is being followed it is
                 // the line the screen is about, and the position marker sits on it rather than under it.

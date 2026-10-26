@@ -61,7 +61,6 @@ fun RecordingDetailScreen(
     onBack: () -> Unit
 ) {
     val detail by viewModel.detail.collectAsStateWithLifecycle()
-    val apiKey by viewModel.apiKey.collectAsStateWithLifecycle()
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
     val geoJson by viewModel.geoJson.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
@@ -96,7 +95,6 @@ fun RecordingDetailScreen(
             Box {
                 BasemapView(
                     basemap = basemap,
-                    apiKey = apiKey,
                     assetGeoJson = geoJson,
                     fitBounds = remember(detail) { boundsOf(detail) },
                     // A picture of one trip, not a place to explore: every gesture off, and the zoom given

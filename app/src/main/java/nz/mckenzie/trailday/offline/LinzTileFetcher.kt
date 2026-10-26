@@ -12,23 +12,22 @@ import java.net.URL
  * Status codes are mapped deliberately rather than collapsed into "failed":
  *
  *  - `200` -> the tile
- *  - `404` -> [TileFetcher.Result.NotFound]; LINZ has no imagery for some tiles
+ *  - `404` -> [TileFetcher.Result.NotFound]; the source has no imagery for some tiles
  *    (the edge of coverage, offshore), and those are not errors to retry
- *  - `400` -> a bad or expired API key, surfaced as a failure with that wording
+ *  - `400` -> a bad or expired key at the proxy, surfaced as a failure with that wording
  *  - `429` -> rate limited; the downloader's backoff and pacing are the answer,
  *    so it is worth saying so rather than reporting a generic failure
  *
- * The app identifies itself in the usual way ([sprayDayUserAgent]). LINZ does not require it;
- * being a well-behaved client of someone else's service does.
+ * The app identifies itself in the usual way ([sprayDayUserAgent]). Neither LINZ nor the app's own
+ * proxy requires it; being a well-behaved client of someone else's service does.
  */
 class LinzTileFetcher(
-    private val apiKey: String,
     /**
      * Where to fetch from. Overridden in tests so the status-code mapping can be
      * asserted against the real local tile server rather than the live service.
      */
     private val urlFor: (zoom: Int, x: Int, y: Int) -> String =
-        { zoom, x, y -> Basemap.LINZ_AERIAL.tileUrl(apiKey, zoom, x, y) },
+        { zoom, x, y -> Basemap.LINZ_AERIAL.tileUrl(zoom, x, y) },
     /** What the caller will accept: a picture, or the vector tiles of the Topographic map. */
     private val accept: String = "image/webp,image/*",
     private val connectTimeoutMs: Int = 10_000,

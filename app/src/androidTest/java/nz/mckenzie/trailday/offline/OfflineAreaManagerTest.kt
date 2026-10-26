@@ -5,9 +5,9 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.runBlocking
-import nz.mckenzie.trailday.BuildConfig
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -19,6 +19,8 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -113,8 +115,8 @@ class OfflineAreaManagerTest {
         )
         val first = manager.createArea(ridge)
         val second = manager.createArea(valley)
-        manager.download(first.id, "key")
-        manager.download(second.id, "key")
+        manager.download(first.id)
+        manager.download(second.id)
 
         val ridgeTiles = plannedTiles(ridge.bounds, 16, 16)
         val valleyTiles = plannedTiles(valley.bounds, 16, 16)
@@ -137,7 +139,7 @@ class OfflineAreaManagerTest {
         val manager = manager { _, _, _ -> TileFetcher.Result.Tile(ByteArray(64)) }
 
         val created = manager.createArea(plan)
-        val finished = manager.download(created.id, apiKey = "test-key")
+        val finished = manager.download(created.id)
 
         assertTrue("the plan should need some tiles", plan.tileCount > 0)
         assertEquals(plan.tileCount.toInt(), finished.plannedTiles)
@@ -157,7 +159,7 @@ class OfflineAreaManagerTest {
         val manager = manager { _, _, _ -> TileFetcher.Result.NotFound }
 
         val created = manager.createArea(plan)
-        val finished = manager.download(created.id, "test-key")
+        val finished = manager.download(created.id)
 
         // Nothing arrived, but nothing failed either: those tiles do not exist,
         // so the download is finished and says what is missing.
@@ -183,14 +185,14 @@ class OfflineAreaManagerTest {
         }
 
         val created = manager.createArea(plan)
-        val stopped = manager.download(created.id, "test-key")
+        val stopped = manager.download(created.id)
 
         assertFalse("a failed download must not look complete", stopped.isComplete)
         assertTrue("the reason should be recorded", stopped.lastError != null)
         assertEquals(0, stopped.storedTiles)
 
         serviceUp = true
-        val resumed = manager.download(created.id, "test-key")
+        val resumed = manager.download(created.id)
 
         assertTrue(resumed.isComplete)
         assertEquals(plan.tileCount.toInt(), resumed.storedTiles)
@@ -204,10 +206,10 @@ class OfflineAreaManagerTest {
         val manager = manager { _, _, _ -> TileFetcher.Result.Tile(ByteArray(32)) }
 
         val created = manager.createArea(plan)
-        manager.download(created.id, "test-key")
+        manager.download(created.id)
         val afterFirst = fetches.get()
 
-        val again = manager.download(created.id, "test-key")
+        val again = manager.download(created.id)
 
         assertEquals("nothing should be refetched", afterFirst, fetches.get())
         assertEquals(plan.tileCount.toInt(), again.storedTiles)
@@ -220,7 +222,7 @@ class OfflineAreaManagerTest {
         val manager = manager { _, _, _ -> TileFetcher.Result.Tile(ByteArray(8)) }
 
         val created = manager.createArea(plan)
-        manager.download(created.id, "test-key")
+        manager.download(created.id)
 
         val removed = manager.deleteArea(created.id)
 
@@ -238,8 +240,8 @@ class OfflineAreaManagerTest {
         val plan = smallPlan("Shared")
         val first = manager.createArea(plan)
         val second = manager.createArea(plan.copy(name = "Shared again"))
-        manager.download(first.id, "test-key")
-        manager.download(second.id, "test-key")
+        manager.download(first.id)
+        manager.download(second.id)
 
         val removed = manager.deleteArea(first.id)
 
@@ -254,7 +256,7 @@ class OfflineAreaManagerTest {
         val manager = manager { _, _, _ -> TileFetcher.Result.Tile(ByteArray(8)) }
 
         val created = manager.createArea(plan)
-        manager.download(created.id, "test-key")
+        manager.download(created.id)
 
         val removed = manager.clearTiles()
 
@@ -309,7 +311,7 @@ class OfflineAreaManagerTest {
         }
 
         val created = manager.createArea(plan)
-        val stopped = manager.download(created.id, "test-key")
+        val stopped = manager.download(created.id)
 
         assertFalse(stopped.isComplete)
         assertTrue("the tiles that did arrive should be kept", stopped.storedTiles > 0)
@@ -321,7 +323,7 @@ class OfflineAreaManagerTest {
         val fetchedSoFar = fetches.get()
 
         serviceHealthy = true
-        val resumed = manager.download(created.id, "test-key")
+        val resumed = manager.download(created.id)
 
         assertTrue(resumed.isComplete)
         assertEquals(plan.tileCount.toInt(), resumed.storedTiles)
@@ -336,8 +338,7 @@ class OfflineAreaManagerTest {
 
     @Test
     fun aRealAreaFromLinzLandsOnDiskWithinItsOwnEstimate() = runBlocking {
-        val key = BuildConfig.LINZ_API_KEY
-        assumeTrue("needs a LINZ Basemaps key", key.isNotBlank())
+        assumeTrue("needs the deployed LINZ proxy", proxyAnswers())
 
         // ~2 km across at zoom 13-14: a couple of dozen tiles, quick to fetch.
         val plan = OfflineAreaPlan.aroundCentre(
@@ -351,14 +352,16 @@ class OfflineAreaManagerTest {
             pack = OfflinePack.IMAGERY,
             passes = listOf(
                 // The app's own fetcher, against the real service: this is the one test that checks a
-                // real area's real bytes against the estimate the screen shows.
-                PackPass(store = store, fetcherFor = { key -> LinzTileFetcher(key) })
+                // real area's real bytes against the estimate the screen shows. It used to skip unless
+                // a key was configured; there is no key on this side any more, so it skips unless the
+                // proxy that holds it is answering.
+                PackPass(store = store, fetcherFor = { LinzTileFetcher() })
             ),
             dao = database.offlineAreaDao()
         )
 
         val created = manager.createArea(plan)
-        val finished = manager.download(created.id, key)
+        val finished = manager.download(created.id)
 
         assertEquals("the estimate should be what was recorded", plan.tileCount.toInt(), finished.plannedTiles)
         assertTrue(
@@ -392,4 +395,23 @@ class OfflineAreaManagerTest {
         assertEquals("RIFF", String(bytes, 0, 4, Charsets.US_ASCII))
         assertEquals("WEBP", String(bytes, 8, 4, Charsets.US_ASCII))
     }
+
+    /**
+     * Whether the app's LINZ proxy is answering at all.
+     *
+     * The live test above is the only one here that needs a network and somebody else's service, so it
+     * skips rather than fails on a checkout where the proxy has not been deployed yet - which is every
+     * checkout until it is. See `worker-linz/README.md`.
+     */
+    private fun proxyAnswers(): Boolean = runCatching {
+        val connection = URL("${Basemap.LINZ_TILES_HOST}/health")
+            .openConnection() as HttpURLConnection
+        connection.connectTimeout = 5_000
+        connection.readTimeout = 5_000
+        try {
+            connection.responseCode == HttpURLConnection.HTTP_OK
+        } finally {
+            connection.disconnect()
+        }
+    }.getOrDefault(false)
 }

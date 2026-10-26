@@ -133,7 +133,7 @@ class DrawnTileFetcherTest {
     fun `the default url is their host, over https, with no key`() {
         assertEquals(
             "https://tile.openstreetmap.org/14/1017/660.png",
-            Basemap.OPENSTREETMAP.tileUrl("", 14, 1017, 660)
+            Basemap.OPENSTREETMAP.tileUrl(14, 1017, 660)
         )
     }
 }

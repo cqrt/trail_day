@@ -49,8 +49,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.backup.BackupDestination
 import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.domain.tiles.Basemap
-import nz.mckenzie.trailday.viewmodel.KeyCheckState
-import nz.mckenzie.trailday.viewmodel.KeySource
 import nz.mckenzie.trailday.viewmodel.InstallState
 import nz.mckenzie.trailday.viewmodel.OffsiteCheckState
 import nz.mckenzie.trailday.viewmodel.SettingsViewModel
@@ -58,12 +56,11 @@ import nz.mckenzie.trailday.viewmodel.UpdateState
 import nz.mckenzie.trailday.viewmodel.UpdateViewModel
 
 /**
- * App settings, which today means the LINZ Basemaps key.
+ * App settings: the basemap, the offline material, the backups and the update check.
  *
- * Standard-access keys expire every 90 days and the failure is silent, so this screen
- * exists to make a dead key a two-minute fix in the paddock rather than a wait for a
- * new build. [Check] is the important button: it asks LINZ for one tile and reports
- * exactly what came back.
+ * No map key lives here any more. LINZ's tiles are fetched through the app's own proxy, which holds
+ * the key, so there is nothing for the walker to paste and nothing that expires on the phone - which
+ * is why this screen is about the map, the material and the housekeeping rather than about a key.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -72,8 +69,6 @@ fun SettingsScreen(
     updateViewModel: UpdateViewModel,
     onBack: () -> Unit
 ) {
-    val keyText by viewModel.keyText.collectAsStateWithLifecycle()
-    val keySource by viewModel.keySource.collectAsStateWithLifecycle()
     val updateState by updateViewModel.state.collectAsStateWithLifecycle()
     val installState by updateViewModel.install.collectAsStateWithLifecycle()
     val autoUpdateChecks by updateViewModel.autoCheckEnabled.collectAsStateWithLifecycle()
@@ -85,15 +80,11 @@ fun SettingsScreen(
         canInstallUpdates = updateViewModel.canInstall()
         onPauseOrDispose { }
     }
-    val activeKeyLabel by viewModel.activeKeyLabel.collectAsStateWithLifecycle()
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
-    val linzKey by viewModel.linzKey.collectAsStateWithLifecycle()
     val themeChoice by viewModel.themeChoice.collectAsStateWithLifecycle()
     val webEditorUrl by viewModel.webEditorUrl.collectAsStateWithLifecycle()
     val webEditorTokenRequired by viewModel.webEditorTokenRequired.collectAsStateWithLifecycle()
     val webEditorKeepAwake by viewModel.webEditorKeepAwake.collectAsStateWithLifecycle()
-    val check by viewModel.check.collectAsStateWithLifecycle()
-    val message by viewModel.message.collectAsStateWithLifecycle()
     val storedTiles by viewModel.storedTiles.collectAsStateWithLifecycle()
     val dataMessage by viewModel.dataMessage.collectAsStateWithLifecycle()
     val dataBusy by viewModel.dataBusy.collectAsStateWithLifecycle()
@@ -227,7 +218,6 @@ fun SettingsScreen(
                             BasemapChoice(
                                 basemap = choice,
                                 selected = choice == basemap,
-                                apiKey = linzKey,
                                 onClick = { viewModel.setBasemap(choice) }
                             )
                         }
@@ -376,78 +366,6 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                }
-            }
-
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text("LINZ Basemaps key", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        text = "In use: " +
-                            (activeKeyLabel.ifBlank { "none" }) +
-                            " \u2014 " + sourceLabel(keySource),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = "Standard-access keys expire every 90 days, and an expired key leaves " +
-                            "new ground blank. Press Check if the map looks wrong.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    OutlinedTextField(
-                        value = keyText,
-                        onValueChange = viewModel::setKeyText,
-                        label = { Text("Key") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    // Wrapping, because three actions with long labels do not fit across
-                    // a phone as one row.
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(onClick = viewModel::save) { Text("Save") }
-                        OutlinedButton(
-                            onClick = viewModel::check,
-                            enabled = check != KeyCheckState.Checking
-                        ) {
-                            Text(if (check == KeyCheckState.Checking) "Checking…" else "Check")
-                        }
-                        OutlinedButton(onClick = viewModel::clearEnteredKey) {
-                            Text("Use the built-in key")
-                        }
-                    }
-
-                    when (val state = check) {
-                        KeyCheckState.Idle -> Unit
-                        KeyCheckState.Checking ->
-                            Text("Asking LINZ for a tile\u2026", style = MaterialTheme.typography.bodySmall)
-
-                        KeyCheckState.Worked -> Text(
-                            text = "The key works: LINZ accepted it.",
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-
-                        is KeyCheckState.Failed -> Text(
-                            text = "The key did not work: ${state.message}",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-
-                    message?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
-
-                    TextButton(onClick = { uriHandler.openUri("https://basemaps.linz.govt.nz") }) {
-                        Text("Get a key from LINZ")
-                    }
                 }
             }
 
@@ -810,12 +728,6 @@ private fun openNotificationSettings(context: Context) {
             .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     )
-}
-
-private fun sourceLabel(source: KeySource): String = when (source) {
-    KeySource.ENTERED -> "entered on this device"
-    KeySource.BUILT_IN -> "built into this build"
-    KeySource.NONE -> "no key set yet"
 }
 
 private fun destinationLabel(destination: BackupDestination): String = when (destination) {

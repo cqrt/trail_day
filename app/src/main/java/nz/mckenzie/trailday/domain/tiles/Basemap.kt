@@ -6,12 +6,14 @@ package nz.mckenzie.trailday.domain.tiles
  * There are two kinds of thing here, and the difference matters more than the code:
  *
  *  - **Aerial imagery** (LINZ): a photograph of the ground, which is what a route is planned
- *    from, and which the app may *download ahead of time* into the offline store. Keys are
- *    per-source, and LINZ's expire every 90 days.
+ *    from, and which the app may *download ahead of time* into the offline store.
  *  - **A drawn map** (OpenStreetMap): roads, tracks, gates, streams and names, which is what the
- *    walker reads to find a way in or to say where they are. It needs no key and works the day
- *    a LINZ key has expired - but it shows nothing about what is growing, and its tiles may only
- *    be fetched as they are looked at. See [prefetchable].
+ *    walker reads to find a way in or to say where they are - but it shows nothing about what is
+ *    growing, and its tiles may only be fetched as they are looked at. See [prefetchable].
+ *
+ * **No source here asks the walker for anything.** LINZ's tiles are fetched through the app's own
+ * proxy, which holds the key - so there is nothing to paste into Settings, and nothing that expires on
+ * a phone. See [LINZ_TILES_HOST].
  *
  * Everything specific to a source lives in this table: the tile URL, how tiles are named on
  * disk, the zoom it is published to, and the attribution its licence requires. That is on
@@ -25,8 +27,6 @@ enum class Basemap(
     val displayName: String,
     /** One line for the picker, in the walker's terms. */
     val summary: String,
-    /** Whether tiles cannot be served at all without a key from the provider. */
-    val needsKey: Boolean,
     /** How a tile file is named on disk and in the URL, e.g. `.webp`. */
     val tileSuffix: String,
     /** What the server answers with, e.g. `image/webp`. */
@@ -53,8 +53,7 @@ enum class Basemap(
     LINZ_AERIAL(
         id = "linz-aerial",
         displayName = "Aerial imagery",
-        summary = "Aerial photography. Needs a LINZ key; can be downloaded.",
-        needsKey = true,
+        summary = "Aerial photography from LINZ. Can be downloaded for offline use.",
         tileSuffix = ".webp",
         contentType = "image/webp",
         maxZoom = 22,
@@ -67,8 +66,7 @@ enum class Basemap(
     OPENSTREETMAP(
         id = "osm",
         displayName = "OpenStreetMap",
-        summary = "No key needed; cannot be downloaded but tiles are cached when browsing.",
-        needsKey = false,
+        summary = "Their own drawn map. Cached as you browse; cannot be downloaded.",
         tileSuffix = ".png",
         contentType = "image/png",
         maxZoom = 19,
@@ -80,8 +78,7 @@ enum class Basemap(
     TOPOGRAPHIC(
         id = "topo",
         displayName = "Topographic (OSM)",
-        summary = "No key needed; cannot be downloaded but tiles are cached when browsing.",
-        needsKey = false,
+        summary = "The same, with contours and heights. Cached as you browse.",
         tileSuffix = ".png",
         contentType = "image/png",
         maxZoom = 17,
@@ -96,14 +93,13 @@ enum class Basemap(
      *
      * **A vector style, not a raster tile set.** LINZ publishes `topographic-v2` as vector tiles plus
      * a terrain-rgb elevation source, and its own style already draws the hillshade. The app fetches
-     * that style, points its two sources at the app's tile server, and loads it, so the key stays on
-     * the phone and both tile sets are cached like every other basemap.
+     * that style, points its two sources at the app's own proxy, and loads it, so both tile sets are
+     * cached like every other basemap.
      */
     LINZ_TOPO_LIDAR_HILLSHADE(
         id = "linz-topo-lidar-hillshade",
         displayName = "Topographic (LINZ)",
-        summary = "LINZ's clean Topographic map with LiDAR hillshade. Needs a LINZ key; tiles are cached when browsing.",
-        needsKey = true,
+        summary = "LINZ's clean Topographic map with LiDAR hillshade. Cached as you browse.",
         tileSuffix = ".pbf",
         contentType = "application/x-protobuf",
         maxZoom = 15,
@@ -121,9 +117,9 @@ enum class Basemap(
      * app's own tile server rather than by the map itself. See
      * [nz.mckenzie.trailday.offline.DrawnTileFetcher].
      */
-    fun tileTemplate(apiKey: String): String = when (this) {
+    fun tileTemplate(): String = when (this) {
         LINZ_AERIAL ->
-            "$LINZ_HOST/v1/tiles/aerial/$LINZ_TILE_MATRIX/{z}/{x}/{y}.webp?api=${sanitiseKey(apiKey)}"
+            "$LINZ_TILES_HOST/v1/tiles/aerial/$LINZ_TILE_MATRIX/{z}/{x}/{y}.webp"
 
         OPENSTREETMAP ->
             "$OSM_HOST/{z}/{x}/{y}.png"
@@ -132,14 +128,14 @@ enum class Basemap(
             "$TOPO_HOST/{z}/{x}/{y}.png"
 
         LINZ_TOPO_LIDAR_HILLSHADE ->
-            "$LINZ_HOST/v1/tiles/$LINZ_TOPOGRAPHIC_V2_TILESET/$LINZ_TILE_MATRIX/" +
-                "{z}/{x}/{y}.pbf?api=${sanitiseKey(apiKey)}"
+            "$LINZ_TILES_HOST/v1/tiles/$LINZ_TOPOGRAPHIC_V2_TILESET/$LINZ_TILE_MATRIX/" +
+                "{z}/{x}/{y}.pbf"
     }
 
     /** One specific tile, as the fetchers need it. */
-    fun tileUrl(apiKey: String, zoom: Int, x: Int, y: Int): String = when (this) {
+    fun tileUrl(zoom: Int, x: Int, y: Int): String = when (this) {
         LINZ_AERIAL ->
-            "$LINZ_HOST/v1/tiles/aerial/$LINZ_TILE_MATRIX/$zoom/$x/$y.webp?api=${sanitiseKey(apiKey)}"
+            "$LINZ_TILES_HOST/v1/tiles/aerial/$LINZ_TILE_MATRIX/$zoom/$x/$y.webp"
 
         OPENSTREETMAP ->
             "$OSM_HOST/$zoom/$x/$y.png"
@@ -148,8 +144,8 @@ enum class Basemap(
             "$TOPO_HOST/$zoom/$x/$y.png"
 
         LINZ_TOPO_LIDAR_HILLSHADE ->
-            "$LINZ_HOST/v1/tiles/$LINZ_TOPOGRAPHIC_V2_TILESET/$LINZ_TILE_MATRIX/" +
-                "$zoom/$x/$y.pbf?api=${sanitiseKey(apiKey)}"
+            "$LINZ_TILES_HOST/v1/tiles/$LINZ_TOPOGRAPHIC_V2_TILESET/$LINZ_TILE_MATRIX/" +
+                "$zoom/$x/$y.pbf"
     }
 
     /**
@@ -159,30 +155,30 @@ enum class Basemap(
      * actually looks like. The vector Topographic map cannot be drawn as a raster tile, so its
      * preview is LINZ's clean gridless Topo raster of the same ground - the closest honest picture.
      */
-    fun previewTileUrl(apiKey: String, zoom: Int, x: Int, y: Int): String = when (this) {
-        LINZ_AERIAL -> tileUrl(apiKey, zoom, x, y)
-        OPENSTREETMAP, TOPOGRAPHIC -> tileUrl("", zoom, x, y)
+    fun previewTileUrl(zoom: Int, x: Int, y: Int): String = when (this) {
+        LINZ_AERIAL -> tileUrl(zoom, x, y)
+        OPENSTREETMAP, TOPOGRAPHIC -> tileUrl(zoom, x, y)
         LINZ_TOPO_LIDAR_HILLSHADE ->
-            "$LINZ_HOST/v1/tiles/$PREVIEW_TOPO_TILESET/$LINZ_TILE_MATRIX/" +
-                "$zoom/$x/$y.webp?api=${sanitiseKey(apiKey)}"
+            "$LINZ_TILES_HOST/v1/tiles/$PREVIEW_TOPO_TILESET/$LINZ_TILE_MATRIX/" +
+                "$zoom/$x/$y.webp"
     }
 
     /** Whether this basemap is one of LINZ's hosted style documents rather than a single tile set. */
     val usesHostedStyle: Boolean get() = this == LINZ_TOPO_LIDAR_HILLSHADE
 
     /**
-     * LINZ's own style document for the vector Topographic basemap, with the key in it.
+     * LINZ's own style document for the vector Topographic basemap.
      *
-     * The style is fetched by the app and adapted before it is loaded: LINZ's hosted document carries
-     * a `sky` block and glyph/sprite URLs without the key, and its sources are pointed at the app's
-     * tile server so the key stays on the phone. See [LinzVectorStyle].
+     * The style is fetched by the app and adapted before it is loaded: LINZ's hosted document carries a
+     * `sky` block, names its sprite and letters at LINZ's own host, and its sources are pointed at the
+     * app's proxy so the whole of it is one hop from the phone. See [LinzVectorStyle].
      */
-    fun hostedStyleUrl(apiKey: String): String? =
+    fun hostedStyleUrl(): String? =
         if (!usesHostedStyle) {
             null
         } else {
-            "$LINZ_HOST/v1/tiles/$LINZ_TOPOGRAPHIC_V2_TILESET/$LINZ_TILE_MATRIX/" +
-                "style/$LINZ_TOPOGRAPHIC_V2_TILESET.json?api=${sanitiseKey(apiKey)}"
+            "$LINZ_TILES_HOST/v1/tiles/$LINZ_TOPOGRAPHIC_V2_TILESET/$LINZ_TILE_MATRIX/" +
+                "style/$LINZ_TOPOGRAPHIC_V2_TILESET.json"
         }
 
     /** The credit as HTML, single-quoted so it drops into a style document without escaping. */
@@ -192,7 +188,25 @@ enum class Basemap(
         /** What the map draws until the walker chooses otherwise. */
         val DEFAULT: Basemap = LINZ_AERIAL
 
-        const val LINZ_HOST = "https://basemaps.linz.govt.nz"
+        /**
+         * Where LINZ's tiles are fetched from: **the app's own proxy, not LINZ**.
+         *
+         * Every LINZ URL in the app is built from this one constant, and every one of them is a LINZ
+         * path on the proxy's host - so the proxy is a swap of this line and nothing else. The key it
+         * needs lives there as a Worker secret, which is why nothing here carries one and why nothing
+         * expires on a phone. See `worker-linz/README.md`, and [LINZ_ORIGIN] for the host this stands
+         * in for.
+         */
+        const val LINZ_TILES_HOST = "https://trailday-linz-proxy.le-mckenzies.workers.dev"
+
+        /**
+         * LINZ's own host, which the app no longer talks to.
+         *
+         * Named for the one thing that still needs it: a style document LINZ serves names its sprite
+         * and its letters at LINZ's host, and those are rewritten to the proxy before the style is
+         * loaded. See [nz.mckenzie.trailday.map.LinzVectorStyle].
+         */
+        const val LINZ_ORIGIN = "https://basemaps.linz.govt.nz"
 
         /**
          * OpenTopoMap's tile host: a drawn topographic map of the whole world - contours, tracks,
@@ -251,50 +265,32 @@ enum class Basemap(
             entries.firstOrNull { it.id == value } ?: DEFAULT
 
         /**
-         * Strips anything that is not safe in a URL or a JSON string. Keys from
-         * basemaps.linz.govt.nz are alphanumeric, so this only ever guards against a pasted key
-         * bringing whitespace or quotes with it.
-         */
-        fun sanitiseKey(apiKey: String): String =
-            apiKey.trim().filter { it.isLetterOrDigit() || it == '-' || it == '_' }
-
-        /**
-         * LINZ's hosted **aerial** style, used only as the entry point for asking whether a key
-         * works. See [nz.mckenzie.trailday.offline.LinzKeyProbe] for why the probe is a style
-         * document rather than a tile.
-         */
-        fun linzStyleUrl(apiKey: String): String =
-            "$LINZ_HOST/v1/tiles/aerial/$LINZ_TILE_MATRIX/style/aerial.json" +
-                "?api=${sanitiseKey(apiKey)}"
-
-        /**
          * LINZ's terrain-rgb elevation, which a renderer shades into the hillshade.
          *
          * The hosted style carries this source for the phone. The desk cannot read a hosted style, so
          * it is given the same source through the phone's own tile server and draws the shade itself.
          */
-        fun elevationTemplate(apiKey: String): String =
-            "$LINZ_HOST/v1/tiles/elevation/$LINZ_TILE_MATRIX/{z}/{x}/{y}.png" +
-                "?pipeline=terrain-rgb&api=${sanitiseKey(apiKey)}"
+        fun elevationTemplate(): String =
+            "$LINZ_TILES_HOST/v1/tiles/elevation/$LINZ_TILE_MATRIX/{z}/{x}/{y}.png" +
+                "?pipeline=terrain-rgb"
 
         /** One elevation tile, as the fetchers need it. */
-        fun elevationUrl(apiKey: String, zoom: Int, x: Int, y: Int): String =
-            "$LINZ_HOST/v1/tiles/elevation/$LINZ_TILE_MATRIX/$zoom/$x/$y.png" +
-                "?pipeline=terrain-rgb&api=${sanitiseKey(apiKey)}"
+        fun elevationUrl(zoom: Int, x: Int, y: Int): String =
+            "$LINZ_TILES_HOST/v1/tiles/elevation/$LINZ_TILE_MATRIX/$zoom/$x/$y.png" +
+                "?pipeline=terrain-rgb"
 
         /** LINZ's pre-rendered DEM hillshade, as a template for the desk and the phone's server. */
-        fun demHillshadeTemplate(apiKey: String): String =
-            "$LINZ_HOST/v1/tiles/$DEM_HILLSHADE_TILESET/$LINZ_TILE_MATRIX/" +
-                "{z}/{x}/{y}.webp?api=${sanitiseKey(apiKey)}"
+        fun demHillshadeTemplate(): String =
+            "$LINZ_TILES_HOST/v1/tiles/$DEM_HILLSHADE_TILESET/$LINZ_TILE_MATRIX/" +
+                "{z}/{x}/{y}.webp"
 
         /** One DEM hillshade tile, as the fetchers need it. */
-        fun demHillshadeUrl(apiKey: String, zoom: Int, x: Int, y: Int): String =
-            "$LINZ_HOST/v1/tiles/$DEM_HILLSHADE_TILESET/$LINZ_TILE_MATRIX/" +
-                "$zoom/$x/$y.webp?api=${sanitiseKey(apiKey)}"
+        fun demHillshadeUrl(zoom: Int, x: Int, y: Int): String =
+            "$LINZ_TILES_HOST/v1/tiles/$DEM_HILLSHADE_TILESET/$LINZ_TILE_MATRIX/" +
+                "$zoom/$x/$y.webp"
 
         /** LINZ's hosted topographic style, for a basemap this build does not offer yet. */
-        fun linzTopographicStyleUrl(apiKey: String): String =
-            "$LINZ_HOST/v1/tiles/topographic/$LINZ_TILE_MATRIX/style/topographic.json" +
-                "?api=${sanitiseKey(apiKey)}"
+        fun linzTopographicStyleUrl(): String =
+            "$LINZ_TILES_HOST/v1/tiles/topographic/$LINZ_TILE_MATRIX/style/topographic.json"
     }
 }

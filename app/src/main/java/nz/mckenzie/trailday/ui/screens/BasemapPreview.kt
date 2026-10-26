@@ -31,11 +31,10 @@ import nz.mckenzie.trailday.map.BasemapPreviewCache
 @Composable
 internal fun BasemapPreview(
     basemap: Basemap,
-    apiKey: String,
     modifier: Modifier = Modifier
 ) {
-    val tile by produceState<ImageBitmap?>(initialValue = null, basemap, apiKey) {
-        value = BasemapPreviewCache.load(basemap, apiKey)
+    val tile by produceState<ImageBitmap?>(initialValue = null, basemap) {
+        value = BasemapPreviewCache.load(basemap)
     }
 
     Surface(
@@ -73,7 +72,6 @@ internal fun BasemapPreview(
 internal fun BasemapChoice(
     basemap: Basemap,
     selected: Boolean,
-    apiKey: String,
     onClick: () -> Unit
 ) {
     Surface(
@@ -96,7 +94,6 @@ internal fun BasemapChoice(
         ) {
             BasemapPreview(
                 basemap = basemap,
-                apiKey = apiKey,
                 modifier = Modifier.size(64.dp)
             )
             androidx.compose.foundation.layout.Column(

@@ -70,8 +70,8 @@ data class PackPass(
     val store: OfflineTileStore,
     /** What this pass is, in the walker's words, when a pack has more than one. */
     val phase: String? = null,
-    /** Built per download rather than held, so a key pasted into Settings takes effect on the next tile. */
-    val fetcherFor: (apiKey: String) -> TileFetcher
+    /** Built per download rather than held, so a download always starts from a fresh client. */
+    val fetcherFor: () -> TileFetcher
 )
 
 /**
@@ -155,7 +155,7 @@ class OfflineAreaManager(
      * resume: tiles land on disk as they arrive and progress is written to the database as it goes, so a
      * second call picks up where this one stopped rather than starting over.
      */
-    suspend fun download(areaId: Long, apiKey: String): OfflineArea {
+    suspend fun download(areaId: Long): OfflineArea {
         val row = dao.getById(areaId) ?: error("no offline area with id $areaId")
         val bounds = LatLngBounds(row.minLat, row.minLng, row.maxLat, row.maxLng)
 
@@ -165,7 +165,7 @@ class OfflineAreaManager(
         var failures = 0
         try {
             passes.forEach { pass ->
-                val downloader = TileDownloader(store = pass.store, fetcher = pass.fetcherFor(apiKey))
+                val downloader = TileDownloader(store = pass.store, fetcher = pass.fetcherFor())
                 val progress = downloader.download(bounds, row.minZoom, row.maxZoom) { current ->
                     // What a walker watching this reads: one sentence, the same one the offline screen and
                     // the notification show, and per pass - a single bar across two passes would appear to
@@ -275,7 +275,7 @@ class OfflineAreaManager(
             passes = listOf(
                 PackPass(
                     store = TileServerHolder.imageryStore(context),
-                    fetcherFor = { key -> LinzTileFetcher(key) }
+                    fetcherFor = { LinzTileFetcher() }
                 )
             ),
             dao = dao
@@ -294,11 +294,10 @@ class OfflineAreaManager(
                 PackPass(
                     store = TileServerHolder.topographyStore(context),
                     phase = MAP_PHASE,
-                    fetcherFor = { key ->
+                    fetcherFor = {
                         LinzTileFetcher(
-                            key,
                             urlFor = { zoom, x, y ->
-                                Basemap.LINZ_TOPO_LIDAR_HILLSHADE.tileUrl(key, zoom, x, y)
+                                Basemap.LINZ_TOPO_LIDAR_HILLSHADE.tileUrl(zoom, x, y)
                             },
                             accept = "application/x-protobuf"
                         )
@@ -307,10 +306,9 @@ class OfflineAreaManager(
                 PackPass(
                     store = TileServerHolder.elevationStore(context),
                     phase = HEIGHTS_PHASE,
-                    fetcherFor = { key ->
+                    fetcherFor = {
                         LinzTileFetcher(
-                            key,
-                            urlFor = { zoom, x, y -> Basemap.elevationUrl(key, zoom, x, y) },
+                            urlFor = { zoom, x, y -> Basemap.elevationUrl(zoom, x, y) },
                             // The DEM endpoint answers PNG, and the renderer decodes it as PNG.
                             accept = "image/png"
                         )

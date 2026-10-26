@@ -21,7 +21,7 @@ class PlaceLabelsTest {
     @Test
     fun `a style takes the names from the address the tiles come from`() {
         // One server for everything the map fetches, so the desk asks the phone for names for the
-        // same reason it asks it for imagery - and the key never leaves the phone.
+        // same reason it asks it for imagery - and neither the phone nor the desk needs a key.
         assertEquals(
             "http://127.0.0.1:41234/tiles/linz-place-labels/{z}/{x}/{y}.pbf",
             PlaceLabels.urlTemplateFrom(tiles)
@@ -29,17 +29,15 @@ class PlaceLabelsTest {
     }
 
     @Test
-    fun `a tile URL names LINZ's current tileset, the tile matrix, and the key`() {
-        val url = PlaceLabels.tileUrl("c01abcDEF123", 10, 1009, 641)
+    fun `a tile URL names LINZ's current tileset and the tile matrix, through the proxy`() {
+        val url = PlaceLabels.tileUrl(10, 1009, 641)
 
-        assertTrue(
-            "the tile itself: $url",
-            url.startsWith(
-                "https://basemaps.linz.govt.nz/v1/tiles/${PlaceLabels.TILESET}/" +
-                    "WebMercatorQuad/10/1009/641.pbf"
-            )
+        assertEquals(
+            "https://trailday-linz-proxy.le-mckenzies.workers.dev/v1/tiles/" +
+                "${PlaceLabels.TILESET}/WebMercatorQuad/10/1009/641.pbf",
+            url
         )
-        assertTrue("and the key, as every other LINZ request carries it: $url", url.contains("api=c01abcDEF123"))
+        assertFalse("and no key: the proxy holds it", url.contains("api="))
     }
 
     @Test
@@ -49,17 +47,9 @@ class PlaceLabelsTest {
         // load-bearing rather than tidiness, and this is the test that keeps it.
         assertEquals("topographic-v2", PlaceLabels.TILESET)
 
-        val url = PlaceLabels.tileUrl("key", 1, 1, 1)
+        val url = PlaceLabels.tileUrl(1, 1, 1)
         assertTrue("the v2 tileset: $url", url.contains("/tiles/topographic-v2/"))
         assertFalse("and never the older one: $url", url.contains("/tiles/topographic/"))
-    }
-
-    @Test
-    fun `a key that would break the URL is cleaned the same way the imagery's key is`() {
-        assertEquals(
-            PlaceLabels.tileUrl("c01abcDEF123", 1, 2, 3),
-            PlaceLabels.tileUrl("  c01abcDEF123\n", 1, 2, 3)
-        )
     }
 
     @Test

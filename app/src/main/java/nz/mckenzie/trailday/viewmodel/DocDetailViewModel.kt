@@ -46,9 +46,6 @@ class DocDetailViewModel(
     private val docStore: DocCache
 ) : ViewModel() {
 
-    val apiKey: StateFlow<String> = settingsRepository.linzApiKey
-        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
-
     val basemap: StateFlow<Basemap> = settingsRepository.basemap
         .stateIn(viewModelScope, SharingStarted.Eagerly, Basemap.DEFAULT)
 

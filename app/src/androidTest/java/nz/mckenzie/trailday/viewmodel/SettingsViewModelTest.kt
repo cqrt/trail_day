@@ -7,37 +7,30 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import nz.mckenzie.trailday.BuildConfig
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.domain.settings.ThemeChoice
-import nz.mckenzie.trailday.offline.KeyCheck
-import nz.mckenzie.trailday.offline.LinzKeyProbe
 import nz.mckenzie.trailday.offline.OfflineTileStore
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.util.Collections
-import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Entering a LINZ key in the app.
+ * The settings screen's own behaviour: what a tap writes down, and what it tells the running service.
  *
- * This is the piece that was missing: standard-access keys expire every 90 days, the
- * failure is silent, and before this screen the only fix was a new build.
+ * There used to be a key entered here, and a suite of tests around it. There is no key any more -
+ * LINZ's tiles come through the app's own proxy, which holds it - so what is left is the housekeeping:
+ * the desk's switches, the light, and the seeding of the fields the screen is built with.
  *
- * Every wait here is on a *specific* value rather than on "something non-null", and
- * the timeouts are generous, because DataStore round trips on a CI emulator are
- * slower than on a desk - an earlier version of these tests read a stale message and
- * called it a failure.
+ * Every wait here is on a *specific* value rather than on "something non-null", and the timeouts are
+ * generous, because DataStore round trips on a CI emulator are slower than on a desk - an earlier
+ * version of these tests read a stale message and called it a failure.
  */
 @RunWith(AndroidJUnit4::class)
 class SettingsViewModelTest {
@@ -50,13 +43,11 @@ class SettingsViewModelTest {
         context = ApplicationProvider.getApplicationContext()
         store = OfflineTileStore(File(context.cacheDir, "settings-test-tiles"))
         store.deleteAll()
-        SettingsRepository(context).setLinzApiKey("")
     }
 
     @After
     fun tearDown(): Unit = runBlocking {
-        SettingsRepository(context).setLinzApiKey("")
-        // And the repository field goes back to blank, so a test that set one cannot leave the next
+        // The repository field goes back to blank, so a test that set one cannot leave the next
         // one reading somebody else's destination.
         SettingsRepository(context).setBackupRepo("")
         // And the editor's switches go back to what an untouched install has - served, no token asked
@@ -71,23 +62,10 @@ class SettingsViewModelTest {
         store.deleteAll()
     }
 
-    private fun viewModel(check: suspend (String) -> KeyCheck = { KeyCheck.Works }) = SettingsViewModel(
+    private fun viewModel() = SettingsViewModel(
         settings = SettingsRepository(context),
-        store = store,
-        checkKey = check
+        store = store
     )
-
-    @Test
-    fun theKeyInForceIsTheBuildsUntilSomethingElseIsStored() {
-        val viewModel = viewModel()
-
-        // Known synchronously, so a slow device shows the right key immediately rather
-        // than flashing "no key set yet" and correcting itself.
-        assertEquals(
-            if (BuildConfig.LINZ_API_KEY.isNotBlank()) KeySource.BUILT_IN else KeySource.NONE,
-            viewModel.keySource.value
-        )
-    }
 
     /**
      * Polls [read] until it gives [expected], then returns it.
@@ -112,25 +90,6 @@ class SettingsViewModelTest {
     // were not void when first written, and the run failed as "invalid test class"
     // rather than as a test failure.
 
-    @Test
-    fun aKeyBeingTypedIsNotWipedByTheStoredOneArrivingLate(): Unit = runBlocking {
-        SettingsRepository(context).setLinzApiKey("stored-earlier")
-        // A tile in the store, so the summary the same coroutine publishes tells us when
-        // the seeding read has finished - without sleeping and hoping.
-        store.write(12, 1, 1, ByteArray(10))
-
-        val viewModel = viewModel()
-        // Typed before the read lands, as happens on a slow device.
-        viewModel.setKeyText("half-typed")
-
-        withTimeout(TIMEOUT_MS) { viewModel.storedTiles.first { it.tiles == 1L } }
-        assertEquals(
-            "the setting being read must not overwrite what is being typed",
-            "half-typed",
-            viewModel.keyText.value
-        )
-    }
-
     /**
      * The off-site fields are seeded from the same repository, and the seeding has to survive a read
      * that answers **immediately**.
@@ -154,7 +113,6 @@ class SettingsViewModelTest {
         // Warm every read the constructor's own seeding makes.
         settings.backupRepo.first()
         settings.backupToken.first()
-        settings.storedLinzApiKey.first()
 
         val viewModel = withContext(Dispatchers.Default) { SettingsViewModel(settings, store) }
 
@@ -163,125 +121,6 @@ class SettingsViewModelTest {
         }
 
         settings.setBackupRepo("")
-    }
-
-    @Test
-    fun anEnteredKeyIsSavedAndWinsOverTheOneInTheBuild(): Unit = runBlocking {
-        val settings = SettingsRepository(context)
-        val viewModel = SettingsViewModel(settings, store, checkKey = { KeyCheck.Works })
-
-        viewModel.setKeyText("entered-key-9876")
-        viewModel.save()
-
-        // The key in force and the key on the device are the source of truth, and both
-        // are read straight from the repository here. The masked label the screen shows
-        // is derived from this same value by a pure function (maskKey, unit tested), and
-        // it is checked on a device rather than raced here: under a full suite the
-        // StateFlow that carries it occasionally reports its previous value, which says
-        // nothing about whether the key was saved.
-        awaitValue("the entered key should be the one in force", "entered-key-9876") {
-            settings.linzApiKey.first()
-        }
-        awaitValue("the entered key should be on the device", "entered-key-9876") {
-            settings.storedLinzApiKey.first()
-        }
-    }
-
-    @Test
-    fun clearingFallsBackToTheKeyInTheBuild(): Unit = runBlocking {
-        val settings = SettingsRepository(context)
-        // The stored key is set here, not through the view model: a suspend write the
-        // test itself awaits has no dispatcher hop to lose a race with, so this test is
-        // about clearing rather than about how fast Main wakes up under a full suite.
-        settings.setLinzApiKey("temporary-key")
-
-        val viewModel = SettingsViewModel(settings, store, checkKey = { KeyCheck.Works })
-        viewModel.clearEnteredKey()
-
-        withTimeout(TIMEOUT_MS) { settings.storedLinzApiKey.first { it.isEmpty() } }
-        assertEquals(
-            "with nothing stored, the build's key is in use again",
-            BuildConfig.LINZ_API_KEY,
-            settings.linzApiKey.first()
-        )
-        withTimeout(TIMEOUT_MS) { viewModel.keyText.first { it.isEmpty() } }
-    }
-
-    @Test
-    fun checkingAsksTheServiceAboutTheKeyInForce(): Unit = runBlocking {
-        val settings = SettingsRepository(context)
-        // A key entered for this test, rather than one baked in at build time: the check must use
-        // whatever key is in force, and a test must not depend on the app having been built with one.
-        settings.setLinzApiKey("a-key-entered-for-this-test")
-        // Written from the view model's coroutines, read here: an AtomicReference keeps
-        // that a real hand-off rather than a hopeful one.
-        val askedWith = AtomicReference<String?>(null)
-        val viewModel = SettingsViewModel(settings, store, checkKey = { key ->
-            askedWith.set(key)
-            KeyCheck.Works
-        })
-
-        viewModel.check()
-
-        val state = withTimeout(TIMEOUT_MS) {
-            viewModel.check.first { it != KeyCheckState.Idle && it != KeyCheckState.Checking }
-        }
-        assertEquals(KeyCheckState.Worked, state)
-        assertEquals("the check must use the key in force", settings.linzApiKey.first(), askedWith.get())
-    }
-
-    @Test
-    fun aRejectedKeyIsReportedInTheWordsTheServiceUsed(): Unit = runBlocking {
-        // A key in force, so the check is reached at all: what it answers is stubbed, but the view
-        // model refuses to ask when there is nothing to ask about.
-        SettingsRepository(context).setLinzApiKey("a-key-entered-for-this-test")
-        val expired = "LINZ rejected the key (HTTP 400): it may have expired"
-        val viewModel = viewModel { KeyCheck.Failed(expired) }
-
-        viewModel.check()
-
-        val state = withTimeout(TIMEOUT_MS) {
-            viewModel.check.first { it is KeyCheckState.Failed }
-        } as KeyCheckState.Failed
-        assertTrue(
-            "the walker should read why, not just \"failed\": ${state.message}",
-            state.message.contains("expired")
-        )
-    }
-
-    @Test
-    fun aRealKeyIsAcceptedAndABogusOneIsNot(): Unit = runBlocking {
-        val key = SettingsRepository(context).linzApiKey.first()
-        assumeTrue("needs a LINZ Basemaps key", key.isNotBlank())
-
-        // The real probe, so this is the same request the Check button makes.
-        val probe = LinzKeyProbe()
-
-        val good = withTimeout(NETWORK_TIMEOUT_MS) { probe.check(key) }
-        // A key that is being probed repeatedly gets rate limited, and 429 says nothing
-        // about whether the key is valid, so wait and ask once more rather than calling
-        // a good key bad.
-        val confirmed = if (good is KeyCheck.Failed && good.message.contains("429")) {
-            delay(10_000)
-            withTimeout(NETWORK_TIMEOUT_MS) { probe.check(key) }
-        } else {
-            good
-        }
-        assertEquals("the key in this build should be accepted by LINZ", KeyCheck.Works, confirmed)
-
-        // The regression this probe design exists for: a *tile* probe called a bogus key
-        // good, because LINZ's CDN serves popular tile paths regardless of the key.
-        val bogus = withTimeout(NETWORK_TIMEOUT_MS) { probe.check("bogus-key-0000") }
-        assertTrue("a bad key must not be called good: $bogus", bogus is KeyCheck.Failed)
-        if (bogus is KeyCheck.Failed && bogus.message.contains("429")) {
-            // Rate limited: that is about us, not about the key, so there is nothing to
-            // assert here beyond the service being reachable at all.
-            return@runBlocking
-        }
-        assertTrue(
-            "and should be named as rejected: ${(bogus as KeyCheck.Failed).message}",
-            bogus.message.contains("400")
-        )
     }
 
     /**
@@ -433,7 +272,7 @@ class SettingsViewModelTest {
     @Test
     fun theLightSettingIsWrittenAndPublishedToTheScreens(): Unit = runBlocking {
         val settings = SettingsRepository(context)
-        val viewModel = SettingsViewModel(settings, store, checkKey = { KeyCheck.Works })
+        val viewModel = viewModel()
 
         viewModel.setThemeChoice(ThemeChoice.DARK)
 
@@ -464,8 +303,5 @@ class SettingsViewModelTest {
     private companion object {
         /** DataStore round trips on a CI emulator are not instant. */
         const val TIMEOUT_MS = 20_000L
-
-        /** The live service, which is slower still. */
-        const val NETWORK_TIMEOUT_MS = 30_000L
     }
 }

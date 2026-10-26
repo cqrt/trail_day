@@ -1,12 +1,6 @@
 package nz.mckenzie.trailday.offline
 
 import android.content.Context
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import nz.mckenzie.trailday.BuildConfig
-import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.map.GlyphFonts
@@ -61,9 +55,6 @@ object TileServerHolder {
     @Volatile
     private var server: LocalTileServer? = null
 
-    @Volatile
-    private var currentKey: String = ""
-
     /** The XYZ template for [basemap] to give the map, or null if the server is not up yet. */
     fun templateUrl(basemap: Basemap): String? =
         server?.takeIf { it.isRunning }?.tileUrlTemplate(basemap.id)
@@ -86,11 +77,10 @@ object TileServerHolder {
         server?.takeIf { it.isRunning }?.spriteUrl(basemap.id)
 
     /** Safe to ask for twice: the second ask finds the server up - the app and the tests both ask. */
-    fun start(context: Context, initialKey: String = BuildConfig.LINZ_API_KEY) {
+    fun start(context: Context) {
         if (server != null) return
 
         val appContext = context.applicationContext
-        currentKey = initialKey
 
         // The letters a track's name is written with are read out of the app, here and nowhere else: the
         // server itself knows nothing about where they live - see GlyphFonts.
@@ -102,11 +92,6 @@ object TileServerHolder {
         )
         started.start()
         server = started
-
-        // Follow the key from settings for the life of the process.
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            SettingsRepository(appContext).linzApiKey.collect { currentKey = it }
-        }
     }
 
     /**
@@ -126,26 +111,23 @@ object TileServerHolder {
                 store = store(context, basemap),
                 suffix = basemap.tileSuffix,
                 contentType = basemap.contentType,
-                // Read per request, so a key pasted into Settings takes effect at once.
+                // One fetcher per basemap: LINZ's tiles come through the app's own proxy, which holds
+                // the key, and the drawn maps come from their own hosts with the app's own user agent.
                 upstream = {
                     when (basemap) {
-                        Basemap.LINZ_AERIAL ->
-                            currentKey.takeIf { it.isNotBlank() }?.let { key -> LinzTileFetcher(key) }
+                        Basemap.LINZ_AERIAL -> LinzTileFetcher()
 
                         Basemap.OPENSTREETMAP, Basemap.TOPOGRAPHIC -> DrawnTileFetcher(
-                            urlFor = { zoom, x, y -> basemap.tileUrl("", zoom, x, y) }
+                            urlFor = { zoom, x, y -> basemap.tileUrl(zoom, x, y) }
                         )
 
                         // The vector Topographic tiles, served through the same server as everything
-                        // else so the key stays on the phone and the desk can draw them too.
+                        // else so the desk can draw them too.
                         Basemap.LINZ_TOPO_LIDAR_HILLSHADE ->
-                            currentKey.takeIf { it.isNotBlank() }?.let { key ->
-                                LinzTileFetcher(
-                                    key,
-                                    urlFor = { zoom, x, y -> basemap.tileUrl(key, zoom, x, y) },
-                                    accept = "application/x-protobuf"
-                                )
-                            }
+                            LinzTileFetcher(
+                                urlFor = { zoom, x, y -> basemap.tileUrl(zoom, x, y) },
+                                accept = "application/x-protobuf"
+                            )
                     }
                 }
             )
@@ -160,28 +142,21 @@ object TileServerHolder {
      *
      * LINZ's topographic vector tiles, and only their `place_labels` layer is ever drawn - see
      * [PlaceLabels]. They go through this server for the reason everything else does: one place the
-     * map fetches from, one store on disk, the key never leaving the phone, and the desk drawing the
-     * names from the phone rather than from LINZ itself. Fetched on the way through like any other
-     * tile, so the ground that has been looked at keeps its names with no reception.
-     *
-     * No key, no names: the upstream is null and the route answers 404, exactly as the imagery does.
+     * map fetches from, one store on disk, and the desk drawing the names from the phone rather than
+     * from LINZ itself. Fetched on the way through like any other tile, so the ground that has been
+     * looked at keeps its names with no reception.
      */
     private fun placeLabelsSource(context: Context): TileSource = TileSource(
         id = PlaceLabels.ID,
         store = labelsStore(context),
         suffix = PlaceLabels.TILE_SUFFIX,
         contentType = PlaceLabels.CONTENT_TYPE,
-        upstream = {
-            currentKey.takeIf { it.isNotBlank() }?.let { key ->
-                LinzTileFetcher(key, urlFor = { zoom, x, y -> PlaceLabels.tileUrl(key, zoom, x, y) })
-            }
-        }
+        upstream = { LinzTileFetcher(urlFor = { zoom, x, y -> PlaceLabels.tileUrl(zoom, x, y) }) }
     )
 
     /**
      * The elevation behind the LiDAR hillshade, as one more source in the same server.
      *
-     * No key, no shade: the upstream is null and the route answers 404, exactly as the imagery does.
      * It is fetched on the way through like any other tile, so the desk can draw the shade from the
      * phone rather than from LINZ itself.
      */
@@ -191,15 +166,12 @@ object TileServerHolder {
         suffix = ELEVATION_SUFFIX,
         contentType = ELEVATION_CONTENT_TYPE,
         upstream = {
-            currentKey.takeIf { it.isNotBlank() }?.let { key ->
-                LinzTileFetcher(
-                    key,
-                    urlFor = { zoom, x, y -> Basemap.elevationUrl(key, zoom, x, y) },
-                    // The DEM endpoint answers PNG, and MapLibre decodes it as PNG: asking for WebP
-                    // first gets bytes the renderer cannot read, which is a hillshade that never draws.
-                    accept = "image/png"
-                )
-            }
+            LinzTileFetcher(
+                urlFor = { zoom, x, y -> Basemap.elevationUrl(zoom, x, y) },
+                // The DEM endpoint answers PNG, and MapLibre decodes it as PNG: asking for WebP
+                // first gets bytes the renderer cannot read, which is a hillshade that never draws.
+                accept = "image/png"
+            )
         }
     )
 
@@ -218,8 +190,6 @@ object TileServerHolder {
 
     /**
      * LINZ's pre-rendered DEM hillshade, as one more source in the same server.
-     *
-     * No key, no shade: the upstream is null and the route answers 404, exactly as the imagery does.
      */
     private fun hillshadeSource(context: Context): TileSource = TileSource(
         id = HILLSHADE_ID,
@@ -227,12 +197,7 @@ object TileServerHolder {
         suffix = HILLSHADE_SUFFIX,
         contentType = HILLSHADE_CONTENT_TYPE,
         upstream = {
-            currentKey.takeIf { it.isNotBlank() }?.let { key ->
-                LinzTileFetcher(
-                    key,
-                    urlFor = { zoom, x, y -> Basemap.demHillshadeUrl(key, zoom, x, y) }
-                )
-            }
+            LinzTileFetcher(urlFor = { zoom, x, y -> Basemap.demHillshadeUrl(zoom, x, y) })
         }
     )
 

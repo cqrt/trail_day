@@ -4,6 +4,7 @@ import kotlinx.coroutines.runBlocking
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -53,7 +54,6 @@ class LinzTileFetcherTest {
 
     /** A fetcher that talks to the local server instead of LINZ. */
     private fun fetcher() = LinzTileFetcher(
-        apiKey = "test-key",
         urlFor = { zoom, x, y ->
             "http://127.0.0.1:$port/tiles/${Basemap.LINZ_AERIAL.id}/$zoom/$x/$y" +
                 Basemap.LINZ_AERIAL.tileSuffix
@@ -92,7 +92,6 @@ class LinzTileFetcherTest {
     fun `an unreachable host is a failure rather than an exception`() = runBlocking {
         // Port 1 on loopback: nothing is listening, so the connection is refused.
         val offline = LinzTileFetcher(
-            apiKey = "test-key",
             urlFor = { _, _, _ -> "http://127.0.0.1:1/tiles/14/1017/660.webp" },
             connectTimeoutMs = 1_000,
             readTimeoutMs = 1_000
@@ -104,12 +103,14 @@ class LinzTileFetcherTest {
     }
 
     @Test
-    fun `the default url is a keyed linz aerial tile`() {
-        val url = Basemap.LINZ_AERIAL.tileUrl("abc123", 14, 1017, 660)
+    fun `the default url is an unkeyed linz aerial tile on the app's proxy`() {
+        val url = Basemap.LINZ_AERIAL.tileUrl(14, 1017, 660)
 
         assertEquals(
-            "https://basemaps.linz.govt.nz/v1/tiles/aerial/WebMercatorQuad/14/1017/660.webp?api=abc123",
+            "https://trailday-linz-proxy.le-mckenzies.workers.dev/v1/tiles/aerial/" +
+                "WebMercatorQuad/14/1017/660.webp",
             url
         )
+        assertFalse("a key must never reach the phone's own URLs", url.contains("api="))
     }
 }
