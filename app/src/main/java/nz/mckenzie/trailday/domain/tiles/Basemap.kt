@@ -13,7 +13,7 @@ package nz.mckenzie.trailday.domain.tiles
  *
  * **No source here asks the walker for anything.** LINZ's tiles are fetched through the app's own
  * proxy, which holds the key - so there is nothing to paste into Settings, and nothing that expires on
- * a phone. See [LINZ_TILES_HOST].
+ * a phone. See [LinzAccess].
  *
  * Everything specific to a source lives in this table: the tile URL, how tiles are named on
  * disk, the zoom it is published to, and the attribution its licence requires. That is on
@@ -110,16 +110,17 @@ enum class Basemap(
     );
 
     /**
-     * The XYZ template to hand MapLibre, with the key in it where the source needs one.
+     * The XYZ template to hand MapLibre.
      *
-     * OpenStreetMap's URL is the one their policy names, over https: `http://` is refused, and a
-     * library's default user agent is not enough - which is why their tiles are fetched by the
-     * app's own tile server rather than by the map itself. See
-     * [nz.mckenzie.trailday.offline.DrawnTileFetcher].
+     * A LINZ path goes through [LinzAccess], which is the one place that decides which host it is on
+     * and whether the walker's own key rides with it. OpenStreetMap's URL is the one their policy
+     * names, over https: `http://` is refused, and a library's default user agent is not enough -
+     * which is why their tiles are fetched by the app's own tile server rather than by the map
+     * itself. See [nz.mckenzie.trailday.offline.DrawnTileFetcher].
      */
     fun tileTemplate(): String = when (this) {
         LINZ_AERIAL ->
-            "$LINZ_TILES_HOST/v1/tiles/aerial/$LINZ_TILE_MATRIX/{z}/{x}/{y}.webp"
+            LinzAccess.url("/v1/tiles/aerial/$LINZ_TILE_MATRIX/{z}/{x}/{y}.webp")
 
         OPENSTREETMAP ->
             "$OSM_HOST/{z}/{x}/{y}.png"
@@ -128,14 +129,15 @@ enum class Basemap(
             "$TOPO_HOST/{z}/{x}/{y}.png"
 
         LINZ_TOPO_LIDAR_HILLSHADE ->
-            "$LINZ_TILES_HOST/v1/tiles/$LINZ_TOPOGRAPHIC_V2_TILESET/$LINZ_TILE_MATRIX/" +
-                "{z}/{x}/{y}.pbf"
+            LinzAccess.url(
+                "/v1/tiles/$LINZ_TOPOGRAPHIC_V2_TILESET/$LINZ_TILE_MATRIX/{z}/{x}/{y}.pbf"
+            )
     }
 
     /** One specific tile, as the fetchers need it. */
     fun tileUrl(zoom: Int, x: Int, y: Int): String = when (this) {
         LINZ_AERIAL ->
-            "$LINZ_TILES_HOST/v1/tiles/aerial/$LINZ_TILE_MATRIX/$zoom/$x/$y.webp"
+            LinzAccess.url("/v1/tiles/aerial/$LINZ_TILE_MATRIX/$zoom/$x/$y.webp")
 
         OPENSTREETMAP ->
             "$OSM_HOST/$zoom/$x/$y.png"
@@ -144,8 +146,9 @@ enum class Basemap(
             "$TOPO_HOST/$zoom/$x/$y.png"
 
         LINZ_TOPO_LIDAR_HILLSHADE ->
-            "$LINZ_TILES_HOST/v1/tiles/$LINZ_TOPOGRAPHIC_V2_TILESET/$LINZ_TILE_MATRIX/" +
-                "$zoom/$x/$y.pbf"
+            LinzAccess.url(
+                "/v1/tiles/$LINZ_TOPOGRAPHIC_V2_TILESET/$LINZ_TILE_MATRIX/$zoom/$x/$y.pbf"
+            )
     }
 
     /**
@@ -159,8 +162,9 @@ enum class Basemap(
         LINZ_AERIAL -> tileUrl(zoom, x, y)
         OPENSTREETMAP, TOPOGRAPHIC -> tileUrl(zoom, x, y)
         LINZ_TOPO_LIDAR_HILLSHADE ->
-            "$LINZ_TILES_HOST/v1/tiles/$PREVIEW_TOPO_TILESET/$LINZ_TILE_MATRIX/" +
-                "$zoom/$x/$y.webp"
+            LinzAccess.url(
+                "/v1/tiles/$PREVIEW_TOPO_TILESET/$LINZ_TILE_MATRIX/$zoom/$x/$y.webp"
+            )
     }
 
     /** Whether this basemap is one of LINZ's hosted style documents rather than a single tile set. */
@@ -177,8 +181,10 @@ enum class Basemap(
         if (!usesHostedStyle) {
             null
         } else {
-            "$LINZ_TILES_HOST/v1/tiles/$LINZ_TOPOGRAPHIC_V2_TILESET/$LINZ_TILE_MATRIX/" +
-                "style/$LINZ_TOPOGRAPHIC_V2_TILESET.json"
+            LinzAccess.url(
+                "/v1/tiles/$LINZ_TOPOGRAPHIC_V2_TILESET/$LINZ_TILE_MATRIX/" +
+                    "style/$LINZ_TOPOGRAPHIC_V2_TILESET.json"
+            )
         }
 
     /** The credit as HTML, single-quoted so it drops into a style document without escaping. */
@@ -187,26 +193,6 @@ enum class Basemap(
     companion object {
         /** What the map draws until the walker chooses otherwise. */
         val DEFAULT: Basemap = LINZ_AERIAL
-
-        /**
-         * Where LINZ's tiles are fetched from: **the app's own proxy, not LINZ**.
-         *
-         * Every LINZ URL in the app is built from this one constant, and every one of them is a LINZ
-         * path on the proxy's host - so the proxy is a swap of this line and nothing else. The key it
-         * needs lives there as a Worker secret, which is why nothing here carries one and why nothing
-         * expires on a phone. See `worker-linz/README.md`, and [LINZ_ORIGIN] for the host this stands
-         * in for.
-         */
-        const val LINZ_TILES_HOST = "https://trailday-linz-proxy.le-mckenzies.workers.dev"
-
-        /**
-         * LINZ's own host, which the app no longer talks to.
-         *
-         * Named for the one thing that still needs it: a style document LINZ serves names its sprite
-         * and its letters at LINZ's host, and those are rewritten to the proxy before the style is
-         * loaded. See [nz.mckenzie.trailday.map.LinzVectorStyle].
-         */
-        const val LINZ_ORIGIN = "https://basemaps.linz.govt.nz"
 
         /**
          * OpenTopoMap's tile host: a drawn topographic map of the whole world - contours, tracks,
@@ -263,26 +249,30 @@ enum class Basemap(
          * it is given the same source through the phone's own tile server and draws the shade itself.
          */
         fun elevationTemplate(): String =
-            "$LINZ_TILES_HOST/v1/tiles/elevation/$LINZ_TILE_MATRIX/{z}/{x}/{y}.png" +
-                "?pipeline=terrain-rgb"
+            LinzAccess.url(
+                "/v1/tiles/elevation/$LINZ_TILE_MATRIX/{z}/{x}/{y}.png?pipeline=terrain-rgb"
+            )
 
         /** One elevation tile, as the fetchers need it. */
         fun elevationUrl(zoom: Int, x: Int, y: Int): String =
-            "$LINZ_TILES_HOST/v1/tiles/elevation/$LINZ_TILE_MATRIX/$zoom/$x/$y.png" +
-                "?pipeline=terrain-rgb"
+            LinzAccess.url(
+                "/v1/tiles/elevation/$LINZ_TILE_MATRIX/$zoom/$x/$y.png?pipeline=terrain-rgb"
+            )
 
         /** LINZ's pre-rendered DEM hillshade, as a template for the desk and the phone's server. */
         fun demHillshadeTemplate(): String =
-            "$LINZ_TILES_HOST/v1/tiles/$DEM_HILLSHADE_TILESET/$LINZ_TILE_MATRIX/" +
-                "{z}/{x}/{y}.webp"
+            LinzAccess.url(
+                "/v1/tiles/$DEM_HILLSHADE_TILESET/$LINZ_TILE_MATRIX/{z}/{x}/{y}.webp"
+            )
 
         /** One DEM hillshade tile, as the fetchers need it. */
         fun demHillshadeUrl(zoom: Int, x: Int, y: Int): String =
-            "$LINZ_TILES_HOST/v1/tiles/$DEM_HILLSHADE_TILESET/$LINZ_TILE_MATRIX/" +
-                "$zoom/$x/$y.webp"
+            LinzAccess.url(
+                "/v1/tiles/$DEM_HILLSHADE_TILESET/$LINZ_TILE_MATRIX/$zoom/$x/$y.webp"
+            )
 
         /** LINZ's hosted topographic style, for a basemap this build does not offer yet. */
         fun linzTopographicStyleUrl(): String =
-            "$LINZ_TILES_HOST/v1/tiles/topographic/$LINZ_TILE_MATRIX/style/topographic.json"
+            LinzAccess.url("/v1/tiles/topographic/$LINZ_TILE_MATRIX/style/topographic.json")
     }
 }

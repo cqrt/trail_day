@@ -39,6 +39,7 @@ import nz.mckenzie.trailday.domain.asset.AssetLayer
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.asset.YourPlaceLayer
 import nz.mckenzie.trailday.domain.tiles.Basemap
+import nz.mckenzie.trailday.domain.tiles.LinzAccess
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.domain.tiles.TeAraroa
 
@@ -350,11 +351,16 @@ fun BasemapView(
     // block is dropped, its sprite and its letters are pointed at the app's own proxy, and its two
     // sources are pointed at the app's tile server. Null until it has arrived, and null forever for
     // every other basemap.
-    var hostedStyleJson by remember(basemap) { mutableStateOf<String?>(null) }
+    // A hosted style is the one thing that has to be fetched again when the walker's own LINZ key is
+    // entered or cleared: the document itself comes from one host or the other, and the two are two
+    // different sets of URLs for the same map. Every other basemap is fetched through the app's own tile
+    // server, which resolves the host per request - see [LinzAccess] - so it follows a change by itself.
+    val ownKeyInUse by LinzAccess.ownKeyInUse.collectAsStateWithLifecycle()
+    var hostedStyleJson by remember(basemap, ownKeyInUse) { mutableStateOf<String?>(null) }
     // The document, the sprite and the letters are all kept or served by the app itself, so a phone
     // that has looked at this basemap once can draw it again with no reception at all.
     val context = LocalContext.current
-    LaunchedEffect(basemap, tileUrlTemplate) {
+    LaunchedEffect(basemap, tileUrlTemplate, ownKeyInUse) {
         hostedStyleJson = if (basemap.usesHostedStyle) {
             LinzVectorStyle.load(
                 basemap = basemap,

@@ -39,6 +39,17 @@ object BasemapPreviewCache {
         Basemap.entries.forEach { basemap -> load(basemap) }
     }
 
+    /**
+     * Forgets every picture, so the next look fetches them again.
+     *
+     * For the one thing that changes what a picture *is*: a key of the walker's own sends a tile to a
+     * different host, and a picture fetched from the other one would be a picture of the wrong thing to
+     * have beside the name. See [nz.mckenzie.trailday.domain.tiles.LinzAccess].
+     */
+    fun forget() {
+        cache.clear()
+    }
+
     private fun cacheKey(basemap: Basemap): String = basemap.id
 
     private suspend fun fetch(basemap: Basemap): ImageBitmap? =

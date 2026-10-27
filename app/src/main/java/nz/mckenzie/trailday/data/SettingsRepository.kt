@@ -73,6 +73,54 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     private val lastOffsiteFailureNotifiedAtPref = longPreferencesKey("last_offsite_failure_notified_at")
 
     /**
+     * Whether the **Developer options** section has been unlocked, by seven taps on the version line.
+     *
+     * Off when unset, which is the whole point: an ordinary walker never sees the section. Once it is on
+     * it stays on across restarts, the way Android's own developer options do - and the switch inside the
+     * section is how it goes away again.
+     */
+    private val developerOptionsPref = booleanPreferencesKey("developer_options")
+
+    /**
+     * The walker's own LINZ key, empty when the app's own proxy is what fetches the tiles.
+     *
+     * A credential rather than a record: it never travels in a backup, and nothing but the developer
+     * section reads it. See [nz.mckenzie.trailday.domain.tiles.LinzAccess].
+     */
+    private val developerLinzKeyPref = stringPreferencesKey("developer_linz_key")
+
+    /**
+     * Whether the **Developer options** section is showing.
+     *
+     * Read by the Settings screen and by nothing else: everything the section controls is read through
+     * the preference it writes, so the door being open or shut changes nothing about the app.
+     */
+    val developerOptions: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[developerOptionsPref] ?: false
+    }
+
+    suspend fun setDeveloperOptions(unlocked: Boolean) {
+        context.settingsDataStore.edit { prefs -> prefs[developerOptionsPref] = unlocked }
+    }
+
+    /**
+     * The walker's own LINZ key, empty when the app's own proxy is what fetches the tiles.
+     *
+     * The key in force is this and nothing else - there is no compiled-in default and no fallback - so
+     * clearing it is the way back to the proxy, and nothing about it reaches a backup.
+     */
+    val developerLinzKey: Flow<String> = context.settingsDataStore.data.map { prefs ->
+        prefs[developerLinzKeyPref].orEmpty()
+    }
+
+    suspend fun setDeveloperLinzKey(value: String) {
+        context.settingsDataStore.edit { prefs ->
+            val trimmed = value.trim()
+            if (trimmed.isEmpty()) prefs.remove(developerLinzKeyPref) else prefs[developerLinzKeyPref] = trimmed
+        }
+    }
+
+    /**
      * Which map the walker draws under the work.
      *
      * Aerial imagery by default, which is what every existing install has been looking at: a new

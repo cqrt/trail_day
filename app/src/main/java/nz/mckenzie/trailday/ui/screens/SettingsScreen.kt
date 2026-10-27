@@ -6,6 +6,7 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -50,6 +51,7 @@ import nz.mckenzie.trailday.domain.backup.BackupDestination
 import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.viewmodel.InstallState
+import nz.mckenzie.trailday.viewmodel.KeyCheckState
 import nz.mckenzie.trailday.viewmodel.OffsiteCheckState
 import nz.mckenzie.trailday.viewmodel.SettingsViewModel
 import nz.mckenzie.trailday.viewmodel.UpdateState
@@ -82,6 +84,14 @@ fun SettingsScreen(
     }
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
     val themeChoice by viewModel.themeChoice.collectAsStateWithLifecycle()
+    // The hidden section, and everything it shows when it is open. See [DeveloperOptionsCard].
+    val developerOptions by viewModel.developerOptions.collectAsStateWithLifecycle()
+    val doorMessage by viewModel.doorMessage.collectAsStateWithLifecycle()
+    val ownKeyLabel by viewModel.ownKeyLabel.collectAsStateWithLifecycle()
+    val keyText by viewModel.keyText.collectAsStateWithLifecycle()
+    val ownKeyInForce by viewModel.ownKeyInForce.collectAsStateWithLifecycle()
+    val check by viewModel.check.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
     val webEditorUrl by viewModel.webEditorUrl.collectAsStateWithLifecycle()
     val webEditorTokenRequired by viewModel.webEditorTokenRequired.collectAsStateWithLifecycle()
     val webEditorKeepAwake by viewModel.webEditorKeepAwake.collectAsStateWithLifecycle()
@@ -700,7 +710,21 @@ fun SettingsScreen(
                 ) {
 
                     Text("This device", style = MaterialTheme.typography.titleMedium)
-                    Text(viewModel.versionLabel, style = MaterialTheme.typography.bodyMedium)
+                    // The door: seven taps on the version line opens the Developer options section at
+                    // the foot of this screen. Android's own joke, and Android's own number - see
+                    // [SettingsViewModel.onVersionTap] for why it is not discoverable by accident.
+                    Text(
+                        text = viewModel.versionLabel,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.clickable { viewModel.onVersionTap() }
+                    )
+                    doorMessage?.let { hint ->
+                        Text(
+                            text = hint,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     Text(
                         text = "${storedTiles.tiles} imagery tiles cached, ${storedTiles.sizeLabel}",
                         style = MaterialTheme.typography.bodyMedium
@@ -713,6 +737,121 @@ fun SettingsScreen(
                     )
                 }
             }
+
+            if (developerOptions) {
+                DeveloperOptionsCard(
+                    viewModel = viewModel,
+                    ownKeyLabel = ownKeyLabel,
+                    keyText = keyText,
+                    ownKeyInForce = ownKeyInForce,
+                    check = check,
+                    message = message
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The hidden section: what a walker who went looking for it gets.
+ *
+ * Off unless the version line has been tapped seven times - see [SettingsViewModel.onVersionTap] - and
+ * the switch at its top is how it goes away again. Closing it hides these controls and **changes nothing
+ * they set**: a walker who closes the section has not asked for their map back, and the way back is
+ * **Clear**, which is a thing you press deliberately.
+ *
+ * The app ships no key of its own: by default every LINZ tile comes through the app's own proxy, which
+ * holds the key so the app does not have to. A key entered here sends the app to LINZ itself instead -
+ * see [nz.mckenzie.trailday.domain.tiles.LinzAccess] - which is what a walker with their own key, or a
+ * developer checking against LINZ rather than the proxy, would want.
+ */
+@Composable
+private fun DeveloperOptionsCard(
+    viewModel: SettingsViewModel,
+    ownKeyLabel: String,
+    keyText: String,
+    ownKeyInForce: Boolean,
+    check: KeyCheckState,
+    message: String?
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Developer options", style = MaterialTheme.typography.titleMedium)
+                Switch(checked = true, onCheckedChange = { viewModel.setDeveloperOptions(it) })
+            }
+
+            Text(
+                text = if (ownKeyInForce) {
+                    "Using your own LINZ key (${ownKeyLabel.ifBlank { "none" }}). Tiles come straight " +
+                        "from LINZ, so the app's own proxy is not used."
+                } else {
+                    "Using the app's own proxy. A key here sends every LINZ request straight to LINZ " +
+                        "instead, with the key on the URL."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            OutlinedTextField(
+                value = keyText,
+                onValueChange = viewModel::setKeyText,
+                label = { Text("Your LINZ key") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(onClick = viewModel::saveKey) { Text("Save") }
+                OutlinedButton(
+                    onClick = viewModel::check,
+                    enabled = check != KeyCheckState.Checking
+                ) {
+                    Text(if (check == KeyCheckState.Checking) "Checking…" else "Check")
+                }
+                OutlinedButton(onClick = { viewModel.setKeyText(""); viewModel.saveKey() }) {
+                    Text("Clear")
+                }
+            }
+
+            when (check) {
+                KeyCheckState.Idle -> Unit
+
+                KeyCheckState.Checking ->
+                    Text("Asking LINZ for its style document…", style = MaterialTheme.typography.bodySmall)
+
+                KeyCheckState.Worked -> Text(
+                    text = "The key works: LINZ accepted it.",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                is KeyCheckState.Failed -> Text(
+                    text = "The key did not work: ${check.message}",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            message?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
+
+            Text(
+                text = "A key is a credential, so it is never written into a backup. LINZ's " +
+                    "standard-access keys expire every 90 days, which is why Check is worth pressing.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

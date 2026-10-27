@@ -89,7 +89,7 @@ class BasemapTest {
 
     @Test
     fun `every linz url is fetched from the app's proxy, not from linz`() {
-        val host = Basemap.LINZ_TILES_HOST
+        val host = LinzAccess.PROXY
 
         assertTrue(aerial.tileTemplate().startsWith("$host/"))
         assertTrue(Basemap.elevationTemplate().startsWith("$host/"))
@@ -99,11 +99,45 @@ class BasemapTest {
             "and the drawn maps are still fetched from their own hosts",
             osm.tileTemplate().startsWith(host)
         )
-        assertEquals(
-            "linz's own host is named only for the style rewrite",
-            "https://basemaps.linz.govt.nz",
-            Basemap.LINZ_ORIGIN
-        )
+    }
+
+    @Test
+    fun `a key of the walker's own sends every linz url to linz itself, with the key on it`() {
+        // The other half of the same seam: the Developer options section's key. See [LinzAccess] for why
+        // there are two hosts at all, and the Worker's README for why only one of them is the default.
+        LinzAccess.use("c01abcDEF123")
+
+        try {
+            assertEquals(
+                "${LinzAccess.LINZ_ORIGIN}/v1/tiles/aerial/WebMercatorQuad/{z}/{x}/{y}.webp" +
+                    "?api=c01abcDEF123",
+                aerial.tileTemplate()
+            )
+            assertEquals(
+                "${LinzAccess.LINZ_ORIGIN}/v1/tiles/aerial/WebMercatorQuad/14/1017/660.webp" +
+                    "?api=c01abcDEF123",
+                aerial.tileUrl(14, 1017, 660)
+            )
+            // A path that carries a query of its own keeps it, and the key joins it rather than
+            // replacing it: `pipeline=terrain-rgb` is what makes the elevation source an elevation one.
+            assertEquals(
+                "${LinzAccess.LINZ_ORIGIN}/v1/tiles/elevation/WebMercatorQuad/14/1017/660.png" +
+                    "?pipeline=terrain-rgb&api=c01abcDEF123",
+                Basemap.elevationUrl(14, 1017, 660)
+            )
+            // And a LINZ asset a style document names is moved with everything else.
+            assertEquals(
+                "${LinzAccess.LINZ_ORIGIN}/v1/sprites/topographic@2x.png?api=c01abcDEF123",
+                LinzAccess.rewrite("${LinzAccess.LINZ_ORIGIN}/v1/sprites/topographic@2x.png")
+            )
+            assertEquals(
+                "a drawn map's URL is nobody else's to rewrite",
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                LinzAccess.rewrite(osm.tileTemplate())
+            )
+        } finally {
+            LinzAccess.use("")
+        }
     }
 
     @Test

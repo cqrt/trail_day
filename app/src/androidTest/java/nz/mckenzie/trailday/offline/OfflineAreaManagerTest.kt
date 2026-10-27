@@ -9,6 +9,7 @@ import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
+import nz.mckenzie.trailday.domain.tiles.LinzAccess
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -404,7 +405,7 @@ class OfflineAreaManagerTest {
      * checkout until it is. See `worker-linz/README.md`.
      */
     private fun proxyAnswers(): Boolean = runCatching {
-        val connection = URL("${Basemap.LINZ_TILES_HOST}/health")
+        val connection = URL("${LinzAccess.PROXY}/health")
             .openConnection() as HttpURLConnection
         connection.connectTimeout = 5_000
         connection.readTimeout = 5_000

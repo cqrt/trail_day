@@ -31,9 +31,14 @@ import nz.mckenzie.trailday.domain.backup.OffsiteBackupRules
 import nz.mckenzie.trailday.domain.backup.StoredBackup
 import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.domain.tiles.Basemap
+import nz.mckenzie.trailday.domain.tiles.LinzAccess
+import nz.mckenzie.trailday.map.BasemapPreviewCache
+import nz.mckenzie.trailday.offline.KeyCheck
+import nz.mckenzie.trailday.offline.LinzKeyProbe
 import nz.mckenzie.trailday.offline.OfflineTileStore
 import nz.mckenzie.trailday.offline.TileServerHolder
 import nz.mckenzie.trailday.offline.TileStoreSummary
+import nz.mckenzie.trailday.offline.maskKey
 import nz.mckenzie.trailday.web.WebEditorService
 import nz.mckenzie.trailday.web.WebEditorState
 
@@ -53,6 +58,14 @@ interface WebEditorSwitch {
 
     /** Serves it again from scratch, for a setting a run was built from having changed. */
     fun restart()
+}
+
+/** What the **Developer options** section's Check button is doing, and what it last said. */
+sealed interface KeyCheckState {
+    data object Idle : KeyCheckState
+    data object Checking : KeyCheckState
+    data object Worked : KeyCheckState
+    data class Failed(val message: String) : KeyCheckState
 }
 
 /** What the off-site "Test" button found. */
@@ -95,8 +108,73 @@ class SettingsViewModel(
      * Injected for the same reason the switch is: a setting a run is built from has to serve the
      * editor again when it changes, and that decision is worth a test without a service behind it.
      */
-    private val isEditorServing: () -> Boolean = { WebEditorState.isOn }
+    private val isEditorServing: () -> Boolean = { WebEditorState.isOn },
+    /**
+     * Asks LINZ whether it accepts a key, for the **Developer options** section's Check button.
+     *
+     * Injected so a test never reaches LINZ: see [nz.mckenzie.trailday.offline.LinzKeyProbe], which also
+     * explains why the probe is a style document rather than a tile.
+     */
+    private val checkKey: suspend (String) -> KeyCheck = { LinzKeyProbe().check(it) }
 ) : ViewModel() {
+
+    /**
+     * How many times the version line has been tapped, for the door.
+     *
+     * Deliberately **not** a preference: a count that survived a restart would be a count nobody could
+     * reason about, and the door's own state is what is remembered. See [onVersionTap].
+     */
+    private var versionTaps = 0
+
+    /**
+     * Whether the **Developer options** section is showing.
+     *
+     * Read by this screen and by nothing else: everything the section sets is read through the preference
+     * behind it, so the door being open changes nothing about the app.
+     */
+    val developerOptions: StateFlow<Boolean> = settings.developerOptions
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
+
+    /**
+     * What to say under the version line while the walker is tapping it.
+     *
+     * The same courtesy Android pays: a hint that something is happening before the door opens, rather
+     * than seven silent taps and then a section appearing from nowhere.
+     */
+    private val _doorMessage = MutableStateFlow<String?>(null)
+    val doorMessage: StateFlow<String?> = _doorMessage
+
+    /**
+     * The version line was tapped.
+     *
+     * Seven times opens the door, which is Android's own number and Android's own joke: nobody arrives
+     * there by accident, and anybody who wants it can be told how. Four taps in, it starts saying how many
+     * are left.
+     */
+    fun onVersionTap() {
+        if (developerOptions.value) return
+
+        versionTaps++
+        when {
+            versionTaps >= TAPS_TO_UNLOCK -> {
+                viewModelScope.launch { settings.setDeveloperOptions(true) }
+                _doorMessage.value = "Developer options unlocked"
+            }
+
+            versionTaps >= TAPS_TO_UNLOCK - COUNTDOWN_FROM -> _doorMessage.value =
+                "You are now ${TAPS_TO_UNLOCK - versionTaps} steps away"
+
+            else -> _doorMessage.value = null
+        }
+    }
+
+    /** Opens or closes the section. Closing it hides the controls and changes nothing they set. */
+    fun setDeveloperOptions(unlocked: Boolean) {
+        versionTaps = 0
+        _doorMessage.value = null
+        _message.value = null
+        viewModelScope.launch { settings.setDeveloperOptions(unlocked) }
+    }
 
     /**
      * Which basemap the walker has chosen for their maps.
@@ -111,6 +189,83 @@ class SettingsViewModel(
     /** Chooses a basemap. Every map reads the same preference, so this is visible at once. */
     fun setBasemap(value: Basemap) {
         viewModelScope.launch { settings.setBasemap(value) }
+    }
+
+    /**
+     * The key as typed in the **Developer options** section, seeded from what is stored.
+     *
+     * The field rather than the stored value: a key half-typed must not be read as the key in force, and
+     * the masked [ownKeyLabel] is the only form the walker ever sees written back.
+     */
+    private val _keyText = MutableStateFlow("")
+    val keyText: StateFlow<String> = _keyText
+
+    /** The key actually in force, masked: enough to tell two keys apart, no more. */
+    val ownKeyLabel: StateFlow<String> = settings.developerLinzKey
+        .map { key -> if (key.isBlank()) "" else maskKey(key) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), "")
+
+    /**
+     * Whether the walker's own key is what fetches LINZ's tiles, rather than the app's own proxy.
+     *
+     * [LinzAccess]'s own flow rather than a second read of the preference: it is what every URL in the
+     * app is built from, so a screen that reported anything else could disagree with the map.
+     */
+    val ownKeyInForce: StateFlow<Boolean> = LinzAccess.ownKeyInUse
+
+    /** What the Check button is doing, and what it last said. */
+    private val _check = MutableStateFlow<KeyCheckState>(KeyCheckState.Idle)
+    val check: StateFlow<KeyCheckState> = _check
+
+    /** What the section has to say about what was just done, or null when it has nothing to say. */
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message
+
+    /** The field changed, so any verdict about the old text is no longer about this one. */
+    fun setKeyText(text: String) {
+        _keyText.value = text
+        _check.value = KeyCheckState.Idle
+        _message.value = null
+    }
+
+    /**
+     * Saves the key, or clears it when the field is empty.
+     *
+     * Written to the preference that [LinzAccess] follows, so the next tile the app asks for goes to the
+     * host this key belongs to rather than at the next launch. The basemap picker's pictures are the one
+     * thing that has to be fetched again, because they were fetched from the other host.
+     */
+    fun saveKey() {
+        viewModelScope.launch {
+            val value = _keyText.value.trim()
+            settings.setDeveloperLinzKey(value)
+            BasemapPreviewCache.forget()
+            _check.value = KeyCheckState.Idle
+            _message.value = if (value.isBlank()) {
+                "Cleared: the app's own proxy fetches LINZ again."
+            } else {
+                "Saved. Press Check to make sure LINZ accepts it."
+            }
+        }
+    }
+
+    /** Asks LINZ whether it accepts the key, which is the only honest answer to give. */
+    fun check() {
+        viewModelScope.launch {
+            _check.value = KeyCheckState.Checking
+            _message.value = null
+            val key = _keyText.value.trim().ifBlank { settings.developerLinzKey.first() }
+            _check.value = when {
+                key.isBlank() -> KeyCheckState.Failed("There is no key to check")
+                else -> when (
+                    val result = runCatching { checkKey(key) }
+                        .getOrElse { failure -> KeyCheck.Failed(failure.message ?: "the check could not run") }
+                ) {
+                    KeyCheck.Works -> KeyCheckState.Worked
+                    is KeyCheck.Failed -> KeyCheckState.Failed(result.message)
+                }
+            }
+        }
     }
 
     /**
@@ -394,6 +549,9 @@ class SettingsViewModel(
      */
     init {
         viewModelScope.launch {
+            // The key the field starts from, read before anything can be typed into it - see the note
+            // above this block for why that order matters.
+            _keyText.value = settings.developerLinzKey.first()
             _storedTiles.value = TileStoreSummary(store.storedTileCount(), store.storedBytes())
         }
 
@@ -660,6 +818,12 @@ class SettingsViewModel(
 
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L
+
+        /** Seven taps on the version line, which is Android's own number for the same door. */
+        private const val TAPS_TO_UNLOCK = 7
+
+        /** How many taps from the end the hint starts saying how many are left. */
+        private const val COUNTDOWN_FROM = 3
 
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext

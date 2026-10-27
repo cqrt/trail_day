@@ -306,14 +306,16 @@ object PlaceLabels {
     const val HALO_WIDTH = 1.4f
 
     /**
-     * The one tile [zoom], [x], [y], as the app's proxy serves it.
+     * The one tile [zoom], [x], [y], as the app reaches LINZ.
      *
      * The fetcher takes this rather than building it, so the URL is one decision in one place - the
-     * same arrangement `Basemap.tileUrl` has for the imagery.
+     * same arrangement `Basemap.tileUrl` has for the imagery - and it is [LinzAccess] that decides which
+     * host it is on and whether the walker's own key rides with it.
      */
     fun tileUrl(zoom: Int, x: Int, y: Int): String =
-        "${Basemap.LINZ_TILES_HOST}/v1/tiles/$TILESET/${Basemap.LINZ_TILE_MATRIX}/$zoom/$x/$y" +
-            TILE_SUFFIX
+        LinzAccess.url(
+            "/v1/tiles/$TILESET/${Basemap.LINZ_TILE_MATRIX}/$zoom/$x/$y$TILE_SUFFIX"
+        )
 
     /**
      * The XYZ template for a style, given the address the app's tile server hands out.

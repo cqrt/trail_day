@@ -6,7 +6,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import nz.mckenzie.trailday.domain.tiles.Basemap
+import nz.mckenzie.trailday.domain.tiles.LinzAccess
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -41,7 +41,7 @@ sealed interface ProxyHealth {
  */
 class ProxyHealthCheck(
     /** Overridden in tests: the live Worker is not part of a unit test. */
-    private val urlFor: () -> String = { "${Basemap.LINZ_TILES_HOST}/health" },
+    private val urlFor: () -> String = { "${LinzAccess.PROXY}/health" },
     private val connectTimeoutMs: Int = 5_000,
     private val readTimeoutMs: Int = 5_000
 ) {

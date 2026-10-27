@@ -54,6 +54,8 @@ import nz.mckenzie.trailday.map.DocGeoJson
 import nz.mckenzie.trailday.map.TeAraroaGeoJson
 import nz.mckenzie.trailday.map.DocTrackVisibility
 import nz.mckenzie.trailday.map.drawingKind
+import nz.mckenzie.trailday.offline.KeyCheck
+import nz.mckenzie.trailday.offline.LinzKeyProbe
 import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.offline.ProxyHealth
 import nz.mckenzie.trailday.offline.ProxyHealthCheck
@@ -142,7 +144,13 @@ class MapViewModel(
     /** Injected so a test can count how often a line is re-read from the database. */
     private val loadGeometry: suspend (Long) -> AssetGeometry = assetRepository::getAssetGeometry,
     /** Injected so a test can say what the app's own proxy answers without reaching it. */
-    private val proxyHealth: ProxyHealthCheck = ProxyHealthCheck()
+    private val proxyHealth: ProxyHealthCheck = ProxyHealthCheck(),
+    /**
+     * Injected so a test can say what LINZ answers about the walker's own key without reaching it.
+     *
+     * Used only when there *is* one: see [askWhatIsWrong], and [LinzAccess] for the two modes.
+     */
+    private val keyProbe: LinzKeyProbe = LinzKeyProbe()
 ) : ViewModel() {
 
     /** Which map to draw under the work: the walker's choice in Settings. */
@@ -152,13 +160,17 @@ class MapViewModel(
     /**
      * What to say when the basemap has stopped answering, or null when there is nothing to say.
      *
-     * A run of tiles has to fail first - see [TileTrouble] - and only then is the app's own proxy asked,
-     * so a map that is working never makes the call. What is shown is the Worker's own sentence about the
-     * key rather than a guess made here, which is the whole reason the call is made: this phone cannot
-     * tell a dead key from a Worker that is down, and the Worker can.
+     * A run of tiles has to fail first - see [TileTrouble] - and only then is anything asked, so a map
+     * that is working never makes the call. What is shown is the sentence the thing that knows gives back,
+     * rather than a guess made here: this phone cannot tell a dead key from a service that is down, and
+     * whichever of the two is fetching the tiles can.
+     *
+     * **Which of the two depends on the walker's own key** - see [LinzAccess]. With one in force the app
+     * talks to LINZ directly, so the proxy's `/health` would be a sentence about somebody else's key; with
+     * none it is the proxy's business, and the proxy's answer is the one worth repeating.
      */
     val basemapTrouble: StateFlow<String?> = TileTrouble.showing
-        .map { showing -> if (showing) askProxy() else null }
+        .map { showing -> if (showing) askWhatIsWrong() else null }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     /**
@@ -955,14 +967,26 @@ class MapViewModel(
     }
 
     /**
-     * Asks the app's own proxy what it makes of the key.
+     * Asks whichever service is fetching the tiles what it makes of the key.
      *
-     * Best-effort: a phone with no reception cannot ask, and "the map service could not be reached" is
-     * then the honest answer rather than a claim about the key.
+     * Best-effort in both modes: a phone with no reception cannot ask, and "could not be reached" is then
+     * the honest answer rather than a claim about a key.
      */
-    private suspend fun askProxy(): String = when (val answer = proxyHealth.check()) {
-        is ProxyHealth.Answered -> answer.message
-        ProxyHealth.Unreachable -> "The map service could not be reached."
+    private suspend fun askWhatIsWrong(): String {
+        val own = settingsRepository.developerLinzKey.first()
+        if (own.isBlank()) {
+            return when (val answer = proxyHealth.check()) {
+                is ProxyHealth.Answered -> answer.message
+                ProxyHealth.Unreachable -> "The map service could not be reached."
+            }
+        }
+
+        return when (val answer = keyProbe.check(own)) {
+            // The key is fine, so the trouble is something else - and saying so is more use than
+            // repeating a sentence about a key that works.
+            KeyCheck.Works -> "Your LINZ key was accepted, so the trouble is elsewhere."
+            is KeyCheck.Failed -> answer.message
+        }
     }
 
     companion object {

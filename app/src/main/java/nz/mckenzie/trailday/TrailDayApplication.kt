@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.backup.BackupScheduler
 import nz.mckenzie.trailday.data.SettingsRepository
+import nz.mckenzie.trailday.domain.tiles.LinzAccess
 import nz.mckenzie.trailday.map.BasemapPreviewCache
 import nz.mckenzie.trailday.offline.TileServerHolder
 import nz.mckenzie.trailday.tracking.DevicePosition
@@ -40,6 +41,14 @@ class TrailDayApplication : Application() {
 
         // The switches below have to actually stop the job they name, or the setting is a lie.
         val settings = SettingsRepository(this)
+
+        // The walker's own LINZ key, if they have put one in the developer section: followed for the
+        // life of the process, so a key entered or cleared takes effect on the next tile rather than at
+        // the next launch. See [LinzAccess].
+        LinzAccess.follow(
+            settings.developerLinzKey,
+            CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        )
 
         // The basemap picker's example tiles, fetched once at launch: one small tile each, so the
         // pictures are there the moment Settings is opened rather than arriving while it is read.

@@ -16,6 +16,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.domain.tiles.Basemap
+import nz.mckenzie.trailday.domain.tiles.LinzAccess
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -227,15 +228,13 @@ object LinzVectorStyle {
     }
 
     /**
-     * A LINZ asset URL, fetched through the app's proxy.
+     * A LINZ asset URL, fetched the way everything else here is.
      *
-     * LINZ's style document names its own sprite and its own letters at LINZ's host, and the app no
-     * longer talks to LINZ at all: everything goes through the proxy, which is the only thing holding
-     * the key. The rewrite is the host and nothing else - the path is LINZ's, which is what the proxy
-     * answers on.
+     * LINZ's style document names its own sprite and its own letters at LINZ's host, so they have to be
+     * moved with everything else - to the app's proxy by default, or to LINZ itself with the walker's key
+     * when they have asked for that. [LinzAccess.rewrite] is that decision, made once.
      */
-    private fun throughProxy(url: String): String =
-        url.replace(Basemap.LINZ_ORIGIN, Basemap.LINZ_TILES_HOST)
+    private fun throughProxy(url: String): String = LinzAccess.rewrite(url)
 
     private fun readText(url: String): String? = readBytes(url)?.decodeToString()
 
