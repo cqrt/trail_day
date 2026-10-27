@@ -112,6 +112,18 @@ private const val TRAIL_WIDTH = 4f
 /** Its casing, wider than the line by the same margin the recorded line's gold edge wears. */
 private const val TRAIL_CASING_WIDTH = 7f
 
+/**
+ * The white outline drawn under every reference line, and how much wider it is than the line it holds.
+ *
+ * **One outline for every publisher**, which is why it is here rather than in either publisher's file:
+ * DOC's tracks and the tracks councils and trusts publish are drawn by the same rule - a line over a
+ * photograph has to say where it is before it says what colour it is, and the walker's own lines have no
+ * outline at all. Two copies of the same white is how the two come to differ later.
+ */
+private const val REFERENCE_CASING_COLOUR = "#FFFFFF"
+
+private const val REFERENCE_CASING_WIDTH_PX = 4f
+
 // The layers of the work are named in [AssetLayerIds], which is also where the map's own switches
 // find them: the layer that is created and the layer a switch hides are the same name by
 // construction, rather than two strings that have to be kept in step.
@@ -1286,9 +1298,9 @@ private fun addReferenceCasing(
     style.addLayer(
         LineLayer(id, source)
             .withProperties(
-                PropertyFactory.lineColor(Expression.literal(DocLayerIds.CASING_COLOUR)),
+                PropertyFactory.lineColor(Expression.literal(REFERENCE_CASING_COLOUR)),
                 PropertyFactory.lineWidth(
-                    Expression.literal(ASSET_LINE_WIDTH + DocLayerIds.CASING_WIDTH_PX)
+                    Expression.literal(ASSET_LINE_WIDTH + REFERENCE_CASING_WIDTH_PX)
                 ),
                 PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                 PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),

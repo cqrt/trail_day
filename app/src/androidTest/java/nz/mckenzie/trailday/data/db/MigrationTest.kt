@@ -3,7 +3,7 @@ package nz.mckenzie.trailday.data.db
 import androidx.room.testing.MigrationTestHelper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import nz.mckenzie.trailday.domain.doc.DocFactsJson
+import nz.mckenzie.trailday.domain.cache.FactsJson
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -61,7 +61,7 @@ class MigrationTest {
 
             // The three columns the old table had are facts now, under the names DOC uses for them - so
             // the reader finds them exactly as it finds them on the wire.
-            val facts = DocFactsJson.read(rows.getString(5))
+            val facts = FactsJson.read(rows.getString(5))
             assertEquals("Walking Track", facts["SubObjectType"])
             assertEquals("One way", facts["WEB_TRACK_TYPE"])
             assertEquals("BLUFFHIL-TK02", facts["FlocID"])

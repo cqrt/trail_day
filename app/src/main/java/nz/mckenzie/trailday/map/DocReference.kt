@@ -82,12 +82,6 @@ object DocLayerIds {
      */
     const val BIKE_BADGES = "trailday-doc-bike-badges"
 
-    /** How much wider the casing is than the line it holds, in pixels. */
-    const val CASING_WIDTH_PX = 4f
-
-    /** The casing's colour: the same white a marker's edge wears, for the same reason. */
-    const val CASING_COLOUR = "#FFFFFF"
-
     /**
      * The marker layer one kind of DOC place is drawn by.
      *

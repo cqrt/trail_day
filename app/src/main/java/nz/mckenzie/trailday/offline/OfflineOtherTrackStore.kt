@@ -3,8 +3,8 @@ package nz.mckenzie.trailday.offline
 import kotlinx.coroutines.flow.Flow
 import nz.mckenzie.trailday.data.db.OfflineOtherTrackDao
 import nz.mckenzie.trailday.data.db.OfflineOtherTrackEntity
-import nz.mckenzie.trailday.domain.doc.DocFactsJson
-import nz.mckenzie.trailday.domain.doc.DocPathsJson
+import nz.mckenzie.trailday.domain.cache.FactsJson
+import nz.mckenzie.trailday.domain.cache.PathsJson
 import nz.mckenzie.trailday.domain.other.OtherTrack
 import nz.mckenzie.trailday.domain.other.OtherTracksCache
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
@@ -80,19 +80,18 @@ class OfflineOtherTrackStore(
 /**
  * A cache row back into a track.
  *
- * A row whose geometry will not read is dropped rather than guessed at: a cache is a copy of something
- * still published, and a copy that cannot be read is not worth a screen failing over. See
- * [DocPathsJson] and [DocFactsJson] - **DOC's names for two things that are no longer DOC's**, which the
- * plan's rename will move and rename together rather than half at a time.
+ * A row whose shape will not read is dropped rather than guessed at: a saved copy is a copy of something
+ * still published, and a copy that cannot be read is not worth a screen failing over. See [PathsJson] and
+ * [FactsJson].
  */
 private fun OfflineOtherTrackEntity.toTrack(): OtherTrack? {
-    val paths = DocPathsJson.read(pathsJson)
+    val paths = PathsJson.read(pathsJson)
     if (paths.isEmpty()) return null
     return OtherTrack(
         globalId = globalId,
         name = name,
         paths = paths,
-        facts = DocFactsJson.read(factsJson)
+        facts = FactsJson.read(factsJson)
     )
 }
 
@@ -100,8 +99,8 @@ private fun OtherTrack.toEntity(at: Long) = OfflineOtherTrackEntity(
     globalId = globalId,
     name = name,
     lengthM = lengthM,
-    pathsJson = DocPathsJson.write(paths),
-    factsJson = DocFactsJson.write(facts),
+    pathsJson = PathsJson.write(paths),
+    factsJson = FactsJson.write(facts),
     downloadedAtEpochMs = at
 )
 

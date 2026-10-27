@@ -1,4 +1,4 @@
-package nz.mckenzie.trailday.domain.doc
+package nz.mckenzie.trailday.domain.cache
 
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import org.junit.Assert.assertEquals
@@ -12,7 +12,7 @@ import org.junit.Test
  * a track comes back exactly - every path, every vertex, in order - and that a broken row is nothing
  * rather than a crash in front of a walker with no reception.
  */
-class DocPathsJsonTest {
+class PathsJsonTest {
 
     @Test
     fun `paths survive the round trip, side tracks and all`() {
@@ -21,22 +21,22 @@ class DocPathsJsonTest {
             listOf(GeoPoint(-46.61, 168.31), GeoPoint(-46.62, 168.32))
         )
 
-        assertEquals(paths, DocPathsJson.read(DocPathsJson.write(paths)))
+        assertEquals(paths, PathsJson.read(PathsJson.write(paths)))
     }
 
     @Test
     fun `a single vertex is still a path, and nothing is nothing`() {
-        assertEquals(emptyList<List<GeoPoint>>(), DocPathsJson.write(emptyList()).let(DocPathsJson::read))
+        assertEquals(emptyList<List<GeoPoint>>(), PathsJson.write(emptyList()).let(PathsJson::read))
         assertEquals(
             listOf(listOf(GeoPoint(-46.6, 168.3))),
-            DocPathsJson.read(DocPathsJson.write(listOf(listOf(GeoPoint(-46.6, 168.3)))))
+            PathsJson.read(PathsJson.write(listOf(listOf(GeoPoint(-46.6, 168.3)))))
         )
     }
 
     @Test
     fun `text that will not read is no paths rather than a crash`() {
-        assertTrue(DocPathsJson.read("not json").isEmpty())
-        assertTrue(DocPathsJson.read("").isEmpty())
-        assertTrue("a pair too short to be a point is dropped", DocPathsJson.read("[[[168.3]]]").isEmpty())
+        assertTrue(PathsJson.read("not json").isEmpty())
+        assertTrue(PathsJson.read("").isEmpty())
+        assertTrue("a pair too short to be a point is dropped", PathsJson.read("[[[168.3]]]").isEmpty())
     }
 }

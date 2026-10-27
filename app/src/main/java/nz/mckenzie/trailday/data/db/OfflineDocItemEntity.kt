@@ -14,8 +14,8 @@ import androidx.room.Index
  * and a track really can both be 123; keyed on the number alone, the second of them would overwrite the
  * first and the walker would lose a hut they had downloaded without being told. The geometry travels in
  * one JSON column, and so do DOC's own facts, because nothing ever joins to a cache row - see
- * [nz.mckenzie.trailday.domain.doc.DocPathsJson] and
- * [nz.mckenzie.trailday.domain.doc.DocFactsJson].
+ * [nz.mckenzie.trailday.domain.cache.PathsJson] and
+ * [nz.mckenzie.trailday.domain.cache.FactsJson].
  */
 @Entity(
     tableName = "offline_doc_items",

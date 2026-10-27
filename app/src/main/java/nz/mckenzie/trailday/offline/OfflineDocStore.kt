@@ -10,9 +10,9 @@ import nz.mckenzie.trailday.doc.DocPictures
 import nz.mckenzie.trailday.doc.DocReadProgress
 import nz.mckenzie.trailday.domain.doc.DocBounds
 import nz.mckenzie.trailday.domain.doc.DocCache
-import nz.mckenzie.trailday.domain.doc.DocFactsJson
+import nz.mckenzie.trailday.domain.cache.FactsJson
+import nz.mckenzie.trailday.domain.cache.PathsJson
 import nz.mckenzie.trailday.domain.doc.DocItem
-import nz.mckenzie.trailday.domain.doc.DocPathsJson
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.bounds
 import nz.mckenzie.trailday.domain.doc.withoutRepeats
@@ -145,18 +145,18 @@ class OfflineDocStore(
  *
  * A row whose source this build has never heard of is dropped rather than guessed at, and so is one
  * whose geometry will not read: a cache is a copy of something still published, and a copy that cannot
- * be read is not worth a screen failing over. See [DocPathsJson] and [DocFactsJson].
+ * be read is not worth a screen failing over. See [PathsJson] and [FactsJson].
  */
 private fun OfflineDocItemEntity.toItem(): DocItem? {
     val known = DocSource.known(source) ?: return null
-    val paths = DocPathsJson.read(pathsJson)
+    val paths = PathsJson.read(pathsJson)
     if (paths.isEmpty()) return null
     return DocItem(
         source = known,
         objectId = objectId,
         name = name,
         paths = paths,
-        facts = DocFactsJson.read(factsJson)
+        facts = FactsJson.read(factsJson)
     )
 }
 
@@ -165,8 +165,8 @@ private fun DocItem.toEntity(at: Long) = OfflineDocItemEntity(
     objectId = objectId,
     name = name,
     lengthM = lengthM,
-    pathsJson = DocPathsJson.write(paths),
-    factsJson = DocFactsJson.write(facts),
+    pathsJson = PathsJson.write(paths),
+    factsJson = FactsJson.write(facts),
     downloadedAtEpochMs = at
 )
 

@@ -17,11 +17,9 @@ import androidx.room.Index
  * that it does is unverified, and [nz.mckenzie.trailday.domain.other.OtherTrack] says what catches it if
  * it does not.
  *
- * The geometry travels in one JSON column and so do the row's own facts, because nothing ever joins to a
- * cache row - see [nz.mckenzie.trailday.domain.doc.DocPathsJson] and
- * [nz.mckenzie.trailday.domain.doc.DocFactsJson]. **Those two helpers are DOC's names for something no
- * longer DOC's**, and that is deliberate for now: they are shared, they want moving and renaming
- * together, and doing half of it here would leave a neutrally-named file sitting in the DOC package.
+ * The shape travels in one column of text and so do the row's own details, because nothing ever joins to a
+ * saved row - see [nz.mckenzie.trailday.domain.cache.PathsJson] and
+ * [nz.mckenzie.trailday.domain.cache.FactsJson].
  */
 @Entity(
     tableName = "offline_other_tracks",

@@ -37,7 +37,7 @@ object OtherTracksLayerIds {
      * it reads over green bush, pale scree and water alike.
      *
      * The casing under it is **not** given its own copy: there is one white casing on this map, under
-     * every line that is not the walker's own, and it is [DocLayerIds.CASING_COLOUR]'s.
+     * every line that is not the walker's own, and it is `BasemapView`'s.
      */
     const val COLOUR = "#00695C"
 
