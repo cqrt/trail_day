@@ -90,15 +90,13 @@ object OtherTracksUrl {
     /**
      * The rows that are the app's to show, and the name filter when there is one.
      *
-     * Four exclusions, each **measured against the live service** rather than assumed:
+     * Three exclusions, each **measured against the live service** rather than assumed:
      *
      *  - **DOC's rows, 7,335 of 25,349.** `%DOC%` looks like the blunt way to do it and is in fact the
      *    exact way: every supplier name the dataset holds that contains "DOC" is `DOC Tracks` or
      *    `DOC MTB Routes` - both measured, and no council's name contains it anywhere - so the clause
      *    cannot catch somebody else's track. A row DOC and a council both publish is *one* row naming
      *    both, and it goes: what was asked for is the tracks that are not DOC's.
-     *  - **Te Araroa's, 1,416 rows** (643 of them not already taken by the line above). The app carries
-     *    the Trust's own route as a bundled layer, and two lines for one trail is worse than one.
      *  - **Removed and decommissioned tracks, 284.** The rest of the status field is junk inherited from
      *    the sources ("Com", "Stratford", " ", "Closed for lambing"), so nothing else in it is filtered
      *    on and a track that is *temporarily* closed still comes through to be read.
@@ -107,7 +105,15 @@ object OtherTracksUrl {
      *    grade is kept, and `Walk` is never null in the dataset, so no row is dropped by a comparison
      *    against nothing.
      *
-     * Together they leave **17,087** of the dataset's 25,349.
+     * **Te Araroa is deliberately NOT excluded**, and that is a reversal worth knowing about. It was, on
+     * the argument that the app already carries the Trust's own route as a bundled layer; what that cost
+     * was every **local** track a council and the Trust both publish - one row naming both, gone - so a
+     * resident's own walkway went missing because a national trail happened to run along it. Including
+     * them adds **920** rows, and where the two layers are both switched on a trail's line is drawn twice.
+     * That is the cheaper mistake: a duplicated line is visible and harmless, and a missing walkway is
+     * neither.
+     *
+     * Together they leave **16,893** of the dataset's 25,349.
      */
     fun where(nameContains: String = ""): String {
         val name = nameContains.trim()
@@ -122,10 +128,9 @@ object OtherTracksUrl {
      */
     private const val REMOVED = "Decommisioned"
 
-    /** The four exclusions, in the order they are worth reading. */
+    /** The three exclusions, in the order they are worth reading. */
     val EXCLUSIONS: String =
         "NOT (DataSupplier LIKE '%DOC%')" +
-            " AND NOT (DataSupplier LIKE '%Te Araroa%')" +
             " AND Status <> '$REMOVED'" +
             " AND Walk <> 0"
 

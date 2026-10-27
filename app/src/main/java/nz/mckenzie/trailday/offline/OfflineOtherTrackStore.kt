@@ -7,6 +7,7 @@ import nz.mckenzie.trailday.domain.cache.FactsJson
 import nz.mckenzie.trailday.domain.cache.PathsJson
 import nz.mckenzie.trailday.domain.other.OtherTrack
 import nz.mckenzie.trailday.domain.other.OtherTracksCache
+import nz.mckenzie.trailday.domain.other.joinedByName
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.other.OtherTracksDownloadResult
 import nz.mckenzie.trailday.other.OtherTracksDownloader
@@ -30,8 +31,15 @@ class OfflineOtherTrackStore(
     private val now: () -> Long = System::currentTimeMillis
 ) : OtherTracksCache {
 
-    /** Everything held, for the map to draw and the browser to list. */
-    override suspend fun cached(): List<OtherTrack> = dao.getAll().mapNotNull { it.toTrack() }
+    /**
+     * Everything held, for the map to draw and the browser to list - **with a walkway the dataset cut into
+     * pieces shown as one track**.
+     *
+     * Joined on the way out as well as on the way in, because a cache filled by two overlapping downloads
+     * can hold a joined track and a loose piece of it: the rule only ever merges rows that are the same
+     * walkway, so applying it again changes nothing that was already joined.
+     */
+    override suspend fun cached(): List<OtherTrack> = dao.getAll().mapNotNull { it.toTrack() }.joinedByName()
 
     override suspend fun count(): Int = dao.count()
 

@@ -961,8 +961,7 @@ const BROWSERS = {
     valuesOf: docValuesOf,
     showing: docShowing,
     sources: true,
-    tile: true,
-    where: false
+    tile: true
   },
   other: {
     title: 'Other tracks',
@@ -973,8 +972,7 @@ const BROWSERS = {
     valuesOf: otherTracksValuesOf,
     showing: otherTracksShowing,
     sources: false,
-    tile: false,
-    where: true
+    tile: false
   }
 };
 
@@ -1252,22 +1250,13 @@ function drawBrowseList() {
     name.className = 'name';
     name.textContent = row.name;
 
-    // The phone's own line about the row - what it is, who publishes it, how far away it is - so the desk
-    // reads exactly what the phone would read about the same thing.
+    // The phone's own line about the row - what it is, who publishes it, where it is, how far away it is -
+    // so the desk reads exactly what the phone would read about the same thing.
     const meta = document.createElement('span');
     meta.className = 'detail';
     meta.textContent = row.detail;
 
     words.append(name, meta);
-
-    // And where it is, for the publisher whose rows have a place: a council walkway is found by its suburb
-    // or its district, and the phone's own browser says so on the row too.
-    if (mode.where && row.where) {
-      const where = document.createElement('span');
-      where.className = 'detail';
-      where.textContent = row.where;
-      words.append(where);
-    }
 
     line.append(words);
     list.append(line);

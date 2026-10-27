@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.domain.other
 
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.reference.Followable
 import nz.mckenzie.trailday.domain.text.PlainText
 
 /**
@@ -46,18 +47,22 @@ data class OtherTrack(
     /** The service's UUID for the row. */
     val globalId: String,
     /** What the dataset calls it, or what [OtherTracksJson] names it when the dataset named it nothing. */
-    val name: String,
+    override val name: String,
     /**
      * The line, as the paths the service published it in.
      *
      * Kept apart rather than joined, for the reason DOC's tracks are: a service that publishes a track
      * in pieces means it, and joining paths that do not meet draws a line across whatever is between
-     * them.
+     * them. The one exception is [joinedByName], which joins the pieces of a walkway the dataset has cut
+     * up - because there the paths *do* meet, and the walker is looking at one walkway.
      */
-    val paths: List<List<GeoPoint>>,
+    override val paths: List<List<GeoPoint>>,
     /** The row exactly as it arrived, by the service's own field names. Never carries `GlobalID`. */
     val facts: Map<String, String> = emptyMap()
-) {
+) : Followable {
+
+    /** The reference a pass that follows this track records: see [Followable]. */
+    override val sourceRef: String get() = otherTrackSourceRef(globalId)
 
     /** How long the line is, which is what a row and a page say about it. */
     val lengthM: Double get() = AssetGeometry(paths).lengthM

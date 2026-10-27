@@ -282,7 +282,11 @@ class MainActivity : ComponentActivity() {
                                 // Back to the map, which is the only place this page is opened from: the
                                 // browser that will open it too is the next piece of this work, and it
                                 // brings its own origin with it.
-                                onBack = { destination = Destination.MAP }
+                                onBack = { destination = Destination.MAP },
+                                onFollow = { followed ->
+                                    PendingFollow.offer(followed)
+                                    destination = Destination.RECORD
+                                }
                             )
                         }
                     }

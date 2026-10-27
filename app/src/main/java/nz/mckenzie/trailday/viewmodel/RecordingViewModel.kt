@@ -41,6 +41,7 @@ import nz.mckenzie.trailday.domain.geo.DriftWord
 import nz.mckenzie.trailday.domain.geo.FollowPoint
 import nz.mckenzie.trailday.domain.geo.FollowProgress
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.reference.Followable
 import nz.mckenzie.trailday.domain.geo.RecordingBreak
 import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
 import nz.mckenzie.trailday.domain.geo.splitAtBreaks
@@ -503,14 +504,15 @@ class RecordingViewModel(
     }
 
     /**
-     * Follows one of DOC's lines, as the chooser offers them.
+     * Follows a published line, as a page, a card or the recorder's own chooser offers it.
      *
-     * DOC's material stays DOC's: no place is made and nothing is copied. The trip that follows it carries
-     * the reference, so the walk is remembered against the line without the line changing hands.
+     * **Nothing is copied and no place is made**: DOC's material and somebody else's stay what they are.
+     * The trip that follows it carries the reference, so the walk is remembered against the line without
+     * the line changing hands.
      */
-    fun selectDoc(item: DocItem) {
-        // The line to follow is the longest of DOC's paths, not whichever came first: a route with a short
-        // spur in front of its own line would otherwise be followed along the spur.
+    fun selectDoc(item: Followable) {
+        // The line to follow is the longest of the published paths, not whichever came first: a route with
+        // a short spur in front of its own line would otherwise be followed along the spur.
         val line = item.paths
             .filter { it.size >= 2 }
             .maxByOrNull { path -> polylineLengthMeters(path) }

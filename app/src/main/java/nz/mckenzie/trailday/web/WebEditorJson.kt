@@ -24,7 +24,6 @@ import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.drawingKind
 import nz.mckenzie.trailday.ui.docRowDetail
 import nz.mckenzie.trailday.ui.otherTrackRowDetail
-import nz.mckenzie.trailday.ui.otherTrackRowWhere
 
 /**
  * What the page is told about the work: the document behind `GET /api/state`, and what a write
@@ -226,7 +225,6 @@ object WebEditorJson {
                         id = track.globalId,
                         name = track.name,
                         detail = otherTrackRowDetail(track),
-                        where = otherTrackRowWhere(track),
                         // Every answer the row has for each filter, not one: see WebEditorOtherTrackRow.
                         values = OTHER_TRACK_FILTERS.associate { filter ->
                             filter.field to track.filterValues(filter.field)
@@ -578,10 +576,11 @@ data class WebEditorOtherTracksSearch(
 data class WebEditorOtherTrackRow(
     val id: String = "",
     val name: String = "",
-    /** What the phone says under the name: what it is, whether it is closed, and who publishes it. */
+    /**
+     * What the phone says under the name: what it is, who publishes it, and where it is - one line, as a
+     * DOC row's is, because the two lists are meant to read the same.
+     */
     val detail: String = "",
-    /** Where the track is: the dataset's own locality and council area, when it has them. */
-    val where: String? = null,
     val values: Map<String, List<String>> = emptyMap(),
     /**
      * The metres from the phone's own fix to the nearest point of this, or null when the phone has no fix.

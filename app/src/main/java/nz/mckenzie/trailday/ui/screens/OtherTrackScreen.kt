@@ -2,13 +2,16 @@ package nz.mckenzie.trailday.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -37,18 +40,50 @@ import nz.mckenzie.trailday.viewmodel.OtherTrackViewModel
  * There is no picture, and that is measured rather than forgotten: the dataset publishes an image address
  * on **33 rows of the 15,973 this app reads**, so a fetch and a cache for a picture almost no track has
  * would be machinery kept for nothing.
+ *
+ * **The action at the foot is the one DOC's page offers for a line** — Follow this track — because
+ * following is what a walker wants from somebody else's walkway: the recorder takes the line as its target
+ * and the pass is measured against it. Nothing is copied and no place is made; the track stays the
+ * publisher's, and the walk remembers which line it followed.
  */
 @Composable
 fun OtherTrackScreen(
     viewModel: OtherTrackViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onFollow: (OtherTrack) -> Unit = {}
 ) {
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
     val track = viewModel.track
     val uriHandler = LocalUriHandler.current
     val link = track.webLink
 
-    Scaffold { innerPadding ->
+    Scaffold(
+        bottomBar = {
+            Surface(tonalElevation = 2.dp, color = MaterialTheme.colorScheme.surface) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { onFollow(track) },
+                        modifier = Modifier.weight(if (link != null) 1.7f else 1f)
+                    ) {
+                        Text("Follow this track")
+                    }
+                    if (link != null) {
+                        OutlinedButton(
+                            onClick = { runCatching { uriHandler.openUri(link) } },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("More info \u2197")
+                        }
+                    }
+                }
+            }
+        }
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -92,15 +127,6 @@ fun OtherTrackScreen(
                 ReferenceTextSection("Who publishes it", track.suppliers.joinToString(", "))
                 ReferenceTextSection("Looked after by", track.managedBy)
                 ReferenceTextSection("Conditions of use", track.conditions)
-
-                if (link != null) {
-                    TextButton(
-                        onClick = { runCatching { uriHandler.openUri(link) } },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("More about this track \u2197")
-                    }
-                }
             }
         }
     }

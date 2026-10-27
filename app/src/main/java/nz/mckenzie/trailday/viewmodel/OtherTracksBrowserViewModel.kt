@@ -15,19 +15,14 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.domain.asset.AssetKind
-import nz.mckenzie.trailday.domain.asset.AssetShape
-import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.other.OTHER_TRACK_FILTERS
-import nz.mckenzie.trailday.domain.other.OTHER_TRACK_REF_PREFIX
 import nz.mckenzie.trailday.domain.other.OtherTrack
 import nz.mckenzie.trailday.domain.other.OtherTracksCache
 import nz.mckenzie.trailday.domain.other.OtherTracksQuery
+import nz.mckenzie.trailday.domain.other.joinedByName
 import nz.mckenzie.trailday.domain.other.matching
-import nz.mckenzie.trailday.domain.other.otherTrackSourceRef
 import nz.mckenzie.trailday.domain.other.showing
 import nz.mckenzie.trailday.domain.other.valuesPresent
 import nz.mckenzie.trailday.domain.other.within
@@ -51,15 +46,14 @@ import nz.mckenzie.trailday.tracking.DevicePosition
  * because the download is the place filter and the cache only holds the areas asked for. That is the same
  * bargain DOC's browser makes, and it is what the offline area download is for.
  *
- * A row can also be **taken on as the walker's own place**, which is the one thing this screen writes: see
- * [import]. DOC's material is read and never kept, and this is the difference between the two - the plan's
- * decision, not an accident.
+ * **Nothing here writes anything**, which is what makes it DOC's browser's twin: a row opens the track's
+ * own page, and that page is where the walker asks the recorder to follow the line. A track somebody else
+ * publishes is not a place of the walker's and never becomes one.
  */
 class OtherTracksBrowserViewModel(
     private val reader: OtherTracksReader,
     /** What has been downloaded for offline use, read when the service cannot be reached. */
-    private val cache: OtherTracksCache,
-    private val assetRepository: AssetRepository
+    private val cache: OtherTracksCache
 ) : ViewModel() {
 
     private val _name = MutableStateFlow("")
@@ -144,19 +138,9 @@ class OtherTracksBrowserViewModel(
                 .filter { track -> !wheelchairOnly || track.suitsWheelchair }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
-    /** The tracks of this layer that are already the walker's own places, by source reference. */
-    private val _imported = MutableStateFlow<Set<String>>(emptySet())
-    val imported: StateFlow<Set<String>> = _imported
-
     init {
         viewModelScope.launch {
             DevicePosition.updates(viewModelScope).collect { position -> fix.value = position }
-        }
-        viewModelScope.launch {
-            // Read once rather than per row: a page is a few hundred candidates and each asks the same
-            // question - is this one already here - which is not a query per row.
-            _imported.value = assetRepository.existingSourceRefs()
-                .filterTo(mutableSetOf()) { ref -> ref.startsWith(OTHER_TRACK_REF_PREFIX) }
         }
     }
 
@@ -228,7 +212,9 @@ class OtherTracksBrowserViewModel(
 
             when (val result = reader.read(query)) {
                 is OtherTracksReadResult.Found -> {
-                    val page = result.tracks.within(radius * 1000.0, position)
+                    // The pieces of a walkway the dataset has cut up are joined before the circle is
+                    // trimmed, so a walker near one end sees the walkway rather than a quarter of it.
+                    val page = result.tracks.joinedByName().within(radius * 1000.0, position)
                     _results.value = page
                     // A new set of results, so a filter from the last search is not carried onto it.
                     _filters.value = emptyMap()
@@ -264,33 +250,6 @@ class OtherTracksBrowserViewModel(
         }
     }
 
-    /**
-     * Takes one of these tracks on as the walker's own place, and says whether it did.
-     *
-     * **The one thing on this screen that writes.** A track somebody else publishes is read from the
-     * service and drawn as a reference; a track the walker takes on becomes a place of their own - named,
-     * drawn, editable, sprayed, blocked, exported - which is what "I want this one" means.
-     *
-     * It records an **exact source reference**, the same way a DOC track imported by the desk does, so the
-     * same track cannot be taken on twice: the row says *already yours*, the button is off, and this
-     * refuses it at the door that writes as well as in the list.
-     */
-    suspend fun import(track: OtherTrack): Boolean {
-        val ref = otherTrackSourceRef(track.globalId)
-        if (ref in _imported.value) return false
-        assetRepository.createAsset(
-            name = track.name,
-            // The row's own paths, kept apart: a track published in pieces is drawn in pieces, and
-            // joining them would draw a line across whatever is between them.
-            geometry = AssetGeometry(track.paths),
-            kind = AssetKind.TRACK,
-            shape = AssetShape.LINE,
-            sourceRef = ref
-        )
-        _imported.value = _imported.value + ref
-        return true
-    }
-
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L
 
@@ -304,8 +263,7 @@ class OtherTracksBrowserViewModel(
                     val database = TrailDayDatabase.get(appContext)
                     OtherTracksBrowserViewModel(
                         reader = ArcGisOtherTracks(),
-                        cache = OfflineOtherTrackStore(dao = database.offlineOtherTrackDao()),
-                        assetRepository = AssetRepository(database)
+                        cache = OfflineOtherTrackStore(dao = database.offlineOtherTrackDao())
                     )
                 }
             }

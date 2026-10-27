@@ -21,6 +21,7 @@ import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.other.EmptyOtherTracksCache
 import nz.mckenzie.trailday.domain.other.OtherTracksCache
 import nz.mckenzie.trailday.domain.other.OtherTracksQuery
+import nz.mckenzie.trailday.domain.other.joinedByName
 import nz.mckenzie.trailday.domain.other.matching
 import nz.mckenzie.trailday.domain.other.within
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
@@ -408,7 +409,10 @@ class WebEditorDocuments(
         val radiusM = radius * 1000.0
         return when (val result = otherTracks.read(query)) {
             is OtherTracksReadResult.Found -> {
-                val items = if (point != null) result.tracks.within(radiusM, point) else result.tracks
+                // The pieces of a walkway the dataset has cut up are joined before the circle is trimmed,
+                // so the desk shows a walkway rather than a quarter of one - the same rule the phone keeps.
+                val items = result.tracks.joinedByName()
+                    .let { if (point != null) it.within(radiusM, point) else it }
                 WebEditorJson.otherTracksSearch(
                     items = items,
                     from = from,

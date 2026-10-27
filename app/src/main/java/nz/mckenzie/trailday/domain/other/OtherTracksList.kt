@@ -1,6 +1,7 @@
 package nz.mckenzie.trailday.domain.other
 
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.geo.haversineMeters
 import nz.mckenzie.trailday.domain.geo.nearestPathDistanceMeters
 import nz.mckenzie.trailday.domain.reference.ReferenceFilter
 import nz.mckenzie.trailday.domain.reference.ReferenceSort
@@ -98,4 +99,116 @@ fun List<OtherTrack>.matching(nameContains: String): List<OtherTrack> {
     val needle = nameContains.trim()
     if (needle.isEmpty()) return this
     return filter { it.name.contains(needle, ignoreCase = true) }
+}
+
+/**
+ * How near two pieces' ends have to be to be one walkway, in metres.
+ *
+ * **Measured rather than guessed.** "Otatara Scenic Reserve Walkway" arrives as five rows: four around
+ * Invercargill whose ends coincide *exactly* - 0.0 m between them - and a fifth "Otatara" in Napier, 900 km
+ * away, which must not join them. Ten metres leaves room for a re-survey to move a cut end a little
+ * without ever bringing a different walkway in.
+ */
+private const val JOIN_TOLERANCE_M = 10.0
+
+/**
+ * The walkways the dataset publishes in pieces, as one track each.
+ *
+ * **The dataset cuts a walkway up and the walker does not.** "Otatara Scenic Reserve Walkway" is four rows;
+ * "Southern Walkway" is four around Mount Victoria; "Crazy Horse" is two that share a vertex. A list that
+ * shows each piece is a list that says a walkway is four walkways, and each row's length is a quarter of
+ * the walk.
+ *
+ * **A name is not enough, and the same example proves it**: there is an Otatara walkway in Invercargill and
+ * another in Napier. Two rows join only when their names are the same *and* an end of one is within
+ * [JOIN_TOLERANCE_M] of an end of the other - end to end, because a walkway cut into pieces is cut at
+ * points. Pieces are then gathered into whole walkways, so four rows that meet in a loop become one track
+ * rather than two pairs.
+ *
+ * The joined track keeps the **lowest service id** of its pieces, so which row stands for a walkway does
+ * not depend on the order the service happened to answer in. Its paths stay apart - they meet, so they draw
+ * as one line - and its publishers are all of them, because narrowing by a council means a track that
+ * council had a hand in.
+ */
+fun List<OtherTrack>.joinedByName(toleranceM: Double = JOIN_TOLERANCE_M): List<OtherTrack> {
+    if (size < 2) return this
+
+    // Grouped by name first: only rows that share a name can be the same walkway, and a list is thousands
+    // of rows, which is not worth comparing every pair of.
+    val groups = LinkedHashMap<String, MutableList<Int>>()
+    forEachIndexed { index, track ->
+        groups.getOrPut(track.name.trim().lowercase()) { mutableListOf() } += index
+    }
+
+    val replaced = arrayOfNulls<OtherTrack>(size)
+    val dropped = BooleanArray(size)
+    for (indices in groups.values) {
+        if (indices.size < 2) continue
+        for (component in componentsOf(indices, toleranceM)) {
+            if (component.size < 2) continue
+            replaced[component.first()] = joinedOf(component)
+            component.drop(1).forEach { dropped[it] = true }
+        }
+    }
+    if (replaced.none { it != null }) return this
+
+    return mapIndexedNotNull { index, track ->
+        when {
+            dropped[index] -> null
+            else -> replaced[index] ?: track
+        }
+    }
+}
+
+/** The walkways among [indices]: those whose ends meet, gathered into one component each. */
+private fun List<OtherTrack>.componentsOf(indices: List<Int>, toleranceM: Double): List<List<Int>> {
+    val remaining = indices.toMutableList()
+    val components = mutableListOf<List<Int>>()
+    while (remaining.isNotEmpty()) {
+        val component = mutableListOf(remaining.removeAt(0))
+        var grew = true
+        while (grew) {
+            grew = false
+            val iterator = remaining.iterator()
+            while (iterator.hasNext()) {
+                val candidate = iterator.next()
+                if (component.any { this[it].meets(this[candidate], toleranceM) }) {
+                    component += candidate
+                    iterator.remove()
+                    grew = true
+                }
+            }
+        }
+        components += component.sorted()
+    }
+    return components
+}
+
+/** Whether an end of this track is within [toleranceM] of an end of [other]: one cut walkway. */
+private fun OtherTrack.meets(other: OtherTrack, toleranceM: Double): Boolean {
+    val mine = ends()
+    val theirs = other.ends()
+    return mine.any { a -> theirs.any { b -> haversineMeters(a.lat, a.lng, b.lat, b.lng) <= toleranceM } }
+}
+
+/** The vertices at the two ends of a track's paths. A path of one point is not a line. */
+private fun OtherTrack.ends(): List<GeoPoint> = paths
+    .filter { it.size >= 2 }
+    .flatMap { listOf(it.first(), it.last()) }
+
+/** [component]'s pieces as one track: see [joinedByName]. */
+private fun List<OtherTrack>.joinedOf(component: List<Int>): OtherTrack {
+    val pieces = component.map { this[it] }.sortedBy { it.globalId }
+    val main = pieces.first()
+    // The publishers of every piece, each once, so the filter still finds the walkway by any council that
+    // has a hand in it. The field is comma-separated where a row was merged upstream, so this round-trips.
+    val publishers = pieces.flatMap { it.suppliers }.distinct()
+    return main.copy(
+        paths = pieces.flatMap { it.paths },
+        facts = if (publishers.isEmpty()) {
+            main.facts
+        } else {
+            main.facts + ("DataSupplier" to publishers.joinToString(", "))
+        }
+    )
 }

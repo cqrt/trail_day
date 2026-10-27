@@ -19,13 +19,24 @@ import org.junit.Test
 class OtherTracksUrlTest {
 
     @Test
-    fun `the four exclusions are all asked for`() {
+    fun `the three exclusions are all asked for`() {
         val where = OtherTracksUrl.where()
 
         assertTrue("DOC's rows", where.contains("NOT (DataSupplier LIKE '%DOC%')"))
-        assertTrue("Te Araroa's rows", where.contains("NOT (DataSupplier LIKE '%Te Araroa%')"))
         assertTrue("the removed ones", where.contains("Status <> 'Decommisioned'"))
         assertTrue("the ones nobody may walk on", where.contains("Walk <> 0"))
+    }
+
+    @Test
+    fun `Te Araroa's rows are kept, because a council's walkway travels with them`() {
+        // The exclusion was there once, on the argument that the app carries the Trust's own route as a
+        // bundled layer. What that cost was every local track a council and the Trust both publish - one
+        // row naming both, gone - so a resident's own walkway went missing because a national trail ran
+        // along it. A duplicated line where both layers are on is the cheaper mistake.
+        assertFalse(
+            "Te Araroa must not be excluded",
+            OtherTracksUrl.where().contains("Te Araroa")
+        )
     }
 
     @Test

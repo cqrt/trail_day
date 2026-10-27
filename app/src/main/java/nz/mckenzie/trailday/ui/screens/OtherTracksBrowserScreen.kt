@@ -24,29 +24,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.launch
+import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.other.OtherTrack
 import nz.mckenzie.trailday.domain.other.distanceM
-import nz.mckenzie.trailday.domain.other.otherTrackSourceRef
 import nz.mckenzie.trailday.domain.reference.ReferenceFilter
 import nz.mckenzie.trailday.domain.reference.ReferenceSort
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.otherTrackRowDetail
-import nz.mckenzie.trailday.ui.otherTrackRowWhere
 import nz.mckenzie.trailday.viewmodel.OtherTracksBrowserViewModel
 
 /**
@@ -80,14 +72,9 @@ fun OtherTracksBrowserScreen(
     val sort by viewModel.sort.collectAsStateWithLifecycle()
     val phoneFix by viewModel.phoneFix.collectAsStateWithLifecycle()
     val searched by viewModel.searched.collectAsStateWithLifecycle()
-    val imported by viewModel.imported.collectAsStateWithLifecycle()
     val bikeOnly by viewModel.bikeOnly.collectAsStateWithLifecycle()
     val wheelchairOnly by viewModel.wheelchairOnly.collectAsStateWithLifecycle()
     val focus = LocalFocusManager.current
-    val scope = rememberCoroutineScope()
-
-    // Which row is being taken on, so its own button can say so rather than the whole list going quiet.
-    var takingOn by remember { mutableStateOf<String?>(null) }
 
     val search = {
         focus.clearFocus()
@@ -177,19 +164,10 @@ fun OtherTracksBrowserScreen(
                             contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)
                         ) {
                             items(visible, key = { track -> track.globalId }) { track ->
-                                OtherTrackRow(
+                                OtherTrackCard(
                                     track = track,
                                     distanceM = phoneFix?.let { position -> track.distanceM(position) },
-                                    alreadyMine = otherTrackSourceRef(track.globalId) in imported,
-                                    takingOn = takingOn == track.globalId,
-                                    onOpen = { onOpenTrack(track) },
-                                    onTakeOn = {
-                                        takingOn = track.globalId
-                                        scope.launch {
-                                            viewModel.import(track)
-                                            takingOn = null
-                                        }
-                                    }
+                                    onOpen = { onOpenTrack(track) }
                                 )
                             }
                         }
@@ -304,80 +282,40 @@ private fun OtherTracksControlsDeck(
 }
 
 /**
- * One of somebody else's tracks, as a row: the name, what it is and who publishes it, where it is, and how
- * far away it is.
+ * One of somebody else's tracks, as a card: **the tile, the name, what it is and where it is, and how far
+ * away it is** - the last in the app's own colour, because "how far" is the question the list is answering.
  *
- * **No kind's tile**, unlike DOC's rows: every row here is the same kind of thing, so a tile on each would
- * be a mark that distinguishes nothing. DOC's four services are four kinds and their rows need one.
+ * **The same row DOC's browser draws**, down to its paddings and its tile: a walker reading a page of
+ * somebody else's tracks should not have to learn a second way of reading a row because the publisher
+ * changed. The line under the name is the phone's own words for the row (`otherTrackRowDetail`), which is
+ * the same sentence the laptop is sent.
  */
 @Composable
-private fun OtherTrackRow(
+private fun OtherTrackCard(
     track: OtherTrack,
     distanceM: Double?,
-    alreadyMine: Boolean,
-    takingOn: Boolean,
-    onOpen: () -> Unit,
-    onTakeOn: () -> Unit
+    onOpen: () -> Unit
 ) {
     Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            KindTile(kind = AssetKind.TRACK)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(text = track.name, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    text = track.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
+                    text = otherTrackRowDetail(track),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                distanceM?.let {
+                distanceM?.let { metres ->
                     Text(
-                        text = formatDistance(it),
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = "${formatDistance(metres)} away",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary
                     )
-                }
-            }
-            Text(
-                text = otherTrackRowDetail(track),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            otherTrackRowWhere(track)?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (alreadyMine) {
-                    // Said rather than offered: the reference is on the phone, so there is nothing to do
-                    // and a button that did nothing would be worse than a word.
-                    Text(
-                        text = "Yours",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                    )
-                } else {
-                    TextButton(onClick = onTakeOn, enabled = !takingOn) {
-                        Text(if (takingOn) "Taking it on\u2026" else "Take this on")
-                    }
                 }
             }
         }

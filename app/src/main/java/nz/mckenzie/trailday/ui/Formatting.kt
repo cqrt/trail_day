@@ -74,25 +74,22 @@ fun docRowDetail(item: DocItem, distanceM: Double?): String {
 }
 
 /**
- * The line under a row of somebody else's tracks: what it is, whether it is closed, and who publishes it.
+ * The line under a row of somebody else's tracks: what it is, who publishes it, and where it is.
  *
- * Here rather than in the browser's own file because **the desk's browser draws the same rows** - see
- * [nz.mckenzie.trailday.web.WebEditorJson.otherTracksSearch] - and a rule kept on one of the two is a rule
- * the other would have to copy. A status of "Open" is left off: it is the ordinary case, and a row that
- * said it on every one of seventeen thousand tracks would be saying nothing.
+ * **One line, as DOC's rows have one.** The desk's browser draws the same rows - see
+ * [nz.mckenzie.trailday.web.WebEditorJson.otherTracksSearch] - and it sends this same sentence, so the two
+ * lists cannot come to describe a track two ways. A status of "Open" is left off: it is the ordinary case,
+ * and a row that said it on every one of seventeen thousand tracks would be saying nothing.
  */
 fun otherTrackRowDetail(track: OtherTrack): String = listOfNotNull(
     track.walkGrade,
     track.status?.takeIf { it != OtherTrackAccess.OPEN },
-    track.suppliers.firstOrNull()
-).joinToString(" \u00b7 ")
-
-/** The line under that: where the track is, which is the dataset's own two words for it. */
-fun otherTrackRowWhere(track: OtherTrack): String? =
+    track.suppliers.firstOrNull(),
     listOfNotNull(track.locality, track.localAuthority)
         .distinct()
         .joinToString(", ")
         .takeIf { it.isNotEmpty() }
+).joinToString(" \u00b7 ")
 
 /** How many sites a campsite has, in the walker's terms, or null when DOC said nothing. */
 private fun campsiteSites(item: DocItem): String? {    val unpowered = item.unpoweredSites ?: return null

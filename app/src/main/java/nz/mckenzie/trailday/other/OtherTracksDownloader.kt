@@ -3,6 +3,7 @@ package nz.mckenzie.trailday.other
 import nz.mckenzie.trailday.domain.other.OtherTrack
 import nz.mckenzie.trailday.domain.other.OtherTracksQuery
 import nz.mckenzie.trailday.domain.other.OtherTracksUrl
+import nz.mckenzie.trailday.domain.other.joinedByName
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 
 /** What reading a whole area produced: the rows, and whether they are all of them. */
@@ -56,7 +57,10 @@ class OtherTracksDownloader(
                 OtherTracksQuery(bounds = bounds, limit = pageSize, offset = offset)
             )
             when (page) {
-                is OtherTracksReadResult.Failed -> return OtherTracksDownloadResult.Failed(page.message, all)
+                is OtherTracksReadResult.Failed -> return OtherTracksDownloadResult.Failed(
+                    page.message,
+                    all.joinedByName()
+                )
                 is OtherTracksReadResult.Found -> {
                     all += page.tracks
                     onProgress(all.size)
@@ -65,7 +69,9 @@ class OtherTracksDownloader(
                 }
             }
         }
-        return OtherTracksDownloadResult.Done(all)
+        // A walkway the dataset cut into pieces can be cut across a page boundary, so the whole area is
+        // joined once rather than each page: this is what the walker counts as a track.
+        return OtherTracksDownloadResult.Done(all.joinedByName())
     }
 
     /**

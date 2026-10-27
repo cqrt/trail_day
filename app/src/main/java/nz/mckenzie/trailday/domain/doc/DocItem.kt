@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.domain.doc
 
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.reference.Followable
 import nz.mckenzie.trailday.domain.text.PlainText
 
 /**
@@ -34,7 +35,7 @@ data class DocItem(
     /** DOC's own number for it, unique within its service and not across services. */
     val objectId: Long,
     /** What DOC calls it. Never blank: a row with no name is named after its number. */
-    val name: String,
+    override val name: String,
     /**
      * Where it is: **a line's paths, or a place's single coordinate**.
      *
@@ -42,10 +43,10 @@ data class DocItem(
      * speaks in paths - a place is a path of one point, and every map, list and card reads a place that
      * way. The source's own shape says which it is; see [source].
      */
-    val paths: List<List<GeoPoint>>,
+    override val paths: List<List<GeoPoint>>,
     /** What DOC says about it, by DOC's own field name. Never contains the id, which is [objectId]. */
     val facts: Map<String, String> = emptyMap()
-) {
+) : Followable {
 
     /** How long the line is, or zero for a place. */
     val lengthM: Double get() = if (source.isLine) AssetGeometry(paths).lengthM else 0.0
@@ -57,7 +58,7 @@ data class DocItem(
     val point: GeoPoint? get() = if (source.isLine) null else paths.firstOrNull()?.firstOrNull()
 
     /** The reference the walker's own places are marked with once one of these is kept. */
-    val sourceRef: String get() = docSourceRef(source, objectId)
+    override val sourceRef: String get() = docSourceRef(source, objectId)
 
     /** The place DOC puts it in - its own field where it has one, the app's map where it does not. */
     val place: String? get() = fact("place") ?: DocPlaces.placeFor(flocId)

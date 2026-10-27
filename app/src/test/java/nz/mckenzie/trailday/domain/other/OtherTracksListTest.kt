@@ -126,12 +126,120 @@ class OtherTracksListTest {
     }
 
     @Test
+    fun `a walkway the dataset cut into pieces is one track`() {
+        // Measured against the live service: "Otatara Scenic Reserve Walkway" is four rows around
+        // Invercargill whose ends coincide exactly.
+        val joined = listOf(otataraA, otataraB, otataraC).joinedByName()
+
+        assertEquals("three pieces are one walkway", 1, joined.size)
+        assertEquals("and it keeps every piece of the line", 3, joined.single().paths.size)
+    }
+
+    @Test
+    fun `the same name a country away is a different walkway`() {
+        // There is an Otatara in Invercargill and another in Napier, and a name alone would merge them.
+        val joined = listOf(otataraA, otataraB, otataraNapier).joinedByName()
+
+        assertEquals(2, joined.size)
+    }
+
+    @Test
+    fun `two rows whose ends are a gap apart are not joined`() {
+        // Ten metres is the allowance: the measured joins are 0.0 m and the nearest different walkway of
+        // the same name was 355 m.
+        val far = track(
+            name = "Otatara Scenic Reserve Walkway",
+            facts = arrayOf("Walk" to "3"),
+            paths = listOf(listOf(GeoPoint(-46.4290, 168.3000), GeoPoint(-46.4295, 168.3005)))
+        )
+
+        assertEquals(2, listOf(otataraA, far).joinedByName().size)
+    }
+
+    @Test
+    fun `a joined walkway is as long as all of it`() {
+        val whole = listOf(otataraA, otataraB).joinedByName().single()
+
+        assertEquals(
+            "the length is the pieces together, not the first piece",
+            otataraA.lengthM + otataraB.lengthM,
+            whole.lengthM,
+            0.001
+        )
+    }
+
+    @Test
+    fun `a joined walkway is found by every publisher of it`() {
+        val whole = listOf(
+            otataraA.copy(facts = mapOf("Walk" to "3", "DataSupplier" to "Invercargill City Council")),
+            otataraB.copy(facts = mapOf("Walk" to "3", "DataSupplier" to "Southland District Council"))
+        ).joinedByName().single()
+
+        assertEquals(
+            listOf("Invercargill City Council", "Southland District Council"),
+            whole.suppliers
+        )
+        assertEquals(
+            listOf(whole),
+            listOf(whole).showing(mapOf("DataSupplier" to setOf("Southland District Council")))
+        )
+    }
+
+    @Test
+    fun `a joined walkway keeps the lowest id, so which row stands for it does not depend on the order`() {
+        val forwards = listOf(otataraA, otataraB).joinedByName().single()
+        val backwards = listOf(otataraB, otataraA).joinedByName().single()
+
+        assertEquals(forwards.globalId, backwards.globalId)
+    }
+
+    @Test
+    fun `a track that is not one of a joined pair is left alone`() {
+        assertEquals(1, listOf(plain).joinedByName().size)
+        assertEquals(plain, listOf(plain).joinedByName().single())
+    }
+
+    @Test
     fun `the three facts a page can be narrowed by are the three a walker asks about`() {
         assertEquals(listOf("Walk", "DataSupplier", "DogAccess"), OTHER_TRACK_FILTERS.map { it.field })
     }
 
-    private fun track(name: String, facts: Array<Pair<String, String>>, paths: List<List<GeoPoint>>) =
-        OtherTrack(globalId = name, name = name, paths = paths, facts = facts.toMap())
+    /** Three pieces of one Invercargill walkway, each starting where the last ended. */
+    private val otataraA = track(
+        name = "Otatara Scenic Reserve Walkway",
+        facts = arrayOf("Walk" to "3"),
+        paths = listOf(listOf(GeoPoint(-46.42866, 168.29894), GeoPoint(-46.42892, 168.29953))),
+        id = "aa"
+    )
+
+    private val otataraB = track(
+        name = "otatara scenic reserve walkway",
+        facts = arrayOf("Walk" to "3"),
+        paths = listOf(listOf(GeoPoint(-46.42892, 168.29953), GeoPoint(-46.43143, 168.29589))),
+        id = "bb"
+    )
+
+    private val otataraC = track(
+        name = "Otatara Scenic Reserve Walkway",
+        facts = arrayOf("Walk" to "3"),
+        paths = listOf(listOf(GeoPoint(-46.43143, 168.29589), GeoPoint(-46.42866, 168.29894))),
+        id = "cc"
+    )
+
+    /** The same name, in Napier. */
+    private val otataraNapier = track(
+        name = "Otatara Scenic Reserve Walkway",
+        facts = arrayOf("Walk" to "3"),
+        paths = listOf(listOf(GeoPoint(-39.55034, 176.83383), GeoPoint(-39.55040, 176.83390))),
+        id = "zz"
+    )
+
+    private fun track(
+        name: String,
+        facts: Array<Pair<String, String>>,
+        paths: List<List<GeoPoint>>,
+        id: String = name
+    ) = OtherTrack(globalId = id, name = name, paths = paths, facts = facts.toMap())
 
     private val wellington = GeoPoint(lat = -41.2865, lng = 174.7762)
 
