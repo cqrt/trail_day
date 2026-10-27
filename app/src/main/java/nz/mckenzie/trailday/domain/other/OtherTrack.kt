@@ -5,6 +5,23 @@ import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.text.PlainText
 
 /**
+ * The prefix a track imported from this dataset is marked with, in the walker's own places.
+ *
+ * **Never renamed**: it is written into `assets.sourceRef` and travels in a backup, so a later build
+ * reading a different prefix would not recognise a track the walker had already taken on. It is also not
+ * DOC's: DOC's own imports are `doc-…`, and the app drops those in one action that must not touch these.
+ */
+const val OTHER_TRACK_REF_PREFIX = "other:"
+
+/**
+ * The exact reference a track imported from this dataset is known by.
+ *
+ * Namespaced by the publisher for the reason DOC's is: an id is only unique within whoever issued it, and
+ * on a bare UUID the already-imported check would be comparing a council's track with a hut's.
+ */
+fun otherTrackSourceRef(globalId: String): String = "$OTHER_TRACK_REF_PREFIX$globalId"
+
+/**
  * One track from Herenga ā Nuku's National Tracks Dataset (Pilot): what the app keeps of a row.
  *
  * **This is not DOC's material and must not be kept as if it were.** The dataset is a merge of
@@ -82,6 +99,18 @@ data class OtherTrack(
     val isOpen: Boolean? get() = status?.let { it == OtherTrackAccess.OPEN }
 
     /**
+     * Whether the dataset says a bike may be ridden on it.
+     *
+     * True for a graded track *and* for one the dataset simply marks as permitted: the second is 940 rows
+     * of the app's set that a chip reading only grades would leave out, and "you may ride this" is the
+     * answer the chip is about.
+     */
+    val isRideable: Boolean get() = bikeGrade != null || fact(BIKE) == PERMITTED
+
+    /** Whether the dataset says a wheelchair, mobility scooter or pushchair can use it. */
+    val suitsWheelchair: Boolean get() = mobilityAccess == OtherTrackAccess.SUITABLE
+
+    /**
      * Who published it, each named once.
      *
      * The field is comma-separated where a track was merged from several suppliers, and a walker reading
@@ -113,6 +142,25 @@ data class OtherTrack(
     /** Somebody else's page about it, usually Trailforks. On 29% of the app's set. */
     val webLink: String? get() = fact(WEB_LINK)
 
+    /**
+     * What this row's answer is to a filter's question, or nothing when the dataset said nothing.
+     *
+     * **A list rather than one value**, which is the one place this differs from DOC's material: a track
+     * merged from several suppliers names all of them, and a walker narrowing by "Wellington City Council"
+     * means a track that council had a hand in, not only one where it happens to be named first. Every
+     * other fact has one answer.
+     *
+     * The answers are the app's own words for the dataset's codes - see [OtherTrackAccess] - so a filter's
+     * chips and a page's chips cannot come to disagree about what a track is.
+     */
+    fun filterValues(field: String): List<String> = when (field) {
+        WALK -> listOfNotNull(walkGrade)
+        BIKE -> listOfNotNull(bikeGrade)
+        DOG_ACCESS -> listOfNotNull(dogAccess)
+        SUPPLIER -> suppliers
+        else -> listOfNotNull(fact(field))
+    }
+
     /** One fact, trimmed, or null when the dataset sent nothing or nothing but spaces. */
     private fun fact(field: String): String? = facts[field]?.trim()?.takeIf { it.isNotEmpty() }
 
@@ -132,6 +180,14 @@ data class OtherTrack(
 
         /** The dataset's own word for a field it left unset. */
         const val UNKNOWN = "Unknown"
+
+        /**
+         * The code the dataset uses for "permitted, with no grade recorded", in the access fields.
+         *
+         * 98 rather than a word, and it means something different from 99 ("unknown"): a track nobody has
+         * graded but everybody may use is not a track nobody knows about.
+         */
+        const val PERMITTED = "98"
     }
 }
 
@@ -188,9 +244,9 @@ object OtherTrackAccess {
         "Prohibited" to "Not allowed"
     )
 
-    /** Whether a wheelchair, mobility scooter or pushchair can use it. */
+    /** Whether the dataset says a wheelchair, mobility scooter or pushchair can use it. */
     private val MOBILITY = mapOf(
-        "Yes" to "Suitable",
+        "Yes" to SUITABLE,
         "No" to "Not suitable"
     )
 
@@ -204,6 +260,9 @@ object OtherTrackAccess {
 
     /** The one status that is not a warning: the app's word for it, and what a chip is compared against. */
     const val OPEN = "Open"
+
+    /** The one mobility answer that is a yes, and what a chip is compared against. */
+    const val SUITABLE = "Suitable"
 
     fun walk(code: String?): String? = WALK[code]
 

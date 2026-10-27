@@ -1,5 +1,7 @@
 package nz.mckenzie.trailday.domain.doc
 
+import nz.mckenzie.trailday.domain.reference.ReferenceFilter
+
 /**
  * What shape a service publishes: a line to travel along, or a place to stop at.
  *
@@ -7,14 +9,6 @@ package nz.mckenzie.trailday.domain.doc
  * read and drawn. The other is which fields it carries, which is the rest of this table.
  */
 enum class DocShape { LINE, POINT }
-
-/**
- * A fact worth narrowing a page of DOC's material by, and what to call it.
- *
- * The label is the app's own words, because DOC's field names are not: "SubObjectType" is not something
- * to show anybody. [field] is the name the fact arrives under, which is what a row is matched on.
- */
-data class DocFilter(val field: String, val label: String)
 
 /**
  * The free name-and-value slots the replacement tracks service publishes.
@@ -130,7 +124,7 @@ enum class DocSource(
      * a source with nothing worth narrowing by says nothing, rather than a row of chips that filter
      * nothing.
      */
-    val filters: List<DocFilter>
+    val filters: List<ReferenceFilter>
 ) {
 
     /**
@@ -152,10 +146,10 @@ enum class DocSource(
         nameField = "TechObjectName",
         fields = listOf("SubObjectType", "FlocID") + characteristicSlots(TRACK_CHARACTERISTIC_SLOTS),
         filters = listOf(
-            DocFilter("SubObjectType", "What it is"),
+            ReferenceFilter("SubObjectType", "What it is"),
             // The top-level constant rather than the companion's, because the table is built before the
             // companion exists - the same reason the slots are named that way above.
-            DocFilter(TRACK_TYPE_SLOT_NAME, "How it is walked")
+            ReferenceFilter(TRACK_TYPE_SLOT_NAME, "How it is walked")
         )
     ),
 
@@ -182,8 +176,8 @@ enum class DocSource(
         // A hut has no kind of its own and nothing about walking it: what a walker narrows by is whether
         // it has to be booked, and where in the country it is.
         filters = listOf(
-            DocFilter("bookable", "Bookable"),
-            DocFilter("region", "Region")
+            ReferenceFilter("bookable", "Bookable"),
+            ReferenceFilter("region", "Region")
         )
     ),
 
@@ -208,9 +202,9 @@ enum class DocSource(
             "landscape", "access", "hasAlerts", "introductionThumbnail", "staticLink", "locationString"
         ),
         filters = listOf(
-            DocFilter("campsiteCategory", "What it is"),
-            DocFilter("bookable", "Bookable"),
-            DocFilter("region", "Region")
+            ReferenceFilter("campsiteCategory", "What it is"),
+            ReferenceFilter("bookable", "Bookable"),
+            ReferenceFilter("region", "Region")
         )
     ),
 
@@ -234,7 +228,7 @@ enum class DocSource(
             "mountainBikingTrackWebPage"
         ),
         // How hard the riding is: the one fact a rider narrows this layer by.
-        filters = listOf(DocFilter("difficulty", "Difficulty"))
+        filters = listOf(ReferenceFilter("difficulty", "Difficulty"))
     );
 
     /** Whether this source publishes lines rather than places. */

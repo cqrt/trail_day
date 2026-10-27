@@ -5,6 +5,7 @@ import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.tan
+import nz.mckenzie.trailday.domain.geo.GeoPoint
 
 /**
  * XYZ (Web Mercator) tile maths, used to estimate the cost of downloading an
@@ -95,6 +96,39 @@ data class LatLngBounds(
  * will show ([withMinimumSpan]).
  */
 const val FRAME_HALF_WIDTH_DEGREES = 0.01
+
+/** A degree of latitude, in kilometres. Longitude depends on where you are; see [boxAround]. */
+private const val KM_PER_DEGREE = 111.32
+
+/** The floor under the cosine, so a polar box stays a box. */
+private const val MIN_COS = 0.01
+
+/**
+ * The box to ask a service about, from where the walker is: a square of [radiusKm] around the fix.
+ *
+ * Longitude degrees are shorter than latitude ones away from the equator, so the box is widened by the
+ * cosine of the latitude - and the cosine is floored, because at the pole it is zero and a box of infinite
+ * width is not a question anyone can answer.
+ *
+ * **The box is a service's quick filter, not the answer.** Its corners reach about 1.4x the radius, and a
+ * long line that clips it passes right through, so a caller that asked about a *circle* keeps only what is
+ * truly inside it - see [nz.mckenzie.trailday.domain.doc.within] and
+ * [nz.mckenzie.trailday.domain.other.within].
+ *
+ * Here rather than beside either publisher's URL builder, because both ask it: DOC's search is a circle
+ * around the phone and so is the national tracks dataset's, and two readings of one cosine rule is how one
+ * of them comes to be wrong.
+ */
+fun boxAround(point: GeoPoint, radiusKm: Double): LatLngBounds {
+    val latitudeDelta = radiusKm / KM_PER_DEGREE
+    val longitudeDelta = radiusKm / (KM_PER_DEGREE * maxOf(cos(Math.toRadians(point.lat)), MIN_COS))
+    return LatLngBounds(
+        minLat = point.lat - latitudeDelta,
+        minLng = point.lng - longitudeDelta,
+        maxLat = point.lat + latitudeDelta,
+        maxLng = point.lng + longitudeDelta
+    )
+}
 
 /**
  * The box as a frame a map can actually be asked for: a place is one coordinate, so the box

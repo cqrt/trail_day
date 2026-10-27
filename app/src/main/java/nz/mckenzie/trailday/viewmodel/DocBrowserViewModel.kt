@@ -23,11 +23,11 @@ import nz.mckenzie.trailday.doc.DocReadResult
 import nz.mckenzie.trailday.doc.DocReader
 import nz.mckenzie.trailday.domain.doc.DocBikeLinks
 import nz.mckenzie.trailday.domain.doc.DocCache
-import nz.mckenzie.trailday.domain.doc.DocFilter
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocQuery
-import nz.mckenzie.trailday.domain.doc.DocSort
 import nz.mckenzie.trailday.domain.doc.DocSource
+import nz.mckenzie.trailday.domain.reference.ReferenceFilter
+import nz.mckenzie.trailday.domain.reference.ReferenceSort
 import nz.mckenzie.trailday.domain.doc.matching
 import nz.mckenzie.trailday.domain.doc.showing
 import nz.mckenzie.trailday.domain.doc.valuesPresent
@@ -46,8 +46,24 @@ import nz.mckenzie.trailday.tracking.DevicePosition
  *
  * A short page is DOC saying that is all there is, so it earns nothing.
  */
-internal fun docPageMessage(sent: Int, shown: Int): String? {
-    if (sent < DocQuery.DEFAULT_LIMIT) return null
+internal fun docPageMessage(sent: Int, shown: Int): String? =
+    referencePageMessage(sent = sent, shown = shown, limit = DocQuery.DEFAULT_LIMIT)
+
+/**
+ * The line a browser says above a page of results, or null when the service's answer was the whole answer.
+ *
+ * **The figure is the one the walker can count**, which is not the page's own size: a service is asked
+ * about a box and answers with a page, while the search is a circle, so the corners of the box are trimmed
+ * before the rows are shown. Telling somebody looking at 241 rows that they are seeing 300 reads as a
+ * miscount - and saying "of the first 300" is what explains why there is a warning at all.
+ *
+ * A short page is the service saying that is all there is, so it earns nothing.
+ *
+ * Here rather than in either browser's view model, because both publishers answer a page at a time and the
+ * sentence about it is one sentence.
+ */
+internal fun referencePageMessage(sent: Int, shown: Int, limit: Int): String? {
+    if (sent < limit) return null
     val rest = "Narrow the search to see the rest."
     return if (shown < sent) {
         "Showing $shown of the first $sent matches. $rest"
@@ -66,7 +82,7 @@ internal fun docPageMessage(sent: Int, shown: Int): String? {
  * this screen is how the walker reads it before going.
  *
  * Which service is being read is the screen's own first question, because the four answer different
- * questions and carry different facts - see [DocSource] and [DocFilter].
+ * questions and carry different facts - see [DocSource] and [ReferenceFilter].
  */
 class DocBrowserViewModel(
     private val reader: DocReader,
@@ -116,13 +132,13 @@ class DocBrowserViewModel(
      * What the walker has narrowed the page to, by the field each filter is on.
      *
      * A map rather than one set per fact, because which facts are worth narrowing by is the *source's*
-     * answer and differs between the four - see [DocFilter].
+     * answer and differs between the four - see [ReferenceFilter].
      */
     private val _filters = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
     val filters: StateFlow<Map<String, Set<String>>> = _filters
 
-    private val _sort = MutableStateFlow(DocSort.NEAREST)
-    val sort: StateFlow<DocSort> = _sort
+    private val _sort = MutableStateFlow(ReferenceSort.NEAREST)
+    val sort: StateFlow<ReferenceSort> = _sort
 
     /**
      * DOC's bike points and tracks, paired: which track each bike point belongs to, and which bike
@@ -149,7 +165,7 @@ class DocBrowserViewModel(
      * Built from the results rather than from DOC, so every chip is a fact about something on the screen
      * and a chip that matches nothing cannot be offered.
      */
-    val filterChoices: StateFlow<List<Pair<DocFilter, List<String>>>> =
+    val filterChoices: StateFlow<List<Pair<ReferenceFilter, List<String>>>> =
         combine(_results, _source) { results, source ->
             source.filters.map { filter -> filter to results.valuesPresent(filter.field) }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
@@ -214,7 +230,7 @@ class DocBrowserViewModel(
     }
 
     /** Tick or untick one value of one filter; a filter with nothing ticked shows everything. */
-    fun toggleFilter(filter: DocFilter, value: String) {
+    fun toggleFilter(filter: ReferenceFilter, value: String) {
         _filters.update { current ->
             val chosen = current[filter.field].orEmpty()
             val next = if (value in chosen) chosen - value else chosen + value
@@ -226,7 +242,7 @@ class DocBrowserViewModel(
         _filters.value = emptyMap()
     }
 
-    fun setSort(sort: DocSort) {
+    fun setSort(sort: ReferenceSort) {
         _sort.value = sort
     }
 

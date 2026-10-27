@@ -1,5 +1,7 @@
 package nz.mckenzie.trailday.domain.doc
 
+import nz.mckenzie.trailday.domain.reference.ReferenceFilter
+
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -149,24 +151,24 @@ class DocSourceTest {
         // the other three a chip that can never match.
         assertEquals(
             listOf(
-                DocFilter("SubObjectType", "What it is"),
-                DocFilter(DocSource.TRACK_TYPE_CHARACTERISTIC, "How it is walked")
+                ReferenceFilter("SubObjectType", "What it is"),
+                ReferenceFilter(DocSource.TRACK_TYPE_CHARACTERISTIC, "How it is walked")
             ),
             DocSource.TRACKS.filters
         )
         assertEquals(
-            listOf(DocFilter("bookable", "Bookable"), DocFilter("region", "Region")),
+            listOf(ReferenceFilter("bookable", "Bookable"), ReferenceFilter("region", "Region")),
             DocSource.HUTS.filters
         )
         assertEquals(
             listOf(
-                DocFilter("campsiteCategory", "What it is"),
-                DocFilter("bookable", "Bookable"),
-                DocFilter("region", "Region")
+                ReferenceFilter("campsiteCategory", "What it is"),
+                ReferenceFilter("bookable", "Bookable"),
+                ReferenceFilter("region", "Region")
             ),
             DocSource.CAMPSITES.filters
         )
-        assertEquals(listOf(DocFilter("difficulty", "Difficulty")), DocSource.BIKES.filters)
+        assertEquals(listOf(ReferenceFilter("difficulty", "Difficulty")), DocSource.BIKES.filters)
     }
 
     @Test

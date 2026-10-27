@@ -73,6 +73,8 @@ fun AssetListScreen(
     onOpenDocDetail: (DocItem, DocItem?) -> Unit,
     onAddSpot: () -> Unit,
     onOpenDoc: () -> Unit,
+    /** Opens the browser for the tracks other people publish: see [OtherTracksBrowserScreen]. */
+    onOpenOtherTracks: () -> Unit = {},
     onOpenSettings: () -> Unit
 ) {
     val assets by viewModel.assets.collectAsStateWithLifecycle()
@@ -144,16 +146,26 @@ fun AssetListScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     SecondaryPlaceAction(
-                        label = if (busy) "Importing…" else "Import a file",
+                        label = if (busy) "Importing…" else "Import",
                         glyph = IconGlyph.OFFLINE,
                         enabled = !busy,
                         onClick = { importLauncher.launch(TRACK_MIME_TYPES) },
                         modifier = Modifier.weight(1f)
                     )
                     SecondaryPlaceAction(
-                        label = "DOC reference",
+                        label = "DOC",
                         glyph = IconGlyph.MAP,
                         onClick = onOpenDoc,
+                        modifier = Modifier.weight(1f)
+                    )
+                    // The second publisher's tracks, beside DOC's: the three buttons are the three ways
+                    // somebody else's material reaches the phone, so they belong on one row. Their labels
+                    // are one word each because three of them share a phone's width - see the emulator
+                    // note in the plan log.
+                    SecondaryPlaceAction(
+                        label = "Other tracks",
+                        glyph = IconGlyph.TRAIL,
+                        onClick = onOpenOtherTracks,
                         modifier = Modifier.weight(1f)
                     )
                 }

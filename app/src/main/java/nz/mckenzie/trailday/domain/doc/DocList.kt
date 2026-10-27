@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.domain.doc
 
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.haversineMeters
+import nz.mckenzie.trailday.domain.reference.ReferenceSort
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 
 /**
@@ -116,16 +117,6 @@ fun List<DocItem>.within(radiusM: Double, from: GeoPoint?): List<DocItem> {
     return filter { item -> (item.distanceM(from) ?: Double.MAX_VALUE) <= radiusM }
 }
 
-/** The order a page of DOC's material is shown in. */
-enum class DocSort {
-
-    /** Nearest first, which is what somebody standing somewhere wants. */
-    NEAREST,
-
-    /** By name, which is what somebody looking for a particular one wants. */
-    NAME
-}
-
 /**
  * The rows to show, in the order to show them.
  *
@@ -135,7 +126,7 @@ enum class DocSort {
  */
 fun List<DocItem>.showing(
     filters: Map<String, Set<String>> = emptyMap(),
-    sort: DocSort = DocSort.NAME,
+    sort: ReferenceSort = ReferenceSort.NAME,
     from: GeoPoint? = null
 ): List<DocItem> {
     val filtered = filter { item ->
@@ -143,14 +134,14 @@ fun List<DocItem>.showing(
         filters.all { (field, chosen) -> chosen.isEmpty() || item.filterValue(field) in chosen }
     }
     return when (sort) {
-        DocSort.NEAREST -> filtered.sortedWith(
+        ReferenceSort.NEAREST -> filtered.sortedWith(
             compareBy(
                 { item -> from?.let { fix -> item.distanceM(fix) ?: Double.MAX_VALUE } ?: 0.0 },
                 { item -> item.name.lowercase() }
             )
         )
 
-        DocSort.NAME -> filtered.sortedBy { it.name.lowercase() }
+        ReferenceSort.NAME -> filtered.sortedBy { it.name.lowercase() }
     }
 }
 

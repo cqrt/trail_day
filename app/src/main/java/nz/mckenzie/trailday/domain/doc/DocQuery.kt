@@ -3,6 +3,7 @@ package nz.mckenzie.trailday.domain.doc
 import java.net.URLEncoder
 import java.util.Locale
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.tiles.boxAround
 
 /**
  * What to ask DOC, and which of its services to ask.
@@ -136,18 +137,18 @@ object DocUrl {
     /**
      * The box to ask about, from where the walker is: a square of [radiusKm] around the fix.
      *
-     * Longitude degrees are shorter than latitude ones away from the equator, so the box is widened by
-     * the cosine of the latitude - and the cosine is floored, because at the pole it is zero and a box
-     * of infinite width is not a question anyone can answer.
+     * The rule itself is [boxAround]'s, in `domain/tiles` beside the box it returns: this only writes it
+     * the way an ARC GIS envelope is written.
      */
     fun envelope(near: GeoPoint, radiusKm: Double): String {
-        val latitudeDelta = radiusKm / KM_PER_DEGREE
-        val longitudeDelta = radiusKm / (KM_PER_DEGREE * maxOf(kotlin.math.cos(Math.toRadians(near.lat)), MIN_COS))
-        return box(
-            minLng = near.lng - longitudeDelta,
-            minLat = near.lat - latitudeDelta,
-            maxLng = near.lng + longitudeDelta,
-            maxLat = near.lat + latitudeDelta
+        val box = boxAround(near, radiusKm)
+        return envelope(
+            DocBounds(
+                minLat = box.minLat,
+                minLng = box.minLng,
+                maxLat = box.maxLat,
+                maxLng = box.maxLng
+            )
         )
     }
 
@@ -201,12 +202,6 @@ object DocUrl {
             maxLng,
             maxLat
         )
-
-    /** A degree of latitude, in kilometres. Longitude depends on where you are; see [envelope]. */
-    private const val KM_PER_DEGREE = 111.32
-
-    /** The floor under the cosine, so a polar box stays a box. */
-    private const val MIN_COS = 0.01
 
     /**
      * The most rows one request may ask for.

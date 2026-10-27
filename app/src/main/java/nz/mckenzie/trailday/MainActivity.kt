@@ -35,6 +35,7 @@ import nz.mckenzie.trailday.ui.screens.AssetDetailScreen
 import nz.mckenzie.trailday.ui.screens.AssetEditScreen
 import nz.mckenzie.trailday.ui.screens.AssetListScreen
 import nz.mckenzie.trailday.ui.screens.OtherTrackScreen
+import nz.mckenzie.trailday.ui.screens.OtherTracksBrowserScreen
 import nz.mckenzie.trailday.ui.theme.TrailDayTheme
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.other.OtherTrack
@@ -48,6 +49,7 @@ import nz.mckenzie.trailday.viewmodel.PendingFollow
 import nz.mckenzie.trailday.viewmodel.PendingMapFocus
 import nz.mckenzie.trailday.viewmodel.OfflineViewModel
 import nz.mckenzie.trailday.viewmodel.OtherTrackViewModel
+import nz.mckenzie.trailday.viewmodel.OtherTracksBrowserViewModel
 import nz.mckenzie.trailday.viewmodel.RecordingDetailViewModel
 import nz.mckenzie.trailday.viewmodel.RecordingsViewModel
 import nz.mckenzie.trailday.viewmodel.RecordingViewModel
@@ -60,7 +62,7 @@ import nz.mckenzie.trailday.web.WebEditorService
 import nz.mckenzie.trailday.web.WebEditorState
 
 /** Destinations for now; swap for a NavHost when routes need arguments. */
-private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, OFFLINE_OTHER_TRACKS_PICKER, OFFLINE_TOPO_PICKER, OFFLINE_PICKER_AROUND, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC, DOC_DETAIL, OTHER_TRACK_DETAIL }
+private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, OFFLINE_OTHER_TRACKS_PICKER, OFFLINE_TOPO_PICKER, OFFLINE_PICKER_AROUND, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC, DOC_DETAIL, OTHER_TRACK_DETAIL, OTHER_TRACKS_BROWSER }
 
 class MainActivity : ComponentActivity() {
 
@@ -207,6 +209,7 @@ class MainActivity : ComponentActivity() {
                                 destination = Destination.ADD_SPOT
                             },
                             onOpenDoc = { destination = Destination.DOC },
+                            onOpenOtherTracks = { destination = Destination.OTHER_TRACKS_BROWSER },
                             onOpenSettings = { destination = Destination.SETTINGS }
                         )
                     }
@@ -249,6 +252,20 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
+                    }
+
+                    Destination.OTHER_TRACKS_BROWSER -> {
+                        val browserViewModel: OtherTracksBrowserViewModel = viewModel(
+                            factory = OtherTracksBrowserViewModel.factory(applicationContext)
+                        )
+                        OtherTracksBrowserScreen(
+                            viewModel = browserViewModel,
+                            onBack = { destination = Destination.ASSETS },
+                            onOpenTrack = { track ->
+                                selectedOtherTrack = track
+                                destination = Destination.OTHER_TRACK_DETAIL
+                            }
+                        )
                     }
 
                     Destination.OTHER_TRACK_DETAIL -> {

@@ -1,5 +1,7 @@
 package nz.mckenzie.trailday.domain.doc
 
+import nz.mckenzie.trailday.domain.reference.ReferenceSort
+
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -151,7 +153,7 @@ class DocListTest {
         assertTrue(huts.valuesPresent("difficulty").isEmpty())
         assertEquals(
             listOf(huts[0]),
-            huts.showing(mapOf("bookable" to setOf("Yes")), DocSort.NAME, from = null)
+            huts.showing(mapOf("bookable" to setOf("Yes")), ReferenceSort.NAME, from = null)
         )
     }
 
@@ -167,7 +169,7 @@ class DocListTest {
             listOf(loopTramp, loopWalk),
             tracks.showing(
                 filters = mapOf(DocSource.TRACK_TYPE_CHARACTERISTIC to setOf("Loop")),
-                sort = DocSort.NAME,
+                sort = ReferenceSort.NAME,
                 from = invercargill
             )
         )
@@ -179,7 +181,7 @@ class DocListTest {
                     "SubObjectType" to setOf("Tramping Track"),
                     DocSource.TRACK_TYPE_CHARACTERISTIC to setOf("Loop")
                 ),
-                sort = DocSort.NAME,
+                sort = ReferenceSort.NAME,
                 from = invercargill
             )
         )
@@ -199,7 +201,7 @@ class DocListTest {
         val near = track(1, "Near", "Walking Track", GeoPoint(-46.4130, 168.3538))
         val far = track(2, "Far", "Walking Track", GeoPoint(-46.30, 168.20))
 
-        val shown = listOf(far, near).showing(emptyMap(), DocSort.NEAREST, from = invercargill)
+        val shown = listOf(far, near).showing(emptyMap(), ReferenceSort.NEAREST, from = invercargill)
 
         assertEquals(listOf(near, far), shown)
     }
@@ -209,7 +211,7 @@ class DocListTest {
         val b = track(1, "B", "Walking Track", invercargill)
         val a = track(2, "A", "Walking Track", invercargill)
 
-        val shown = listOf(b, a).showing(emptyMap(), DocSort.NEAREST, from = null)
+        val shown = listOf(b, a).showing(emptyMap(), ReferenceSort.NEAREST, from = null)
 
         assertEquals(listOf(a, b), shown)
     }
@@ -220,7 +222,7 @@ class DocListTest {
         val tramp = track(2, "Tramp", "Tramping Track", invercargill)
 
         val shown = listOf(walk, tramp)
-            .showing(mapOf("SubObjectType" to setOf("Tramping Track")), DocSort.NAME, invercargill)
+            .showing(mapOf("SubObjectType" to setOf("Tramping Track")), ReferenceSort.NAME, invercargill)
 
         assertEquals(listOf(tramp), shown)
     }
@@ -232,11 +234,11 @@ class DocListTest {
         // By name, which is the order a filter asks for unless the walker says nearest.
         val both = listOf(tramp, walk)
 
-        assertEquals(both, listOf(walk, tramp).showing(emptyMap(), DocSort.NAME, invercargill))
+        assertEquals(both, listOf(walk, tramp).showing(emptyMap(), ReferenceSort.NAME, invercargill))
         assertEquals(
             "and a field with nothing chosen is the same as no filter at all",
             both,
-            listOf(walk, tramp).showing(mapOf("SubObjectType" to emptySet()), DocSort.NAME, invercargill)
+            listOf(walk, tramp).showing(mapOf("SubObjectType" to emptySet()), ReferenceSort.NAME, invercargill)
         )
     }
 
