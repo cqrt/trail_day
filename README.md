@@ -72,6 +72,10 @@ app used to carry one, and **LINZ's standard-access keys expire every 90 days** 
 was one rotation away from a blank map, with the walker the one who had to fix it. Rotating it now
 is `npx wrangler secret put LINZ_API_KEY` and no release at all.
 
+A walker who has a LINZ key of their own can use it instead, from a **Developer options** section that
+stays out of the way until the version line in Settings has been tapped seven times. See
+[`docs/developer-options.md`](docs/developer-options.md).
+
 OpenStreetMap is in the app because a drawn map is the other half of the picture - gates, roads and
 names that a photograph does not show - and because its tiles may be looked at with no key, no
 account and nothing to configure.

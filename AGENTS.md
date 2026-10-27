@@ -20,7 +20,8 @@ from a blank page here — it starts from the last paragraph.
 - `README.md` is what the app does and how it is built and released.
 - `docs/*.md` is one file per feature that needed more than a paragraph: `doc-tracks.md`,
   `place-names.md`, `elevation.md`, `side-tracks.md`, `carparks.md`, `kind-filter.md`,
-  `map-by-kind.md`, `te-araroa.md`, `web-editor.md`, `trail-day-conversion.md`.
+  `map-by-kind.md`, `te-araroa.md`, `developer-options.md`, `web-editor.md`,
+  `trail-day-conversion.md`.
 - **A paragraph that says "It shipped as 0.3.NN" is a claim that a tag exists.** Check.
 
 ## How a change lands
