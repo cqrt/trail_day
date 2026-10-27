@@ -40,12 +40,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.domain.other.OtherTrack
-import nz.mckenzie.trailday.domain.other.OtherTrackAccess
 import nz.mckenzie.trailday.domain.other.distanceM
 import nz.mckenzie.trailday.domain.other.otherTrackSourceRef
 import nz.mckenzie.trailday.domain.reference.ReferenceFilter
 import nz.mckenzie.trailday.domain.reference.ReferenceSort
 import nz.mckenzie.trailday.ui.formatDistance
+import nz.mckenzie.trailday.ui.otherTrackRowDetail
+import nz.mckenzie.trailday.ui.otherTrackRowWhere
 import nz.mckenzie.trailday.viewmodel.OtherTracksBrowserViewModel
 
 /**
@@ -382,23 +383,3 @@ private fun OtherTrackRow(
         }
     }
 }
-
-/**
- * The line under a row's name: what it is, whether it is closed, and who publishes it.
- *
- * The same facts a page opens with, in the same order, so a row and the page it opens cannot come to
- * describe one track two ways. A status of "Open" is left off: it is the ordinary case and a row that said
- * it on every one of seventeen thousand tracks would be saying nothing.
- */
-private fun otherTrackRowDetail(track: OtherTrack): String = listOfNotNull(
-    track.walkGrade,
-    track.status?.takeIf { it != OtherTrackAccess.OPEN },
-    track.suppliers.firstOrNull()
-).joinToString(" \u00b7 ")
-
-/** The line under that: where the track is, which is the dataset's own two words for it. */
-private fun otherTrackRowWhere(track: OtherTrack): String? =
-    listOfNotNull(track.locality, track.localAuthority)
-        .distinct()
-        .joinToString(", ")
-        .takeIf { it.isNotEmpty() }

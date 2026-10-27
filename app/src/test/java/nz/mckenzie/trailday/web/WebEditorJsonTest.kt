@@ -406,7 +406,7 @@ class WebEditorJsonTest {
         )
         assertEquals(
             "and what a hut can be narrowed by, which is not what a track can",
-            listOf(WebEditorDocFilter(field = "bookable", label = "Bookable"), WebEditorDocFilter(field = "region", label = "Region")),
+            listOf(WebEditorFilter(field = "bookable", label = "Bookable"), WebEditorFilter(field = "region", label = "Region")),
             read.filters
         )
         assertEquals(1, read.rows.size)

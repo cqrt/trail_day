@@ -172,6 +172,24 @@ class WebEditorServer(
         ),
 
         HttpRoute(
+            claims = { it.method == GET && it.path == OTHER_TRACKS_PATH },
+            // The tracks other people publish, searched by the phone for the desk's own browser, for the
+            // reasons DOC's search is: the service is the phone's business and what a track is is the
+            // phone's rule. **Read-only**, as this desk's DOC browser is - taking a track on as the walker's
+            // own is the phone's own browser, where the walker is standing when they decide.
+            handler = { request ->
+                json(
+                    data.otherTracksSearch(
+                        name = request.query["name"].orEmpty(),
+                        near = request.query["near"],
+                        radiusKm = request.query["radiusKm"]?.toDoubleOrNull(),
+                        bounds = request.query["bounds"]
+                    )
+                )
+            }
+        ),
+
+        HttpRoute(
             claims = { it.method == PUT && assetId(it.path) != null },
             // The id is asked for twice, once to decide whether this route answers at all and once
             // to answer with - so a route can never answer for a path it did not claim, and there is
@@ -379,6 +397,15 @@ class WebEditorServer(
          */
         const val DOC_PATH = "/api/doc"
 
+        /**
+         * Where the national tracks dataset is searched: `/api/other-tracks`.
+         *
+         * A path of its own rather than a parameter on DOC's, because it is a different publisher with a
+         * different service and a different set of facts - and because a page that asked for "somebody
+         * else's tracks" with DOC's path would be a page that had to know which of the two it meant.
+         */
+        const val OTHER_TRACKS_PATH = "/api/other-tracks"
+
 
         /**
          * The longest track file the phone will take, in bytes of the file itself.
@@ -544,6 +571,20 @@ interface WebEditorData {
      */
     suspend fun docSearch(
         source: String,
+        name: String,
+        near: String?,
+        radiusKm: Double?,
+        bounds: String?
+    ): String
+
+    /**
+     * `GET /api/other-tracks`: the tracks other people publish, searched by the phone for the desk.
+     *
+     * [name] is part of a name, empty for any; [near] is `lat,lng` around which to look, or null;
+     * [radiusKm] is how far around it; [bounds] is the desk's own map view as `minLat,minLng,maxLat,maxLng`,
+     * or null. The answer is a document of tracks and the phone's own word when there is one to say.
+     */
+    suspend fun otherTracksSearch(
         name: String,
         near: String?,
         radiusKm: Double?,

@@ -304,6 +304,25 @@ class WebEditorServerTest {
             return """{"source":"huts","rows":[],"message":"no huts here","capped":false}"""
         }
 
+        /** What a search of the other publisher asked for, and a document for it. */
+        var lastOtherName: String? = null
+        var lastOtherNear: String? = null
+        var lastOtherRadiusKm: Double? = null
+        var lastOtherBounds: String? = null
+
+        override suspend fun otherTracksSearch(
+            name: String,
+            near: String?,
+            radiusKm: Double?,
+            bounds: String?
+        ): String {
+            lastOtherName = name
+            lastOtherNear = near
+            lastOtherRadiusKm = radiusKm
+            lastOtherBounds = bounds
+            return """{"filters":[],"rows":[],"message":"nothing here","capped":false}"""
+        }
+
         override fun page(path: String): HttpResponse? =
             if (path == "/" || path == "/index.html" || path == "/app.js") {
                 HttpResponse.bytes(200, "text/html; charset=utf-8", PAGE.toByteArray())
@@ -819,5 +838,41 @@ class WebEditorServerTest {
         // And nothing under the old import path: what DOC publishes is read here, and never written.
         assertEquals(404, get("${WebEditorServer.DOC_PATH}/import").code)
         assertEquals(404, send("${WebEditorServer.DOC_PATH}/import", "POST", """{"tracks":[]}""").code)
+    }
+
+    @Test
+    fun `the tracks other people publish are searched at their own path, with the name and place the page asked for`() {
+        start()
+
+        val response = get(
+            "${WebEditorServer.OTHER_TRACKS_PATH}" +
+                "?name=Southern&near=-41.6,172.6&bounds=-41.7,172.5,-41.5,172.7"
+        )
+
+        assertEquals(200, response.code)
+        assertEquals("application/json; charset=utf-8", response.contentType)
+        assertEquals("the name reached the phone", "Southern", data.lastOtherName)
+        assertEquals("and the place too", "-41.6,172.6", data.lastOtherNear)
+        assertEquals("and the map's own view", "-41.7,172.5,-41.5,172.7", data.lastOtherBounds)
+        assertEquals(
+            """{"filters":[],"rows":[],"message":"nothing here","capped":false}""",
+            response.body
+        )
+    }
+
+    @Test
+    fun `the other publisher's tracks need the token as surely as a write does`() {
+        start()
+
+        assertEquals(403, get("${WebEditorServer.OTHER_TRACKS_PATH}?name=x", withToken = false).code)
+        assertNull("a refused search never reached the data", data.lastOtherName)
+
+        // And nothing under an import path: this browser reads, as DOC's here does. Taking a track on as
+        // the walker's own is the phone's own browser, where the walker is standing when they decide.
+        assertEquals(404, get("${WebEditorServer.OTHER_TRACKS_PATH}/import").code)
+        assertEquals(
+            404,
+            send("${WebEditorServer.OTHER_TRACKS_PATH}/import", "POST", """{"tracks":[]}""").code
+        )
     }
 }

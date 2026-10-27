@@ -18,7 +18,14 @@ import nz.mckenzie.trailday.domain.doc.matching
 import nz.mckenzie.trailday.domain.doc.within
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.other.EmptyOtherTracksCache
+import nz.mckenzie.trailday.domain.other.OtherTracksCache
+import nz.mckenzie.trailday.domain.other.OtherTracksQuery
+import nz.mckenzie.trailday.domain.other.matching
+import nz.mckenzie.trailday.domain.other.within
+import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
+import nz.mckenzie.trailday.domain.tiles.boxAround
 import nz.mckenzie.trailday.domain.track.TrackInterchange
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.map.AssetColors
@@ -27,6 +34,9 @@ import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.LinzVectorStyle
 import nz.mckenzie.trailday.map.WebStyleJson
 import nz.mckenzie.trailday.offline.HttpResponse
+import nz.mckenzie.trailday.other.ArcGisOtherTracks
+import nz.mckenzie.trailday.other.OtherTracksReadResult
+import nz.mckenzie.trailday.other.OtherTracksReader
 
 /**
  * The documents the editor serves, built from the same repository calls the app's own screens use.
@@ -74,6 +84,16 @@ class WebEditorDocuments(
      * desk can import a downloaded track as readily as the phone can.
      */
     private val docCache: DocCache = EmptyDocCache,
+    /**
+     * Where the tracks other people publish are searched from. The live service by default; a test hands in
+     * its own, so the desk's search of them can be proved without a network.
+     */
+    private val otherTracks: OtherTracksReader = ArcGisOtherTracks(),
+    /**
+     * The tracks other people publish that were downloaded for offline use, searched when the service
+     * cannot be reached.
+     */
+    private val otherTracksCache: OtherTracksCache = EmptyOtherTracksCache,
     private val now: () -> Long = System::currentTimeMillis
 ) : WebEditorData {
 
@@ -295,7 +315,7 @@ class WebEditorDocuments(
         }
 
         val limit = DocQuery.DEFAULT_LIMIT
-        val radius = radiusKm ?: DEFAULT_DOC_RADIUS_KM
+        val radius = radiusKm ?: DEFAULT_SEARCH_RADIUS_KM
         val query = DocQuery(
             source = wanted,
             nameContains = name.trim(),
@@ -338,6 +358,81 @@ class WebEditorDocuments(
                                 wanted.displayName.lowercase() + "."
 
                         docCache.count() > 0 -> "Could not reach DOC, and nothing downloaded matches."
+                        else -> result.message
+                    },
+                    capped = false
+                )
+            }
+        }
+    }
+
+    /**
+     * `GET /api/other-tracks`: the tracks other people publish, searched by the phone on the desk's behalf.
+     *
+     * The same shape as DOC's search and for the same reason: the service, the query and the reading of what
+     * a track is are all the phone's, and the desk is handed a document it can draw. A search with neither a
+     * name nor a place is refused before the service is asked, because "all seventeen thousand tracks" is
+     * not a search.
+     */
+    override suspend fun otherTracksSearch(
+        name: String,
+        near: String?,
+        radiusKm: Double?,
+        bounds: String?
+    ): String {
+        val point = pointOf(near)
+        val box = boundsOf(bounds)
+        if (name.isBlank() && point == null && box == null) {
+            return WebEditorJson.otherTracksSearch(
+                items = emptyList(),
+                from = null,
+                message = "Type part of a name, turn on Near the phone, or search the map's view.",
+                capped = false
+            )
+        }
+
+        val limit = OtherTracksQuery.DEFAULT_LIMIT
+        val radius = radiusKm ?: DEFAULT_SEARCH_RADIUS_KM
+        val query = OtherTracksQuery(
+            nameContains = name.trim(),
+            // The desk's own map view is a box already; a near-me search is a circle, so it is asked for as
+            // the square around it and the corners are trimmed below. Two names for one rectangle, which is
+            // why the conversion is here rather than a second box type.
+            bounds = box?.let { LatLngBounds(it.minLat, it.minLng, it.maxLat, it.maxLng) }
+                ?: point?.let { at -> boxAround(at, radius) },
+            limit = limit
+        )
+        // The distance the desk is told is measured from the place the desk asked about, else the phone's
+        // own fix. Read once, so every row's distance is from the same point.
+        val from = point ?: position()
+        val radiusM = radius * 1000.0
+        return when (val result = otherTracks.read(query)) {
+            is OtherTracksReadResult.Found -> {
+                val items = if (point != null) result.tracks.within(radiusM, point) else result.tracks
+                WebEditorJson.otherTracksSearch(
+                    items = items,
+                    from = from,
+                    message = if (items.isEmpty()) "No other tracks matched." else null,
+                    capped = result.tracks.size >= limit
+                )
+            }
+
+            is OtherTracksReadResult.Failed -> {
+                // No service: fall back to what was downloaded for offline use, so what the phone holds can
+                // still be read with no reception. Filtered by name; the download is the place filter.
+                val held = otherTracksCache.cached()
+                    .matching(name)
+                    .let { if (point != null) it.within(radiusM, point) else it }
+                WebEditorJson.otherTracksSearch(
+                    items = held,
+                    from = from,
+                    message = when {
+                        held.isNotEmpty() -> "Could not reach the tracks service. Showing " +
+                            "${held.size} downloaded " + if (held.size == 1) "track." else "tracks."
+
+                        otherTracksCache.count() > 0 ->
+                            "Could not reach the tracks service, and nothing downloaded matches."
+
                         else -> result.message
                     },
                     capped = false
@@ -451,7 +546,7 @@ class WebEditorDocuments(
         private const val TOKEN_PARAM = WebEditorServer.TOKEN_PARAM
 
         /** How far around the phone "Near the phone" looks, when the page does not say. */
-        private const val DEFAULT_DOC_RADIUS_KM = 25.0
+        private const val DEFAULT_SEARCH_RADIUS_KM = 25.0
 
         /** The most tracks one import may carry: more than a page of them is a request to refuse. */
 

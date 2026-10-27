@@ -15,11 +15,16 @@ import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.distanceM
 import nz.mckenzie.trailday.domain.geo.ElevationProfile
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.other.OTHER_TRACK_FILTERS
+import nz.mckenzie.trailday.domain.other.OtherTrack
+import nz.mckenzie.trailday.domain.other.distanceM
 import nz.mckenzie.trailday.domain.track.TrackInterchange
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.drawingKind
 import nz.mckenzie.trailday.ui.docRowDetail
+import nz.mckenzie.trailday.ui.otherTrackRowDetail
+import nz.mckenzie.trailday.ui.otherTrackRowWhere
 
 /**
  * What the page is told about the work: the document behind `GET /api/state`, and what a write
@@ -171,7 +176,7 @@ object WebEditorJson {
                 kind = source.drawingKind().name,
                 colour = AssetColors.forKind(source.drawingKind()),
                 filters = source.filters.map { filter ->
-                    WebEditorDocFilter(field = filter.field, label = filter.label)
+                    WebEditorFilter(field = filter.field, label = filter.label)
                 },
                 rows = items.map { item ->
                     val distance = from?.let { fix -> item.distanceM(fix) }
@@ -185,6 +190,47 @@ object WebEditorJson {
                             item.filterValue(filter.field)?.let { value -> filter.field to value }
                         }.toMap(),
                         // The phone's own distance, so the desk's "nearest" order is the phone's.
+                        distanceM = distance
+                    )
+                },
+                message = message,
+                capped = capped
+            )
+        )
+
+    /**
+     * What a search of the national tracks dataset answers with.
+     *
+     * **The phone decides, the desk draws**, as DOC's answer does: which facts are worth filtering by, what
+     * each row says under its name, where it is and how far away it is are the phone's own answers, worked
+     * out by the same rules its own browser uses - so a laptop cannot come to show something about a council
+     * walkway that only makes sense about a DOC track, and the two surfaces cannot drift apart.
+     *
+     * There is no source and no tile to send: one dataset, and every row the same kind of thing.
+     */
+    fun otherTracksSearch(
+        items: List<OtherTrack>,
+        from: GeoPoint?,
+        message: String?,
+        capped: Boolean
+    ): String =
+        json.encodeToString(
+            WebEditorOtherTracksSearch.serializer(),
+            WebEditorOtherTracksSearch(
+                filters = OTHER_TRACK_FILTERS.map { filter ->
+                    WebEditorFilter(field = filter.field, label = filter.label)
+                },
+                rows = items.map { track ->
+                    val distance = from?.let { fix -> track.distanceM(fix) }
+                    WebEditorOtherTrackRow(
+                        id = track.globalId,
+                        name = track.name,
+                        detail = otherTrackRowDetail(track),
+                        where = otherTrackRowWhere(track),
+                        // Every answer the row has for each filter, not one: see WebEditorOtherTrackRow.
+                        values = OTHER_TRACK_FILTERS.associate { filter ->
+                            filter.field to track.filterValues(filter.field)
+                        },
                         distanceM = distance
                     )
                 },
@@ -440,10 +486,10 @@ data class WebEditorGpxRules(
  * these tracks are not on the phone yet: the desk has to be able to draw them, and ticking one has to
  * be able to make it without a second trip to DOC.
  */
-/** What a page of DOC's material can be narrowed by, as the phone's own browser narrows it. */
+/** What a page of somebody else's material can be narrowed by, as the phone's own browser narrows it. */
 @Serializable
-data class WebEditorDocFilter(
-    /** The fact's DOC field name, which is what a row's values are matched on. */
+data class WebEditorFilter(
+    /** The fact's own field name, which is what a row's values are matched on. */
     val field: String = "",
     /** The app's own words for it: "What it is", "How it is walked", "Bookable". */
     val label: String = ""
@@ -496,10 +542,52 @@ data class WebEditorDocSearch(
      */
     val kind: String = "",
     val colour: String = "",
-    val filters: List<WebEditorDocFilter> = emptyList(),
+    val filters: List<WebEditorFilter> = emptyList(),
     val rows: List<WebEditorDocRow> = emptyList(),
     val message: String? = null,
     val capped: Boolean = false
+)
+
+/**
+ * The answer to `GET /api/other-tracks`: what its rows can be narrowed by, the rows, and the phone's own
+ * word when there is one to say.
+ *
+ * **No source and no tile**, unlike DOC's answer: there is one dataset and every row is the same kind of
+ * thing, so a page has nothing to choose between and nothing to wear per row.
+ */
+@Serializable
+data class WebEditorOtherTracksSearch(
+    val filters: List<WebEditorFilter> = emptyList(),
+    val rows: List<WebEditorOtherTrackRow> = emptyList(),
+    val message: String? = null,
+    val capped: Boolean = false
+)
+
+/**
+ * One of somebody else's tracks, as the desk draws it.
+ *
+ * [id] is the service's own UUID as text rather than a number, because that is what it is: DOC numbers its
+ * rows, this dataset does not.
+ *
+ * [values] is a list per field rather than one value, which is the one place this differs from a DOC row. A
+ * track merged from several suppliers names all of them, and narrowing by a council means a track that
+ * council had a hand in - not only one where it happens to be named first. The desk's chips are built and
+ * matched from these, so they cannot offer a value no row has.
+ */
+@Serializable
+data class WebEditorOtherTrackRow(
+    val id: String = "",
+    val name: String = "",
+    /** What the phone says under the name: what it is, whether it is closed, and who publishes it. */
+    val detail: String = "",
+    /** Where the track is: the dataset's own locality and council area, when it has them. */
+    val where: String? = null,
+    val values: Map<String, List<String>> = emptyMap(),
+    /**
+     * The metres from the phone's own fix to the nearest point of this, or null when the phone has no fix.
+     * Worked out on the phone so the desk's "nearest" order is the phone's.
+     */
+    val distanceM: Double? = null
 )
 
 /** One thing a walker can pick, as the phone stores it and as the phone says it. */
