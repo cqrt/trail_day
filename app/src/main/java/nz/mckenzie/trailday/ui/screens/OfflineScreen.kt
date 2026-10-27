@@ -45,6 +45,7 @@ import nz.mckenzie.trailday.offline.OfflineArea
 import nz.mckenzie.trailday.offline.OfflinePack
 import nz.mckenzie.trailday.offline.docHeldWords
 import nz.mckenzie.trailday.offline.downloadProgressWords
+import nz.mckenzie.trailday.offline.otherTracksHeldWords
 import nz.mckenzie.trailday.offline.pictureCountWords
 import nz.mckenzie.trailday.viewmodel.OfflineViewModel
 
@@ -65,6 +66,7 @@ fun OfflineScreen(
     onOpenTab: (Tab) -> Unit = {},
     onChooseArea: () -> Unit,
     onChooseDocArea: () -> Unit,
+    onChooseOtherTracksArea: () -> Unit,
     onChooseTopoArea: () -> Unit
 ) {
     val stored by viewModel.stored.collectAsStateWithLifecycle()
@@ -74,6 +76,7 @@ fun OfflineScreen(
     val docDataCount by viewModel.docDataCount.collectAsStateWithLifecycle()
     val docCounts by viewModel.docCounts.collectAsStateWithLifecycle()
     val docPictures by viewModel.docPictures.collectAsStateWithLifecycle()
+    val otherTracksDataCount by viewModel.otherTracksDataCount.collectAsStateWithLifecycle()
     val topoSummary by viewModel.topoSummary.collectAsStateWithLifecycle()
     val topoAreas by viewModel.topoAreas.collectAsStateWithLifecycle()
     val download by DownloadState.current.collectAsStateWithLifecycle()
@@ -83,9 +86,11 @@ fun OfflineScreen(
     val imageryLive = download?.takeIf { it.pack == OfflinePack.IMAGERY }
     val topoLive = download?.takeIf { it.pack == OfflinePack.TOPOGRAPHY }
     val docLive = download?.takeIf { it.pack == OfflinePack.DOC }
+    val otherTracksLive = download?.takeIf { it.pack == OfflinePack.OTHER_TRACKS }
 
     var confirmingClearImagery by remember { mutableStateOf(false) }
     var confirmingClearDocData by remember { mutableStateOf(false) }
+    var confirmingClearOtherTracks by remember { mutableStateOf(false) }
     var confirmingClearTopo by remember { mutableStateOf(false) }
     var choosingDownload by remember { mutableStateOf(false) }
 
@@ -164,6 +169,28 @@ fun OfflineScreen(
             ) {
                 // No rows: DOC's material arrives by area and is counted as one thing, which is the whole
                 // point of it being one entry.
+            }
+
+            // The second publisher's tracks, on their own card: their own cache, their own download and
+            // their own Clear, because a walker clearing DOC's material has not asked to lose the tracks
+            // their own council publishes.
+            DownloadCard(
+                title = OfflinePack.OTHER_TRACKS.title,
+                icon = { AppIcon(glyph = IconGlyph.TRAIL, tint = MaterialTheme.colorScheme.primary) },
+                summary = otherTracksLive?.let { downloadProgressWords(it) }
+                    ?: if (otherTracksDataCount == 0) {
+                        "Nothing downloaded yet"
+                    } else {
+                        otherTracksHeldWords(otherTracksDataCount)
+                    },
+                progress = otherTracksLive?.let { it.percent / 100f },
+                progressLabel = null,
+                footnote = "Read offline by the map, beside DOC's material.",
+                error = null,
+                clearLabel = "Clear other tracks".takeIf { otherTracksDataCount > 0 },
+                onClear = { confirmingClearOtherTracks = true }
+            ) {
+                // No rows: this material arrives by area and is counted as one thing too.
             }
 
             // The drawn map: the other thing a walker can choose to keep, and the cheap one - vector
@@ -248,6 +275,17 @@ fun OfflineScreen(
                 ListItem(
                     modifier = Modifier.clickable {
                         choosingDownload = false
+                        onChooseOtherTracksArea()
+                    },
+                    headlineContent = { Text("Other tracks") },
+                    supportingContent = {
+                        Text("Tracks from councils, trusts and clubs, drawn on the map")
+                    },
+                    leadingContent = { AppIcon(glyph = IconGlyph.TRAIL) }
+                )
+                ListItem(
+                    modifier = Modifier.clickable {
+                        choosingDownload = false
                         onChooseTopoArea()
                     },
                     headlineContent = { Text("Topographic map") },
@@ -308,6 +346,32 @@ fun OfflineScreen(
             },
             dismissButton = {
                 TextButton(onClick = { confirmingClearDocData = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (confirmingClearOtherTracks) {
+        AlertDialog(
+            onDismissRequest = { confirmingClearOtherTracks = false },
+            title = { Text("Delete downloaded other tracks?") },
+            text = {
+                Text(
+                    "This removes the ${otherTracksHeldWords(otherTracksDataCount)} kept for offline " +
+                        "use. The map needs reception until an area is downloaded again. " +
+                        "DOC's material and your own places are not touched."
+                )
+            },
+            confirmButton = {
+                DestructiveTextButton(
+                    text = "Delete",
+                    onClick = {
+                        confirmingClearOtherTracks = false
+                        viewModel.clearOtherTracksData()
+                    }
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingClearOtherTracks = false }) { Text("Cancel") }
             }
         )
     }

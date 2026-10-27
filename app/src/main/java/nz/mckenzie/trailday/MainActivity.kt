@@ -57,7 +57,7 @@ import nz.mckenzie.trailday.web.WebEditorService
 import nz.mckenzie.trailday.web.WebEditorState
 
 /** Destinations for now; swap for a NavHost when routes need arguments. */
-private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, OFFLINE_TOPO_PICKER, OFFLINE_PICKER_AROUND, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC, DOC_DETAIL }
+private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, OFFLINE_OTHER_TRACKS_PICKER, OFFLINE_TOPO_PICKER, OFFLINE_PICKER_AROUND, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC, DOC_DETAIL }
 
 class MainActivity : ComponentActivity() {
 
@@ -367,6 +367,10 @@ class MainActivity : ComponentActivity() {
                                 offlinePickerVisit++
                                 destination = Destination.OFFLINE_DOC_PICKER
                             },
+                            onChooseOtherTracksArea = {
+                                offlinePickerVisit++
+                                destination = Destination.OFFLINE_OTHER_TRACKS_PICKER
+                            },
                             onChooseTopoArea = {
                                 offlinePickerVisit++
                                 destination = Destination.OFFLINE_TOPO_PICKER
@@ -395,6 +399,21 @@ class MainActivity : ComponentActivity() {
                             factory = OfflineAreaPickerViewModel.factory(
                                 applicationContext,
                                 OfflinePickerMode.DOC_DATA
+                            )
+                        )
+                        OfflineAreaPickerScreen(
+                            viewModel = pickerViewModel,
+                            onBack = { destination = Destination.OFFLINE },
+                            onSaved = { destination = Destination.OFFLINE }
+                        )
+                    }
+
+                    Destination.OFFLINE_OTHER_TRACKS_PICKER -> {
+                        val pickerViewModel: OfflineAreaPickerViewModel = viewModel(
+                            key = "offline-other-tracks-picker-$offlinePickerVisit",
+                            factory = OfflineAreaPickerViewModel.factory(
+                                applicationContext,
+                                OfflinePickerMode.OTHER_TRACKS
                             )
                         )
                         OfflineAreaPickerScreen(

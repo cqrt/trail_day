@@ -99,6 +99,8 @@ class OfflineAreaPickerTest {
             ),
             dao = db.offlineAreaDao()
         ),
+        // Nor the second publisher's cache: wired so the view model can be built.
+        otherTracksStore = OfflineOtherTrackStore(dao = db.offlineOtherTrackDao()),
         // This test is about the imagery area the picker stores.
         mode = OfflinePickerMode.IMAGERY
     )

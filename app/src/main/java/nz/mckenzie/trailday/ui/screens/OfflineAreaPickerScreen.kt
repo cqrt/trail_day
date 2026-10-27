@@ -74,6 +74,10 @@ fun OfflineAreaPickerScreen(
     val topoMessage by viewModel.topoMessage.collectAsStateWithLifecycle()
     val docInventory by viewModel.docInventory.collectAsStateWithLifecycle()
     val docCounting by viewModel.docCounting.collectAsStateWithLifecycle()
+    val otherTracksWorking by viewModel.otherTracksWorking.collectAsStateWithLifecycle()
+    val otherTracksMessage by viewModel.otherTracksMessage.collectAsStateWithLifecycle()
+    val otherTracksCount by viewModel.otherTracksCount.collectAsStateWithLifecycle()
+    val otherTracksCounting by viewModel.otherTracksCounting.collectAsStateWithLifecycle()
     val download by DownloadState.current.collectAsStateWithLifecycle()
 
     // What a download in flight is doing, in the words the notification uses. One sentence, read here and
@@ -100,6 +104,9 @@ fun OfflineAreaPickerScreen(
     // drawn Topographic map with the heights its shade comes from. Around a track is the first two.
     val keepsImagery = imagery || around
     val keepsDocData = viewModel.mode == OfflinePickerMode.DOC_DATA || around
+    // Somebody else's tracks are the second publisher's material, and their own cache: kept in one act
+    // that has nothing to do with DOC's, which is why this is not part of [keepsDocData].
+    val keepsOtherTracks = viewModel.mode == OfflinePickerMode.OTHER_TRACKS
     // A zoom range is what any pack of tiles is asked, and the imagery and the drawn map are both that.
     val keepsZooms = keepsImagery || topography
     // A name belongs to a pack that keeps **areas** - imagery, and the drawn map - because an area is a row
@@ -137,6 +144,7 @@ fun OfflineAreaPickerScreen(
                             OfflinePickerMode.DOC_DATA -> "Choose a DOC area"
                             OfflinePickerMode.TOPOGRAPHY -> "Choose an area to keep the map for"
                             OfflinePickerMode.AROUND_TRACK -> "Keep the ground around this track"
+                            OfflinePickerMode.OTHER_TRACKS -> "Choose an area for other tracks"
                         }
                     )
                 },
@@ -318,6 +326,40 @@ fun OfflineAreaPickerScreen(
                         }
                     }
 
+                    // What somebody else's tracks come to in the same box, asked before the button is
+                    // tapped. **A count rather than a size**: this service will not say what a box weighs,
+                    // and a figure the app made up would be worse than none.
+                    if (keepsOtherTracks) {
+                        val count = otherTracksCount
+                        Text(
+                            text = when {
+                                otherTracksCounting -> "Asking the tracks service what is in this box..."
+
+                                // No box and no answer are different things, and a walker told to draw a box
+                                // they have already drawn would draw it again.
+                                !draft.isComplete -> "Draw a box to see what tracks are inside it."
+
+                                count == null ->
+                                    "The tracks service could not be asked. Try again in a moment."
+
+                                count == 0 -> "There are no other tracks inside this box."
+
+                                count == 1 -> "1 track inside this box."
+
+                                else -> "$count tracks inside this box."
+                            },
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "The tracks councils, trusts and clubs publish inside the box are " +
+                                "downloaded and drawn on the map.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        otherTracksMessage?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+
                     // What a download in flight is doing, in the same words the notification uses. One line
                     // for every pack, in one place, so no mode can be the one that forgot to say.
                     live?.let {
@@ -327,7 +369,8 @@ fun OfflineAreaPickerScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
                             onClick = viewModel::clearCorners,
-                            enabled = draft.corners.isNotEmpty() && !working && !docWorking
+                            enabled = draft.corners.isNotEmpty() && !working && !docWorking &&
+                                !otherTracksWorking
                         ) { Text("Start over") }
                         Button(
                             onClick = viewModel::download,
@@ -336,6 +379,8 @@ fun OfflineAreaPickerScreen(
                                     !draft.isTooBig && !working && !docWorking
 
                                 topography -> draft.isComplete && !draft.isTooBig && !working
+
+                                keepsOtherTracks -> draft.isComplete && !otherTracksWorking
 
                                 else -> draft.isComplete && !docWorking
                             }
@@ -346,6 +391,8 @@ fun OfflineAreaPickerScreen(
                                     around -> "Keep the ground"
                                     topography && working -> "Downloading the map…"
                                     topography -> "Download the map"
+                                    keepsOtherTracks && otherTracksWorking -> "Downloading other tracks…"
+                                    keepsOtherTracks -> "Download other tracks"
                                     !imagery && docWorking -> "Downloading DOC data…"
                                     !imagery -> "Download DOC data"
                                     else -> "Download area"

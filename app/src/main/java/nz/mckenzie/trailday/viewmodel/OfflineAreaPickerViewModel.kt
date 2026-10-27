@@ -39,10 +39,12 @@ import nz.mckenzie.trailday.offline.OfflineAreaDraft
 import nz.mckenzie.trailday.offline.OfflineAreaManager
 import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.offline.OfflinePack
+import nz.mckenzie.trailday.offline.OfflineOtherTrackStore
 import nz.mckenzie.trailday.offline.OfflinePickerMode
 import nz.mckenzie.trailday.offline.TileServerHolder
 import nz.mckenzie.trailday.offline.docDownloadedMessage
 import nz.mckenzie.trailday.offline.groundAround
+import nz.mckenzie.trailday.offline.otherTracksDownloadedMessage
 import nz.mckenzie.trailday.offline.topoDownloadedMessage
 import nz.mckenzie.trailday.tracking.FusedLocationSource
 import nz.mckenzie.trailday.tracking.LocationSource
@@ -63,6 +65,14 @@ class OfflineAreaPickerViewModel(
     private val settings: SettingsRepository,
     /** The DOC tracks kept for offline use, downloaded for the box drawn here. */
     private val docStore: OfflineDocStore,
+    /**
+     * The tracks other people publish, kept for offline use, downloaded for the box drawn here.
+     *
+     * A second store rather than a second use of [docStore], because it is a second publisher's material
+     * in a second cache: a walker keeping their council's walkways is not keeping DOC's huts, and the two
+     * are downloaded, counted and cleared apart.
+     */
+    private val otherTracksStore: OfflineOtherTrackStore,
     /** The drawn map's own pack: its areas are named, listed and downloaded through it. */
     private val topography: OfflineAreaManager,
     /** Which pack this run is choosing an area for. */
@@ -180,6 +190,30 @@ class OfflineAreaPickerViewModel(
     /** True while DOC is being asked what is in the drawn box, so the screen can say so. */
     val docCounting: StateFlow<Boolean> = _docCounting
 
+    private val _otherTracksWorking = MutableStateFlow(false)
+    val otherTracksWorking: StateFlow<Boolean> = _otherTracksWorking
+
+    private val _otherTracksMessage = MutableStateFlow<String?>(null)
+
+    /** What the last download of somebody else's tracks kept, or why it could not be made. */
+    val otherTracksMessage: StateFlow<String?> = _otherTracksMessage
+
+    private val _otherTracksCount = MutableStateFlow<Int?>(null)
+
+    /**
+     * How many tracks the service says are in the box drawn, or null while there is no box or the answer
+     * is still coming.
+     *
+     * **A count rather than a size**, which is the one place this differs from DOC's inventory: this
+     * service will not say what a box weighs, and a figure the app made up would be worse than none.
+     */
+    val otherTracksCount: StateFlow<Int?> = _otherTracksCount
+
+    private val _otherTracksCounting = MutableStateFlow(false)
+
+    /** True while the service is being asked what is in the drawn box, so the screen can say so. */
+    val otherTracksCounting: StateFlow<Boolean> = _otherTracksCounting
+
     fun consumeSaved() {
         _saved.value = false
     }
@@ -240,6 +274,28 @@ class OfflineAreaPickerViewModel(
                     _docCounting.value = false
                 }
         }
+
+        // The same question of the second publisher, asked only when this run is about its tracks. The two
+        // services are asked separately because they are separate: a box drawn for DOC's material has no
+        // business asking anybody else what is in it, and this one is never asked for DOC's.
+        viewModelScope.launch {
+            _draft
+                .map { draft -> draft.plan(name = draft.name, fallbackName = "") }
+                .distinctUntilChanged()
+                .collectLatest { plan ->
+                    if (mode != OfflinePickerMode.OTHER_TRACKS || plan == null) {
+                        _otherTracksCount.value = null
+                        _otherTracksCounting.value = false
+                        return@collectLatest
+                    }
+                    _otherTracksCounting.value = true
+                    delay(INVENTORY_PAUSE_MS)
+                    _otherTracksCount.value = runCatching {
+                        otherTracksStore.inventory(plan.bounds)
+                    }.getOrNull()
+                    _otherTracksCounting.value = false
+                }
+        }
     }
 
     /** A tap on the map: the first corner, then the opposite one. */
@@ -277,6 +333,7 @@ class OfflineAreaPickerViewModel(
             OfflinePickerMode.DOC_DATA -> downloadDocData()
             OfflinePickerMode.TOPOGRAPHY -> downloadTopography()
             OfflinePickerMode.AROUND_TRACK -> downloadGround()
+            OfflinePickerMode.OTHER_TRACKS -> downloadOtherTracks()
         }
     }
 
@@ -465,6 +522,70 @@ class OfflineAreaPickerViewModel(
     }
 
     /**
+     * Downloads every track the service has in the box drawn here, so the map's second reference layer
+     * works with no reception.
+     *
+     * **Its own act rather than part of DOC's**, because it is somebody else's material: a walker planning
+     * a walk on their own council's walkways is not keeping DOC's huts, and the two caches are counted and
+     * cleared apart. Like DOC's, nothing here is an area record - this cache is the walker's own, held
+     * once, and two overlapping boxes end with one copy of a track rather than two.
+     */
+    private fun downloadOtherTracks() {
+        if (_otherTracksWorking.value) return
+        val current = _draft.value
+        val plan = current.plan(name = current.name, fallbackName = defaultName())
+        if (plan == null) {
+            _otherTracksMessage.value = "Tap two opposite corners on the map to choose the area."
+            return
+        }
+
+        viewModelScope.launch {
+            _otherTracksWorking.value = true
+            _otherTracksMessage.value = null
+            val startedAt = System.nanoTime()
+            try {
+                val download = otherTracksStore.download(plan.bounds) {
+                    reportOtherTracks(it, startedAt)
+                }
+                // A download that stopped short still kept what arrived, so the walker stays here and can
+                // read what came of it rather than being sent back with half an answer.
+                _otherTracksMessage.value = otherTracksDownloadedMessage(download)
+                _saved.value = download.tracks.isNotEmpty()
+            } catch (cancelled: CancellationException) {
+                // Leaving the screen is not a failure; what already arrived is kept.
+                throw cancelled
+            } catch (failure: Throwable) {
+                _otherTracksMessage.value = failure.message ?: "Download failed"
+            } finally {
+                _otherTracksWorking.value = false
+                DownloadState.clear()
+            }
+        }
+    }
+
+    /**
+     * Reports how a download of somebody else's tracks is going, in the words the offline screen and the
+     * notification use.
+     *
+     * **The total is the count the box was asked for**, which is the same answer the downloader cannot
+     * have: it pages until the service stops answering and never knows how many rows the box holds. A
+     * total of nothing simply leaves the sentence without one.
+     */
+    private fun reportOtherTracks(done: Int, startedAt: Long) {
+        DownloadState.report(
+            DownloadProgress(
+                pack = OfflinePack.OTHER_TRACKS,
+                unit = RECORD_UNIT,
+                phase = null,
+                done = done,
+                total = _otherTracksCount.value ?: 0,
+                bytes = 0L,
+                elapsedMs = (System.nanoTime() - startedAt) / 1_000_000
+            )
+        )
+    }
+
+    /**
      * Reports how a DOC download is going, in the words the offline screen and the notification use.
      *
      * **The totals are the inventory's.** The downloader pages until DOC stops answering and never knows
@@ -552,6 +673,11 @@ class OfflineAreaPickerViewModel(
                         docStore = OfflineDocStore(
                             dao = database.offlineDocItemDao(),
                             downloader = DocDownloader.online()
+                        ),
+                        // The tracks other people publish: its own cache, and no key or proxy between the
+                        // phone and the service.
+                        otherTracksStore = OfflineOtherTrackStore(
+                            dao = database.offlineOtherTrackDao()
                         ),
                         // The drawn map's own pack: its areas are named, listed and downloaded through the
                         // same manager imagery uses, which is what makes them resumable and countable.

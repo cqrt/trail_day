@@ -21,6 +21,7 @@ import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.offline.OfflineArea
 import nz.mckenzie.trailday.offline.OfflineAreaManager
 import nz.mckenzie.trailday.offline.OfflineDocStore
+import nz.mckenzie.trailday.offline.OfflineOtherTrackStore
 import nz.mckenzie.trailday.offline.OfflineTileStore
 import nz.mckenzie.trailday.offline.TileServerHolder
 import nz.mckenzie.trailday.offline.TileStoreSummary
@@ -39,7 +40,14 @@ class OfflineViewModel(
     /** The drawn map's pack: its own areas, listed on its own card. */
     private val topography: OfflineAreaManager,
     private val settings: SettingsRepository,
-    private val docStore: OfflineDocStore
+    private val docStore: OfflineDocStore,
+    /**
+     * The tracks other people publish, kept for offline use.
+     *
+     * Its own store beside DOC's, because it is a second publisher's cache: the two are counted and
+     * cleared apart, so a walker clearing DOC's material keeps their council's walkways.
+     */
+    private val otherTracksStore: OfflineOtherTrackStore
 ) : ViewModel() {
 
     /** The imagery areas on the device. Chosen elsewhere; managed here. */
@@ -76,6 +84,16 @@ class OfflineViewModel(
 
     /** How many things from DOC are kept for offline use, live from the database. All four services. */
     val docDataCount: StateFlow<Int> = docStore.observeCount()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
+
+    /**
+     * How many tracks other people publish are kept, live from the database.
+     *
+     * One number rather than DOC's breakdown by service, because there is one service: the dataset is a
+     * merge of many suppliers, but the app reads one layer of one of them and the walker's own question is
+     * how many tracks are on the phone.
+     */
+    val otherTracksDataCount: StateFlow<Int> = otherTracksStore.observeCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
 
     private val _docBounds = MutableStateFlow<LatLngBounds?>(null)
@@ -194,6 +212,18 @@ class OfflineViewModel(
         }
     }
 
+    /**
+     * Forgets every track other people publish. Costs nothing but the download.
+     *
+     * Its own action rather than part of [clearDocData], because it is somebody else's material: a walker
+     * clearing DOC's data has not asked to lose the tracks their own council publishes.
+     */
+    fun clearOtherTracksData() {
+        viewModelScope.launch {
+            runCatching { otherTracksStore.clear() }
+        }
+    }
+
     private fun refreshSummary() {
         viewModelScope.launch {
             _summary.value = runCatching { manager.summary() }.getOrDefault(TileStoreSummary(0, 0))
@@ -249,6 +279,11 @@ class OfflineViewModel(
                         docStore = OfflineDocStore(
                             dao = database.offlineDocItemDao(),
                             downloader = DocDownloader.online()
+                        ),
+                        // The tracks other people publish: its own cache, filled by its own picker and
+                        // drawn by the map's second reference layer.
+                        otherTracksStore = OfflineOtherTrackStore(
+                            dao = database.offlineOtherTrackDao()
                         )
                     )
                 }

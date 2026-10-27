@@ -33,5 +33,15 @@ enum class OfflinePickerMode {
      * track" - so the box arrives already drawn around the track's line and both caches are kept in one
      * act. See [AroundTrack].
      */
-    AROUND_TRACK
+    AROUND_TRACK,
+
+    /**
+     * The tracks other people publish - councils, regional councils, trail trusts and clubs - for the map's
+     * second reference layer to work with no reception.
+     *
+     * Its own mode rather than part of [DOC_DATA]'s, because it is a second publisher's material and a
+     * second cache: a walker planning a walk on their own council's walkways has no reason to pay for
+     * DOC's huts, and the two are counted and cleared apart on the offline screen.
+     */
+    OTHER_TRACKS
 }

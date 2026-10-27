@@ -104,3 +104,41 @@ private fun OtherTrack.toEntity(at: Long) = OfflineOtherTrackEntity(
     factsJson = DocFactsJson.write(facts),
     downloadedAtEpochMs = at
 )
+
+/**
+ * What is held of somebody else's tracks, in the walker's own terms: "412 tracks", "1 track".
+ *
+ * One place for the words, so the offline screen's card and the sentence a download earns cannot come to
+ * name the same thing differently.
+ */
+fun otherTracksHeldWords(count: Int): String =
+    if (count == 1) "1 track" else "$count tracks"
+
+/**
+ * The sentence a download of somebody else's tracks earns, in the walker's own terms.
+ *
+ * Three things can be true of it and all three are worth saying: what arrived, that the service stopped
+ * answering part-way, and that the box held more than one download keeps. The second is the part a walker
+ * would otherwise find out on the hill, where nothing can be fetched; the third is the difference between
+ * "that is all of it" and "that is as much as this keeps".
+ */
+fun otherTracksDownloadedMessage(download: OtherTracksDownloadResult): String {
+    val kept = download.tracks.size
+    val said = if (kept == 0) {
+        "Nothing was in that area."
+    } else {
+        "Kept ${otherTracksHeldWords(kept)}."
+    }
+
+    // The ceiling is the downloader's, and a box that reached it has more behind it. Said rather than
+    // silent, because a truncated download that reads as a complete one is the app telling a walker
+    // there is no track where there is one.
+    if (download is OtherTracksDownloadResult.Done && kept >= OtherTracksDownloader.MAX_TRACKS) {
+        return "$said That is as many as one download keeps: narrow the area for the rest."
+    }
+
+    return when (download) {
+        is OtherTracksDownloadResult.Done -> said
+        is OtherTracksDownloadResult.Failed -> "$said ${download.message}"
+    }
+}
