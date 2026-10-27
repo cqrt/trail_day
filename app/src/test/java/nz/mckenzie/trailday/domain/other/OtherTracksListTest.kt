@@ -155,6 +155,41 @@ class OtherTracksListTest {
     }
 
     @Test
+    fun `a reserve whose whole network carries one name is one row`() {
+        // Measured: "Thomsons Bush Walking Track" is 35 rows - the whole reserve's network, named once by
+        // the council. Thirty-four of them touch; one 607 m loop is 235 m from the rest, which is what a
+        // walker reported as "two instances".
+        val joined = listOf(thomsonsLoop, thomsonsNetwork).joinedByName()
+
+        assertEquals(1, joined.size)
+        assertEquals("nothing of the network is dropped", 2, joined.single().paths.size)
+    }
+
+    @Test
+    fun `the wide allowance is only for pieces one publisher made for one district`() {
+        // The same 235 m gap, the same name, but a different district: two reserves that happen to share a
+        // name, which is exactly what the wide allowance must not bridge.
+        val elsewhere = thomsonsLoop.copy(
+            facts = thomsonsLoop.facts + ("LocalAuthority" to "Napier City")
+        )
+
+        assertEquals(2, listOf(elsewhere, thomsonsNetwork).joinedByName().size)
+    }
+
+    @Test
+    fun `even one publisher's name does not reach across a kilometre`() {
+        // A council with two places called "Domain Walkway" keeps two rows: a kilometre is a neighbourhood,
+        // not a region.
+        val otherTown = thomsonsNetwork.copy(
+            paths = listOf(
+                listOf(GeoPoint(-46.38242, 168.38174), GeoPoint(-46.38262, 168.38215))
+            )
+        )
+
+        assertEquals(2, listOf(thomsonsLoop, otherTown).joinedByName().size)
+    }
+
+    @Test
     fun `two rows whose ends are a gap apart are not joined`() {
         // Five hundred metres: beyond any separation measured inside one walkway (the worst was 126 m), so
         // a same-named track that far away is a different walk.
@@ -294,6 +329,34 @@ class OtherTracksListTest {
         facts = arrayOf("Walk" to "3"),
         paths = listOf(listOf(GeoPoint(-46.44047, 168.36135), GeoPoint(-46.44073, 168.36101))),
         id = "k3"
+    )
+
+    /**
+     * The "Thomsons Bush" pair, with the service's own coordinates: the 607 m loop, and the network it
+     * belongs to but does not touch - 235 m away.
+     */
+    private val thomsonsLoop = track(
+        name = "Thomsons Bush Walking Track",
+        facts = arrayOf(
+            "Walk" to "98",
+            "DataSupplier" to "Environment Southland Regional Council",
+            "LocalAuthority" to "Invercargill City"
+        ),
+        paths = listOf(
+            listOf(GeoPoint(-46.38286, 168.36520), GeoPoint(-46.38290, 168.36560), GeoPoint(-46.38286, 168.36520))
+        ),
+        id = "t1"
+    )
+
+    private val thomsonsNetwork = track(
+        name = "Thomsons Bush Walking Track",
+        facts = arrayOf(
+            "Walk" to "98",
+            "DataSupplier" to "Environment Southland Regional Council",
+            "LocalAuthority" to "Invercargill City"
+        ),
+        paths = listOf(listOf(GeoPoint(-46.38242, 168.36174), GeoPoint(-46.38262, 168.36215))),
+        id = "t2"
     )
 
     private fun track(
