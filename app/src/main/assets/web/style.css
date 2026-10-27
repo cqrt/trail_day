@@ -961,7 +961,7 @@ main { flex: 1; display: flex; min-height: 0; position: relative; }
 #import:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }
 #import:disabled { background: var(--shade); color: var(--quiet); }
 
-#doc-open {
+.browse-open {
   padding: 10px 18px;
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
@@ -971,7 +971,7 @@ main { flex: 1; display: flex; min-height: 0; position: relative; }
   cursor: pointer;
 }
 
-#doc-open:hover { background: var(--state-soft); }
+.browse-open:hover { background: var(--state-soft); }
 
 /* The dialog is a card too, and its four services read as the phone's own chips. */
 #doc { border-radius: var(--radius); }

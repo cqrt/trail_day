@@ -136,6 +136,22 @@ const { docSearchNote, docSearchPath, docShowing, docValuesOf } = await import(
 );
 
 /**
+ * The tracks other people publish, browsed through the phone: the query a search is, and the page of rows
+ * it answers with.
+ *
+ * The same shape as DOC's module above, and loaded the same way - with the token in its own address, which
+ * is why it stands alone rather than importing a sibling.
+ */
+const {
+  otherTracksNote,
+  otherTracksSearchPath,
+  otherTracksShowing,
+  otherTracksValuesOf
+} = await import(
+  TOKEN ? `./other-tracks.mjs?k=${encodeURIComponent(TOKEN)}` : './other-tracks.mjs'
+);
+
+/**
  * The browser's own store, or null when this browser will not hand one over.
  *
  * Reading `window.localStorage` is itself a thing that can throw - a browser with storage switched off
@@ -173,7 +189,7 @@ themeButton.addEventListener('click', () => {
   // The tiles are pictures the phone draws per theme, so a theme change asks for them again - as
   // does the DOC dialog's page, which is the same pictures.
   drawList();
-  if (docRows.length) drawDocList();
+  if (browseRows.length) drawBrowseList();
 });
 
 applyTheme(recallTheme(browserStore()));
@@ -924,73 +940,134 @@ async function importGpxFile(file) {
 }
 
 /**
- * What DOC publishes, read through the phone: four services, searched and narrowed.
+ * The two browsers this dialog is: DOC's material, and the tracks other people publish.
  *
- * **The phone does the asking.** The page never reaches DOC itself: it says which of the four services
- * to read, a name and a place, and the phone asks DOC and hands back a page of rows. And **nothing is
- * written**: a DOC thing is not one of the walker's places - what is out there reaches the phone as the
- * map's own layer - so this dialog is a way of reading, not of adding.
+ * **One dialog rather than two**, because they are one screen's worth of questions - a name, a place, a
+ * filter, an order - and a walker who has used one has used the other. What differs between them is small
+ * enough to be a table: which address to ask, which rules narrow and order the answer, what the dialog is
+ * called, and whether a row wears a tile and says where it is.
  *
- * The page decides three things: which service is asked, which rows survive the filters, and the order.
- * Everything else is the phone's - the words, the facts, the distances and the list of services all
- * arrive in the answer - so a laptop cannot come to say about a hut what only makes sense about a track.
+ * Everything else is the **phone's** answer - the words, the facts, the distances, and which facts are worth
+ * filtering by - so a laptop cannot come to say about a council walkway what only makes sense about a DOC
+ * hut.
  */
-let docRows = [];
+const BROWSERS = {
+  doc: {
+    title: 'From DOC',
+    hint: 'What the Department of Conservation publishes: its tracks, huts, campsites and bike trails. ' +
+      'The phone does the searching, and nothing here is saved to your places.',
+    path: docSearchPath,
+    note: docSearchNote,
+    valuesOf: docValuesOf,
+    showing: docShowing,
+    sources: true,
+    tile: true,
+    where: false
+  },
+  other: {
+    title: 'Other tracks',
+    hint: 'Tracks published by councils, trail trusts and clubs, gathered by the Outdoor Access ' +
+      'Commission. The phone does the searching, and nothing here is saved to your places.',
+    path: otherTracksSearchPath,
+    note: otherTracksNote,
+    valuesOf: otherTracksValuesOf,
+    showing: otherTracksShowing,
+    sources: false,
+    tile: false,
+    where: true
+  }
+};
+
+/** Which of the two the dialog is in, and the table entry for it. */
+let browse = 'doc';
+
+function browseMode() {
+  return BROWSERS[browse] || BROWSERS.doc;
+}
+
+let browseRows = [];
+/** Which of DOC's services is being read. DOC's own answer, so only DOC's browser has one. */
 let docSource = '';
-let docFilters = [];
+let browseFilters = [];
 let docKind = '';
 let docColour = '';
-const docChosen = new Map();
-let docSort = 'nearest';
+const browseChosen = new Map();
+let browseSort = 'nearest';
 
-function openDoc() {
+/**
+ * Opens the dialog as one of the two browsers.
+ *
+ * The last search's rows go when the dialog changes hands: a page of DOC's huts under the other publisher's
+ * filters would be a page narrowed by a question it never answered.
+ */
+function openBrowser(which) {
+  if (which && which !== browse) {
+    browse = which;
+    browseRows = [];
+    browseFilters = [];
+    browseChosen.clear();
+  }
+  const mode = browseMode();
+  field('doc-title').textContent = mode.title;
+  field('doc-hint').textContent = mode.hint;
   field('doc-overlay').hidden = false;
   field('doc-words').hidden = true;
   field('doc-words').textContent = '';
   field('doc-controls').hidden = true;
-  drawDocSources();
+  drawBrowseSources();
+  // The rows are redrawn as well as cleared: a dialog that opened on the other publisher's rows would be
+  // showing a page nobody asked this one for, and clearing the state alone does not take them off the page.
+  drawBrowseFilters();
+  drawBrowseList();
   field('doc-name').focus();
 }
 
-function closeDoc() {
+function closeBrowser() {
   field('doc-overlay').hidden = true;
 }
 
 /**
- * The four services, in the phone's own words for them.
+ * DOC's four services, in the phone's own words for them - or nothing at all for the publisher that
+ * publishes one thing.
  *
  * Built from the state document rather than written here, for the reason this page reads every other
  * vocabulary from the phone: a list kept here is a second copy to keep in step, and which services DOC
  * publishes is the phone's own business.
  */
-function drawDocSources() {
+function drawBrowseSources() {
+  const container = field('doc-sources');
+  if (!browseMode().sources) {
+    container.replaceChildren();
+    container.hidden = true;
+    return;
+  }
   const sources = state.docSources || [];
   if (!docSource && sources.length > 0) docSource = sources[0].value;
-  docOrders(
-    field('doc-sources'),
+  orderGroup(
+    container,
     'What DOC publishes',
     sources.map((one) => ({ value: one.value, label: one.label })),
     docSource,
-    chooseDocSource
+    chooseBrowseSource
   );
 }
 
 /** Reads another of DOC's services: the last page's rows and filters were about a different thing. */
-function chooseDocSource(value) {
+function chooseBrowseSource(value) {
   docSource = value;
-  docRows = [];
-  docFilters = [];
-  docChosen.clear();
+  browseRows = [];
+  browseFilters = [];
+  browseChosen.clear();
   field('doc-words').hidden = true;
-  drawDocFilters();
-  drawDocList();
+  drawBrowseFilters();
+  drawBrowseList();
 }
 
-async function searchDoc() {
+async function searchBrowse() {
   const nearWanted = field('doc-near').checked;
   const viewWanted = field('doc-view').checked;
   const near = nearWanted && state ? state.position : null;
-  const bounds = viewWanted ? docMapBounds() : null;
+  const bounds = viewWanted ? browseMapBounds() : null;
 
   if (nearWanted && !near) {
     showNotice('The phone has not said where it is yet. Try again in a moment, or search by name.');
@@ -1009,19 +1086,19 @@ async function searchDoc() {
   button.disabled = true;
   try {
     const answer = await getJson(
-      docSearchPath(field('doc-name').value, near, bounds, field('doc-radius').value, docSource)
+      browseMode().path(field('doc-name').value, near, bounds, field('doc-radius').value, docSource)
     );
-    docRows = answer.rows || [];
-    docFilters = answer.filters || [];
+    browseRows = answer.rows || [];
+    browseFilters = answer.filters || [];
     // The phone's own tile for this service, and the colour under it - one per page, because a page of
     // DOC's material is one of its services.
     docKind = answer.kind || '';
     docColour = answer.colour || '';
     // A new set of results, so a filter from the last search is not carried onto it.
-    docChosen.clear();
-    drawDocFilters();
-    drawDocList();
-    const words = docSearchNote(answer);
+    browseChosen.clear();
+    drawBrowseFilters();
+    drawBrowseList();
+    const words = browseMode().note(answer);
     field('doc-words').textContent = words;
     field('doc-words').hidden = words === '';
   } catch (error) {
@@ -1032,7 +1109,7 @@ async function searchDoc() {
 }
 
 /** The desk map's own view as a box, or null while the map is still opening. */
-function docMapBounds() {
+function browseMapBounds() {
   const bounds = map && typeof map.getBounds === 'function' ? map.getBounds() : null;
   if (!bounds) return null;
   return {
@@ -1052,36 +1129,36 @@ function docMapBounds() {
  * keeping its own idea of DOC's taxonomy. The values in a group are the ones the rows actually carry,
  * so a filter can never offer a choice that matches nothing.
  */
-function drawDocFilters() {
+function drawBrowseFilters() {
   const container = field('doc-filters');
   container.replaceChildren();
-  field('doc-controls').hidden = docRows.length === 0;
-  if (docRows.length === 0) return;
+  field('doc-controls').hidden = browseRows.length === 0;
+  if (browseRows.length === 0) return;
 
-  for (const filter of docFilters) {
-    const values = docValuesOf(docRows, filter.field);
+  for (const filter of browseFilters) {
+    const values = browseMode().valuesOf(browseRows, filter.field);
     if (values.length === 0) continue;
     const group = document.createElement('div');
     group.className = 'doc-choices';
-    docChoices(group, filter.label, values, docChosen.get(filter.field) || new Set(), (value) => {
-      const chosen = docChosen.get(filter.field) || new Set();
+    choiceGroup(group, filter.label, values, browseChosen.get(filter.field) || new Set(), (value) => {
+      const chosen = browseChosen.get(filter.field) || new Set();
       if (chosen.has(value)) chosen.delete(value);
       else chosen.add(value);
-      docChosen.set(filter.field, chosen);
+      browseChosen.set(filter.field, chosen);
     });
     container.append(group);
   }
 
-  docOrders(
+  orderGroup(
     field('doc-sort'),
     null,
     [
       { value: 'nearest', label: 'Nearest to phone' },
       { value: 'name', label: 'Name' }
     ],
-    docSort,
+    browseSort,
     (value) => {
-      docSort = value;
+      browseSort = value;
     }
   );
 }
@@ -1090,12 +1167,12 @@ function drawDocFilters() {
  * One labelled group of tickable choices: a small sub-heading naming what they are, then a checkbox per
  * choice. An empty group is hidden rather than shown as a heading over nothing.
  */
-function docChoices(container, tag, choices, chosen, onToggle) {
+function choiceGroup(container, tag, choices, chosen, onToggle) {
   container.replaceChildren();
   container.hidden = choices.length === 0;
   if (choices.length === 0) return;
 
-  container.append(docSub(tag));
+  container.append(groupHeading(tag));
   for (const choice of choices) {
     const label = document.createElement('label');
     label.className = 'doc-choice';
@@ -1104,8 +1181,8 @@ function docChoices(container, tag, choices, chosen, onToggle) {
     box.checked = chosen.has(choice);
     box.addEventListener('change', () => {
       onToggle(choice);
-      drawDocFilters();
-      drawDocList();
+      drawBrowseFilters();
+      drawBrowseList();
     });
     const text = document.createElement('span');
     text.textContent = choice;
@@ -1115,10 +1192,10 @@ function docChoices(container, tag, choices, chosen, onToggle) {
 }
 
 /** One labelled group of orders: radios, because only one order can be on. */
-function docOrders(container, tag, orders, chosen, onChoose) {
+function orderGroup(container, tag, orders, chosen, onChoose) {
   container.replaceChildren();
   container.hidden = orders.length === 0;
-  if (tag) container.append(docSub(tag));
+  if (tag) container.append(groupHeading(tag));
   for (const order of orders) {
     const label = document.createElement('label');
     label.className = 'doc-choice';
@@ -1128,8 +1205,8 @@ function docOrders(container, tag, orders, chosen, onChoose) {
     radio.checked = order.value === chosen;
     radio.addEventListener('change', () => {
       onChoose(order.value);
-      drawDocFilters();
-      drawDocList();
+      drawBrowseFilters();
+      drawBrowseList();
     });
     const text = document.createElement('span');
     text.textContent = order.label;
@@ -1139,7 +1216,7 @@ function docOrders(container, tag, orders, chosen, onChoose) {
 }
 
 /** A small sub-heading inside a group: which part of DOC's answer the choices below are. */
-function docSub(text) {
+function groupHeading(text) {
   const span = document.createElement('span');
   span.className = 'doc-sub';
   span.textContent = text;
@@ -1147,24 +1224,26 @@ function docSub(text) {
 }
 
 /** The chosen values as the plain `field: [values]` the page's own filtering reads. */
-function docChosenNow() {
+function browseChosenNow() {
   const plain = {};
-  for (const [field, values] of docChosen) plain[field] = [...values];
+  for (const [field, values] of browseChosen) plain[field] = [...values];
   return plain;
 }
 
-function drawDocList() {
+function drawBrowseList() {
   const list = field('doc-list');
   list.replaceChildren();
   // Filtered and ordered on the page, from the phone's own distances: changing a filter narrows what is
   // already here rather than asking DOC again.
-  for (const row of docShowing(docRows, docChosenNow(), docSort)) {
+  const mode = browseMode();
+  for (const row of mode.showing(browseRows, browseChosenNow(), browseSort)) {
     const line = document.createElement('div');
     line.className = 'doc-row';
 
     // DOC's own kind for the service, from the phone: every row of a page wears the same tile, because a
-    // page is one of the four services.
-    if (docKind) line.append(kindTile(docKind, docColour));
+    // page is one of the four services. Somebody else's tracks wear none: every row there is the same kind
+    // of thing, so a tile on each would be a mark that distinguishes nothing.
+    if (mode.tile && docKind) line.append(kindTile(docKind, docColour));
 
     const words = document.createElement('span');
     words.className = 'words';
@@ -1173,13 +1252,23 @@ function drawDocList() {
     name.className = 'name';
     name.textContent = row.name;
 
-    // The phone's own line about the row - what it is, what DOC says about it, how far away it is - so
-    // the desk reads exactly what the phone would read about the same thing.
+    // The phone's own line about the row - what it is, who publishes it, how far away it is - so the desk
+    // reads exactly what the phone would read about the same thing.
     const meta = document.createElement('span');
     meta.className = 'detail';
     meta.textContent = row.detail;
 
     words.append(name, meta);
+
+    // And where it is, for the publisher whose rows have a place: a council walkway is found by its suburb
+    // or its district, and the phone's own browser says so on the row too.
+    if (mode.where && row.where) {
+      const where = document.createElement('span');
+      where.className = 'detail';
+      where.textContent = row.where;
+      words.append(where);
+    }
+
     line.append(words);
     list.append(line);
   }
@@ -1433,17 +1522,18 @@ document.getElementById('import-file').addEventListener('change', (event) => {
  * on a press inside it, which is the walker working. The press, not the click: a click's target is
  * the nearest parent its press and its release share, so a drag that left the dialog would close it.
  */
-document.getElementById('doc-open').addEventListener('click', openDoc);
-document.getElementById('doc-close').addEventListener('click', closeDoc);
+document.getElementById('doc-open').addEventListener('click', () => openBrowser('doc'));
+document.getElementById('other-open').addEventListener('click', () => openBrowser('other'));
+document.getElementById('doc-close').addEventListener('click', closeBrowser);
 document.getElementById('doc-overlay').addEventListener('mousedown', (event) => {
-  if (event.target.id === 'doc-overlay') closeDoc();
+  if (event.target.id === 'doc-overlay') closeBrowser();
 });
-document.getElementById('doc-search').addEventListener('click', searchDoc);
+document.getElementById('doc-search').addEventListener('click', searchBrowse);
 document.getElementById('doc-name').addEventListener('keydown', (event) => {
   // Enter searches, as it saves everywhere else on this page: the field is the whole question.
   if (event.key === 'Enter') {
     event.preventDefault();
-    searchDoc();
+    searchBrowse();
   }
 });
 // The two "where" answers are one answer: turning one on turns the other off, so a search never
@@ -1509,7 +1599,7 @@ window.addEventListener('keydown', (event) => {
   // The DOC dialog is the topmost thing when it is open, so its Escape goes first - a dialog closes
   // on Escape before anything behind it is thought about.
   if (!field('doc-overlay').hidden) {
-    closeDoc();
+    closeBrowser();
     return;
   }
   // Escape backs out of the form next: it is on top, and it is the one with unsaved typing in it.

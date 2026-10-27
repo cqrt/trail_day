@@ -43,13 +43,14 @@
         <!-- The picker itself: opened by the button above, and never shown. -->
         <input id="import-file" type="file" accept=".gpx,.kml,.kmz,.geojson,.json,application/gpx+xml,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/geo+json,application/json" hidden>
         <!--
-          What DOC publishes, read through the phone. A way of *reading* rather than of adding: DOC's
-          material is the map's own layer rather than a place of the walker's, so nothing here is
-          imported and nothing is written. It is a dialog rather than a block in the sidebar because it
-          is read once and closed, and because a list of rows wants the width and the height the 460px
-          sidebar could not give it.
+          The two browsers, read through the phone. A way of *reading* rather than of adding: what these
+          two publish is the map's own layer rather than a place of the walker's, so nothing here is
+          imported and nothing is written. They share one dialog because they are one screen's worth of
+          questions - a name, a place, a filter, an order - and it is read once and closed. See `BROWSERS`
+          in `app.js` for the few things that differ between them.
         -->
-        <button id="doc-open" type="button">From DOC</button>
+        <button id="doc-open" class="browse-open" type="button">From DOC</button>
+        <button id="other-open" class="browse-open" type="button">Other tracks</button>
       </div>
 
       <!--
@@ -78,19 +79,19 @@
   </main>
 
   <!--
-    DOC's track network, browsed through the phone, in a dialog over the work. A name and a place are
-    the whole question, and the phone answers both. It is a dialog rather than a block in the sidebar
-    because it is a way of bringing work in - read once and closed - and because a list of tracks
-    wants the width and the height the 460px sidebar could not give it. The search and the filters
-    stand in a column; the list takes three quarters of the dialog and all of its height. The overlay
-    dims the page behind, and Escape, the corner or a press on the dimmed page closes it. Hidden until
-    the sidebar button opens it.
+    The two browsers, over the work in one dialog: DOC's material, and the tracks other people publish. A
+    name and a place are the whole question, and the phone answers both. It is a dialog rather than a block
+    in the sidebar because it is a way of reading somebody else's work - read once and closed - and because
+    a list of rows wants the width and the height the 460px sidebar could not give it. The search and the
+    filters stand in a column; the list takes three quarters of the dialog and all of its height. The
+    overlay dims the page behind, and Escape, the corner or a press on the dimmed page closes it. Hidden
+    until one of the two sidebar buttons opens it.
   -->
   <div id="doc-overlay" hidden>
     <section id="doc" role="dialog" aria-labelledby="doc-title">
       <div class="doc-head">
         <h2 id="doc-title">From DOC</h2>
-        <p class="hint">What the Department of Conservation publishes: its tracks, huts, campsites and bike trails. The phone
+        <p class="hint" id="doc-hint">What the Department of Conservation publishes: its tracks, huts, campsites and bike trails. The phone
           does the searching, and nothing here is saved to your places.</p>
         <p id="doc-words" hidden></p>
         <button id="doc-close" type="button" aria-label="Close">&times;</button>
