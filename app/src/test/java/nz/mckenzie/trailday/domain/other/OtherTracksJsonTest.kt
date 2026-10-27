@@ -72,15 +72,24 @@ class OtherTracksJsonTest {
 
     @Test
     fun `the placeholder is a value rather than a name, however it is spelled`() {
-        // 2,970 rows of the dataset say this in the name field. It is not a name, and a list of rows all
-        // called "Unnamed Track" tells the walker nothing.
-        listOf("Unnamed Track", "unnamed track", "UNNAMED TRACK").forEach { placeholder ->
+        // Measured: 2,610 rows of the app's set say "Unnamed Track", 652 say exactly "Track" and 22 say
+        // "Track 7" and the like. It is not a name, and a list of rows all called "Track" tells the
+        // walker nothing.
+        listOf("Unnamed Track", "unnamed track", "UNNAMED TRACK", "Track", "track", "Track 7").forEach { placeholder ->
             assertEquals(
-                "\"$placeholder\" is the placeholder, not a name",
+                "\"$placeholder\" is a placeholder, not a name",
                 "Richmond",
                 OtherTracksJson.parse(feature(name = placeholder, locality = "Richmond")).single().name
             )
         }
+    }
+
+    @Test
+    fun `a name that merely starts with the placeholder is a name`() {
+        // Anchored, so a track genuinely called "Trackway" keeps the name it was given.
+        val track = OtherTracksJson.parse(feature(name = "Trackway", locality = "Richmond")).single()
+
+        assertEquals("Trackway", track.name)
     }
 
     @Test

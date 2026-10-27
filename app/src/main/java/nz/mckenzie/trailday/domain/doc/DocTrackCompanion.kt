@@ -1,6 +1,7 @@
 package nz.mckenzie.trailday.domain.doc
 
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.text.PlainText
 import nz.mckenzie.trailday.domain.track.GeoJsonParser
 
 /**
@@ -105,7 +106,7 @@ object DocCompanionJson {
             DocCompanion(
                 name = name,
                 point = feature.point,
-                introduction = facts["introduction"]?.let(DocText::plain),
+                introduction = facts["introduction"]?.let(PlainText::plain),
                 difficulty = facts["difficulty"]?.trim()?.takeIf { it.isNotEmpty() },
                 completionTime = facts["completionTime"]?.trim()?.takeIf { it.isNotEmpty() },
                 webPage = facts["walkingAndTrampingWebPage"]?.trim()?.takeIf { it.isNotEmpty() },

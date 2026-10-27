@@ -6,7 +6,7 @@ import nz.mckenzie.trailday.domain.doc.DocAlert
 import nz.mckenzie.trailday.domain.doc.DocAlertsState
 import nz.mckenzie.trailday.domain.doc.DocCompanionJson
 import nz.mckenzie.trailday.domain.doc.DocItem
-import nz.mckenzie.trailday.domain.doc.DocText
+import nz.mckenzie.trailday.domain.text.PlainText
 import nz.mckenzie.trailday.domain.doc.DocTrackCompanion
 import nz.mckenzie.trailday.domain.doc.DocTrackCompanions
 import nz.mckenzie.trailday.domain.doc.DocTrackNames
@@ -158,7 +158,7 @@ internal object DocAlertsParser {
                 ?: objectOf.text("subText")
             DocAlert(
                 title = title,
-                detail = detail?.let(DocText::plain),
+                detail = detail?.let(PlainText::plain),
                 date = objectOf.text("displayDate") ?: objectOf.text("sortDate")
             )
         }.distinctBy { it.title to it.detail }

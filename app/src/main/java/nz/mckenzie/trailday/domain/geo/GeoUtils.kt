@@ -82,6 +82,23 @@ fun distanceToPolylineMeters(point: GeoPoint, polyline: List<GeoPoint>): Double 
 }
 
 /**
+ * How far [point] is from the nearest of [paths], in metres - or null when there is nothing to measure.
+ *
+ * **One rule for every published line in the app.** A thing with several paths is as near as its nearest
+ * one, which is what the eye means by "on the track": a side track hanging off a route does not make the
+ * route look distant, and a track published in pieces is near where any of its pieces is.
+ *
+ * Here rather than beside either publisher's model, because both ask it: DOC's card measures its material
+ * with it, and the tap that decides whether a line under the finger is DOC's or a council's measures both
+ * with the same function - which is what stops two answers to one question.
+ */
+fun nearestPathDistanceMeters(paths: List<List<GeoPoint>>, point: GeoPoint): Double? =
+    paths
+        .filter { it.isNotEmpty() }
+        .minOfOrNull { path -> distanceToPolylineMeters(point, path) }
+        ?.takeIf { it.isFinite() }
+
+/**
  * Where a tap landed on a line: the place itself, and the vertex index it goes in before.
  *
  * [indexAfter] is the index a caller would insert at to put [point] into the path, so the caller does not

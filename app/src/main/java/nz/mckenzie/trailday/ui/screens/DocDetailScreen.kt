@@ -1,22 +1,12 @@
 package nz.mckenzie.trailday.ui.screens
 
 import android.graphics.BitmapFactory
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -32,14 +22,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.doc.DocAlert
 import nz.mckenzie.trailday.domain.doc.DocAlertsState
 import nz.mckenzie.trailday.domain.doc.DocItem
@@ -49,7 +36,6 @@ import nz.mckenzie.trailday.domain.tiles.withMinimumSpan
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.map.DocGeoJson
-import nz.mckenzie.trailday.map.drawingKind
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.viewmodel.DocDetailViewModel
 
@@ -64,7 +50,6 @@ import nz.mckenzie.trailday.viewmodel.DocDetailViewModel
  * **Only sections with something in them are drawn.** A missing facilities line or an empty
  * accessibility note is not a reason to leave a blank card.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DocDetailScreen(
     viewModel: DocDetailViewModel,
@@ -79,10 +64,6 @@ fun DocDetailScreen(
     val uriHandler = LocalUriHandler.current
 
     val bounds = remember(item) { docBounds(item) }
-    // The map at the top is a **preview**: it cannot be dragged or pinched, because a drag on it is how
-    // the walker moves the page under it and a pinch is a gesture on a picture. Looking closer at the line
-    // is still a fair thing to want, so it is given the two buttons instead.
-    val zoom = rememberMapZoomState()
     val geoJson = remember(item, bike) {
         DocGeoJson.build(
             items = listOf(item),
@@ -120,13 +101,7 @@ fun DocDetailScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // The map is the top of the page and does not scroll away: the line or place is what the
-            // page is about, and it stays in front of the walker while the words below it move.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(250.dp)
-            ) {
+            ReferenceMapTop(basemap = basemap, onBack = onBack) { modifier, zoom ->
                 BasemapView(
                     basemap = basemap,
                     assetGeoJson = AssetGeoJson.build(emptyList()),
@@ -136,64 +111,25 @@ fun DocDetailScreen(
                     fitBoundsMaxZoom = 16.0,
                     // Room for the credit strip along the foot, so the line is never under it.
                     fitBoundsPaddingPx = 150,
-                    // A picture of one thing, not a place to explore: every gesture off, and the zoom
-                    // given to the buttons on the right instead.
+                    // A preview rather than a map: it cannot be dragged or pinched, because a drag on it
+                    // is how the walker moves the page under it and a pinch is a gesture on a picture.
+                    // Looking closer at the line is still a fair thing to want, so it is given the two
+                    // buttons instead.
                     interactive = false,
                     zoomStep = zoom.step,
                     zoomCount = zoom.count,
                     // Where the map settled, which is the only thing that knows what level the keys have
                     // brought it to. The fit's own level arrives the same way, a moment after it opens.
                     onCameraIdle = { _, _, level -> zoom.reported(level) },
-                    modifier = Modifier.fillMaxSize()
-                )
-                RoundIconButton(
-                    glyph = IconGlyph.BACK,
-                    description = "Back",
-                    onClick = onBack,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(12.dp)
-                )
-                MapZoomButtons(
-                    zoom = zoom,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = KEY_EDGE_PADDING)
-                )
-                AttributionStrip(
-                    basemap = basemap,
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(start = 6.dp, bottom = 28.dp)
+                    modifier = modifier
                 )
             }
 
-            // The information scrolls inside its own viewport, under the map. Its top edge is square, as on
-            // a place's page and a trip's page.
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp)
-                    .padding(top = 16.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
+            ReferencePageBody {
                 DocHeader(item = item)
                 DocChips(item = item, bike = bike)
 
-                if (photo != null) {
-                    Image(
-                        bitmap = photo,
-                        contentDescription = item.name,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                    )
-                }
+                photo?.let { ReferencePicture(picture = it, description = item.name) }
 
                 item.introduction?.let { intro ->
                     Text(text = intro, style = MaterialTheme.typography.bodyMedium)
@@ -219,15 +155,15 @@ fun DocDetailScreen(
 
                 val facts = remember(item, bike) { docFacts(item, bike) }
                 if (facts.isNotEmpty()) {
-                    DocSectionLabel("At a glance")
-                    DocFactGrid(facts)
+                    ReferenceSectionLabel("At a glance")
+                    ReferenceFactGrid(facts)
                 }
 
-                DocTextSection("Accessibility", item.wheelchairsAndBuggies)
-                DocTextSection("Getting there", item.access)
-                DocTextSection("Nearby facilities", item.facilities)
-                DocTextSection("Activities", item.activities)
-                DocTextSection("Landscape", item.landscape)
+                ReferenceTextSection("Accessibility", item.wheelchairsAndBuggies)
+                ReferenceTextSection("Getting there", item.access)
+                ReferenceTextSection("Nearby facilities", item.facilities)
+                ReferenceTextSection("Activities", item.activities)
+                ReferenceTextSection("Landscape", item.landscape)
 
                 if (link != null) {
                     TextButton(
@@ -267,79 +203,28 @@ private fun DocHeader(item: DocItem) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DocChips(item: DocItem, bike: DocItem?) {
     val chips = buildList {
-        (item.kind ?: item.category)?.let { add(it to DocChipTone.Kind) }
-        item.difficulty?.let { add(it to DocChipTone.Good) }
-        item.trackType?.let { add(it to DocChipTone.Neutral) }
-        (item.completionTime ?: item.walkingDuration)?.let { add(it to DocChipTone.Neutral) }
+        (item.kind ?: item.category)?.let { add(it to ReferenceChipTone.Kind) }
+        item.difficulty?.let { add(it to ReferenceChipTone.Good) }
+        item.trackType?.let { add(it to ReferenceChipTone.Neutral) }
+        (item.completionTime ?: item.walkingDuration)?.let { add(it to ReferenceChipTone.Neutral) }
         item.status?.let {
             val open = it.equals("open", ignoreCase = true)
-            add(it to if (open) DocChipTone.Good else DocChipTone.Bad)
+            add(it to if (open) ReferenceChipTone.Good else ReferenceChipTone.Bad)
         }
         if (bike != null || item.source == DocSource.BIKES) {
-            add("Bike-friendly" to DocChipTone.Kind)
+            add("Bike-friendly" to ReferenceChipTone.Kind)
         }
     }
-    if (chips.isEmpty()) return
-
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        chips.forEach { (text, tone) -> DocChip(text = text, tone = tone) }
-    }
+    ReferenceChipRow(chips)
 }
 
-private enum class DocChipTone { Kind, Good, Bad, Neutral }
-
-@Composable
-private fun DocChip(text: String, tone: DocChipTone) {
-    val colors = when (tone) {
-        DocChipTone.Kind -> MaterialTheme.colorScheme.primaryContainer to
-            MaterialTheme.colorScheme.onPrimaryContainer
-
-        DocChipTone.Good -> MaterialTheme.colorScheme.tertiaryContainer to
-            MaterialTheme.colorScheme.onTertiaryContainer
-
-        DocChipTone.Bad -> MaterialTheme.colorScheme.errorContainer to
-            MaterialTheme.colorScheme.onErrorContainer
-
-        DocChipTone.Neutral -> MaterialTheme.colorScheme.surfaceContainerHigh to
-            MaterialTheme.colorScheme.onSurface
-    }
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = colors.first,
-        contentColor = colors.second
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-        )
-    }
-}
-
-@Composable
-private fun DocSectionLabel(text: String) {
-    Text(
-        text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        letterSpacing = 1.1.sp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-}
-
-private data class DocFact(val label: String, val value: String, val note: String? = null)
-
-private fun docFacts(item: DocItem, bike: DocItem?): List<DocFact> {
-    val facts = mutableListOf<DocFact>()
+private fun docFacts(item: DocItem, bike: DocItem?): List<ReferenceFact> {
+    val facts = mutableListOf<ReferenceFact>()
     fun add(label: String, value: String?, note: String? = null) {
-        value?.takeIf { it.isNotBlank() }?.let { facts += DocFact(label, it, note) }
+        value?.takeIf { it.isNotBlank() }?.let { facts += ReferenceFact(label, it, note) }
     }
 
     if (item.source == DocSource.TRACKS) {
@@ -384,66 +269,6 @@ private fun docFacts(item: DocItem, bike: DocItem?): List<DocFact> {
         add("Ride time", item.bikingTime)
     }
     return facts
-}
-
-@Composable
-private fun DocFactGrid(facts: List<DocFact>) {
-    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        facts.chunked(2).forEach { row ->
-            if (row.size == 1) {
-                DocFactTile(row.first(), Modifier.fillMaxWidth())
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(7.dp)
-                ) {
-                    DocFactTile(row[0], Modifier.weight(1f))
-                    DocFactTile(row[1], Modifier.weight(1f))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DocFactTile(fact: DocFact, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Text(fact.value, style = MaterialTheme.typography.titleSmall)
-            Text(
-                fact.label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            fact.note?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun DocTextSection(title: String, text: String?) {
-    text?.takeIf { it.isNotBlank() }?.let {
-        DocSectionLabel(title)
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(text = it, style = MaterialTheme.typography.bodyMedium)
-    }
 }
 
 @Composable

@@ -1,7 +1,7 @@
 package nz.mckenzie.trailday.domain.doc
 
 import nz.mckenzie.trailday.domain.geo.GeoPoint
-import nz.mckenzie.trailday.domain.geo.distanceToPolylineMeters
+import nz.mckenzie.trailday.domain.geo.nearestPathDistanceMeters
 
 /**
  * What DOC publishes under the walker's finger.
@@ -72,8 +72,5 @@ object DocHitTest {
      * "4.71 km away" on the card and "the track under the finger" cannot disagree.
      */
     fun distanceTo(item: DocItem, at: GeoPoint): Double? =
-        item.paths
-            .filter { it.isNotEmpty() }
-            .minOfOrNull { path -> distanceToPolylineMeters(at, path) }
-            ?.takeIf { it.isFinite() }
+        nearestPathDistanceMeters(item.paths, at)
 }

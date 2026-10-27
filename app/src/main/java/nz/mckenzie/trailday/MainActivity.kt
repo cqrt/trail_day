@@ -22,6 +22,7 @@ import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.ui.screens.AddSpotScreen
 import nz.mckenzie.trailday.ui.screens.DocBrowserScreen
+import nz.mckenzie.trailday.ui.screens.DocDetailScreen
 import nz.mckenzie.trailday.ui.screens.MapScreen
 import nz.mckenzie.trailday.ui.screens.OfflineAreaPickerScreen
 import nz.mckenzie.trailday.ui.screens.OfflineScreen
@@ -33,9 +34,10 @@ import nz.mckenzie.trailday.ui.screens.Tab
 import nz.mckenzie.trailday.ui.screens.AssetDetailScreen
 import nz.mckenzie.trailday.ui.screens.AssetEditScreen
 import nz.mckenzie.trailday.ui.screens.AssetListScreen
-import nz.mckenzie.trailday.ui.screens.DocDetailScreen
+import nz.mckenzie.trailday.ui.screens.OtherTrackScreen
 import nz.mckenzie.trailday.ui.theme.TrailDayTheme
 import nz.mckenzie.trailday.domain.doc.DocItem
+import nz.mckenzie.trailday.domain.other.OtherTrack
 import nz.mckenzie.trailday.viewmodel.AddSpotViewModel
 import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
 import nz.mckenzie.trailday.viewmodel.DocDetailViewModel
@@ -45,6 +47,7 @@ import nz.mckenzie.trailday.viewmodel.OfflineAreaPickerViewModel
 import nz.mckenzie.trailday.viewmodel.PendingFollow
 import nz.mckenzie.trailday.viewmodel.PendingMapFocus
 import nz.mckenzie.trailday.viewmodel.OfflineViewModel
+import nz.mckenzie.trailday.viewmodel.OtherTrackViewModel
 import nz.mckenzie.trailday.viewmodel.RecordingDetailViewModel
 import nz.mckenzie.trailday.viewmodel.RecordingsViewModel
 import nz.mckenzie.trailday.viewmodel.RecordingViewModel
@@ -57,7 +60,7 @@ import nz.mckenzie.trailday.web.WebEditorService
 import nz.mckenzie.trailday.web.WebEditorState
 
 /** Destinations for now; swap for a NavHost when routes need arguments. */
-private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, OFFLINE_OTHER_TRACKS_PICKER, OFFLINE_TOPO_PICKER, OFFLINE_PICKER_AROUND, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC, DOC_DETAIL }
+private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, OFFLINE_OTHER_TRACKS_PICKER, OFFLINE_TOPO_PICKER, OFFLINE_PICKER_AROUND, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC, DOC_DETAIL, OTHER_TRACK_DETAIL }
 
 class MainActivity : ComponentActivity() {
 
@@ -98,6 +101,15 @@ class MainActivity : ComponentActivity() {
                 var selectedDocItem by remember { mutableStateOf<DocItem?>(null) }
                 var selectedDocBike by remember { mutableStateOf<DocItem?>(null) }
                 var docDetailOrigin by remember { mutableStateOf(Destination.MAP) }
+
+                /**
+                 * Somebody else's track, on its way to its own page.
+                 *
+                 * Held rather than looked up again, because everything the page shows is in the row that
+                 * was tapped - see [nz.mckenzie.trailday.viewmodel.OtherTrackViewModel] - so the page has
+                 * nothing to ask the cache for and works whether or not the area is still held.
+                 */
+                var selectedOtherTrack by remember { mutableStateOf<OtherTrack?>(null) }
     // The place a page sent the recorder here to follow: chosen on the page, and read by the recorder's own
     // view model for as long as it is up.
     var recordTargetId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -161,6 +173,10 @@ class MainActivity : ComponentActivity() {
                                 selectedDocBike = bike
                                 docDetailOrigin = Destination.MAP
                                 destination = Destination.DOC_DETAIL
+                            },
+                            onOpenOtherTrack = { track ->
+                                selectedOtherTrack = track
+                                destination = Destination.OTHER_TRACK_DETAIL
                             }
                         )
                     }
@@ -231,6 +247,25 @@ class MainActivity : ComponentActivity() {
                                     PendingFollow.offer(followed)
                                     destination = Destination.RECORD
                                 }
+                            )
+                        }
+                    }
+
+                    Destination.OTHER_TRACK_DETAIL -> {
+                        val track = selectedOtherTrack
+                        if (track == null) {
+                            destination = Destination.MAP
+                        } else {
+                            val otherTrackViewModel: OtherTrackViewModel = viewModel(
+                                key = "other-track-${track.globalId}",
+                                factory = OtherTrackViewModel.factory(applicationContext, track)
+                            )
+                            OtherTrackScreen(
+                                viewModel = otherTrackViewModel,
+                                // Back to the map, which is the only place this page is opened from: the
+                                // browser that will open it too is the next piece of this work, and it
+                                // brings its own origin with it.
+                                onBack = { destination = Destination.MAP }
                             )
                         }
                     }

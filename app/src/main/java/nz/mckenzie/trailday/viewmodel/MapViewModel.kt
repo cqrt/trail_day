@@ -31,6 +31,7 @@ import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.asset.YourPlaceLayer
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.geo.nearestPathDistanceMeters
 import nz.mckenzie.trailday.domain.geo.splitAtBreaks
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.domain.tiles.Basemap
@@ -47,6 +48,7 @@ import nz.mckenzie.trailday.domain.doc.DocHitTest
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.other.EmptyOtherTracksCache
+import nz.mckenzie.trailday.domain.other.OtherTrack
 import nz.mckenzie.trailday.domain.other.OtherTracksCache
 import nz.mckenzie.trailday.domain.doc.EmptyDocCache
 import nz.mckenzie.trailday.domain.doc.DocPick
@@ -570,6 +572,33 @@ class MapViewModel(
 
     /** The bicycle note paired with [item], when one of DOC's bike points sits on it. */
     fun bikeFor(item: DocItem): DocItem? = bikeLinks.value.bikeFor(item)
+
+    /**
+     * The nearest of somebody else's tracks to a tap, or null when the tap landed on none.
+     *
+     * The same question [pickDocAt] asks of DOC's material, asked of the second publisher's - and with the
+     * **same distance rule**, so a line under the finger is measured one way whichever publisher drew it.
+     * That is why the arithmetic lives in [nearestPathDistanceMeters] rather than here.
+     *
+     * The frame is set whether or not the tap found anything, as [pickDocAt] sets it, so pressing back
+     * from a page lands on the line that was tapped rather than wherever the map happened to be.
+     */
+    suspend fun pickOtherTrackAt(lat: Double, lng: Double, radiusM: Double): OtherTrack? {
+        val at = GeoPoint(lat = lat, lng = lng)
+        val track = withContext(Dispatchers.Default) {
+            otherTracksStore.cached()
+                .mapNotNull { candidate ->
+                    nearestPathDistanceMeters(candidate.paths, at)
+                        ?.takeIf { it <= radiusM }
+                        ?.let { candidate to it }
+                }
+                .minByOrNull { it.second }
+                ?.first
+        }
+        _pickedPlaceId.value = null
+        _selectionFrame.value = track?.let { boundsOf(it.paths.flatten()) }
+        return track
+    }
 
     /**
      * Asks DOC for the current alerts for the card's subject.

@@ -8,6 +8,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import nz.mckenzie.trailday.domain.text.PlainText
 
 /** What the proxy's lookup route answered: the API's own id for a track the app already holds. */
 data class DocProxyTrack(
@@ -70,18 +71,18 @@ object DocProxyJson {
     }.getOrDefault(emptyMap())
 
     private fun detailOf(root: JsonObject): DocTrackCompanion = DocTrackCompanion(
-        introduction = root.text("introduction")?.let(DocText::plain),
+        introduction = root.text("introduction")?.let(PlainText::plain),
         difficulty = root.array("walkTrackCategory")?.joinToString(", "),
         completionTime = root.text("walkDuration"),
         webPage = root.text("staticLink"),
         thumbnail = root.text("introductionThumbnail"),
         walkingDuration = root.array("walkDurationCategory")?.joinToString(", "),
         permittedActivities = root.array("permittedActivities")?.joinToString(", "),
-        wheelchairsAndBuggies = root.text("wheelchairsAndBuggies")?.let(DocText::plain),
+        wheelchairsAndBuggies = root.text("wheelchairsAndBuggies")?.let(PlainText::plain),
         mtbDuration = root.text("mtbDuration"),
         mtbCategory = root.array("mtbTrackCategory")?.joinToString(", "),
         kayakingDuration = root.text("kayakingDuration"),
-        dogsAllowed = root.text("dogsAllowed")?.let(DocText::plain),
+        dogsAllowed = root.text("dogsAllowed")?.let(PlainText::plain),
         place = root.text("locationString"),
         region = root.array("region")?.joinToString(", ")
     )
@@ -111,7 +112,7 @@ object DocProxyJson {
             val title = alert.text("title") ?: alert.text("heading") ?: return@mapNotNull null
             DocAlert(
                 title = title,
-                detail = alert.text("detail")?.let(DocText::plain),
+                detail = alert.text("detail")?.let(PlainText::plain),
                 date = alert.text("date") ?: alert.text("displayDate")
             )
         }

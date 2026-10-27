@@ -74,6 +74,7 @@ import nz.mckenzie.trailday.domain.doc.DocAlertsState
 import nz.mckenzie.trailday.domain.doc.DocBikeLinks
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocPick
+import nz.mckenzie.trailday.domain.other.OtherTrack
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.viewmodel.PendingFollow
 import nz.mckenzie.trailday.domain.tiles.Basemap
@@ -104,7 +105,8 @@ fun MapScreen(
     onOpenTab: (Tab) -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenAsset: (Long) -> Unit = {},
-    onOpenDocDetail: (DocItem, DocItem?) -> Unit = { _, _ -> }
+    onOpenDocDetail: (DocItem, DocItem?) -> Unit = { _, _ -> },
+    onOpenOtherTrack: (OtherTrack) -> Unit = {}
 ) {
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
     val basemapTrouble by viewModel.basemapTrouble.collectAsStateWithLifecycle()
@@ -261,6 +263,13 @@ fun MapScreen(
                             val picked = viewModel.pickDocAt(lat, lng, radiusM, raiseCard = false)
                             if (picked != null) {
                                 onOpenDocDetail(picked, viewModel.bikeFor(picked))
+                            } else {
+                                // **DOC's material answers first when both are under the finger**, which is
+                                // deliberate rather than an accident of ordering: a council track running
+                                // along a DOC one is a tap on the DOC one, and that is what this map has
+                                // always answered. Somebody else's tracks are what a tap reaches where DOC
+                                // has nothing.
+                                viewModel.pickOtherTrackAt(lat, lng, radiusM)?.let(onOpenOtherTrack)
                             }
                         }
                     }

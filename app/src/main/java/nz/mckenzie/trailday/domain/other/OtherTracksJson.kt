@@ -57,23 +57,31 @@ object OtherTracksJson {
     /**
      * What the row is called.
      *
-     * **The dataset's own placeholder is not a name.** 2,970 of its rows say "Unnamed Track" in the name
-     * field - a value, not a name - and a list of rows all called "Unnamed Track" tells the walker
-     * nothing, so a row whose name is blank *or* that placeholder takes its **locality** instead, which
-     * is the dataset's own word for the area a track is in ("Mount Victoria", "Richmond"). A row with
-     * neither keeps the placeholder, in the app's own casing.
+     * **The dataset's own placeholders are not names.** Of the 15,973 rows this app reads, 2,610 say
+     * "Unnamed Track", 652 say exactly "Track" and 22 say "Track 7" and the like - 21% of the set with a
+     * value where a name goes. A list of rows all called "Track" tells the walker nothing, so a row whose
+     * name is blank *or* one of those takes its **locality** instead, which is the dataset's own word for
+     * the area a track is in ("Mount Victoria", "Richmond"). A row with neither keeps the app's own words
+     * for an unnamed track.
      *
      * The locality alone rather than "Mount Victoria track": a row's second line already says what it is
      * ("Walking Track · Wellington City Council"), and the place is the useful half of the name.
      */
     private fun nameOf(feature: GeoJsonParser.Feature): String {
         val given = feature.name?.trim().orEmpty()
-        if (given.isNotEmpty() && !given.equals(UNNAMED, ignoreCase = true)) return given
+        if (given.isNotEmpty() && !isPlaceholder(given)) return given
         return feature.properties[LOCALITY]?.trim()?.takeIf { it.isNotEmpty() } ?: UNNAMED_FALLBACK
     }
 
-    /** The dataset's own placeholder for a row it has no name for. */
-    private const val UNNAMED = "Unnamed Track"
+    /**
+     * Whether the dataset put something in the name field that is not a name.
+     *
+     * Anchored and case-blind, so a track genuinely called "Trackway" is left alone - the three values it
+     * catches were read off the live service rather than guessed at.
+     */
+    private fun isPlaceholder(name: String): Boolean = PLACEHOLDER.matches(name)
+
+    private val PLACEHOLDER = Regex("(?i)unnamed track|track( \\d+)?")
 
     /** What a row with neither a name nor a locality is left saying, in the app's own casing. */
     private const val UNNAMED_FALLBACK = "Unnamed track"

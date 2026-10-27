@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.domain.doc
 
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.text.PlainText
 
 /**
  * The exact reference DOC gives one of its things, namespaced by the service it came from.
@@ -90,10 +91,10 @@ data class DocItem(
 
     /** What DOC permits on the track, when it filled the slot in. */
     val permittedActivities: String? get() =
-        DocText.plain(fact("permittedActivities")) ?: characteristic("WEB_PERMITTED_ACTIVITIES")
+        PlainText.plain(fact("permittedActivities")) ?: characteristic("WEB_PERMITTED_ACTIVITIES")
 
     /** DOC's own words about wheelchairs and buggies on the track, when it has any. */
-    val wheelchairsAndBuggies: String? get() = DocText.plain(fact("wheelchairsAndBuggies"))
+    val wheelchairsAndBuggies: String? get() = PlainText.plain(fact("wheelchairsAndBuggies"))
 
     /** How long DOC says the track takes by mountain bike, when it says. */
     val mtbDuration: String? get() = fact("mtbDuration")
@@ -141,23 +142,23 @@ data class DocItem(
     val isBookable: Boolean? get() = bookable?.let { it.equals("yes", ignoreCase = true) }
 
     /** What is there: water, toilets, a fire pit. DOC's words, with the links taken out. */
-    val facilities: String? get() = DocText.plain(fact("facilities"))
+    val facilities: String? get() = PlainText.plain(fact("facilities"))
 
     /** What DOC says about the place in prose, for a campsite or a bike location. */
-    val introduction: String? get() = DocText.plain(fact("introduction"))
+    val introduction: String? get() = PlainText.plain(fact("introduction"))
 
     /** What DOC says can be done here, for a campsite. */
-    val activities: String? get() = DocText.plain(fact("activities"))
+    val activities: String? get() = PlainText.plain(fact("activities"))
 
     /** How to get to the place, for a campsite. */
-    val access: String? get() = DocText.plain(fact("access"))
+    val access: String? get() = PlainText.plain(fact("access"))
 
     /** The landscape a campsite sits in. */
-    val landscape: String? get() = DocText.plain(fact("landscape"))
+    val landscape: String? get() = PlainText.plain(fact("landscape"))
 
     /** Whether dogs are allowed here: DOC's words, which differ from site to site. */
     val dogsAllowed: String? get() =
-        DocText.plain(fact("dogsAllowed") ?: characteristic("WEB_DOGS_ALLOWED"))
+        PlainText.plain(fact("dogsAllowed") ?: characteristic("WEB_DOGS_ALLOWED"))
 
     /** The sites a campsite has, and how many of them have power. */
     val unpoweredSites: Int? get() = fact("numberOfUnpoweredSites")?.toIntOrNull()
@@ -179,7 +180,7 @@ data class DocItem(
      * so it is a standing instruction rather than a fact about this place. Nothing in the app may read
      * this as "no alerts": see [link] for the page it points the walker at.
      */
-    val alertsNote: String? get() = DocText.plain(fact("hasAlerts"))
+    val alertsNote: String? get() = PlainText.plain(fact("hasAlerts"))
 
     /** The picture DOC published for it, if any: fetched and kept when the area is cached. */
     val pictureUrl: String? get() = fact("introductionThumbnail")
@@ -207,34 +208,4 @@ data class DocItem(
      */
     fun filterValue(field: String): String? =
         if (field == DocSource.TRACK_TYPE_CHARACTERISTIC) trackType else fact(field)
-}
-
-/**
- * DOC's own words, with the markup taken out.
- *
- * Several fields arrive with a link inside the sentence - a campsite's dog rules point at a DOC office,
- * its facilities point at a fire ban - and the app draws plain text, so what is left of
- * `Dogs with a permit only. Contact closest <a href="#contacts">DOC office</a>` has to be the sentence.
- *
- * A tag is dropped whole, including one that was cut off part-way: DOC's own fields are truncated
- * mid-tag on the live service, and half a tag is not something to show anyone.
- */
-object DocText {
-
-    /** [html] as plain words, or null when there is nothing but markup or spaces in it. */
-    fun plain(html: String?): String? {
-        if (html.isNullOrBlank()) return null
-        val words = StringBuilder()
-        var insideTag = false
-        for (character in html) {
-            when {
-                character == '<' -> insideTag = true
-                character == '>' -> insideTag = false
-                !insideTag -> words.append(character)
-            }
-        }
-        return words.toString().replace(WHITESPACE, " ").trim().takeIf { it.isNotEmpty() }
-    }
-
-    private val WHITESPACE = Regex("\\s+")
 }
