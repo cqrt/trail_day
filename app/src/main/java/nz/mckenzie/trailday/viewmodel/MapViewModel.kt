@@ -46,17 +46,21 @@ import nz.mckenzie.trailday.domain.doc.DocCache
 import nz.mckenzie.trailday.domain.doc.DocHitTest
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
+import nz.mckenzie.trailday.domain.other.EmptyOtherTracksCache
+import nz.mckenzie.trailday.domain.other.OtherTracksCache
 import nz.mckenzie.trailday.domain.doc.EmptyDocCache
 import nz.mckenzie.trailday.domain.doc.DocPick
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetStretch
 import nz.mckenzie.trailday.map.DocGeoJson
 import nz.mckenzie.trailday.map.TeAraroaGeoJson
+import nz.mckenzie.trailday.map.OtherTracksGeoJson
 import nz.mckenzie.trailday.map.DocTrackVisibility
 import nz.mckenzie.trailday.map.drawingKind
 import nz.mckenzie.trailday.offline.KeyCheck
 import nz.mckenzie.trailday.offline.LinzKeyProbe
 import nz.mckenzie.trailday.offline.OfflineDocStore
+import nz.mckenzie.trailday.offline.OfflineOtherTrackStore
 import nz.mckenzie.trailday.offline.ProxyHealth
 import nz.mckenzie.trailday.offline.ProxyHealthCheck
 import nz.mckenzie.trailday.offline.TileTrouble
@@ -110,6 +114,14 @@ class MapViewModel(
      * why it draws in the hills with no reception at all. See [DocGeoJson].
      */
     private val docStore: DocCache = EmptyDocCache,
+    /**
+     * The tracks other people publish, kept on the phone: the map's second reference layer, beside DOC's.
+     *
+     * Read here rather than fetched, for the reason DOC's is: the layer is what has been kept for offline
+     * use, so it draws in the hills with no reception at all. See
+     * [nz.mckenzie.trailday.map.OtherTracksGeoJson].
+     */
+    private val otherTracksStore: OtherTracksCache = EmptyOtherTracksCache,
     /**
      * The Te Araroa trail, bundled: the map's other reference layer, under DOC's.
      *
@@ -950,6 +962,53 @@ class MapViewModel(
     }
 
     /**
+     * Whether the tracks other people publish are drawn - the map's own "Other tracks" switch.
+     *
+     * Eagerly, like the trail: a switch read after the first draw would show a map without the layer and
+     * then grow one. On when unset, which is the setting's own default.
+     */
+    val otherTracks: StateFlow<Boolean> = settingsRepository.otherTracks
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /**
+     * Those tracks as the map's own document, or the empty collection while the layer is switched off.
+     *
+     * **Read from the cache, and read again whenever the cache changes**, which is the difference between
+     * this layer and the trail: the trail is bundled and read once, while this one grows as areas are
+     * downloaded - and an area kept for the walk ahead is expected on the map before the walk starts, not
+     * after the app is opened again. Built off the main thread: an area can hold thousands of lines, and
+     * a map's first frame is not the place to build them.
+     */
+    val otherTracksGeoJson: StateFlow<String> =
+        combine(otherTracks, otherTracksStore.observeCount()) { shown, _ -> shown }
+            .map { shown ->
+                if (!shown) {
+                    OtherTracksGeoJson.EMPTY
+                } else {
+                    withContext(Dispatchers.Default) {
+                        OtherTracksGeoJson.build(otherTracksStore.cached())
+                    }
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), OtherTracksGeoJson.EMPTY)
+
+    /** Shows or hides somebody else's tracks, written straight through like the trail's own switch. */
+    fun setOtherTracks(shown: Boolean) {
+        viewModelScope.launch { settingsRepository.setOtherTracks(shown) }
+    }
+
+    /**
+     * When the tracks other people publish were last downloaded, or null when none are held.
+     *
+     * For the one thing the dataset's licence asks of a reader that this app did not already do: state
+     * **when the data was acquired**. Read again whenever the cache changes, because a download while the
+     * map is open changes the answer.
+     */
+    val otherTracksDownloadedAt: StateFlow<Long?> = otherTracksStore.observeCount()
+        .map { otherTracksStore.newestDownloadAtEpochMs() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    /**
      * Switches the basemap from the map itself, which is what the trouble notice offers.
      *
      * Written to the preference rather than held here, so it is the same choice the Settings screen
@@ -1004,6 +1063,9 @@ class MapViewModel(
                         docStore = OfflineDocStore(
                             dao = TrailDayDatabase.get(appContext).offlineDocItemDao(),
                             downloader = DocDownloader.online()
+                        ),
+                        otherTracksStore = OfflineOtherTrackStore(
+                            dao = TrailDayDatabase.get(appContext).offlineOtherTrackDao()
                         ),
                         // The places a walk has been made of, read from the trips themselves: a trip deleted
                         // puts its line back to what it was, with nothing to remember on the place.

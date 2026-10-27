@@ -304,6 +304,23 @@ fun BasemapView(
     /** The trail itself, as the GeoJSON to draw: empty where there is none to draw. */
     teAraroaGeoJson: String = AssetGeoJson.build(emptyList()),
     /**
+     * Whether the tracks other people publish are drawn under the walker's own work - the map's own
+     * "Other tracks" switch.
+     *
+     * Off by default, and off for every map that is not the walker's home map, for the reason
+     * [showTeAraroa] is: a map that is *about* one asset is about that asset. Like the trail, switching
+     * it is a property of two layers rather than a style reload.
+     */
+    showOtherTracks: Boolean = false,
+    /**
+     * Those tracks, as the GeoJSON to draw.
+     *
+     * **Empty until something has been downloaded**, and that is the point rather than a shortcoming:
+     * this layer is what is on the phone, not what could be fetched, so it works exactly where
+     * reception does not. See [OtherTracksGeoJson].
+     */
+    otherTracksGeoJson: String = OtherTracksGeoJson.EMPTY,
+    /**
      * A camera move the walker asked for. The bounds say where; [recentreCount] is what says
      * it is a new request rather than the same one arriving twice, so the second tap on
      * "where am I" moves the map again.
@@ -496,7 +513,9 @@ fun BasemapView(
                         hiddenYourPlaces = hiddenYourPlaces,
                         placeNames = placeNames,
                         teAraroaGeoJson = teAraroaGeoJson,
-                        showTeAraroa = showTeAraroa
+                        showTeAraroa = showTeAraroa,
+                        showOtherTracks = showOtherTracks,
+                        otherTracksGeoJson = otherTracksGeoJson
                     ) { style ->
                         styleLoadedOnce = true
                         styleState.value = style
@@ -534,7 +553,9 @@ fun BasemapView(
                 hiddenYourPlaces = hiddenYourPlaces,
                 placeNames = placeNames,
                 teAraroaGeoJson = teAraroaGeoJson,
-                showTeAraroa = showTeAraroa
+                showTeAraroa = showTeAraroa,
+                showOtherTracks = showOtherTracks,
+                otherTracksGeoJson = otherTracksGeoJson
             ) { style ->
                 styleLoadedOnce = true
                 styleState.value = style
@@ -560,6 +581,14 @@ fun BasemapView(
         styleState.value?.getSourceAs<GeoJsonSource>(TRAIL_SOURCE)?.setGeoJson(teAraroaGeoJson)
     }
 
+    // Somebody else's tracks are the same idea without the read: they are on the phone or they are not
+    // drawn, so this hands over whatever the cache holds rather than fetching anything.
+    LaunchedEffect(otherTracksGeoJson, styleState.value) {
+        styleState.value
+            ?.getSourceAs<GeoJsonSource>(OtherTracksLayerIds.SOURCE)
+            ?.setGeoJson(otherTracksGeoJson)
+    }
+
     LaunchedEffect(docBikeBadgesGeoJson, styleState.value) {
         styleState.value
             ?.getSourceAs<GeoJsonSource>(DOC_BIKE_BADGES_SOURCE)
@@ -576,9 +605,9 @@ fun BasemapView(
     // property of a layer rather than a new style, so the camera, the tiles and the zoom are all
     // left exactly where they were - which is what makes the switch usable while reading the map
     // rather than something that sends you back to the start every time you touch it.
-    LaunchedEffect(hiddenLayers, hiddenYourPlaces, showTeAraroa, styleState.value) {
+    LaunchedEffect(hiddenLayers, hiddenYourPlaces, showTeAraroa, showOtherTracks, styleState.value) {
         val style = styleState.value ?: return@LaunchedEffect
-        applyLayerVisibility(style, hiddenLayers, hiddenYourPlaces, showTeAraroa)
+        applyLayerVisibility(style, hiddenLayers, hiddenYourPlaces, showTeAraroa, showOtherTracks)
     }
 
     // The marker follows the fixes. Setting the GeoJSON on one source rather than rebuilding
@@ -709,6 +738,9 @@ internal fun MapLibreMap.loadTrailDayStyle(
     /** The trail's own GeoJSON, and whether it is drawn: see [BasemapView.showTeAraroa]. */
     teAraroaGeoJson: String = AssetGeoJson.build(emptyList()),
     showTeAraroa: Boolean = false,
+    /** Somebody else's tracks, and whether they are drawn: see [BasemapView.showOtherTracks]. */
+    otherTracksGeoJson: String = OtherTracksGeoJson.EMPTY,
+    showOtherTracks: Boolean = false,
     onLoaded: (Style) -> Unit
 ) {
     val json = when {
@@ -767,6 +799,20 @@ internal fun MapLibreMap.loadTrailDayStyle(
                     )
             )
         }
+        // Somebody else's tracks, drawn beside DOC's and under the walker's own work for the same
+        // reason. Added **before** DOC's material so that DOC's draws over them: the two are both
+        // reference layers, and where they overlap the one the walker asked for by name is the one
+        // worth reading.
+        if (style.getSource(OtherTracksLayerIds.SOURCE) == null) {
+            style.addSource(GeoJsonSource(OtherTracksLayerIds.SOURCE, otherTracksGeoJson))
+        }
+        addReferenceCasing(style, OtherTracksLayerIds.CASING, source = OtherTracksLayerIds.SOURCE)
+        addLineLayer(
+            style,
+            OtherTracksLayerIds.LINE,
+            AssetKind.TRACK,
+            source = OtherTracksLayerIds.SOURCE
+        )
         // Then DOC's material, so it lies **under** the walker's own work: what you made is what you
         // are reading, and the reference is the ground it sits on.
         if (style.getSource(DOC_SOURCE) == null) {
@@ -888,7 +934,7 @@ internal fun MapLibreMap.loadTrailDayStyle(
         // The switches, applied to the style that has just been built, so that the first frame is
         // already the map the walker asked for rather than one that flashes everything and then
         // hides half of it.
-        applyLayerVisibility(style, hiddenLayers, hiddenYourPlaces, showTeAraroa)
+        applyLayerVisibility(style, hiddenLayers, hiddenYourPlaces, showTeAraroa, showOtherTracks)
         onLoaded(style)
     }
 }
@@ -931,13 +977,23 @@ private fun applyLayerVisibility(
     style: Style,
     hidden: Set<AssetLayer>,
     hiddenYourPlaces: Set<YourPlaceLayer> = emptySet(),
-    showTeAraroa: Boolean = false
+    showTeAraroa: Boolean = false,
+    showOtherTracks: Boolean = false
 ) {
     // The trail is in neither set: it is the app's own route rather than a kind of the walker's or of
     // DOC's, so it has a switch of its own. Both its layers go together, or the edge is a ghost.
     val trailVisibility = if (showTeAraroa) Property.VISIBLE else Property.NONE
     style.getLayer(TRAIL_CASING_LAYER)?.setProperties(PropertyFactory.visibility(trailVisibility))
     style.getLayer(TRAIL_LAYER)?.setProperties(PropertyFactory.visibility(trailVisibility))
+
+    // Somebody else's tracks are the same case again - a second publisher rather than a fifth kind of
+    // DOC's - so they have a switch of their own too, and their two layers go together as the trail's do.
+    val otherTracksVisibility = if (showOtherTracks) Property.VISIBLE else Property.NONE
+    style.getLayer(OtherTracksLayerIds.CASING)
+        ?.setProperties(PropertyFactory.visibility(otherTracksVisibility))
+    style.getLayer(OtherTracksLayerIds.LINE)
+        ?.setProperties(PropertyFactory.visibility(otherTracksVisibility))
+
     val tracksShown = AssetLayer.TRACKS !in hidden
     val bikeTrailsShown = AssetLayer.BIKE_TRACKS !in hidden
 
@@ -1164,8 +1220,8 @@ private fun addDocLayers(style: Style) {
     // The base layer is every DOC track: a dual-use track is walkable too, and losing it because
     // Bike trails is off is exactly the bug this two-layer split now avoids. The bike layer is the
     // rideable subset, used when the base layer is switched off.
-    addDocCasing(style, DocLayerIds.CASING)
-    addDocCasing(style, DocLayerIds.BIKE_CASING, bikeFriendly = true)
+    addReferenceCasing(style, DocLayerIds.CASING)
+    addReferenceCasing(style, DocLayerIds.BIKE_CASING, bikeFriendly = true)
     addLineLayer(style, DocLayerIds.TRACKS, AssetKind.TRACK, source = DOC_SOURCE)
     addLineLayer(
         style,
@@ -1202,13 +1258,23 @@ private fun addDocBikeBadgeLayer(style: Style) {
 }
 
 /**
- * The white line under DOC's tracks.
+ * The white line under a reference layer's tracks.
  *
  * The same geometry as the line over it, drawn wider and first: a route has to read against dark bush
  * and pale scree alike, and the walker's own lines have no casing - so the casing is also what says, at
- * a glance, which lines are DOC's. The mock screens draw their track exactly this way.
+ * a glance, which lines are somebody else's. The mock screens draw their track exactly this way.
+ *
+ * **One casing for the whole reference layer**, DOC's and any other publisher's alike, because that is
+ * what it is: white, under every line that is not the walker's own. A second copy of the same white for
+ * the second publisher is how the two come to differ later. [source] is which reference source the layer
+ * belongs to.
  */
-private fun addDocCasing(style: Style, id: String, bikeFriendly: Boolean? = null) {
+private fun addReferenceCasing(
+    style: Style,
+    id: String,
+    source: String = DOC_SOURCE,
+    bikeFriendly: Boolean? = null
+) {
     if (style.getLayer(id) != null) return
 
     val filters = mutableListOf(
@@ -1218,7 +1284,7 @@ private fun addDocCasing(style: Style, id: String, bikeFriendly: Boolean? = null
     bikeFriendly?.let { filters += bikeFriendlyFilter(it) }
 
     style.addLayer(
-        LineLayer(id, DOC_SOURCE)
+        LineLayer(id, source)
             .withProperties(
                 PropertyFactory.lineColor(Expression.literal(DocLayerIds.CASING_COLOUR)),
                 PropertyFactory.lineWidth(

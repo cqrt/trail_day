@@ -163,3 +163,44 @@ internal val MIGRATION_6_7 = object : Migration(6, 7) {
         db.execSQL("CREATE INDEX IF NOT EXISTS index_offline_areas_pack ON offline_areas (pack)")
     }
 }
+
+/**
+ * Where the phone gains a second publisher's tracks.
+ *
+ * **Nothing is carried across, because there is nothing to carry.** The table is new and every row
+ * arrives with the next download of an area: this is a cache of what somebody else publishes, and they
+ * are still publishing it. A walker's downloaded imagery and DOC material are untouched - what changes
+ * is that the next area they download can bring the council and community tracks with it.
+ *
+ * Its own table rather than a second kind of row in `offline_doc_items`, because the two are different
+ * publishers with different keys: DOC's rows are keyed by a number the service gives per service, and
+ * these by a UUID. One table holding both would be keyed by a string meaning one thing in one half of it
+ * and another in the other.
+ *
+ * From here on, clearing this cache clears only this: a walker who clears DOC's material keeps the
+ * tracks their council publishes, and the other way round.
+ */
+internal val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS offline_other_tracks (
+                globalId TEXT NOT NULL,
+                name TEXT NOT NULL,
+                lengthM REAL NOT NULL,
+                pathsJson TEXT NOT NULL,
+                factsJson TEXT NOT NULL,
+                downloadedAtEpochMs INTEGER NOT NULL,
+                PRIMARY KEY(globalId)
+            )
+            """.trimIndent()
+        )
+
+        // Room checks the indices against the schema it expects, so this one is named the way Room names
+        // it - the name is part of what a migration has to get right.
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_offline_other_tracks_downloadedAtEpochMs " +
+                "ON offline_other_tracks (downloadedAtEpochMs)"
+        )
+    }
+}

@@ -9,6 +9,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -81,11 +82,13 @@ import nz.mckenzie.trailday.domain.tiles.TeAraroa
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.map.DEFAULT_CAMERA_TARGET
 import nz.mckenzie.trailday.map.DEFAULT_CAMERA_ZOOM
+import nz.mckenzie.trailday.map.OtherTracksLayerIds
 import org.maplibre.android.geometry.LatLng
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.theme.TrailDayElevation
 import nz.mckenzie.trailday.ui.docBikeFacts
 import nz.mckenzie.trailday.ui.docCardFacts
+import nz.mckenzie.trailday.ui.formatDate
 import nz.mckenzie.trailday.ui.docCardProse
 import nz.mckenzie.trailday.ui.formatLengthOf
 import nz.mckenzie.trailday.viewmodel.MapFocus
@@ -110,6 +113,9 @@ fun MapScreen(
     val docGeoJson by viewModel.docGeoJson.collectAsStateWithLifecycle()
     val teAraroa by viewModel.teAraroa.collectAsStateWithLifecycle()
     val teAraroaGeoJson by viewModel.teAraroaGeoJson.collectAsStateWithLifecycle()
+    val otherTracks by viewModel.otherTracks.collectAsStateWithLifecycle()
+    val otherTracksGeoJson by viewModel.otherTracksGeoJson.collectAsStateWithLifecycle()
+    val otherTracksDownloadedAt by viewModel.otherTracksDownloadedAt.collectAsStateWithLifecycle()
     val docBikeBadgesGeoJson by viewModel.docBikeBadgesGeoJson.collectAsStateWithLifecycle()
     val initialFrame by viewModel.initialFrame.collectAsStateWithLifecycle()
     val selectionFrame by viewModel.selectionFrame.collectAsStateWithLifecycle()
@@ -201,6 +207,11 @@ fun MapScreen(
                 // anything the walker has to find and import.
                 showTeAraroa = teAraroa,
                 teAraroaGeoJson = teAraroaGeoJson,
+                // Somebody else's tracks: over the trail, and under DOC's material and the walker's own
+                // work. A second publisher's reference rather than the walker's, so it is drawn where the
+                // reference belongs - and it is empty until an area has been downloaded.
+                showOtherTracks = otherTracks,
+                otherTracksGeoJson = otherTracksGeoJson,
                 // The marker for the phone is the map's own business now, so this screen
                 // says nothing about it: it draws where you are wherever a map is drawn.
                 // The walker's own tracks first; failing that, where the device is;
@@ -380,13 +391,23 @@ fun MapScreen(
             onPlaceNames = viewModel::setPlaceNames,
             teAraroa = teAraroa,
             onTeAraroa = viewModel::setTeAraroa,
+            otherTracks = otherTracks,
+            onOtherTracks = viewModel::setOtherTracks,
+            otherTracksDownloadedAt = otherTracksDownloadedAt,
             onDismiss = { layersOpen = false }
         )
     }
 }
 
-/** The two pages of the layers sheet: the walker's own map, and DOC's reference material. */
-private enum class LayerTab { YOUR_MAP, DOC }
+/**
+ * The pages of the layers sheet: the walker's own map, DOC's reference material, and the tracks other
+ * people publish.
+ *
+ * Three pages rather than two, and the third is not a section of the second: the walker's question when
+ * they open this sheet is *whose line is that*, and a publisher per page answers it exactly. A council
+ * walkway tucked under a page headed "DOC" would be a switch nobody would find.
+ */
+private enum class LayerTab { YOUR_MAP, DOC, OTHER_TRACKS }
 
 /**
  * What the map draws, and the switches for it.
@@ -421,6 +442,10 @@ private fun LayersSheet(
     onPlaceNames: (show: Boolean) -> Unit,
     teAraroa: Boolean,
     onTeAraroa: (show: Boolean) -> Unit,
+    otherTracks: Boolean,
+    onOtherTracks: (show: Boolean) -> Unit,
+    /** When the tracks other people publish were last downloaded, for the credit the licence asks for. */
+    otherTracksDownloadedAt: Long?,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -615,6 +640,25 @@ private fun LayersSheet(
                         )
                     }
                 }
+
+                LayerTab.OTHER_TRACKS -> {
+                    LayerSection("Other tracks")
+                    LayerPanel {
+                        LayerSwitchRow(
+                            icon = { OtherTracksTile() },
+                            title = "Other tracks",
+                            // Who publishes them, in the walker's own terms: the dataset is councils,
+                            // regional councils, trail trusts and a couple of clubs, and "authority" or
+                            // "supplier" is nobody's word for any of that.
+                            subtitle = "From councils, trusts and clubs",
+                            checked = otherTracks,
+                            onToggle = onOtherTracks
+                        )
+                    }
+                    // The publisher's licence, on the page the layer is switched on from - which is where
+                    // a walker is when they wonder whose tracks these are.
+                    OtherTracksCredit(downloadedAtEpochMs = otherTracksDownloadedAt)
+                }
             }
         }
     }
@@ -632,7 +676,7 @@ private fun LayerSection(title: String) {
     )
 }
 
-/** The two-page switch at the top of the sheet: the walker's map, then DOC's material. */
+/** The switch at the top of the sheet: the walker's map, then DOC's material, then anybody else's. */
 @Composable
 private fun LayerTabs(selected: LayerTab, onSelect: (LayerTab) -> Unit) {
     Row(
@@ -652,7 +696,15 @@ private fun LayerTabs(selected: LayerTab, onSelect: (LayerTab) -> Unit) {
             label = "DOC",
             selected = selected == LayerTab.DOC,
             onClick = { onSelect(LayerTab.DOC) },
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(0.7f)
+        )
+        // The third page is the one row it holds, and the label is that row's own name rather than a
+        // category it belongs to: "Other tracks" is what the walker reads on the map's own switch too.
+        LayerTabButton(
+            label = "Other tracks",
+            selected = selected == LayerTab.OTHER_TRACKS,
+            onClick = { onSelect(LayerTab.OTHER_TRACKS) },
+            modifier = Modifier.weight(1.4f)
         )
     }
 }
@@ -754,6 +806,58 @@ private fun LayerSwitchRow(
             }
         }
         Switch(checked = checked, onCheckedChange = null)
+    }
+}
+
+/**
+ * The tile for the "Other tracks" row: **the layer's own colour**, so the sheet and the map agree about
+ * whose lines are whose.
+ *
+ * Not [KindTile], which draws one of the app's own kinds: these tracks are not a kind of anything, they
+ * are somebody else's material, and the colour the map draws them in is the one thing that says so. The
+ * map's copy of that colour is a hex string for its style; this is the same string, drawn - at a low
+ * alpha over the page rather than as a container colour of its own, which is what makes one pair of
+ * constants enough for both the light and the dark set.
+ */
+@Composable
+private fun OtherTracksTile() {
+    val hex = if (isSystemInDarkTheme()) OtherTracksLayerIds.COLOUR_DARK else OtherTracksLayerIds.COLOUR
+    val colour = remember(hex) { Color(android.graphics.Color.parseColor(hex)) }
+    GlyphTile(
+        glyph = IconGlyph.TRAIL,
+        background = colour.copy(alpha = 0.22f),
+        tint = colour
+    )
+}
+
+/**
+ * The dataset's licence, on the page its layer is switched on from - which is where a walker is when
+ * they wonder whose tracks these are.
+ *
+ * It asks for two things, and the app did neither before: **name the publisher**, and **state when the
+ * data was acquired**. The date is the moment of the newest download rather than the moment this switch
+ * was touched, because it is the data that was acquired and not the preference. A walker who has
+ * downloaded nothing has acquired nothing, so there is no date to state and the publisher is still worth
+ * naming - it says whose tracks the switch would draw.
+ */
+@Composable
+private fun OtherTracksCredit(downloadedAtEpochMs: Long?) {
+    Column(
+        modifier = Modifier.padding(top = 10.dp, start = 2.dp, end = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            text = "\u00a9 Herenga \u0101 Nuku Aotearoa, the Outdoor Access Commission",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        downloadedAtEpochMs?.let { at ->
+            Text(
+                text = "Downloaded ${formatDate(at)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

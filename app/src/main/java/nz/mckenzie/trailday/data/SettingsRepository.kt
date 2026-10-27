@@ -43,6 +43,7 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     private val legacyYourTracksHiddenPref = booleanPreferencesKey("your_tracks_hidden")
     private val placeNamesPref = booleanPreferencesKey("place_names")
     private val teAraroaPref = booleanPreferencesKey("te_araroa")
+    private val otherTracksPref = booleanPreferencesKey("other_tracks")
     private val webEditorTokenRequiredPref = booleanPreferencesKey("web_editor_token_required")
 
     /**
@@ -288,6 +289,24 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
 
     suspend fun setTeAraroa(shown: Boolean) {
         context.settingsDataStore.edit { prefs -> prefs[teAraroaPref] = shown }
+    }
+
+    /**
+     * Whether the tracks other people publish are drawn - the map's own "Other tracks" switch.
+     *
+     * **On when unset**, which is the rule the reference layers already follow: what a preference stores
+     * is what is *hidden*, so a layer that arrives in a later build arrives visible rather than missing,
+     * and a walker who has never touched this switch must not be shown a map that quietly left something
+     * out. Nothing is drawn until an area has been downloaded either way - see
+     * [nz.mckenzie.trailday.domain.other.OtherTracksCache] - so the switch being on costs a walker who
+     * has downloaded nothing exactly nothing.
+     */
+    val otherTracks: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[otherTracksPref] ?: true
+    }
+
+    suspend fun setOtherTracks(shown: Boolean) {
+        context.settingsDataStore.edit { prefs -> prefs[otherTracksPref] = shown }
     }
 
     /**
