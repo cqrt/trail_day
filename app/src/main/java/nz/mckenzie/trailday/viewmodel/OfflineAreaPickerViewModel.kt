@@ -527,8 +527,9 @@ class OfflineAreaPickerViewModel(
      *
      * **Its own act rather than part of DOC's**, because it is somebody else's material: a walker planning
      * a walk on their own council's walkways is not keeping DOC's huts, and the two caches are counted and
-     * cleared apart. Like DOC's, nothing here is an area record - this cache is the walker's own, held
-     * once, and two overlapping boxes end with one copy of a track rather than two.
+     * cleared apart. The tracks themselves are held once, so two overlapping boxes end with one copy of a
+     * track rather than two - and **each download is recorded under the name the walker typed**, so the
+     * offline screen can list the hillsides they kept rather than only count the tracks in them.
      */
     private fun downloadOtherTracks() {
         if (_otherTracksWorking.value) return
@@ -544,7 +545,7 @@ class OfflineAreaPickerViewModel(
             _otherTracksMessage.value = null
             val startedAt = System.nanoTime()
             try {
-                val download = otherTracksStore.download(plan.bounds) {
+                val download = otherTracksStore.download(plan.bounds, plan.name) {
                     reportOtherTracks(it, startedAt)
                 }
                 // A download that stopped short still kept what arrived, so the walker stays here and can
@@ -675,9 +676,11 @@ class OfflineAreaPickerViewModel(
                             downloader = DocDownloader.online()
                         ),
                         // The tracks other people publish: its own cache, and no key or proxy between the
-                        // phone and the service.
+                        // phone and the service. Its named downloads are recorded here rather than by the
+                        // picker, so a download started from anywhere lands in the same list.
                         otherTracksStore = OfflineOtherTrackStore(
-                            dao = database.offlineOtherTrackDao()
+                            dao = database.offlineOtherTrackDao(),
+                            areaDao = database.offlineOtherTrackAreaDao()
                         ),
                         // The drawn map's own pack: its areas are named, listed and downloaded through the
                         // same manager imagery uses, which is what makes them resumable and countable.

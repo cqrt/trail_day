@@ -16,9 +16,10 @@ import androidx.room.RoomDatabase
         OfflineAreaEntity::class,
         OfflineDocItemEntity::class,
         OfflineDocPictureEntity::class,
-        OfflineOtherTrackEntity::class
+        OfflineOtherTrackEntity::class,
+        OfflineOtherTrackAreaEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 abstract class TrailDayDatabase : RoomDatabase() {
@@ -32,6 +33,9 @@ abstract class TrailDayDatabase : RoomDatabase() {
 
     /** The national tracks dataset's rows kept for offline use, which are a different publisher's. */
     abstract fun offlineOtherTrackDao(): OfflineOtherTrackDao
+
+    /** The named boxes those rows were downloaded for: the offline screen's list of areas. */
+    abstract fun offlineOtherTrackAreaDao(): OfflineOtherTrackAreaDao
 
     /** Reads and writes everything, for backup and restore. */
     abstract fun backupDao(): BackupDao
@@ -64,7 +68,8 @@ abstract class TrailDayDatabase : RoomDatabase() {
                         MIGRATION_4_5,
                         MIGRATION_5_6,
                         MIGRATION_6_7,
-                        MIGRATION_7_8
+                        MIGRATION_7_8,
+                        MIGRATION_8_9
                     )
                     .build().also { instance = it }
             }

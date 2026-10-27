@@ -25,18 +25,19 @@ enum class OfflinePack(
      * tiles are a fraction of imagery for the same ground - which is what makes several small areas of it
      * worth having rather than one large one.
      */
-    TOPOGRAPHY("topography", "Topographic map"),
+    TOPOGRAPHY("topography", "LINZ Topographic"),
 
     /** Everything DOC publishes for an area. Held as one cache, with no areas of its own. */
     DOC("doc", "DOC assets"),
 
     /**
-     * The tracks other people publish: the national tracks dataset, held as one cache with no areas.
+     * The tracks other people publish: the national tracks dataset, in **named boxes of its own.**
      *
      * Its own pack rather than a second half of [DOC]'s, because it is a second publisher and a second
      * cache: a walker who clears DOC's material keeps their council's walkways, and the other way round.
-     * Like DOC's, it is held once and keyed by the service's own identifier, so two overlapping areas end
-     * with one copy of a track rather than two.
+     * Keyed by the service's own identifier, so two overlapping areas end with one copy of a track rather
+     * than two - but each download is also recorded under the name the walker gave it, because a cache of
+     * tracks cannot tell them which hillsides they kept.
      */
     OTHER_TRACKS("other-tracks", "Other tracks");
 

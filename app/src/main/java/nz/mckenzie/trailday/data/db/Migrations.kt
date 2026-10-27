@@ -204,3 +204,35 @@ internal val MIGRATION_7_8 = object : Migration(7, 8) {
         )
     }
 }
+
+/**
+ * Somebody else's tracks could be downloaded but not **named**, so three downloads of three hillsides read
+ * as one number of tracks with no way to tell what had been asked for.
+ *
+ * The tracks stay where they are: this adds the walker's own record of each download beside them, which is
+ * a name, the box, how many tracks came back and when. Nothing is backfilled - a box downloaded before this
+ * build was never named, and inventing a name for it would be making one up.
+ */
+internal val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS offline_other_track_areas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                name TEXT NOT NULL,
+                minLat REAL NOT NULL,
+                minLng REAL NOT NULL,
+                maxLat REAL NOT NULL,
+                maxLng REAL NOT NULL,
+                trackCount INTEGER NOT NULL,
+                downloadedAtEpochMs INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_offline_other_track_areas_downloadedAtEpochMs " +
+                "ON offline_other_track_areas (downloadedAtEpochMs)"
+        )
+    }
+}

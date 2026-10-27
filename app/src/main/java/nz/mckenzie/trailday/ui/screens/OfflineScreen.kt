@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.doc.DocSource
+import nz.mckenzie.trailday.domain.other.OtherTrackArea
 import nz.mckenzie.trailday.offline.DownloadService
 import nz.mckenzie.trailday.offline.DownloadState
 import nz.mckenzie.trailday.offline.OfflineArea
@@ -46,6 +47,8 @@ import nz.mckenzie.trailday.offline.OfflinePack
 import nz.mckenzie.trailday.offline.docHeldWords
 import nz.mckenzie.trailday.offline.downloadProgressWords
 import nz.mckenzie.trailday.offline.otherTracksHeldWords
+import nz.mckenzie.trailday.offline.otherTracksSummary
+import nz.mckenzie.trailday.offline.otherTrackAreaWords
 import nz.mckenzie.trailday.offline.pictureCountWords
 import nz.mckenzie.trailday.viewmodel.OfflineViewModel
 
@@ -77,6 +80,7 @@ fun OfflineScreen(
     val docCounts by viewModel.docCounts.collectAsStateWithLifecycle()
     val docPictures by viewModel.docPictures.collectAsStateWithLifecycle()
     val otherTracksDataCount by viewModel.otherTracksDataCount.collectAsStateWithLifecycle()
+    val otherTrackAreas by viewModel.otherTrackAreas.collectAsStateWithLifecycle()
     val topoSummary by viewModel.topoSummary.collectAsStateWithLifecycle()
     val topoAreas by viewModel.topoAreas.collectAsStateWithLifecycle()
     val download by DownloadState.current.collectAsStateWithLifecycle()
@@ -178,19 +182,21 @@ fun OfflineScreen(
                 title = OfflinePack.OTHER_TRACKS.title,
                 icon = { AppIcon(glyph = IconGlyph.TRAIL, tint = MaterialTheme.colorScheme.primary) },
                 summary = otherTracksLive?.let { downloadProgressWords(it) }
-                    ?: if (otherTracksDataCount == 0) {
-                        "Nothing downloaded yet"
-                    } else {
-                        otherTracksHeldWords(otherTracksDataCount)
-                    },
+                    ?: otherTracksSummary(otherTrackAreas, otherTracksDataCount),
                 progress = otherTracksLive?.let { it.percent / 100f },
                 progressLabel = null,
-                footnote = "Read offline by the map, beside DOC's material.",
+                footnote = "Read offline by the map, beside DOC's material. Forgetting an area leaves " +
+                    "its tracks on the phone until you clear them.",
                 error = null,
                 clearLabel = "Clear other tracks".takeIf { otherTracksDataCount > 0 },
                 onClear = { confirmingClearOtherTracks = true }
             ) {
-                // No rows: this material arrives by area and is counted as one thing too.
+                // **The named boxes they were downloaded for**, each one a row: the tracks are held once
+                // and shared, so this is the walker's own list of places rather than a second copy of them.
+                otherTrackAreas.forEachIndexed { index, area ->
+                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    OtherTrackAreaRow(area = area, onForget = { viewModel.forgetOtherTrackArea(area.id) })
+                }
             }
 
             // The drawn map: the other thing a walker can choose to keep, and the cheap one - vector
@@ -288,7 +294,7 @@ fun OfflineScreen(
                         choosingDownload = false
                         onChooseTopoArea()
                     },
-                    headlineContent = { Text("Topographic map") },
+                    headlineContent = { Text("LINZ Topographic") },
                     supportingContent = {
                         Text("LINZ's drawn map - roads, tracks, contours and names - for reading the land")
                     },
@@ -519,6 +525,33 @@ private fun AreaRow(
             TextButton(onClick = onResume, enabled = !working) { Text("Resume") }
         }
         DestructiveTextButton(text = "Delete", onClick = onDelete)
+    }
+}
+
+/**
+ * One named box somebody else's tracks were downloaded for: what it is called, and what came back from it.
+ *
+ * **Forget rather than Delete**, because that is what it does: the tracks it brought are still on the phone
+ * and may belong to another named area too. The card's Clear is the one that empties the cache, and the
+ * card says so - a Delete that quietly left the tracks would be worse than a word that is honest.
+ */
+@Composable
+private fun OtherTrackAreaRow(area: OtherTrackArea, onForget: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(text = area.name, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = otherTrackAreaWords(area),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        DestructiveTextButton(text = "Forget", onClick = onForget)
     }
 }
 

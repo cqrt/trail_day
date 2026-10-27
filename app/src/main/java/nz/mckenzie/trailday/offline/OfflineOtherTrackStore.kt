@@ -1,11 +1,16 @@
 package nz.mckenzie.trailday.offline
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.map
+import nz.mckenzie.trailday.data.db.OfflineOtherTrackAreaDao
+import nz.mckenzie.trailday.data.db.OfflineOtherTrackAreaEntity
 import nz.mckenzie.trailday.data.db.OfflineOtherTrackDao
 import nz.mckenzie.trailday.data.db.OfflineOtherTrackEntity
 import nz.mckenzie.trailday.domain.cache.FactsJson
 import nz.mckenzie.trailday.domain.cache.PathsJson
 import nz.mckenzie.trailday.domain.other.OtherTrack
+import nz.mckenzie.trailday.domain.other.OtherTrackArea
 import nz.mckenzie.trailday.domain.other.OtherTracksCache
 import nz.mckenzie.trailday.domain.other.joinedByName
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
@@ -24,9 +29,21 @@ import nz.mckenzie.trailday.other.OtherTracksDownloader
  * cleared apart on the offline screen. Stored globally rather than per area, though: a track is the same
  * track wherever it was downloaded from, so two overlapping areas end with one copy and not two, which
  * is what keying by the service's `GlobalID` is for.
+ *
+ * **The downloads, on the other hand, are named and listed.** The cache answers "what is on the phone";
+ * [areaDao] answers "where did it come from", which is a different question and the one a walker asks when
+ * they cannot remember whether the Tararuas were one of the hillsides they kept.
  */
 class OfflineOtherTrackStore(
     private val dao: OfflineOtherTrackDao,
+    /**
+     * The walker's own record of each download, or null where this store is only ever read.
+     *
+     * The browser's offline fallback reads the cache and never downloads into it, so it has no names to
+     * write - and a store that cannot record a download is a smaller thing to hand it than a second way of
+     * reaching the database.
+     */
+    private val areaDao: OfflineOtherTrackAreaDao? = null,
     private val downloader: OtherTracksDownloader = OtherTracksDownloader(),
     private val now: () -> Long = System::currentTimeMillis
 ) : OtherTracksCache {
@@ -46,7 +63,24 @@ class OfflineOtherTrackStore(
     /** A live count, for the offline screen to say what is stored, and for the map to redraw on. */
     override fun observeCount(): Flow<Int> = dao.observeCount()
 
-    suspend fun clear() = dao.deleteAll()
+    suspend fun clear() {
+        dao.deleteAll()
+        areaDao?.deleteAll()
+    }
+
+    /** The named downloads, newest first, for the offline screen's list. */
+    fun observeAreas(): Flow<List<OtherTrackArea>> = areaDao?.observeAll()
+        ?.map { areas -> areas.map { it.toArea() } }
+        ?: emptyFlow()
+
+    /**
+     * Forgets one named download, and nothing else.
+     *
+     * The tracks it brought stay: another named area may cover the same ground, and the cache is one copy
+     * keyed by the service's identifier. [clear] is what reclaims the space, which is the same bargain the
+     * drawn map's areas make.
+     */
+    suspend fun forgetArea(id: Long) = areaDao?.delete(id)
 
     /**
      * When the newest download of this source happened, or null when nothing is held.
@@ -64,24 +98,54 @@ class OfflineOtherTrackStore(
     suspend fun inventory(bounds: LatLngBounds): Int? = downloader.count(bounds)
 
     /**
-     * Downloads every track the service has inside [bounds] and stores it.
+     * Downloads every track the service has inside [bounds] and stores it, under [name].
      *
      * A download that stopped short **stores what arrived**: the next attempt asks again rather than
-     * starting from a blank cache, and what did arrive is already usable offline.
+     * starting from a blank cache, and what did arrive is already usable offline. It is named and listed
+     * for the same reason - what came back is what the walker has, and telling them otherwise would be
+     * worse than a short list.
+     *
+     * An area that turned out to hold nothing is not recorded: the walker was told so at the time, and a
+     * row reading "0 tracks" is a list of places where there is nothing to walk, which is not the list
+     * this is.
      */
     suspend fun download(
         bounds: LatLngBounds,
+        /** What the walker called this box: "the Tararuas", "Home". Blank is named before it gets here. */
+        name: String,
         /** How many have been read so far, called after each page. */
         onProgress: (read: Int) -> Unit = {}
     ): OtherTracksDownloadResult {
         val result = downloader.download(bounds, onProgress)
         store(result.tracks)
+        record(bounds, name, result.tracks.size)
         return result
+    }
+
+    private suspend fun record(bounds: LatLngBounds, name: String, count: Int) {
+        val areas = areaDao ?: return
+        if (count <= 0) return
+        areas.insert(
+            OfflineOtherTrackAreaEntity(
+                name = name.trim().ifEmpty { UNNAMED_AREA },
+                minLat = bounds.minLat,
+                minLng = bounds.minLng,
+                maxLat = bounds.maxLat,
+                maxLng = bounds.maxLng,
+                trackCount = count,
+                downloadedAtEpochMs = now()
+            )
+        )
     }
 
     private suspend fun store(tracks: List<OtherTrack>) {
         if (tracks.isEmpty()) return
         dao.insertAll(tracks.map { it.toEntity(now()) })
+    }
+
+    private companion object {
+        /** What a download nobody named is still called, so the list has no blank rows in it. */
+        const val UNNAMED_AREA = "Unnamed area"
     }
 }
 
@@ -112,6 +176,14 @@ private fun OtherTrack.toEntity(at: Long) = OfflineOtherTrackEntity(
     downloadedAtEpochMs = at
 )
 
+/** A named download's row back into the walker's own view of it. */
+private fun OfflineOtherTrackAreaEntity.toArea() = OtherTrackArea(
+    id = id,
+    name = name,
+    trackCount = trackCount,
+    downloadedAtEpochMs = downloadedAtEpochMs
+)
+
 /**
  * What is held of somebody else's tracks, in the walker's own terms: "412 tracks", "1 track".
  *
@@ -120,6 +192,30 @@ private fun OtherTrack.toEntity(at: Long) = OfflineOtherTrackEntity(
  */
 fun otherTracksHeldWords(count: Int): String =
     if (count == 1) "1 track" else "$count tracks"
+
+/**
+ * What the card says: **"3 areas · 412 tracks · the Tararuas, Home…"**, or what is held with no names on it.
+ *
+ * The same shape as the imagery's line, because the two cards are read the same way - how many boxes, how
+ * much is in them, and which ones - and the names are the point of naming them: a walker who downloaded
+ * three hillsides should be able to see at a glance which three.
+ *
+ * With tracks held and no areas listed, it says only how many: everything kept before this build was
+ * downloaded without a name, and inventing names for those would be making them up.
+ */
+fun otherTracksSummary(areas: List<OtherTrackArea>, count: Int): String {
+    if (areas.isEmpty()) {
+        return if (count == 0) "Nothing downloaded yet" else otherTracksHeldWords(count)
+    }
+    val boxes = if (areas.size == 1) "1 area" else "${areas.size} areas"
+    val names = areas.map { it.name }.take(2).joinToString(", ")
+    val more = if (areas.size > 2) "\u2026" else ""
+    return "$boxes \u00b7 ${otherTracksHeldWords(count)} \u00b7 $names$more"
+}
+
+/** One named download in the card: what it is called, and what came back from it. */
+fun otherTrackAreaWords(area: OtherTrackArea): String =
+    if (area.trackCount == 1) "1 track" else "${area.trackCount} tracks"
 
 /**
  * The sentence a download of somebody else's tracks earns, in the walker's own terms.

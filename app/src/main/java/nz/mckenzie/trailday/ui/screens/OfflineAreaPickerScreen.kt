@@ -109,9 +109,10 @@ fun OfflineAreaPickerScreen(
     val keepsOtherTracks = viewModel.mode == OfflinePickerMode.OTHER_TRACKS
     // A zoom range is what any pack of tiles is asked, and the imagery and the drawn map are both that.
     val keepsZooms = keepsImagery || topography
-    // A name belongs to a pack that keeps **areas** - imagery, and the drawn map - because an area is a row
-    // the walker finds again later. DOC's material is one cache with no rows, so there is nothing to name.
-    val keepsAreas = keepsImagery || topography
+    // A name belongs to a pack that keeps **areas** - imagery, the drawn map, and somebody else's tracks -
+    // because an area is a row the walker finds again later: "the Tararuas", "the Routeburn". DOC's material
+    // is one cache with no rows, so there is nothing to name.
+    val keepsAreas = keepsImagery || topography || keepsOtherTracks
 
     /**
      * The map the box is drawn on: **the pack's own, where it has one.**
@@ -142,7 +143,7 @@ fun OfflineAreaPickerScreen(
                         when (viewModel.mode) {
                             OfflinePickerMode.IMAGERY -> "Choose an offline area"
                             OfflinePickerMode.DOC_DATA -> "Choose a DOC area"
-                            OfflinePickerMode.TOPOGRAPHY -> "Choose an area to keep the map for"
+                            OfflinePickerMode.TOPOGRAPHY -> "Choose an area for the LINZ Topographic map"
                             OfflinePickerMode.AROUND_TRACK -> "Keep the ground around this track"
                             OfflinePickerMode.OTHER_TRACKS -> "Choose an area for other tracks"
                         }

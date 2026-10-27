@@ -17,6 +17,7 @@ import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.domain.doc.DocSource
+import nz.mckenzie.trailday.domain.other.OtherTrackArea
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.offline.OfflineArea
 import nz.mckenzie.trailday.offline.OfflineAreaManager
@@ -95,6 +96,15 @@ class OfflineViewModel(
      */
     val otherTracksDataCount: StateFlow<Int> = otherTracksStore.observeCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
+
+    /**
+     * The named boxes somebody else's tracks were downloaded for: **the walker's own list of places.**
+     *
+     * Listed rather than counted, because a count of tracks cannot say which hillsides are on the phone -
+     * "412 tracks" reads the same whether the Tararuas were kept or a box was drawn by accident.
+     */
+    val otherTrackAreas: StateFlow<List<OtherTrackArea>> = otherTracksStore.observeAreas()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     private val _docBounds = MutableStateFlow<LatLngBounds?>(null)
 
@@ -224,6 +234,13 @@ class OfflineViewModel(
         }
     }
 
+    /** Forgets one named box of them. The tracks stay until [clearOtherTracksData]. */
+    fun forgetOtherTrackArea(areaId: Long) {
+        viewModelScope.launch {
+            runCatching { otherTracksStore.forgetArea(areaId) }
+        }
+    }
+
     private fun refreshSummary() {
         viewModelScope.launch {
             _summary.value = runCatching { manager.summary() }.getOrDefault(TileStoreSummary(0, 0))
@@ -281,9 +298,11 @@ class OfflineViewModel(
                             downloader = DocDownloader.online()
                         ),
                         // The tracks other people publish: its own cache, filled by its own picker and
-                        // drawn by the map's second reference layer.
+                        // drawn by the map's second reference layer - and its list of named downloads,
+                        // which is this store's other half rather than the picker's.
                         otherTracksStore = OfflineOtherTrackStore(
-                            dao = database.offlineOtherTrackDao()
+                            dao = database.offlineOtherTrackDao(),
+                            areaDao = database.offlineOtherTrackAreaDao()
                         )
                     )
                 }

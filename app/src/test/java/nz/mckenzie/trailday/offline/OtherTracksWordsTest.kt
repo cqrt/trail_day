@@ -1,6 +1,7 @@
 package nz.mckenzie.trailday.offline
 
 import nz.mckenzie.trailday.domain.other.OtherTrack
+import nz.mckenzie.trailday.domain.other.OtherTrackArea
 import nz.mckenzie.trailday.other.OtherTracksDownloadResult
 import nz.mckenzie.trailday.other.OtherTracksDownloader
 import org.junit.Assert.assertEquals
@@ -20,6 +21,38 @@ class OtherTracksWordsTest {
     fun `one track is one track, and several are tracks`() {
         assertEquals("1 track", otherTracksHeldWords(1))
         assertEquals("412 tracks", otherTracksHeldWords(412))
+    }
+
+    @Test
+    fun `the card names the places the tracks were downloaded for`() {
+        // What was missing before: three downloads of three hillsides read as one number of tracks, with no
+        // way to tell "the Tararuas" from a box drawn by accident.
+        assertEquals(
+            "2 areas \u00b7 412 tracks \u00b7 the Tararuas, Home",
+            otherTracksSummary(areas("the Tararuas", "Home"), 412)
+        )
+    }
+
+    @Test
+    fun `more than two names are cut short rather than wrapped`() {
+        assertEquals(
+            "3 areas \u00b7 90 tracks \u00b7 Wellington, Home\u2026",
+            otherTracksSummary(areas("Wellington", "Home", "Nelson Lakes"), 90)
+        )
+    }
+
+    @Test
+    fun `tracks with no named area are counted and not named`() {
+        // Everything downloaded before this build was kept without a name, and inventing one would be
+        // making it up - so the card says only how much is there.
+        assertEquals("412 tracks", otherTracksSummary(emptyList(), 412))
+        assertEquals("Nothing downloaded yet", otherTracksSummary(emptyList(), 0))
+    }
+
+    @Test
+    fun `an area's own row says how many tracks came back`() {
+        assertEquals("1 track", otherTrackAreaWords(area(7, "Home", 1)))
+        assertEquals("412 tracks", otherTrackAreaWords(area(7, "Home", 412)))
     }
 
     @Test
@@ -60,4 +93,10 @@ class OtherTracksWordsTest {
     private fun tracks(count: Int): List<OtherTrack> = List(count) { index ->
         OtherTrack(globalId = "id-$index", name = "Track $index", paths = emptyList())
     }
+
+    private fun areas(vararg names: String): List<OtherTrackArea> =
+        names.mapIndexed { index, name -> area(index.toLong() + 1, name, 10) }
+
+    private fun area(id: Long, name: String, count: Int) =
+        OtherTrackArea(id = id, name = name, trackCount = count, downloadedAtEpochMs = 0L)
 }
