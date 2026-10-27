@@ -144,16 +144,51 @@ class OtherTracksListTest {
     }
 
     @Test
+    fun `a walkway interrupted by a road is still one walkway`() {
+        // Measured: "Kingswell Creek Walkway" is nine rows along one creek in Invercargill, and the gaps
+        // along it are 12, 21, 22 and 126 metres rather than nothing - a walkway stops at a road, a bridge
+        // and a piece of private land. Ten metres left it in four pieces, which is what a walker reported.
+        val joined = listOf(kingswellEast, kingswellMiddle, kingswellWest).joinedByName()
+
+        assertEquals("three separated sections are one walkway", 1, joined.size)
+        assertEquals(3, joined.single().paths.size)
+    }
+
+    @Test
     fun `two rows whose ends are a gap apart are not joined`() {
-        // Ten metres is the allowance: the measured joins are 0.0 m and the nearest different walkway of
-        // the same name was 355 m.
+        // Five hundred metres: beyond any separation measured inside one walkway (the worst was 126 m), so
+        // a same-named track that far away is a different walk.
         val far = track(
             name = "Otatara Scenic Reserve Walkway",
             facts = arrayOf("Walk" to "3"),
-            paths = listOf(listOf(GeoPoint(-46.4290, 168.3000), GeoPoint(-46.4295, 168.3005)))
+            paths = listOf(listOf(GeoPoint(-46.42866, 168.30600), GeoPoint(-46.42900, 168.30640))),
+            id = "ff"
         )
 
         assertEquals(2, listOf(otataraA, far).joinedByName().size)
+    }
+
+    @Test
+    fun `two tracks nobody named are not joined, however close they are`() {
+        // A fifth of the dataset has a placeholder in its name field and is renamed after its locality, so
+        // twelve unnamed tracks in Mount Victoria all read "Mount Victoria". Joining on that would draw one
+        // enormous fake track across a suburb; the publisher's own name is what may join two rows.
+        val first = track(
+            name = "Mount Victoria",
+            facts = arrayOf("Walk" to "3"),
+            paths = listOf(listOf(GeoPoint(-41.2900, 174.7900), GeoPoint(-41.2905, 174.7905))),
+            id = "u1",
+            published = "Unnamed Track"
+        )
+        val second = track(
+            name = "Mount Victoria",
+            facts = arrayOf("Walk" to "3"),
+            paths = listOf(listOf(GeoPoint(-41.2905, 174.7905), GeoPoint(-41.2910, 174.7910))),
+            id = "u2",
+            published = "Unnamed Track"
+        )
+
+        assertEquals(2, listOf(first, second).joinedByName().size)
     }
 
     @Test
@@ -171,8 +206,8 @@ class OtherTracksListTest {
     @Test
     fun `a joined walkway is found by every publisher of it`() {
         val whole = listOf(
-            otataraA.copy(facts = mapOf("Walk" to "3", "DataSupplier" to "Invercargill City Council")),
-            otataraB.copy(facts = mapOf("Walk" to "3", "DataSupplier" to "Southland District Council"))
+            otataraA.copy(facts = otataraA.facts + ("DataSupplier" to "Invercargill City Council")),
+            otataraB.copy(facts = otataraB.facts + ("DataSupplier" to "Southland District Council"))
         ).joinedByName().single()
 
         assertEquals(
@@ -234,12 +269,46 @@ class OtherTracksListTest {
         id = "zz"
     )
 
+    /**
+     * Three of the nine real sections of "Kingswell Creek Walkway", with the service's own coordinates.
+     *
+     * The gaps between them are 21 m and 126 m - measured, not invented - which is what a walkway
+     * interrupted by roads looks like.
+     */
+    private val kingswellEast = track(
+        name = "Kingswell Creek Walkway",
+        facts = arrayOf("Walk" to "3"),
+        paths = listOf(listOf(GeoPoint(-46.43923, 168.37170), GeoPoint(-46.43922, 168.38069))),
+        id = "k1"
+    )
+
+    private val kingswellMiddle = track(
+        name = "Kingswell Creek Walkway",
+        facts = arrayOf("Walk" to "3"),
+        paths = listOf(listOf(GeoPoint(-46.43951, 168.36225), GeoPoint(-46.43916, 168.37143))),
+        id = "k2"
+    )
+
+    private val kingswellWest = track(
+        name = "Kingswell Creek Walkway",
+        facts = arrayOf("Walk" to "3"),
+        paths = listOf(listOf(GeoPoint(-46.44047, 168.36135), GeoPoint(-46.44073, 168.36101))),
+        id = "k3"
+    )
+
     private fun track(
         name: String,
         facts: Array<Pair<String, String>>,
         paths: List<List<GeoPoint>>,
-        id: String = name
-    ) = OtherTrack(globalId = id, name = name, paths = paths, facts = facts.toMap())
+        id: String = name,
+        /** What the publisher put in the name field, which is what a join is allowed to look at. */
+        published: String = name
+    ) = OtherTrack(
+        globalId = id,
+        name = name,
+        paths = paths,
+        facts = (facts + arrayOf(OtherTracksUrl.NAME_FIELD to published)).toMap()
+    )
 
     private val wellington = GeoPoint(lat = -41.2865, lng = 174.7762)
 

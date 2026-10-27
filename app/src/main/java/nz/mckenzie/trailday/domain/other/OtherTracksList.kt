@@ -104,12 +104,22 @@ fun List<OtherTrack>.matching(nameContains: String): List<OtherTrack> {
 /**
  * How near two pieces' ends have to be to be one walkway, in metres.
  *
- * **Measured rather than guessed.** "Otatara Scenic Reserve Walkway" arrives as five rows: four around
- * Invercargill whose ends coincide *exactly* - 0.0 m between them - and a fifth "Otatara" in Napier, 900 km
- * away, which must not join them. Ten metres leaves room for a re-survey to move a cut end a little
- * without ever bringing a different walkway in.
+ * **Measured rather than guessed, and it started at ten metres and was wrong.** Two walkways settled the
+ * number between them:
+ *
+ *  - "Otatara Scenic Reserve Walkway" is four rows around Invercargill whose ends coincide *exactly* - 0.0 m
+ *    - and a fifth "Otatara" in Napier, 900 km away, which must not join them. A name alone would merge
+ *    those.
+ *  - "Kingswell Creek Walkway" is **nine** rows along one creek in Invercargill, and only some of them
+ *    touch: the gaps along it are **12, 21, 22 and 126 metres**, because a walkway is interrupted by roads,
+ *    bridges and private land. At ten metres it stayed four rows, which is what a walker reported.
+ *
+ * Two hundred metres covers the worst real separation measured with room to spare, and it is only safe
+ * because **a name has to match as well**: two differently named walkways are never joined, however close
+ * they are, and two walkways with the same name within a couple of hundred metres are one walkway in two
+ * parts - for a walker standing on it, they are the same walk.
  */
-private const val JOIN_TOLERANCE_M = 10.0
+private const val JOIN_TOLERANCE_M = 200.0
 
 /**
  * The walkways the dataset publishes in pieces, as one track each.
@@ -125,6 +135,11 @@ private const val JOIN_TOLERANCE_M = 10.0
  * points. Pieces are then gathered into whole walkways, so four rows that meet in a loop become one track
  * rather than two pairs.
  *
+ * **The name that counts is the publisher's, not the one the app shows.** A fifth of the dataset's rows have
+ * a placeholder in the name field and are renamed after their locality, so twelve unnamed tracks in Mount
+ * Victoria all read "Mount Victoria": joining on that would draw one enormous fake track across a suburb.
+ * [publishedName] answers "did somebody actually name this", and a row nobody named never joins anything.
+ *
  * The joined track keeps the **lowest service id** of its pieces, so which row stands for a walkway does
  * not depend on the order the service happened to answer in. Its paths stay apart - they meet, so they draw
  * as one line - and its publishers are all of them, because narrowing by a council means a track that
@@ -133,11 +148,12 @@ private const val JOIN_TOLERANCE_M = 10.0
 fun List<OtherTrack>.joinedByName(toleranceM: Double = JOIN_TOLERANCE_M): List<OtherTrack> {
     if (size < 2) return this
 
-    // Grouped by name first: only rows that share a name can be the same walkway, and a list is thousands
-    // of rows, which is not worth comparing every pair of.
+    // Grouped by published name first: only rows somebody named the same can be the same walkway, and a
+    // list is thousands of rows, which is not worth comparing every pair of.
     val groups = LinkedHashMap<String, MutableList<Int>>()
     forEachIndexed { index, track ->
-        groups.getOrPut(track.name.trim().lowercase()) { mutableListOf() } += index
+        val named = track.publishedName()?.lowercase() ?: return@forEachIndexed
+        groups.getOrPut(named) { mutableListOf() } += index
     }
 
     val replaced = arrayOfNulls<OtherTrack>(size)

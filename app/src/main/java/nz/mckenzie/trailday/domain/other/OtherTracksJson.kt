@@ -66,22 +66,15 @@ object OtherTracksJson {
      *
      * The locality alone rather than "Mount Victoria track": a row's second line already says what it is
      * ("Walking Track · Wellington City Council"), and the place is the useful half of the name.
+     *
+     * **A name made up here is never used to join rows into one walkway** - see `publishedName` - which is
+     * why twelve unnamed tracks in one suburb, all showing the suburb's name, stay twelve rows.
      */
     private fun nameOf(feature: GeoJsonParser.Feature): String {
         val given = feature.name?.trim().orEmpty()
-        if (given.isNotEmpty() && !isPlaceholder(given)) return given
+        if (given.isNotEmpty() && !isPlaceholderName(given)) return given
         return feature.properties[LOCALITY]?.trim()?.takeIf { it.isNotEmpty() } ?: UNNAMED_FALLBACK
     }
-
-    /**
-     * Whether the dataset put something in the name field that is not a name.
-     *
-     * Anchored and case-blind, so a track genuinely called "Trackway" is left alone - the three values it
-     * catches were read off the live service rather than guessed at.
-     */
-    private fun isPlaceholder(name: String): Boolean = PLACEHOLDER.matches(name)
-
-    private val PLACEHOLDER = Regex("(?i)unnamed track|track( \\d+)?")
 
     /** What a row with neither a name nor a locality is left saying, in the app's own casing. */
     private const val UNNAMED_FALLBACK = "Unnamed track"

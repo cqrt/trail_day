@@ -59,6 +59,14 @@ object OtherTracksUrl {
     const val OBJECT_ID_FIELD = "OBJECTID"
 
     /**
+     * What the publisher called the track.
+     *
+     * Named because two things read it rather than one: the row is drawn under this name when it is a
+     * name at all, and it is the only thing allowed to join two rows into one walkway - see [joinedByName].
+     */
+    const val NAME_FIELD = "Name"
+
+    /**
      * What the app asks for: the key, the name, and everything a row and a page have words for.
      *
      * **Named one by one rather than asked for whole.** A row of this dataset carries about twenty
@@ -68,7 +76,7 @@ object OtherTracksUrl {
      */
     val OUT_FIELDS: List<String> = listOf(
         GLOBAL_ID_FIELD,
-        "Name",
+        NAME_FIELD,
         "Locality",
         "LocalAuthority",
         "DataSupplier",
