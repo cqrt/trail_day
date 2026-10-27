@@ -104,6 +104,10 @@ class MainActivity : ComponentActivity() {
                 var selectedDocBike by remember { mutableStateOf<DocItem?>(null) }
                 var docDetailOrigin by remember { mutableStateOf(Destination.MAP) }
 
+                // Where somebody else's track was opened from: the map's own tap, or the browser that lists
+                // them. Its page is reached from two places and Back has to return to the one that asked.
+                var otherTrackDetailOrigin by remember { mutableStateOf(Destination.MAP) }
+
                 /**
                  * Somebody else's track, on its way to its own page.
                  *
@@ -128,10 +132,10 @@ class MainActivity : ComponentActivity() {
 
                 // System back returns the way the walker came, and never leaves the app.
                 BackHandler(enabled = destination != Destination.MAP) {
-                    destination = if (destination == Destination.DOC_DETAIL) {
-                        docDetailOrigin
-                    } else {
-                        Destination.MAP
+                    destination = when (destination) {
+                        Destination.DOC_DETAIL -> docDetailOrigin
+                        Destination.OTHER_TRACK_DETAIL -> otherTrackDetailOrigin
+                        else -> Destination.MAP
                     }
                 }
 
@@ -178,6 +182,7 @@ class MainActivity : ComponentActivity() {
                             },
                             onOpenOtherTrack = { track ->
                                 selectedOtherTrack = track
+                                otherTrackDetailOrigin = Destination.MAP
                                 destination = Destination.OTHER_TRACK_DETAIL
                             }
                         )
@@ -263,6 +268,7 @@ class MainActivity : ComponentActivity() {
                             onBack = { destination = Destination.ASSETS },
                             onOpenTrack = { track ->
                                 selectedOtherTrack = track
+                                otherTrackDetailOrigin = Destination.OTHER_TRACKS_BROWSER
                                 destination = Destination.OTHER_TRACK_DETAIL
                             }
                         )
@@ -279,10 +285,10 @@ class MainActivity : ComponentActivity() {
                             )
                             OtherTrackScreen(
                                 viewModel = otherTrackViewModel,
-                                // Back to the map, which is the only place this page is opened from: the
-                                // browser that will open it too is the next piece of this work, and it
-                                // brings its own origin with it.
-                                onBack = { destination = Destination.MAP },
+                                // Back to whichever list or map asked for the track, not always the map: the
+                                // browser is where most of these are opened, and a walker reading a page of
+                                // council walkways wants the page back, not a jump to the map.
+                                onBack = { destination = otherTrackDetailOrigin },
                                 onFollow = { followed ->
                                     PendingFollow.offer(followed)
                                     destination = Destination.RECORD
