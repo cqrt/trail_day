@@ -1,6 +1,7 @@
 package nz.mckenzie.trailday.offline
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import java.net.HttpURLConnection
@@ -36,42 +37,17 @@ class LinzTileFetcher(
 
     override suspend fun fetch(zoom: Int, x: Int, y: Int): TileFetcher.Result =
         withContext(Dispatchers.IO) {
-            val url = URL(urlFor(zoom, x, y))
-
-            val result = runCatching {
-                val connection = (url.openConnection() as HttpURLConnection).apply {
-                    requestMethod = "GET"
-                    connectTimeout = connectTimeoutMs
-                    readTimeout = readTimeoutMs
-                    setRequestProperty("User-Agent", sprayDayUserAgent())
-                    setRequestProperty("Accept", accept)
-                }
-                try {
-                    when (val code = connection.responseCode) {
-                        HttpURLConnection.HTTP_OK -> {
-                            val bytes = connection.inputStream.use { it.readBytes() }
-                            if (bytes.isEmpty()) {
-                                TileFetcher.Result.Failed("empty response")
-                            } else {
-                                TileFetcher.Result.Tile(bytes)
-                            }
-                        }
-
-                        HttpURLConnection.HTTP_NOT_FOUND -> TileFetcher.Result.NotFound
-
-                        HttpURLConnection.HTTP_BAD_REQUEST ->
-                            TileFetcher.Result.Failed("LINZ rejected the key (HTTP 400): it may have expired")
-
-                        TOO_MANY_REQUESTS ->
-                            TileFetcher.Result.Failed("rate limited by LINZ (HTTP 429)")
-
-                        else -> TileFetcher.Result.Failed("HTTP $code")
-                    }
-                } finally {
-                    connection.disconnect()
-                }
-            }.getOrElse { error ->
-                TileFetcher.Result.Failed(error.message ?: error::class.java.simpleName)
+            // **A tile is asked for again before it is called a failure.** A walker reported the "this map is
+            // not drawing" notice arriving while their key was fine and they were online - and one dropped
+            // connection during a pan is enough to fail a screenful, which is the run that raises the
+            // notice. Three attempts a few hundred milliseconds apart turn that blip into a slower tile; a
+            // source that is genuinely not answering still fails all three.
+            var result = attempt(zoom, x, y)
+            var tries = 1
+            while (tries < ATTEMPTS && worthRetrying(result)) {
+                delay(RETRY_PAUSE_MS * tries)
+                result = attempt(zoom, x, y)
+                tries += 1
             }
 
             // Every LINZ tile this app fetches comes through here - the map's own, the place names', the
@@ -85,7 +61,70 @@ class LinzTileFetcher(
             result
         }
 
+    /** One request for one tile, with no retrying: see [fetch]. */
+    private fun attempt(zoom: Int, x: Int, y: Int): TileFetcher.Result {
+        val url = URL(urlFor(zoom, x, y))
+
+        return runCatching {
+            val connection = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = connectTimeoutMs
+                readTimeout = readTimeoutMs
+                setRequestProperty("User-Agent", sprayDayUserAgent())
+                setRequestProperty("Accept", accept)
+            }
+            try {
+                when (val code = connection.responseCode) {
+                    HttpURLConnection.HTTP_OK -> {
+                        val bytes = connection.inputStream.use { it.readBytes() }
+                        if (bytes.isEmpty()) {
+                            TileFetcher.Result.Failed("empty response")
+                        } else {
+                            TileFetcher.Result.Tile(bytes)
+                        }
+                    }
+
+                    HttpURLConnection.HTTP_NOT_FOUND -> TileFetcher.Result.NotFound
+
+                    HttpURLConnection.HTTP_BAD_REQUEST ->
+                        TileFetcher.Result.Failed(KEY_REFUSED)
+
+                    TOO_MANY_REQUESTS ->
+                        TileFetcher.Result.Failed("rate limited by LINZ (HTTP 429)")
+
+                    else -> TileFetcher.Result.Failed("HTTP $code")
+                }
+            } finally {
+                connection.disconnect()
+            }
+        }.getOrElse { error ->
+            TileFetcher.Result.Failed(error.message ?: error::class.java.simpleName)
+        }
+    }
+
     private companion object {
         const val TOO_MANY_REQUESTS = 429
+
+        /** How many times one tile is asked for. */
+        const val ATTEMPTS = 3
+
+        /** The pause before the second attempt, doubled before the third: a moment for a blip to pass. */
+        const val RETRY_PAUSE_MS = 250L
     }
+}
+
+/** What a tile said when the key itself was refused. */
+private const val KEY_REFUSED = "LINZ rejected the key (HTTP 400): it may have expired"
+
+/**
+ * Whether asking for the same tile again could give a different answer.
+ *
+ * **A key LINZ has rejected reads the same three times** - the request is right and the key is not - so the
+ * retries are not spent on it, and the notice is reached the sooner for it. Everything else that fails is a
+ * dropped connection, a timeout, an empty body or a server having a moment, which is exactly what a second
+ * request is for.
+ */
+internal fun worthRetrying(result: TileFetcher.Result): Boolean = when (result) {
+    is TileFetcher.Result.Failed -> result.message != KEY_REFUSED
+    else -> false
 }

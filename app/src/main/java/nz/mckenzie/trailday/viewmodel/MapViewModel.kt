@@ -184,7 +184,14 @@ class MapViewModel(
      * none it is the proxy's business, and the proxy's answer is the one worth repeating.
      */
     val basemapTrouble: StateFlow<String?> = TileTrouble.showing
-        .map { showing -> if (showing) askWhatIsWrong() else null }
+        .map { showing ->
+            if (!showing) return@map null
+            val said = askWhatIsWrong()
+            // **Asking takes a round trip, and the tiles may come back while it is being asked.** A blip
+            // that has already ended is not something to tell a walker about: the notice would appear and
+            // leave again, which reads as the app being unreliable rather than the map having a moment.
+            if (TileTrouble.consecutiveFailures.value == 0) null else said
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
     /**
