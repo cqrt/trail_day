@@ -6,8 +6,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -113,6 +115,9 @@ class DocBrowserViewModel(
     private val _name = MutableStateFlow("")
     val name: StateFlow<String> = _name
 
+    /** The search in hand: a pause behind the text field, or a request on its way. */
+    private var searchJob: Job? = null
+
     private val _nearMe = MutableStateFlow(false)
     val nearMe: StateFlow<Boolean> = _nearMe
 
@@ -217,7 +222,11 @@ class DocBrowserViewModel(
     }
 
     fun onNameChange(value: String) {
+        if (value == _name.value) return
         _name.value = value
+        // **Results as you type**: the same rule as the other browser's box - a pause, not a keystroke, and
+        // a keystroke after the pause cancels the search it woke.
+        launchSearch(waitMs = SEARCH_DEBOUNCE_MS)
     }
 
     fun onNearMeChange(value: Boolean) {
@@ -266,25 +275,36 @@ class DocBrowserViewModel(
         _sort.value = sort
     }
 
-    fun search() {
-        val nearMe = _nearMe.value
-        val position = if (nearMe) fix.value else null
-        if (nearMe && position == null) {
-            // Near me with no fix is not a name search: the place is the whole question, and dropping it
-            // silently is how a hut 80 km away turns up under a 50 km radius.
-            _message.value = "Waiting for a location fix. Try again in a moment, or turn off Near me " +
-                "to search by name."
-            return
-        }
-        val name = _name.value.trim()
-        if (name.isEmpty() && position == null) {
-            _message.value = "Type part of a name, or turn on Near me."
-            return
-        }
-        val radius = _radiusKm.value.trim().toDoubleOrNull()?.takeIf { it > 0.0 } ?: DEFAULT_RADIUS_KM
-        val wanted = _source.value
+    /**
+     * Searches now, replacing any search already running.
+     *
+     * The button, the keyboard's search key and the debounce behind the text field all land here, so typing
+     * and pressing cannot come to mean two things.
+     */
+    fun search() = launchSearch(waitMs = 0)
 
-        viewModelScope.launch {
+    private fun launchSearch(waitMs: Long) {
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            if (waitMs > 0) delay(waitMs)
+
+            val nearMe = _nearMe.value
+            val position = if (nearMe) fix.value else null
+            if (nearMe && position == null) {
+                // Near me with no fix is not a name search: the place is the whole question, and dropping it
+                // silently is how a hut 80 km away turns up under a 50 km radius.
+                _message.value = "Waiting for a location fix. Try again in a moment, or turn off Near me " +
+                    "to search by name."
+                return@launch
+            }
+            val name = _name.value.trim()
+            if (name.isEmpty() && position == null) {
+                _message.value = "Type part of a name, or turn on Near me."
+                return@launch
+            }
+            val radius = _radiusKm.value.trim().toDoubleOrNull()?.takeIf { it > 0.0 } ?: DEFAULT_RADIUS_KM
+            val wanted = _source.value
+
             _busy.value = true
             _message.value = null
             val query = DocQuery(source = wanted, nameContains = name, near = position, radiusKm = radius)
@@ -391,6 +411,14 @@ class DocBrowserViewModel(
     companion object {
         /** How far around the phone a "Near me" search looks, until the walker says otherwise. */
         private const val DEFAULT_RADIUS_KM = 25.0
+
+        /**
+         * How long the search box waits after a keystroke before asking the service.
+         *
+         * Long enough that typing "Angelus" is one request rather than seven, short enough that the list
+         * still reads as following the typing. The same pause as the other browser's box.
+         */
+        private const val SEARCH_DEBOUNCE_MS = 350L
 
         /** How long the derived flows stay warm after the screen stops looking. */
         private const val STOP_TIMEOUT_MS = 5_000L

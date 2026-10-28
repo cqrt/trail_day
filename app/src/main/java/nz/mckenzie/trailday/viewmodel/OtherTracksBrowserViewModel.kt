@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -59,6 +61,9 @@ class OtherTracksBrowserViewModel(
 
     private val _name = MutableStateFlow("")
     val name: StateFlow<String> = _name
+
+    /** The search in hand: a pause behind the text field, or a request on its way. */
+    private var searchJob: Job? = null
 
     private val _nearMe = MutableStateFlow(false)
     val nearMe: StateFlow<Boolean> = _nearMe
@@ -145,10 +150,6 @@ class OtherTracksBrowserViewModel(
         }
     }
 
-    fun onNameChange(value: String) {
-        _name.value = value
-    }
-
     fun onNearMeChange(value: Boolean) {
         _nearMe.value = value
     }
@@ -184,24 +185,50 @@ class OtherTracksBrowserViewModel(
         _wheelchairOnly.value = value
     }
 
-    fun search() {
-        val nearMe = _nearMe.value
-        val position = if (nearMe) fix.value else null
-        if (nearMe && position == null) {
-            // Near me with no fix is not a name search: the place is the whole question, and dropping it
-            // silently is how a track 80 km away turns up under a 50 km radius.
-            _message.value = "Waiting for a location fix. Try again in a moment, or turn off Near me " +
-                "to search by name."
-            return
-        }
-        val name = _name.value.trim()
-        if (name.isEmpty() && position == null) {
-            _message.value = "Type part of a name, or turn on Near me."
-            return
-        }
-        val radius = _radiusKm.value.trim().toDoubleOrNull()?.takeIf { it > 0.0 } ?: DEFAULT_RADIUS_KM
+    /**
+     * Searches now, replacing any search already running.
+     *
+     * The button and the keyboard's search key both land here, and so does the debounce behind the text
+     * field - one place decides what a search is, so typing and pressing cannot come to mean two things.
+     */
+    fun search() = launchSearch(waitMs = 0)
 
-        viewModelScope.launch {
+    /**
+     * **Results as you type**: the field's own changes start a search, after a pause.
+     *
+     * A search is a request to somebody else's service, so a keystroke cannot be one. The pause is
+     * [SEARCH_DEBOUNCE_MS] - long enough that typing "Lake Hayes" is one search rather than ten, short
+     * enough that it feels like the list is following the typing. A keystroke after the pause **cancels
+     * the search it woke**, so a slow answer cannot land on top of a newer one and show results for a name
+     * the walker has already changed.
+     */
+    fun onNameChange(value: String) {
+        if (value == _name.value) return
+        _name.value = value
+        launchSearch(waitMs = SEARCH_DEBOUNCE_MS)
+    }
+
+    private fun launchSearch(waitMs: Long) {
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            if (waitMs > 0) delay(waitMs)
+
+            val nearMe = _nearMe.value
+            val position = if (nearMe) fix.value else null
+            if (nearMe && position == null) {
+                // Near me with no fix is not a name search: the place is the whole question, and dropping it
+                // silently is how a track 80 km away turns up under a 50 km radius.
+                _message.value = "Waiting for a location fix. Try again in a moment, or turn off Near me " +
+                    "to search by name."
+                return@launch
+            }
+            val name = _name.value.trim()
+            if (name.isEmpty() && position == null) {
+                _message.value = "Type part of a name, or turn on Near me."
+                return@launch
+            }
+            val radius = _radiusKm.value.trim().toDoubleOrNull()?.takeIf { it > 0.0 } ?: DEFAULT_RADIUS_KM
+
             _busy.value = true
             _message.value = null
 
@@ -256,6 +283,14 @@ class OtherTracksBrowserViewModel(
 
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L
+
+        /**
+         * How long the search box waits after a keystroke before asking the service.
+         *
+         * Long enough that typing "Lake Hayes" is one request rather than ten, short enough that the list
+         * still reads as following the typing.
+         */
+        private const val SEARCH_DEBOUNCE_MS = 350L
 
         /** How far around the phone "Near me" looks until the walker says otherwise. */
         const val DEFAULT_RADIUS_KM = 25.0
