@@ -5,6 +5,7 @@ import kotlinx.coroutines.runBlocking
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.other.OtherTrack
 import nz.mckenzie.trailday.domain.other.OtherTracksQuery
+import nz.mckenzie.trailday.domain.reference.nearbyBandsFor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -23,10 +24,10 @@ class OtherTracksSearcherTest {
     fun `the rings asked are the radii a walker has been shown, smallest first`() {
         assertEquals(
             listOf(5.0, 10.0, 25.0, 50.0, 100.0, 150.0, 200.0),
-            OtherTracksSearcher.bandsFor(200.0)
+            nearbyBandsFor(200.0)
         )
-        assertEquals(listOf(5.0, 10.0, 25.0, 30.0), OtherTracksSearcher.bandsFor(30.0))
-        assertEquals(listOf(3.0), OtherTracksSearcher.bandsFor(3.0))
+        assertEquals(listOf(5.0, 10.0, 25.0, 30.0), nearbyBandsFor(30.0))
+        assertEquals(listOf(3.0), nearbyBandsFor(3.0))
     }
 
     @Test

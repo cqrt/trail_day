@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDownloader
+import nz.mckenzie.trailday.doc.DocNearestSearcher
 import nz.mckenzie.trailday.doc.DocReadResult
 import nz.mckenzie.trailday.doc.DocReader
 import nz.mckenzie.trailday.domain.doc.DocBikeLinks
@@ -46,8 +47,13 @@ import nz.mckenzie.trailday.tracking.DevicePosition
  *
  * A short page is DOC saying that is all there is, so it earns nothing.
  */
-internal fun docPageMessage(sent: Int, shown: Int): String? =
-    referencePageMessage(sent = sent, shown = shown, limit = DocQuery.DEFAULT_LIMIT)
+internal fun docPageMessage(sent: Int, shown: Int, nearest: Boolean = false): String? =
+    referencePageMessage(
+        sent = sent,
+        shown = shown,
+        limit = DocQuery.DEFAULT_LIMIT,
+        nearest = nearest
+    )
 
 /**
  * The line a browser says above a page of results, or null when the service's answer was the whole answer.
@@ -293,9 +299,26 @@ class DocBrowserViewModel(
                 else -> null
             }
             val (result, companion) = coroutineScope {
-                val primary = async { reader.search(query) }
+                // **Nearest first, in rings outward** when the search is near the phone: one page of a
+                // bigger box is spent on whichever rows DOC lists first, so huts and tracks disappeared as
+                // the radius grew. See [DocNearestSearcher].
+                val nearest = DocNearestSearcher(reader)
+                val primary = async {
+                    if (position == null) {
+                        reader.search(query)
+                    } else {
+                        nearest.nearest(query, at = position, radiusKm = radius)
+                    }
+                }
                 val secondary = companionSource?.let { source ->
-                    async { reader.search(query.copy(source = source)) }
+                    val ask = query.copy(source = source)
+                    async {
+                        if (position == null) {
+                            reader.search(ask)
+                        } else {
+                            nearest.nearest(ask, at = position, radiusKm = radius)
+                        }
+                    }
                 }
                 primary.await() to secondary?.await()
             }
@@ -320,7 +343,8 @@ class DocBrowserViewModel(
                     _searched.value = true
                     _message.value = docPageMessage(
                         sent = result.items.size,
-                        shown = primaryItems.size
+                        shown = primaryItems.size,
+                        nearest = position != null
                     )
                 }
 
