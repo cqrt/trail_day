@@ -19,9 +19,9 @@ from a blank page here — it starts from the last paragraph.
   "It shipped as 0.3.NN." One release, one paragraph, however many commits it took.
 - `README.md` is what the app does and how it is built and released.
 - `docs/*.md` is one file per feature that needed more than a paragraph: `doc-tracks.md`,
-  `place-names.md`, `elevation.md`, `side-tracks.md`, `carparks.md`, `kind-filter.md`,
-  `map-by-kind.md`, `te-araroa.md`, `developer-options.md`, `web-editor.md`,
-  `trail-day-conversion.md`.
+  `place-names.md`, `elevation.md`, `side-tracks.md`, `te-araroa.md`, `developer-options.md`,
+  `web-editor.md`. They describe the app as it is now, in the same plain voice as `README.md`: short
+  sentences, "you", and no history - the history is `trail-day-plan.md`.
 - **A paragraph that says "It shipped as 0.3.NN" is a claim that a tag exists.** Check.
 
 ## How a change lands

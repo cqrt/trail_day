@@ -1,209 +1,182 @@
 # Trail Day
 
-A map for walking and riding the New Zealand backcountry: DOC's tracks, huts, campsites and bike
-trails, the tracks councils, trusts and clubs publish, the places you keep, and the walks you record -
-over maps and material you can carry with no reception.
+Trail Day is an Android app for walking and riding in the New Zealand backcountry. It puts DOC's tracks, huts and campsites, tracks published by councils and trusts, your own saved places and your recorded trips on one map, and it can keep all of that on your phone so it still works when you have no reception.
 
-Everything the app knows is worked out on the phone. It keeps its own copy of what it has been asked
-for and what you have looked at, and it serves a page to a laptop on the same Wi-Fi when a bigger
-screen is what you want.
+You find a track or hut, save it, download the map around it, and then follow it and record your trip. A lot of it also works from a laptop browser on the same Wi-Fi.
 
-## What it does
+It's installed straight from GitHub rather than a store, and updates itself from there.
 
-- **The map is the app.** Your own dot, your places, DOC's material and other people's tracks over
-  the ground itself, and nothing else in the way. The dot is on every map, ringed by the accuracy the
-  fix was actually good to, and one button puts the camera back on it.
-- **Four maps to read the land by**: LINZ aerial imagery, LINZ's own Topographic map, OpenStreetMap
-  and OpenTopoMap. **No map asks you for a key.**
-- **Kept for no reception**: a box of aerial imagery or of the Topographic map, and DOC's material and
-  other publishers' tracks by region - downloaded, named, listed, and deleted again when you are done.
-- **Places**, in five kinds - track, bike track, hut, campsite and waypoint - imported from GPX, KML,
-  KMZ or GeoJSON, drawn on the map, or recorded by walking them. A line may carry **side tracks**
-  hanging off it.
-- **Recording a walk**, kept as a trip with its line, distance, time and every fix, written down as
-  the fixes arrive rather than at the end.
-- **DOC, searched at the source** - its tracks, huts, campsites and bike trails - by name or near you,
-  and imported in one tap.
-- **Other people's tracks**, from Herenga ā Nuku Aotearoa's National Tracks Dataset: the walkways and
-  routes that councils, regional councils, trail trusts, clubs and Te Araroa publish. Searched,
-  imported, and drawn as their own layer.
-- **A laptop can use it too**: the same map, the same places, the same two browsers, and drawing or
-  tidying a line with a mouse.
-- **Backup and restore**: one JSON file holding the places and every trip, plus a copy written off the
-  phone by the app itself.
-- **Updates from inside the app**, because nothing else will ever mention that a new version exists.
+- Android 8.0 or newer
+- Written in Kotlin with Jetpack Compose, Room for storage, and MapLibre for the map
+- App id `nz.mckenzie.trailday`
 
-## The maps
+## The five tabs
 
-| Map | What it shows | Offline |
-| --- | --- | --- |
-| **Aerial imagery** (LINZ) | A photograph of the ground, which is what a route is planned from | downloadable |
-| **Topographic** (LINZ) | LINZ's drawn map, with contours and a hillshade | downloadable |
-| **OpenStreetMap** | Roads, tracks, gates and names, drawn by their community | cached as you look at it |
-| **OpenTopoMap** | The same, with contours and heights | cached as you look at it |
+| Tab | What it's for |
+| --- | --- |
+| **Map** | Your location, your places, and DOC and other tracks, over the base map you pick |
+| **Places** | Everything you've saved or imported: tracks, bike tracks, huts, campsites and waypoints |
+| **Record** | Record a walk or ride, either as a new route or along a place you already have |
+| **Activities** | The trips you've recorded |
+| **Offline** | What's downloaded to the phone, and where you start new downloads |
 
-LINZ's tiles are fetched through the app's own Cloudflare Worker (`worker-linz/`), which holds the
-LINZ Basemaps key as a secret. That is why there is no key to paste into Settings, and why LINZ's
-90-day key rotation is a command rather than a release. A walker with a key of their own may use it
-instead, from **Developer options**: tap the version line in Settings seven times. See
-[`docs/developer-options.md`](docs/developer-options.md).
+Settings, a single place's page, the DOC browser and the other-tracks browser all open from these tabs.
 
-**OpenStreetMap and OpenTopoMap are cached, never downloaded ahead.** Their tile policy forbids bulk
-fetching and offline packs, so the two downloadable packs are the two LINZ maps, and what you have
-looked at is still there with no signal.
+## Base maps
 
-**Place names can be drawn over the imagery** - LINZ's own names for towns, peaks, lakes and rivers -
-from the map's **What the map draws** sheet, off by default. They come through the app's own tile
-server, so anywhere you have looked at keeps its names offline. See
-[`docs/place-names.md`](docs/place-names.md).
+You can switch between four:
 
-**If the imagery stops, the app says so** rather than leaving a blank map: "LINZ rejected the key
-(HTTP 403): it may have expired", or "The map service could not be reached", with a one-tap switch to
-OpenStreetMap under it, which needs no key.
+- **LINZ aerial imagery**: satellite-style photos of the ground
+- **LINZ Topographic**: LINZ's own drawn map, with contours and shading
+- **OpenStreetMap**
+- **OpenTopoMap**: like OpenStreetMap but with contours
 
-## Offline
+None of them need an API key. The LINZ maps go through a small Cloudflare Worker (`worker-linz/`) that holds the LINZ key, so the key never ends up in the app. LINZ keys expire every 90 days, and this way renewing one is a quick change on the Worker rather than a new app release. If you do have your own LINZ key, tap the version number in Settings seven times to unlock Developer options and enter it there ([details](docs/developer-options.md)).
 
-The **Offline** page lists what is kept and has **Download an area** at the top. Four things can be
-kept, and they are four separate caches:
+You can also switch on LINZ place names (towns, peaks, lakes, rivers) over the aerial imagery from the layers sheet on the map. They're off by default ([details](docs/place-names.md)).
 
-- **Aerial imagery** and **the Topographic map**: tap two opposite corners, drag a corner to adjust the
-  box, set the shallowest and deepest zoom, name it. For imagery the tile count shown before you commit
-  is the count downloaded.
-- **DOC's material**: tap a region. All four of DOC's services inside it are downloaded with their
-  pictures and drawn on the map - tracks, huts, campsites and bike trails.
-- **Other people's tracks**: tap a region. The tracks published inside it are downloaded and drawn as
-  their own layer.
+If the LINZ imagery fails to load, the app tells you why (for example, the key was rejected or the service can't be reached) and offers a one-tap switch to OpenStreetMap, rather than just showing a blank map.
 
-Every download **resumes rather than restarts**, so a killed download picks up where it stopped.
+## Working without reception
 
-**Delete really deletes.** Deleting a region removes the tracks it brought, and for DOC's material the
-records inside the region's outline - except any that another region you still have also covers, so
-deleting Canterbury cannot empty Otago's row. Downloading a region you already have updates that row
-rather than adding a second one. Each card also offers one button that empties that whole cache.
+The Offline tab is where you download things. There are four separate downloads:
 
-The map never talks to a map service directly. Tiles are served by a small server inside the phone,
-which answers from what is held and fetches and stores what is not, so a downloaded area and imagery
-you have merely browsed both work with no reception.
+1. **Aerial imagery**: tap two opposite corners on the map to draw a box, drag the corners to adjust, choose how far in and out to zoom, and give it a name. You're shown the tile count before you start.
+2. **Topographic map**: the same, for the LINZ topo map.
+3. **DOC data**: pick a region and the app downloads all of DOC's tracks, huts, campsites and bike trails in it, with their photos.
+4. **Other tracks**: pick a region and it downloads the council, trust and club tracks inside it.
 
-## Places and kinds
+Downloads pick up where they left off if they're interrupted. Deleting a region removes what it brought, but not anything that another region you still have also covers. Re-downloading a region you already have refreshes it instead of making a duplicate.
 
-**The kind decides the shape.** A **track** and a **bike track** are lines you travel along; a **hut**,
-a **campsite** and a **waypoint** are single spots. A hut that was also a line would be a marker drawn
-along a valley, so the app never asks that second question.
+OpenStreetMap and OpenTopoMap can't be downloaded in advance, because their usage policies don't allow it. Those two are cached as you browse, so places you've already looked at still show up offline.
 
-Each kind has its own glyph and its own colour, on the map and in the list, so a line reads as what it
-is at a glance. The list carries **All** and then the five kinds as chips; tapping one shows only that
-kind - rows and counts - and it is deliberately not remembered, because "where are my huts?" is a
-question asked and then put down.
+Under the hood, the map never contacts the tile services directly. The phone runs a small tile server of its own that serves from what's stored and fetches (and stores) the rest, which is how downloaded areas and browsed areas both work offline.
 
-**A line can have side tracks.** Draw the line to the junction, press *Side track*, tap along the spur,
-press *Back to the track*, carry on - or tap the line where the spur leaves it. The length counts every
-path once, and a GPX file carries them both ways. See [`docs/side-tracks.md`](docs/side-tracks.md).
+## Places
 
-**Heights** come from the file a line arrived in: its own page shows the range and a small profile of
-how it climbs. A line drawn on the map has no heights and says nothing rather than a zero. See
-[`docs/elevation.md`](docs/elevation.md).
+There are five kinds of place:
+
+- **Track** and **bike track** are lines you travel along.
+- **Hut**, **campsite** and **waypoint** are single points.
+
+The kind decides the shape, so you never have to say a hut is a point and a track is a line separately. On the Places tab you can filter by kind.
+
+You can get places into the app by:
+
+- importing a GPX, KML, KMZ or GeoJSON file (a file with several tracks becomes several places)
+- importing something from DOC or the other-tracks browser
+- tapping the map to add a spot
+- walking it with the recorder
+
+A track can have **side tracks**: spurs that branch off the main line. Their length is counted once, and they're kept when you export to GPX ([details](docs/side-tracks.md)).
+
+If a track came from a file with elevation data, its page shows the height range and a profile of the climb. A track drawn by hand has no heights, and the app leaves them blank rather than showing zeros ([details](docs/elevation.md)). Waypoints can have a photo attached, which is shrunk to fit before it's stored.
+
+## Following a track
+
+When you're following a track, the app shows how far off the line you are, how far along you've got, how much is left, and roughly how long that will take. The time estimate uses Naismith's rule (5 km/h plus an hour for every 600 m climbed when walking, and 12 km/h plus an hour per 450 m climbed when riding). It only counts climbing, not descent, and always rounds up, so treat it as a rough guide rather than a promise.
 
 ## Recording
 
-A recording writes every fix down as it arrives, so a crash, a kill or a flat battery cannot lose more
-than a single point. **A pause is written down as a pause** rather than as a gap in the signal. What it
-keeps is a **trip**: the line, the distance, the elapsed time and the points - a route of its own, or a
-walk along a place you already had.
+Hit Record and the app logs your position as you move. Each point is saved to the database as it arrives, so a crash or a flat battery loses at most the last point. Pausing is stored as a pause, so it doesn't look like a gap in the GPS signal. The recorder ignores fixes that are obviously bad, such as ones with poor accuracy or ones that would mean you'd moved impossibly fast.
 
-## DOC, and other people's tracks
+A recording is saved as a trip with its line, distance, time and points. If you record along a place you already had, the trip is linked to it. If you record a brand new route, it also becomes a new place, and deleting that trip deletes the place it created (but not a place that was yours beforehand).
 
-**DOC** publishes its tracks, huts, campsites and bike trails as hosted web services. The app searches
-them **at the source** rather than downloading the network: by part of a name, or by distance from the
-phone. **Near me** reads outward in rings, so a longer distance can only ever add results rather than
-reorder or lose them. Importing writes DOC's own number against the place, so a renamed track is still
-recognised as already here, and deleting it makes it importable again. Offline, the browser falls back
-to what you have downloaded and says so. See [`docs/doc-tracks.md`](docs/doc-tracks.md).
+## DOC tracks, huts and campsites
 
-**Other tracks** come from Herenga ā Nuku Aotearoa's National Tracks Dataset, a monthly merge of the
-tracks councils, regional councils, trail trusts, clubs and Te Araroa publish. What the app reads is the
-part that is nobody else's: DOC's own rows are left to DOC's browser, tracks nobody may walk on are
-left out, and a row nobody named is left out until somebody names it. **The same name in pieces is one
-track** - a walkway published in sections by two publishers, kilometres apart, is one row on the map.
-Their licence asks for the publisher **and the date the data was got**, so both sit on the pages the
-layer is switched on from. Te Araroa's own line is drawn separately:
-see [`docs/te-araroa.md`](docs/te-araroa.md).
+DOC publishes its data as online map services. Instead of downloading everything, the app searches those services when you ask: by name, or by distance from where you are. The "near me" search works outward in rings, so widening the distance only adds results and never shuffles the existing ones.
+
+Importing a DOC item stores DOC's own ID against it. If you rename it later, the app still knows it's the same one, and if you delete it you can import it again. A DOC page also shows any current alerts, and if the app couldn't check for alerts it says so rather than implying there are none. Offline, the browser falls back to whatever you've downloaded. See [docs/doc-tracks.md](docs/doc-tracks.md).
+
+DOC's API key is kept on its own Worker (`worker/`), not in the app.
+
+## Tracks from other organisations
+
+These come from the National Tracks Dataset published by Herenga ā Nuku Aotearoa (the Outdoor Access Commission), which merges tracks from councils, trusts, clubs and Te Araroa. The app leaves out DOC's own tracks (the DOC browser covers those), tracks that nobody may walk on, and tracks with no name. A track published in sections by different publishers under one name is shown as a single track. Te Araroa's line is drawn as its own separate layer ([details](docs/te-araroa.md)).
 
 ## The laptop page
 
-The phone serves a page to a laptop on the same Wi-Fi, drawn from the phone's own data so the two
-cannot disagree: the map with the same places and the same layers, the list of places, drawing a new
-line and tidying one by dragging its handles, importing a file, and both browsers - DOC's and other
-people's tracks. What the phone's own rules say about a write is what decides it.
+The phone can serve a web page to a laptop on the same Wi-Fi. Turn it on in Settings, which shows the address to open. The page shows the same map and places as the phone, lets you import track files, and has the DOC and other-tracks browsers. It reads from the phone's own data, so the two always agree.
 
-A switch in Settings, **Keep this phone awake while it is serving**, holds the screen on, dimmed, so the
-page keeps working with the phone put down. See [`docs/web-editor.md`](docs/web-editor.md).
+The laptop page doesn't draw or edit lines any more. That was removed, and the phone is the only place you create or change a track. There's a Settings switch to keep the phone awake while it's serving ([details](docs/web-editor.md)).
 
 ## Backup and restore
 
-**Back up everything** writes one JSON file wherever you choose: the places with their lines, and every
-trip with its fixes. Ids travel both ways, so a place and the trip recorded against it stay joined.
-**Restore** shows what the file holds beside what the phone holds, and only then replaces - in one
-transaction, so an interrupted restore leaves everything as it was.
+**Back up everything** saves a single JSON file wherever you choose, containing your places and all your trips. **Restore** shows you what's in the file next to what's on the phone before it replaces anything, and does the swap in one go so a failed restore leaves your data as it was.
 
-The same backup can be written somewhere else by the app itself, to a file or to a private GitHub
-repository where each backup is a commit. Each phone writes its own file, so two phones pointed at one
-repository cannot trample each other. **An empty database is never written over the copy**: after a
-wipe, the copy off the phone may be the only record left, so the write is refused and the way forward
-is to restore from it.
+The app can also make backups on its own, to a file or to a private GitHub repository (each backup is a commit, and each phone writes its own file so two phones can share one repo). It refuses to overwrite a backup with an empty database, in case your data has been wiped and the backup is all you have left. Downloaded offline data and your GitHub token and LINZ key aren't included in backups.
 
-Downloaded offline material is deliberately absent - it describes tiles and records on one phone, and
-it can be fetched again. The file is versioned (`"format": "trail-day-backup"`, `"version": 2`).
+## Installing and updating
 
-## Build
+1. Download the APK from the [latest release](../../releases/latest). There are separate APKs for each phone architecture and a universal one if you're not sure.
+2. Open it. Android will ask you to allow installing apps from that source.
 
-Requires JDK 17-23 and the Android SDK with platform 36 and build-tools 36.0.0. Add your SDK path to
-`local.properties` (gitignored):
+After that, the app checks GitHub once a day for a new release and tells you if there is one. In Settings you can see your version and install the update, and Android will ask you to confirm each time.
+
+## Building it
+
+You need JDK 17 to 23 and the Android SDK (platform 36, build-tools 36.0.0). Put your SDK path in `local.properties`, which is gitignored:
 
 ```properties
 sdk.dir=/path/to/Android/Sdk
 ```
 
-There is no key to add: the LINZ key lives in the `worker-linz/` Worker as a secret.
+No map key is needed. Then:
 
 ```bash
-./gradlew assembleDebug testDebugUnitTest lint        # what CI runs
-node --test app/src/test/js/*.test.mjs                # the laptop page's own tests
-./gradlew connectedDebugAndroidTest                   # needs a device or emulator
-./gradlew assembleRelease bundleRelease               # needs the signing secrets below
+./gradlew assembleDebug testDebugUnitTest lint   # what CI runs
+node --test app/src/test/js/*.test.mjs           # tests for the laptop page's scripts
+./gradlew connectedDebugAndroidTest              # needs a device or emulator
+./gradlew assembleRelease bundleRelease          # needs signing secrets
 ```
 
-## Release
+On Windows use `.\gradlew.bat`, and put version properties in quotes (`"-PversionName=0.4.10"`) or PowerShell will split them at the dot. Builds are split by CPU architecture, with a universal APK as well. Pass `-PnoAbiSplits` when building the app bundle.
 
-Pushing a `v*.*.*` tag builds, signs and publishes a GitHub Release with the APKs and the bundle
-attached. Signing comes from four repository secrets: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`,
-`KEY_ALIAS` and `KEY_PASSWORD`.
+CI (GitHub Actions) runs the build, unit tests, lint and the Node tests on every push and pull request to `main`, and the instrumented tests on an Android 36 emulator.
 
-The tag is the version: `v0.4.10` is `versionName 0.4.10` and `versionCode 410` (major × 10000 + minor
-× 100 + patch). The APKs are split by architecture with a universal one alongside, so a phone downloads
-only the libraries it can use.
+## Releasing
 
-**`worker-linz` must be answering before a tag goes out** - `curl https://<worker>/health` - or every
-map in that release is blank. It is deployed on its own: `cd worker-linz && npm run deploy`.
+Commit to `main`, then tag and push the tag:
 
-## Getting a new version
+```bash
+git tag -a v0.4.11 -m "Trail Day 0.4.11"
+git push origin v0.4.11
+```
 
-The app is not installed from a store, so it asks GitHub once a day for a newer release of itself and
-says so when there is one. **Settings → Updates** shows which version this is and downloads the newer
-one, handing it to Android's installer. Android asks for confirmation every time, and installing needs
-**install unknown apps** allowed for Trail Day.
+The tag is the release. The Release workflow builds the app, signs it and publishes a GitHub Release with the APKs and the app bundle. It needs four repository secrets: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD`.
 
-## Data and credit
+The version comes from the tag, so `v0.4.10` is version name `0.4.10` and version code `410` (major × 10000 + minor × 100 + patch). Because the app only finds updates through tagged releases, a change that isn't tagged won't reach anyone's phone.
 
-Basemaps are **CC BY 4.0** from LINZ, and every map screen carries the credit its licence requires -
-`LINZ CC BY 4.0 © Imagery Basemap contributors`, or `LINZ CC BY 4.0 © Topographic data`. OpenStreetMap
-data is © OpenStreetMap contributors under the
-[Open Database Licence](https://www.openstreetmap.org/copyright), and OpenTopoMap is CC BY-SA.
+Before tagging, check that the LINZ Worker is up (`curl https://<worker>/health`), or every map in that release will be blank. Each Worker is deployed separately from its own folder with `npm run deploy`.
 
-DOC's data is **CC BY 4.0**, Crown copyright, and the tracks and huts shown are DOC's, not the app's.
-Other people's tracks are © **Herenga ā Nuku Aotearoa, the Outdoor Access Commission**, credited
-wherever the layer is offered, with the date the data was downloaded. Te Araroa's line is © the Te
-Araroa Trust, and the credit travels with it on the map.
+## How the code is laid out
 
-The history of how any of this came to be is in [`docs/trail-day-plan.md`](docs/trail-day-plan.md),
-which is one paragraph per release.
+The app is in `app/src/main/java/nz/mckenzie/trailday/`:
+
+| Folder | What's in it |
+| --- | --- |
+| `domain/` | The rules and logic, mostly plain Kotlin, which is where most tests are aimed |
+| `data/` | Room database, repositories and settings |
+| `doc/`, `other/` | Reading DOC's services and the National Tracks Dataset |
+| `offline/` | Tile storage, the on-phone tile server, and downloads |
+| `map/` | The map view and map styling |
+| `ui/` and `viewmodel/` | Screens and their view models |
+| `tracking/` | Recording and its background service |
+| `backup/`, `update/`, `photo/` | Backups, self-update and waypoint photos |
+| `web/` | The server behind the laptop page. The page itself is in `app/src/main/assets/web/` |
+
+Outside the app: `worker/` holds the DOC key, `worker-linz/` holds the LINZ key (separate so heavy map tile traffic can't use up DOC's rate limit), and `docs/` has a write-up for each bigger feature.
+
+If you're working on the code, read [AGENTS.md](AGENTS.md) first, then the end of [docs/trail-day-plan.md](docs/trail-day-plan.md), which is a running log of every release.
+
+## Where it came from
+
+This started as an app for recording herbicide spraying, which is why the repository is called `spray_day`. It was converted into Trail Day, keeping the map, offline tiles, recorder and backups and replacing the spraying parts. The early paragraphs of [docs/trail-day-plan.md](docs/trail-day-plan.md) still mention spraying, because that is what the app did then.
+
+## Credits and licences
+
+- LINZ Basemaps are CC BY 4.0, and the required credit is shown on every map screen.
+- OpenStreetMap data is © OpenStreetMap contributors ([licence](https://www.openstreetmap.org/copyright)). OpenTopoMap is CC BY-SA.
+- DOC's data is CC BY 4.0, Crown copyright.
+- Other organisations' tracks are © Herenga ā Nuku Aotearoa, the Outdoor Access Commission, and are shown with the date the data was downloaded.
+- Te Araroa's line is © the Te Araroa Trust.
