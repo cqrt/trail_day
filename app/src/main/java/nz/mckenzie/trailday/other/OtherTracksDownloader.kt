@@ -3,7 +3,6 @@ package nz.mckenzie.trailday.other
 import nz.mckenzie.trailday.domain.other.OtherTrack
 import nz.mckenzie.trailday.domain.other.OtherTracksQuery
 import nz.mckenzie.trailday.domain.other.OtherTracksUrl
-import nz.mckenzie.trailday.domain.other.joinedByName
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 
 /** What reading a whole area produced: the rows, and whether they are all of them. */
@@ -46,20 +45,18 @@ class OtherTracksDownloader(
 ) {
 
     suspend fun download(
-        bounds: LatLngBounds,
+        selection: OtherTracksQuery = OtherTracksQuery(),
         /** How many have been read so far, called after each page. */
         onProgress: (read: Int) -> Unit = {}
     ): OtherTracksDownloadResult {
         val all = mutableListOf<OtherTrack>()
         var offset = 0
         while (true) {
-            val page = reader.read(
-                OtherTracksQuery(bounds = bounds, limit = pageSize, offset = offset)
-            )
+            val page = reader.read(selection.copy(limit = pageSize, offset = offset))
             when (page) {
                 is OtherTracksReadResult.Failed -> return OtherTracksDownloadResult.Failed(
                     page.message,
-                    all.joinedByName()
+                    all
                 )
                 is OtherTracksReadResult.Found -> {
                     all += page.tracks
@@ -69,20 +66,23 @@ class OtherTracksDownloader(
                 }
             }
         }
-        // A walkway the dataset cut into pieces can be cut across a page boundary, so the whole area is
-        // joined once rather than each page: this is what the walker counts as a track.
-        return OtherTracksDownloadResult.Done(all.joinedByName())
+        // **What is kept is what the service gave, pieces and all.** The joining of a walkway the dataset
+        // cut up happens when the cache is read, not when it is written - see [OtherTracksCache.cached] -
+        // so the number the picker promised, the number the download reports and the number the offline
+        // card keeps all describe the same thing. Joining here as well made a region promised at 3,112
+        // tracks arrive saying 1,098, which reads as a download that lost two thirds of itself.
+        return OtherTracksDownloadResult.Done(all)
     }
 
     /**
-     * How many tracks the service says are inside [bounds], for a walker deciding whether to take the
-     * area onto a phone. Nothing is read and nothing is written.
+     * How many tracks the service says match [selection], for a walker deciding whether to take the area
+     * onto a phone. Nothing is read and nothing is written.
      *
      * Null when it could not be counted, which is not the same as nothing being there: a walker told "0"
      * who then finds tracks on the hill was told something untrue.
      */
-    suspend fun count(bounds: LatLngBounds): Int? =
-        when (val answer = reader.count(OtherTracksQuery(bounds = bounds))) {
+    suspend fun count(selection: OtherTracksQuery): Int? =
+        when (val answer = reader.count(selection)) {
             is OtherTracksCountResult.Done -> answer.count
             is OtherTracksCountResult.Failed -> null
         }
@@ -93,13 +93,17 @@ class OtherTracksDownloader(
         const val PAGE = 2000
 
         /**
-         * Where a download stops, whatever the box.
+         * Where a download stops, whatever the box or the region.
          *
-         * The same ceiling DOC's track download uses, and for the same reason: an area is a walk's worth
-         * of ground, and a box drawn around the whole South Island is 17,000 rows and a very long wait
-         * on a phone. What arrives is kept and the walker is told how many, so a stop is visible rather
-         * than silent.
+         * An area is a walk's worth of ground, and a box drawn around the whole South Island is 17,000 rows
+         * and a very long wait on a phone. What arrives is kept and the walker is told how many, so a stop
+         * is visible rather than silent.
+         *
+         * **Five thousand rather than four**, because a region is the biggest thing a walker can ask for by
+         * name and the biggest of the sixteen holds **3,848** rows: at four thousand the largest region is
+         * a hair under the ceiling, and a month in which Wellington's councils publish a few hundred more
+         * would cut the region short without anybody asking for that.
          */
-        const val MAX_TRACKS = 4000
+        const val MAX_TRACKS = 5000
     }
 }

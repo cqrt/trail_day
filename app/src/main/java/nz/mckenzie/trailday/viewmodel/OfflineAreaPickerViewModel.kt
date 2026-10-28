@@ -26,6 +26,10 @@ import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.doc.DocInventory
 import nz.mckenzie.trailday.domain.doc.DocBounds
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.other.OtherTracksQuery
+import nz.mckenzie.trailday.domain.region.Region
+import nz.mckenzie.trailday.domain.region.Regions
+import nz.mckenzie.trailday.map.RegionGeoJson
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.map.AssetColors
@@ -37,14 +41,17 @@ import nz.mckenzie.trailday.offline.LinzTileFetcher
 import nz.mckenzie.trailday.offline.OfflineArea
 import nz.mckenzie.trailday.offline.OfflineAreaDraft
 import nz.mckenzie.trailday.offline.OfflineAreaManager
+import nz.mckenzie.trailday.offline.OfflineChoice
 import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.offline.OfflinePack
 import nz.mckenzie.trailday.offline.OfflineOtherTrackStore
 import nz.mckenzie.trailday.offline.OfflinePickerMode
+import nz.mckenzie.trailday.offline.RegionAsset
 import nz.mckenzie.trailday.offline.TileServerHolder
 import nz.mckenzie.trailday.offline.docDownloadedMessage
 import nz.mckenzie.trailday.offline.groundAround
 import nz.mckenzie.trailday.offline.otherTracksDownloadedMessage
+import nz.mckenzie.trailday.offline.offersRegions
 import nz.mckenzie.trailday.offline.topoDownloadedMessage
 import nz.mckenzie.trailday.tracking.FusedLocationSource
 import nz.mckenzie.trailday.tracking.LocationSource
@@ -78,6 +85,14 @@ class OfflineAreaPickerViewModel(
     /** Which pack this run is choosing an area for. */
     val mode: OfflinePickerMode,
     /**
+     * The sixteen regions, when this run can choose one.
+     *
+     * Loaded from the bundled boundary file rather than fetched: a region is a way of choosing ground, and
+     * a picker that could not draw the choices without reception would be the one screen in the app that
+     * needed a signal to work. Empty for the packs that have none.
+     */
+    private val regions: Regions = Regions.EMPTY,
+    /**
      * The place whose ground is being kept, when the picker was opened from one: its line gives the box,
      * and its name names the area. Null for a box drawn by hand.
      */
@@ -91,6 +106,31 @@ class OfflineAreaPickerViewModel(
         )
     )
     val draft: StateFlow<OfflineAreaDraft> = _draft
+
+    /**
+     * Which of the two ways this run is choosing ground.
+     *
+     * A track pack opens on **regions**, because that is the question most walkers are asking and it is one
+     * tap; every other pack opens on the box, which is the only thing its services understand.
+     */
+    private val _choice = MutableStateFlow(
+        if (mode.offersRegions) OfflineChoice.REGION else OfflineChoice.BOX
+    )
+    val choice: StateFlow<OfflineChoice> = _choice
+
+    /** The region the walker has tapped, or null while none is chosen. */
+    private val _region = MutableStateFlow<Region?>(null)
+    val region: StateFlow<Region?> = _region
+
+    /** The outlines to draw on this run's map, empty for a pack that has no regions. */
+    val regionsGeoJson: StateFlow<String> = MutableStateFlow(
+        if (mode.offersRegions) RegionGeoJson.build(regions.all) else RegionGeoJson.EMPTY
+    )
+
+    /** The chosen region, drawn as the wash under the choice. */
+    val pickedRegionGeoJson: StateFlow<String> = _region
+        .map { picked -> RegionGeoJson.picked(picked) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, RegionGeoJson.EMPTY)
 
     /**
      * The deepest level worth fetching for this run.
@@ -219,8 +259,14 @@ class OfflineAreaPickerViewModel(
     }
 
     init {
+        // A region picker opens on the whole country: the regions are the choice, and a map opened over
+        // the walker's own street shows none of them.
+        if (mode.offersRegions) _startBounds.value = regions.bounds
+
         viewModelScope.launch {
-            // Open over the walker: their position, else the middle of their tracks.
+            // Open over the walker: their position, else the middle of their tracks. A region picker is
+            // the one run that does not: it opens on the country, because that is what is being chosen.
+            if (mode.offersRegions) return@launch
             val fix = withTimeoutOrNull(LOCATION_TIMEOUT_MS) {
                 runCatching { locationSource.currentLocation() }.getOrNull()
             }
@@ -283,30 +329,85 @@ class OfflineAreaPickerViewModel(
                 .map { draft -> draft.plan(name = draft.name, fallbackName = "") }
                 .distinctUntilChanged()
                 .collectLatest { plan ->
-                    if (mode != OfflinePickerMode.OTHER_TRACKS || plan == null) {
-                        _otherTracksCount.value = null
-                        _otherTracksCounting.value = false
+                    if (mode != OfflinePickerMode.OTHER_TRACKS || plan == null || choosingRegion) {
+                        // A region's own count is asked for when it is tapped; a box's is cleared here.
+                        if (!choosingRegion) {
+                            _otherTracksCount.value = null
+                            _otherTracksCounting.value = false
+                        }
                         return@collectLatest
                     }
                     _otherTracksCounting.value = true
                     delay(INVENTORY_PAUSE_MS)
                     _otherTracksCount.value = runCatching {
-                        otherTracksStore.inventory(plan.bounds)
+                        otherTracksStore.inventory(OtherTracksQuery(bounds = plan.bounds))
                     }.getOrNull()
                     _otherTracksCounting.value = false
                 }
         }
     }
 
-    /** A tap on the map: the first corner, then the opposite one. */
+    /** A tap on the map: a region when regions are how this run chooses, otherwise the first corner. */
     fun tapAt(latitude: Double, longitude: Double) {
         _error.value = null
+        if (choosingRegion) {
+            chooseRegion(regions.at(GeoPoint(latitude, longitude)))
+            return
+        }
         _draft.value = _draft.value.withCorner(GeoPoint(latitude, longitude))
+    }
+
+    /** Whether this tap is choosing a region rather than drawing a box. */
+    private val choosingRegion: Boolean
+        get() = mode.offersRegions && _choice.value == OfflineChoice.REGION
+
+    /**
+     * Switches between a region and a box, dropping whatever the other way had chosen.
+     *
+     * Two ways of asking one question, so only one of them can be holding an answer: a region with a box
+     * still drawn around part of it would be two selections and no way to tell which one the Download
+     * button meant.
+     */
+    fun setChoice(choice: OfflineChoice) {
+        if (!mode.offersRegions || choice == _choice.value) return
+        _choice.value = choice
+        _error.value = null
+        if (choice == OfflineChoice.BOX) {
+            chooseRegion(null)
+        } else {
+            _draft.value = _draft.value.withoutCorners()
+            _otherTracksCount.value = null
+        }
+    }
+
+    /**
+     * Takes [region] as this run's ground, and asks the service what it holds there.
+     *
+     * The count is asked on every tap rather than for all sixteen up front: sixteen questions when the
+     * walker will ask one is fifteen wasted requests, and the service is the thing being polite about.
+     */
+    private fun chooseRegion(region: Region?) {
+        _region.value = region
+        if (region == null) {
+            _otherTracksCount.value = null
+            _otherTracksCounting.value = false
+            return
+        }
+        // The corners were the other way of choosing ground; a region and a box cannot both be chosen.
+        _draft.value = _draft.value.withoutCorners().copy(name = region.name)
+        viewModelScope.launch {
+            _otherTracksCounting.value = true
+            _otherTracksCount.value = runCatching {
+                otherTracksStore.inventory(OtherTracksQuery(region = region))
+            }.getOrNull()
+            _otherTracksCounting.value = false
+        }
     }
 
     fun clearCorners() {
         _error.value = null
         _draft.value = _draft.value.withoutCorners()
+        chooseRegion(null)
     }
 
     fun setName(name: String) {
@@ -522,30 +623,44 @@ class OfflineAreaPickerViewModel(
     }
 
     /**
-     * Downloads every track the service has in the box drawn here, so the map's second reference layer
-     * works with no reception.
+     * Downloads every track this run asks for, so the map's second reference layer works with no reception.
      *
      * **Its own act rather than part of DOC's**, because it is somebody else's material: a walker planning
      * a walk on their own council's walkways is not keeping DOC's huts, and the two caches are counted and
      * cleared apart. The tracks themselves are held once, so two overlapping boxes end with one copy of a
-     * track rather than two - and **each download is recorded under the name the walker typed**, so the
-     * offline screen can list the hillsides they kept rather than only count the tracks in them.
+     * track rather than two - and **each download is recorded under its name**, so the offline screen can
+     * list the hillsides or the provinces they kept rather than only count the tracks in them.
+     *
+     * A **region** is asked for by name, which the service answers exactly and cheaply; a box is asked for
+     * as a rectangle. Either way the record is the same kind of record, and the region names itself.
      */
     private fun downloadOtherTracks() {
         if (_otherTracksWorking.value) return
+        val region = _region.value.takeIf { choosingRegion }
         val current = _draft.value
-        val plan = current.plan(name = current.name, fallbackName = defaultName())
-        if (plan == null) {
-            _otherTracksMessage.value = "Tap two opposite corners on the map to choose the area."
+        val plan = if (region == null) current.plan(name = current.name, fallbackName = defaultName()) else null
+        if (region == null && plan == null) {
+            _otherTracksMessage.value = if (mode.offersRegions && _choice.value == OfflineChoice.REGION) {
+                "Tap one of the regions on the map."
+            } else {
+                "Tap two opposite corners on the map to choose the area."
+            }
             return
         }
+
+        val selection = if (region != null) {
+            OtherTracksQuery(region = region)
+        } else {
+            OtherTracksQuery(bounds = plan!!.bounds)
+        }
+        val name = region?.name ?: plan!!.name
 
         viewModelScope.launch {
             _otherTracksWorking.value = true
             _otherTracksMessage.value = null
             val startedAt = System.nanoTime()
             try {
-                val download = otherTracksStore.download(plan.bounds, plan.name) {
+                val download = otherTracksStore.download(selection, name) {
                     reportOtherTracks(it, startedAt)
                 }
                 // A download that stopped short still kept what arrived, so the walker stays here and can
@@ -686,6 +801,10 @@ class OfflineAreaPickerViewModel(
                         // same manager imagery uses, which is what makes them resumable and countable.
                         topography = OfflineAreaManager.topography(appContext, database.offlineAreaDao()),
                         mode = mode,
+                        // The sixteen outlines, from the phone's own assets: the picker is the one screen
+                        // that must work with no reception, and a map of the country that needed one to
+                        // draw would be that screen failing.
+                        regions = RegionAsset.load(appContext),
                         aroundAssetId = aroundAssetId
                     )
                 }

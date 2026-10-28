@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.doc.whatDocHasIn
@@ -35,6 +37,7 @@ import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.offline.DownloadService
 import nz.mckenzie.trailday.offline.DownloadState
 import nz.mckenzie.trailday.offline.OfflineAreaDraft
+import nz.mckenzie.trailday.offline.OfflineChoice
 import nz.mckenzie.trailday.offline.OfflinePickerMode
 import nz.mckenzie.trailday.offline.downloadProgressWords
 import nz.mckenzie.trailday.offline.formatBytes
@@ -107,6 +110,17 @@ fun OfflineAreaPickerScreen(
     // Somebody else's tracks are the second publisher's material, and their own cache: kept in one act
     // that has nothing to do with DOC's, which is why this is not part of [keepsDocData].
     val keepsOtherTracks = viewModel.mode == OfflinePickerMode.OTHER_TRACKS
+
+    // Which of the two ways this run is choosing ground, and the region it has chosen. Only the track pack
+    // can choose a region, so every other run is a box whatever the state says.
+    val choice by viewModel.choice.collectAsStateWithLifecycle()
+    val region by viewModel.region.collectAsStateWithLifecycle()
+    val regionsGeoJson by viewModel.regionsGeoJson.collectAsStateWithLifecycle()
+    val pickedRegionGeoJson by viewModel.pickedRegionGeoJson.collectAsStateWithLifecycle()
+    val regionMode = keepsOtherTracks && choice == OfflineChoice.REGION
+    // How much of the screen the card covers, in the pixels the map camera wants: the country is framed
+    // above it rather than behind it.
+    val regionCardPaddingPx = with(LocalDensity.current) { 210.dp.roundToPx() }
     // A zoom range is what any pack of tiles is asked, and the imagery and the drawn map are both that.
     val keepsZooms = keepsImagery || topography
     // A name belongs to a pack that keeps **areas** - imagery, the drawn map, and somebody else's tracks -
@@ -163,7 +177,14 @@ fun OfflineAreaPickerScreen(
                 basemap = mapBasemap,
                 assetGeoJson = previewGeoJson,
                 fitBounds = startBounds,
+                // The card at the foot of this screen is the question, and the country has to fit above
+                // it: framed edge to edge, Otago and Southland sit behind the card that names them.
+                fitBoundsPaddingBottomPx = if (regionMode) regionCardPaddingPx else 0,
                 onMapClick = { latitude, longitude, _ -> viewModel.tapAt(latitude, longitude) },
+                // The sixteen regions, and the one tapped: drawn under everything, because on this screen
+                // they are not a thing to read on the ground but the choosing of the ground itself.
+                regionsGeoJson = regionsGeoJson,
+                regionPickedGeoJson = pickedRegionGeoJson,
                 modifier = Modifier.fillMaxSize()
             )
 
@@ -193,6 +214,8 @@ fun OfflineAreaPickerScreen(
                             // corners but about whether this is the ground the walker wants kept.
                             around -> "Tap the map to change the box."
 
+                            regionMode && region == null -> "Tap a region"
+                            regionMode -> "Tap another region to change it"
                             draft.corners.size == 0 -> "Tap one corner of the area"
                             draft.corners.size == 1 -> "Now tap the opposite corner"
                             else -> "Tap again for a new box."
@@ -200,10 +223,28 @@ fun OfflineAreaPickerScreen(
                         style = MaterialTheme.typography.titleSmall
                     )
 
+                    // Two ways of choosing ground, and only one of them holding an answer at a time: a
+                    // region names itself and needs no drawing, and a box covers the ground no region
+                    // describes - the end of a beach, one valley.
+                    if (keepsOtherTracks) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = choice == OfflineChoice.REGION,
+                                onClick = { viewModel.setChoice(OfflineChoice.REGION) },
+                                label = { Text("Region") }
+                            )
+                            FilterChip(
+                                selected = choice == OfflineChoice.BOX,
+                                onClick = { viewModel.setChoice(OfflineChoice.BOX) },
+                                label = { Text("Box") }
+                            )
+                        }
+                    }
+
                     // A name belongs to a pack that keeps areas, because an area is a row the walker finds
                     // again later: "the Tararuas", "the Routeburn". DOC's material is one cache with no
-                    // rows, so there is nothing to name.
-                    if (keepsAreas) {
+                    // rows, so there is nothing to name. A region names itself, so there is nothing to type.
+                    if (keepsAreas && !regionMode) {
                         OutlinedTextField(
                             value = draft.name,
                             onValueChange = viewModel::setName,
@@ -331,28 +372,36 @@ fun OfflineAreaPickerScreen(
                     // tapped. **A count rather than a size**: this service will not say what a box weighs,
                     // and a figure the app made up would be worse than none.
                     if (keepsOtherTracks) {
+                        // A region's own name, and what the service holds there: the count is asked when a
+                        // region is tapped, so a walker reading this is reading about the region they chose.
+                        if (regionMode) region?.let { chosen -> Text(chosen.name, style = MaterialTheme.typography.titleMedium) }
                         val count = otherTracksCount
+                        val what = if (regionMode) region?.name ?: "this region" else "this box"
                         Text(
                             text = when {
-                                otherTracksCounting -> "Asking the tracks service what is in this box..."
+                                otherTracksCounting -> "Asking the tracks service what is in $what..."
 
-                                // No box and no answer are different things, and a walker told to draw a box
-                                // they have already drawn would draw it again.
-                                !draft.isComplete -> "Draw a box to see what tracks are inside it."
+                                // No choice and no answer are different things, and a walker told to tap a
+                                // region they have already tapped would tap it again.
+                                regionMode && region == null -> "Tap a region to see what is inside it."
+
+                                !regionMode && !draft.isComplete -> "Draw a box to see what tracks are inside it."
 
                                 count == null ->
                                     "The tracks service could not be asked. Try again in a moment."
 
+                                count == 0 && regionMode -> "There are no other tracks inside ${region?.name}."
+
                                 count == 0 -> "There are no other tracks inside this box."
 
-                                count == 1 -> "1 track inside this box."
+                                count == 1 -> "1 track inside $what."
 
-                                else -> "$count tracks inside this box."
+                                else -> "$count tracks inside $what."
                             },
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
-                            text = "The tracks councils, trusts and clubs publish inside the box are " +
+                            text = "The tracks councils, trusts and clubs publish inside $what are " +
                                 "downloaded and drawn on the map.",
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -370,8 +419,8 @@ fun OfflineAreaPickerScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
                             onClick = viewModel::clearCorners,
-                            enabled = draft.corners.isNotEmpty() && !working && !docWorking &&
-                                !otherTracksWorking
+                            enabled = (draft.corners.isNotEmpty() || region != null) &&
+                                !working && !docWorking && !otherTracksWorking
                         ) { Text("Start over") }
                         Button(
                             onClick = viewModel::download,
@@ -381,7 +430,9 @@ fun OfflineAreaPickerScreen(
 
                                 topography -> draft.isComplete && !draft.isTooBig && !working
 
-                                keepsOtherTracks -> draft.isComplete && !otherTracksWorking
+                                // A region needs no corners, and a box needs both of them.
+                                keepsOtherTracks -> (if (regionMode) region != null else draft.isComplete) &&
+                                    !otherTracksWorking
 
                                 else -> draft.isComplete && !docWorking
                             }
@@ -393,6 +444,8 @@ fun OfflineAreaPickerScreen(
                                     topography && working -> "Downloading the map…"
                                     topography -> "Download the map"
                                     keepsOtherTracks && otherTracksWorking -> "Downloading other tracks…"
+                                    keepsOtherTracks && regionMode ->
+                                        "Download ${region?.name ?: "region"}"
                                     keepsOtherTracks -> "Download other tracks"
                                     !imagery && docWorking -> "Downloading DOC data…"
                                     !imagery -> "Download DOC data"

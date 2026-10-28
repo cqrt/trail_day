@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.domain.other
 
 import java.net.URLEncoder
 import java.util.Locale
+import nz.mckenzie.trailday.domain.region.Region
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 
 /**
@@ -15,9 +16,28 @@ import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 data class OtherTracksQuery(
     val nameContains: String = "",
     val bounds: LatLngBounds? = null,
+    /**
+     * One of New Zealand's regions, when the walker chose a region rather than drawing a box.
+     *
+     * A region is asked for **by its districts' names**, which is the dataset's own answer to where a track
+     * is: see [nz.mckenzie.trailday.domain.region.RegionDistricts]. Asking by shape was measured and
+     * rejected - a simplified coastline loses the Hauraki Gulf and its islands, and Auckland's 1,531 tracks
+     * came back as 1,276.
+     *
+     * A region and a [bounds] can both be set, and then both narrow: a region with a box inside it is a
+     * smaller question, not a contradiction. The picker sets one.
+     */
+    val region: Region? = null,
     val limit: Int = DEFAULT_LIMIT,
     val offset: Int = 0
 ) {
+
+    /**
+     * The ground this question covers, for the record a download leaves behind: the box, or the region's
+     * own box when the walker chose a region.
+     */
+    val areaBounds: LatLngBounds? get() = bounds ?: region?.bounds
+
     companion object {
         /**
          * How many rows one search asks for.
@@ -123,11 +143,17 @@ object OtherTracksUrl {
      *
      * Together they leave **16,893** of the dataset's 25,349.
      */
-    fun where(nameContains: String = ""): String {
+    fun where(nameContains: String = "", districts: List<String> = emptyList()): String {
         val name = nameContains.trim()
-        if (name.isEmpty()) return EXCLUSIONS
-        // The quote is doubled because a name with an apostrophe in it is a name, not a syntax error.
-        return "$EXCLUSIONS AND UPPER(Name) LIKE UPPER('%${name.replace("'", "''")}%')"
+        val clauses = mutableListOf(EXCLUSIONS)
+        // The quote is doubled because a name with an apostrophe in it is a name, not a syntax error -
+        // and "Central Hawke's Bay District" is one.
+        if (districts.isNotEmpty()) {
+            val quoted = districts.joinToString(",") { "'${it.replace("'", "''")}'" }
+            clauses += "LocalAuthority IN ($quoted)"
+        }
+        if (name.isNotEmpty()) clauses += "UPPER(Name) LIKE UPPER('%${name.replace("'", "''")}%')"
+        return clauses.joinToString(" AND ")
     }
 
     /**
@@ -150,7 +176,7 @@ object OtherTracksUrl {
      * all.
      */
     fun of(query: OtherTracksQuery): String {
-        val parameters = linkedMapOf("where" to where(query.nameContains))
+        val parameters = linkedMapOf("where" to where(query.nameContains, query.region?.districts.orEmpty()))
         query.bounds?.let { area ->
             parameters["geometry"] = envelope(area)
             parameters["geometryType"] = "esriGeometryEnvelope"
@@ -175,7 +201,7 @@ object OtherTracksUrl {
      * the count is of exactly what a download would read.
      */
     fun countOf(query: OtherTracksQuery): String {
-        val parameters = linkedMapOf("where" to where(query.nameContains))
+        val parameters = linkedMapOf("where" to where(query.nameContains, query.region?.districts.orEmpty()))
         query.bounds?.let { area ->
             parameters["geometry"] = envelope(area)
             parameters["geometryType"] = "esriGeometryEnvelope"

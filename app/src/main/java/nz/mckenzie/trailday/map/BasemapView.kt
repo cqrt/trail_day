@@ -244,6 +244,13 @@ fun BasemapView(
      */
     fitBoundsPaddingPx: Int = BOUNDS_PADDING_PX,
     /**
+     * Extra room at the foot of the map when the camera frames something.
+     *
+     * For a screen with a card drawn over its map - the offline picker's - where framing the country in
+     * the whole view puts the far south behind the card that is asking about it.
+     */
+    fitBoundsPaddingBottomPx: Int = 0,
+    /**
      * Whether the walker may move this map.
      *
      * True on every map the work is read on, and on every map the walker is working *with* - the map tab,
@@ -332,6 +339,15 @@ fun BasemapView(
      * reception does not. See [OtherTracksGeoJson].
      */
     otherTracksGeoJson: String = OtherTracksGeoJson.EMPTY,
+    /**
+     * The regions the offline picker offers, and the one already chosen.
+     *
+     * Drawn **under everything**, because a region is not a thing to read on the ground - it is the choice
+     * of the ground itself. Empty on every screen but the picker: the rest of the app has nothing to say
+     * about regions, and a layer that is always there costs a style rebuild it never earns.
+     */
+    regionsGeoJson: String = RegionGeoJson.EMPTY,
+    regionPickedGeoJson: String = RegionGeoJson.EMPTY,
     /**
      * A camera move the walker asked for. The bounds say where; [recentreCount] is what says
      * it is a new request rather than the same one arriving twice, so the second tap on
@@ -567,7 +583,9 @@ fun BasemapView(
                 teAraroaGeoJson = teAraroaGeoJson,
                 showTeAraroa = showTeAraroa,
                 showOtherTracks = showOtherTracks,
-                otherTracksGeoJson = otherTracksGeoJson
+                otherTracksGeoJson = otherTracksGeoJson,
+                regionsGeoJson = regionsGeoJson,
+                regionPickedGeoJson = regionPickedGeoJson
             ) { style ->
                 styleLoadedOnce = true
                 styleState.value = style
@@ -605,6 +623,20 @@ fun BasemapView(
         styleState.value
             ?.getSourceAs<GeoJsonSource>(DOC_BIKE_BADGES_SOURCE)
             ?.setGeoJson(docBikeBadgesGeoJson)
+    }
+
+    // The regions, and the one chosen: two documents rather than one, so a tap is a rebuild of the small
+    // one instead of a restyle of the country.
+    LaunchedEffect(regionsGeoJson, styleState.value) {
+        styleState.value
+            ?.getSourceAs<GeoJsonSource>(RegionLayerIds.SOURCE)
+            ?.setGeoJson(regionsGeoJson)
+    }
+
+    LaunchedEffect(regionPickedGeoJson, styleState.value) {
+        styleState.value
+            ?.getSourceAs<GeoJsonSource>(RegionLayerIds.PICKED_SOURCE)
+            ?.setGeoJson(regionPickedGeoJson)
     }
 
     // The line being followed, handed over the same way: a new target while the map is up is a new
@@ -668,12 +700,14 @@ fun BasemapView(
     // Frame the track network the first time we know where it is, so opening the
     // app shows "my tracks", not an arbitrary patch of countryside. The asset's own page
     // also says how close it is allowed to end up - see [fitBoundsMaxZoom].
-    LaunchedEffect(fitBounds, fitBoundsMaxZoom, fitBoundsPaddingPx, mapState.value) {
+    LaunchedEffect(fitBounds, fitBoundsMaxZoom, fitBoundsPaddingPx, fitBoundsPaddingBottomPx, mapState.value) {
         val map = mapState.value ?: return@LaunchedEffect
         val bounds = fitBounds ?: return@LaunchedEffect
         if (boundsApplied) return@LaunchedEffect
 
-        map.animateCamera(cameraFor(map, bounds, fitBoundsMaxZoom, fitBoundsPaddingPx))
+        map.animateCamera(
+            cameraFor(map, bounds, fitBoundsMaxZoom, fitBoundsPaddingPx, fitBoundsPaddingBottomPx)
+        )
         boundsApplied = true
     }
 
@@ -753,6 +787,9 @@ internal fun MapLibreMap.loadTrailDayStyle(
     /** Somebody else's tracks, and whether they are drawn: see [BasemapView.showOtherTracks]. */
     otherTracksGeoJson: String = OtherTracksGeoJson.EMPTY,
     showOtherTracks: Boolean = false,
+    /** The offline picker's regions, and the one chosen: see [BasemapView.regionsGeoJson]. */
+    regionsGeoJson: String = RegionGeoJson.EMPTY,
+    regionPickedGeoJson: String = RegionGeoJson.EMPTY,
     onLoaded: (Style) -> Unit
 ) {
     val json = when {
@@ -784,6 +821,57 @@ internal fun MapLibreMap.loadTrailDayStyle(
 
     setStyle(Style.Builder().fromJson(json)) { style ->
         preservedCamera?.let { cameraPosition = it }
+        // The regions first of all, under **everything**: on the picker they are not a line to read on the
+        // ground, they are the choosing of the ground, and every route and place on the map belongs on top
+        // of the shape that was chosen.
+        if (style.getSource(RegionLayerIds.SOURCE) == null) {
+            style.addSource(GeoJsonSource(RegionLayerIds.SOURCE, regionsGeoJson))
+        }
+        if (style.getSource(RegionLayerIds.PICKED_SOURCE) == null) {
+            style.addSource(GeoJsonSource(RegionLayerIds.PICKED_SOURCE, regionPickedGeoJson))
+        }
+        if (style.getLayer(RegionLayerIds.PICKED_FILL) == null) {
+            style.addLayer(
+                FillLayer(RegionLayerIds.PICKED_FILL, RegionLayerIds.PICKED_SOURCE)
+                    .withProperties(
+                        PropertyFactory.fillColor(Expression.literal(RegionLayerIds.PICKED_COLOUR)),
+                        // A wash, not a lid: at country scale the ground is the point, and a solid fill
+                        // would hide exactly what is being chosen by.
+                        PropertyFactory.fillOpacity(
+                            Expression.literal(RegionLayerIds.PICKED_FILL_OPACITY)
+                        )
+                    )
+            )
+        }
+        if (style.getLayer(RegionLayerIds.CASING) == null) {
+            style.addLayer(
+                LineLayer(RegionLayerIds.CASING, RegionLayerIds.SOURCE)
+                    .withProperties(
+                        PropertyFactory.lineColor(Expression.literal("#FFFFFF")),
+                        PropertyFactory.lineWidth(Expression.literal(RegionLayerIds.CASING_WIDTH)),
+                        PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
+                    )
+            )
+        }
+        if (style.getLayer(RegionLayerIds.EDGE) == null) {
+            style.addLayer(
+                LineLayer(RegionLayerIds.EDGE, RegionLayerIds.SOURCE)
+                    .withProperties(
+                        PropertyFactory.lineColor(Expression.literal(RegionLayerIds.EDGE_COLOUR)),
+                        PropertyFactory.lineWidth(Expression.literal(RegionLayerIds.EDGE_WIDTH))
+                    )
+            )
+        }
+        if (style.getLayer(RegionLayerIds.PICKED_EDGE) == null) {
+            style.addLayer(
+                LineLayer(RegionLayerIds.PICKED_EDGE, RegionLayerIds.PICKED_SOURCE)
+                    .withProperties(
+                        PropertyFactory.lineColor(Expression.literal(RegionLayerIds.PICKED_COLOUR)),
+                        PropertyFactory.lineWidth(Expression.literal(RegionLayerIds.PICKED_WIDTH)),
+                        PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
+                    )
+            )
+        }
         // The trail first of all, so it lies under **everything**: a national route is the ground the
         // rest of the map is read against, and it must never be taken for the walker's own work.
         if (style.getSource(TRAIL_SOURCE) == null) {
@@ -1342,25 +1430,26 @@ private fun cameraFor(
     map: MapLibreMap,
     bounds: DomainBounds,
     maxZoom: Double? = null,
-    paddingPx: Int = BOUNDS_PADDING_PX
+    paddingPx: Int = BOUNDS_PADDING_PX,
+    /** Extra room at the foot: a card drawn over the map would otherwise cover what was just framed. */
+    bottomPaddingPx: Int = 0
 ): CameraUpdate {
     val maplibreBounds = org.maplibre.android.geometry.LatLngBounds.Builder()
         .include(LatLng(bounds.minLat, bounds.minLng))
         .include(LatLng(bounds.maxLat, bounds.maxLng))
         .build()
 
-    if (maxZoom == null) return CameraUpdateFactory.newLatLngBounds(maplibreBounds, paddingPx)
+    // Left, top, right, bottom - the order MapLibre takes them in.
+    val padding = intArrayOf(paddingPx, paddingPx, paddingPx, paddingPx + bottomPaddingPx)
 
     // Null when the library cannot work a camera out at all - a map with no size yet, or bounds
     // it refuses. Falling back to the plain fit is what every other screen does anyway, and it is
-    // the shape of the screen that decides whether that is anything to worry about: this path is
-    // the asset's own page, whose map is laid out long before its geometry arrives.
-    val fitted = map.getCameraForLatLngBounds(
-        maplibreBounds,
-        intArrayOf(paddingPx, paddingPx, paddingPx, paddingPx)
-    ) ?: return CameraUpdateFactory.newLatLngBounds(maplibreBounds, paddingPx)
+    // the shape of the screen that decides whether that is anything to worry about: the asset's own page,
+    // whose map is laid out long before its geometry arrives.
+    val fitted = map.getCameraForLatLngBounds(maplibreBounds, padding)
+        ?: return CameraUpdateFactory.newLatLngBounds(maplibreBounds, paddingPx)
 
     return CameraUpdateFactory.newCameraPosition(
-        CameraPosition.Builder(fitted).zoom(minOf(fitted.zoom, maxZoom)).build()
+        CameraPosition.Builder(fitted).zoom(if (maxZoom == null) fitted.zoom else minOf(fitted.zoom, maxZoom)).build()
     )
 }

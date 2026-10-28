@@ -12,6 +12,7 @@ import nz.mckenzie.trailday.domain.cache.PathsJson
 import nz.mckenzie.trailday.domain.other.OtherTrack
 import nz.mckenzie.trailday.domain.other.OtherTrackArea
 import nz.mckenzie.trailday.domain.other.OtherTracksCache
+import nz.mckenzie.trailday.domain.other.OtherTracksQuery
 import nz.mckenzie.trailday.domain.other.joinedByName
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.other.OtherTracksDownloadResult
@@ -90,15 +91,15 @@ class OfflineOtherTrackStore(
      */
     override suspend fun newestDownloadAtEpochMs(): Long? = dao.newestDownloadAtEpochMs()
     /**
-     * What the service says is in [bounds], for the picker to show before anything is downloaded.
+     * What the service says matches [selection], for the picker to show before anything is downloaded.
      *
      * Null when it could not be counted, which is a different thing from nothing being there: a walker
      * who is told "0" and then finds tracks on the hill was told something untrue.
      */
-    suspend fun inventory(bounds: LatLngBounds): Int? = downloader.count(bounds)
+    suspend fun inventory(selection: OtherTracksQuery): Int? = downloader.count(selection)
 
     /**
-     * Downloads every track the service has inside [bounds] and stores it, under [name].
+     * Downloads every track [selection] asks for and stores it, under [name].
      *
      * A download that stopped short **stores what arrived**: the next attempt asks again rather than
      * starting from a blank cache, and what did arrive is already usable offline. It is named and listed
@@ -110,28 +111,28 @@ class OfflineOtherTrackStore(
      * this is.
      */
     suspend fun download(
-        bounds: LatLngBounds,
-        /** What the walker called this box: "the Tararuas", "Home". Blank is named before it gets here. */
+        selection: OtherTracksQuery,
+        /** What the walker called this box or region: "the Tararuas", "Otago". Named before it gets here. */
         name: String,
         /** How many have been read so far, called after each page. */
         onProgress: (read: Int) -> Unit = {}
     ): OtherTracksDownloadResult {
-        val result = downloader.download(bounds, onProgress)
+        val result = downloader.download(selection, onProgress)
         store(result.tracks)
-        record(bounds, name, result.tracks.size)
+        record(selection.areaBounds, name, result.tracks.size)
         return result
     }
 
-    private suspend fun record(bounds: LatLngBounds, name: String, count: Int) {
+    private suspend fun record(area: LatLngBounds?, name: String, count: Int) {
         val areas = areaDao ?: return
-        if (count <= 0) return
+        if (count <= 0 || area == null) return
         areas.insert(
             OfflineOtherTrackAreaEntity(
                 name = name.trim().ifEmpty { UNNAMED_AREA },
-                minLat = bounds.minLat,
-                minLng = bounds.minLng,
-                maxLat = bounds.maxLat,
-                maxLng = bounds.maxLng,
+                minLat = area.minLat,
+                minLng = area.minLng,
+                maxLat = area.maxLat,
+                maxLng = area.maxLng,
                 trackCount = count,
                 downloadedAtEpochMs = now()
             )
