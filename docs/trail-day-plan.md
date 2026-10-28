@@ -1016,3 +1016,11 @@ Two things were learnt at the compiler's expense. **This service rejects `TRIM` 
 Both browsers share the rule: the button, the search key and the debounce all go through one `search()`, so typing and pressing cannot come to mean two things, and cancelling is one job rather than a race. Measured on the emulator: typing "Lake" in the other-tracks browser answers **53 tracks** without a button being touched, and "Angelus" in DOC's answers **Speargrass-Angelus Route**.
 
 The **laptop's** dialogs still have their Search button. They are a different page with the same shape in three dialogs, and making one of them dynamic would leave the other two the odd ones out - that is a change of its own if it is wanted. It shipped as 0.4.6.
+
+**Then a walker saw the "this map is not drawing" notice while their key was fine and they were online, so a tile is now asked for three times before it is called a failure.** The notice was raised by **five tiles failing in a row**, and one dropped connection during a pan is enough to fail a screenful - so a blip that lasted two seconds was being reported as a map that does not draw. The fetcher now tries again after 250 and 500 milliseconds, so a blip becomes a tile that took three quarters of a second longer, and a source that is genuinely not answering still fails all three.
+
+**A refused key is not retried**, because it reads the same three times: the request is right and the key is not. Everything else - a dropped connection, a timeout, an empty body, an HTTP 5xx - is what a second request is for. The decision is one small function with three tests, held still rather than reasoned about.
+
+**And the notice no longer appears for trouble that has ended.** Working out *what* is wrong takes a round trip to the health check or the key probe, and the tiles can come back while that is being asked - which put a card on screen that was already untrue and took it away again a second later. If a tile has arrived by the time the answer comes, nothing is said.
+
+Measured on the emulator with the network cut: no notice while it is working, the notice with **"The map service could not be reached"** once it is off and the map is panned, and the notice gone again once the network is back. It shipped as 0.4.7.
