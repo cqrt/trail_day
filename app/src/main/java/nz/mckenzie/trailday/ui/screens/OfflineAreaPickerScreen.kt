@@ -37,7 +37,6 @@ import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.offline.DownloadService
 import nz.mckenzie.trailday.offline.DownloadState
 import nz.mckenzie.trailday.offline.OfflineAreaDraft
-import nz.mckenzie.trailday.offline.OfflineChoice
 import nz.mckenzie.trailday.offline.OfflinePickerMode
 import nz.mckenzie.trailday.offline.offersRegions
 import nz.mckenzie.trailday.offline.downloadProgressWords
@@ -101,33 +100,31 @@ fun OfflineAreaPickerScreen(
     }
 
     val imagery = viewModel.mode == OfflinePickerMode.IMAGERY
-    val around = viewModel.mode == OfflinePickerMode.AROUND_TRACK
     val topography = viewModel.mode == OfflinePickerMode.TOPOGRAPHY
     // What this run keeps, as separate questions rather than one flag, because the packs are separate
     // caches: the imagery (a name, a zoom range, the tiles), what DOC publishes in the same box, and the
-    // drawn Topographic map with the heights its shade comes from. Around a track is the first two.
-    val keepsImagery = imagery || around
-    val keepsDocData = viewModel.mode == OfflinePickerMode.DOC_DATA || around
+    // drawn Topographic map with the heights its shade comes from.
+    val keepsImagery = imagery
+    val keepsDocData = viewModel.mode == OfflinePickerMode.DOC_DATA
     // Somebody else's tracks are the second publisher's material, and their own cache: kept in one act
     // that has nothing to do with DOC's, which is why this is not part of [keepsDocData].
     val keepsOtherTracks = viewModel.mode == OfflinePickerMode.OTHER_TRACKS
 
-    // Which of the two ways this run is choosing ground, and the region it has chosen. Only the track pack
-    // can choose a region, so every other run is a box whatever the state says.
-    val choice by viewModel.choice.collectAsStateWithLifecycle()
+    // The region this run has chosen. The two track packs choose ground by region; the imagery and the
+    // drawn map are fetched by the rectangle, so they draw a box.
     val region by viewModel.region.collectAsStateWithLifecycle()
     val regionsGeoJson by viewModel.regionsGeoJson.collectAsStateWithLifecycle()
     val pickedRegionGeoJson by viewModel.pickedRegionGeoJson.collectAsStateWithLifecycle()
-    val regionMode = viewModel.mode.offersRegions && choice == OfflineChoice.REGION
+    val regionMode = viewModel.mode.offersRegions
     // How much of the screen the card covers, in the pixels the map camera wants: the country is framed
     // above it rather than behind it.
     val regionCardPaddingPx = with(LocalDensity.current) { 210.dp.roundToPx() }
     // A zoom range is what any pack of tiles is asked, and the imagery and the drawn map are both that.
     val keepsZooms = keepsImagery || topography
-    // A name belongs to a pack that keeps **areas** - imagery, the drawn map, and either publisher's
-    // records - because an area is a row the walker finds again later: "the Tararuas", "the Routeburn". A
-    // region names itself, so there is nothing to type in that mode.
-    val keepsAreas = keepsImagery || topography || keepsOtherTracks || keepsDocData
+    // A name belongs to a pack that keeps **areas the walker types a name for** - imagery, and the drawn
+    // map - because an area is a row they find again later: "the Tararuas", "the Routeburn". The two track
+    // packs keep areas too, but a region names itself.
+    val keepsAreas = keepsImagery || topography
 
     /**
      * The map the box is drawn on: **the pack's own, where it has one.**
@@ -159,7 +156,6 @@ fun OfflineAreaPickerScreen(
                             OfflinePickerMode.IMAGERY -> "Choose an offline area"
                             OfflinePickerMode.DOC_DATA -> "Choose a DOC area"
                             OfflinePickerMode.TOPOGRAPHY -> "Choose an area for the LINZ Topographic map"
-                            OfflinePickerMode.AROUND_TRACK -> "Keep the ground around this track"
                             OfflinePickerMode.OTHER_TRACKS -> "Choose an area for other tracks"
                         }
                     )
@@ -211,10 +207,6 @@ fun OfflineAreaPickerScreen(
                 ) {
                     Text(
                         text = when {
-                            // The box is already drawn around the track, so the question is not about
-                            // corners but about whether this is the ground the walker wants kept.
-                            around -> "Tap the map to change the box."
-
                             regionMode && region == null -> "Tap a region"
                             regionMode -> "Tap another region to change it"
                             draft.corners.size == 0 -> "Tap one corner of the area"
@@ -224,27 +216,9 @@ fun OfflineAreaPickerScreen(
                         style = MaterialTheme.typography.titleSmall
                     )
 
-                    // Two ways of choosing ground, and only one of them holding an answer at a time: a
-                    // region names itself and needs no drawing, and a box covers the ground no region
-                    // describes - the end of a beach, one valley.
-                    if (viewModel.mode.offersRegions) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(
-                                selected = choice == OfflineChoice.REGION,
-                                onClick = { viewModel.setChoice(OfflineChoice.REGION) },
-                                label = { Text("Region") }
-                            )
-                            FilterChip(
-                                selected = choice == OfflineChoice.BOX,
-                                onClick = { viewModel.setChoice(OfflineChoice.BOX) },
-                                label = { Text("Box") }
-                            )
-                        }
-                    }
-
                     // A name belongs to a pack that keeps areas, because an area is a row the walker finds
-                    // again later: "the Tararuas", "the Routeburn". DOC's material is one cache with no
-                    // rows, so there is nothing to name. A region names itself, so there is nothing to type.
+                    // again later: "the Tararuas", "the Routeburn". A region names itself, so there is
+                    // nothing to type.
                     if (keepsAreas && !regionMode) {
                         OutlinedTextField(
                             value = draft.name,
@@ -361,11 +335,7 @@ fun OfflineAreaPickerScreen(
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
-                            text = if (around) {
-                                "Everything DOC publishes here is kept and drawn on the map."
-                            } else {
-                                "Everything DOC publishes inside $what is downloaded and drawn on the map."
-                            },
+                            text = "Everything DOC publishes inside $what is downloaded and drawn on the map.",
                             style = MaterialTheme.typography.bodySmall
                         )
                         docMessage?.let {
@@ -445,8 +415,6 @@ fun OfflineAreaPickerScreen(
                         ) {
                             Text(
                                 when {
-                                    around && working -> "Keeping the ground…"
-                                    around -> "Keep the ground"
                                     topography && working -> "Downloading the map…"
                                     topography -> "Download the map"
                                     keepsOtherTracks && otherTracksWorking -> "Downloading other tracks…"

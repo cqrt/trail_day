@@ -62,7 +62,7 @@ import nz.mckenzie.trailday.web.WebEditorService
 import nz.mckenzie.trailday.web.WebEditorState
 
 /** Destinations for now; swap for a NavHost when routes need arguments. */
-private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, OFFLINE_OTHER_TRACKS_PICKER, OFFLINE_TOPO_PICKER, OFFLINE_PICKER_AROUND, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC, DOC_DETAIL, OTHER_TRACK_DETAIL, OTHER_TRACKS_BROWSER }
+private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, OFFLINE_OTHER_TRACKS_PICKER, OFFLINE_TOPO_PICKER, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC, DOC_DETAIL, OTHER_TRACK_DETAIL, OTHER_TRACKS_BROWSER }
 
 class MainActivity : ComponentActivity() {
 
@@ -310,10 +310,6 @@ class MainActivity : ComponentActivity() {
                                 viewModel = detailViewModel,
                                 onBack = { destination = Destination.ASSETS },
                                 onEdit = { destination = Destination.ASSET_EDIT },
-                                onKeepGround = {
-                                    offlinePickerVisit++
-                                    destination = Destination.OFFLINE_PICKER_AROUND
-                                },
                                 onRecord = {
                                     recordTargetId = assetId
                                     destination = Destination.RECORD
@@ -501,29 +497,6 @@ class MainActivity : ComponentActivity() {
                             onBack = { destination = Destination.OFFLINE },
                             onSaved = { destination = Destination.OFFLINE }
                         )
-                    }
-
-                    // The ground around one track: the same screen, opened with the box already drawn
-                    // around the line, keeping the imagery and what DOC publishes inside it in one act.
-                    Destination.OFFLINE_PICKER_AROUND -> {
-                        val assetId = selectedAssetId
-                        if (assetId == null) {
-                            destination = Destination.ASSETS
-                        } else {
-                            val pickerViewModel: OfflineAreaPickerViewModel = viewModel(
-                                key = "around-$assetId-$offlinePickerVisit",
-                                factory = OfflineAreaPickerViewModel.factory(
-                                    applicationContext,
-                                    OfflinePickerMode.AROUND_TRACK,
-                                    aroundAssetId = assetId
-                                )
-                            )
-                            OfflineAreaPickerScreen(
-                                viewModel = pickerViewModel,
-                                onBack = { destination = Destination.ASSET_DETAIL },
-                                onSaved = { destination = Destination.OFFLINE }
-                            )
-                        }
                     }
                 }
             }
