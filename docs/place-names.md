@@ -1,149 +1,88 @@
 # Place names over the imagery
 
-Aerial imagery is a photograph. It says what the ground looks like and nothing about what any of it is
-called, which is a real question at a kitchen table: *that paddock is beside which town?* The **drawn
-map** (OpenStreetMap) answers it, but choosing it means giving up the photograph - and the photograph
-is what this app is for, because what the imagery shows is what a spray decision is made from.
+Aerial imagery is a photograph. It shows what the ground looks like and says nothing about what any of
+it is called, which is a question you ask at a kitchen table: *that ridge is above which town?*
 
-So the names come as a **layer of their own**, over the imagery.
+So the names arrive as a layer of their own, drawn over the imagery. They are off until you switch them
+on, from the **What the map draws** sheet on the map.
 
-## Where they come from
+## Where the names come from
 
-LINZ publishes the same data the imagery comes from as **vector tiles**, and one layer of them is a
-point per named place. It is the same service, the same key and the same licence as the imagery
-(CC BY 4.0), so nothing new is being trusted and the credit the map already carries covers it.
+LINZ publishes its maps as vector tiles, and one layer of them is a point for every named place. It is
+the same service and the same licence as the imagery, so nothing new is trusted and the credit the map
+already carries covers it.
 
-Two things about that service are worth writing down, because both were checked against it rather than
-read off a page (`build/verify/place-names.txt`):
+Three things about that service were checked against the live service rather than read off a page:
 
-- **The tileset is `topographic-v2`.** The obvious-looking `topographic` answers **HTTP 200** and has
-  **no `place_labels` layer at all** - it is an older schema. A tileset named wrongly here turns the
-  feature off without turning anything red, which is why `PlaceLabelsTest` pins the name.
-- **The layer is `place_labels` and the name is in `label`** - not the `name` a vanilla Shortbread
-  tile would carry. `place` says what kind of place a point is (city, town, village, locality, suburb),
-  and `natural` says peak, bay, cape or peninsula.
-
-The tiles go to **zoom 15**, and past it the map overzooms: it keeps drawing the deepest tile it has,
-scaled up, which for a point with a name on it is exactly right - the name stays where the place is
-and only its lettering grows.
+- **The tileset is `topographic-v2`.** The obvious-looking `topographic` answers, but it is an older
+  schema with no place labels in it at all. A tileset named wrongly here would turn the feature off
+  without turning anything red.
+- **The names are in the `label` property**, not the `name` a plain tile would carry. `place` says what
+  kind of place a point is (city, town, village, locality, suburb), and `natural` says peak, bay, cape
+  or peninsula.
+- **The tiles stop at zoom 15.** Past that the map keeps drawing the deepest tile it has, scaled up,
+  which for a name on a point is exactly right: the name stays where the place is and only the letters
+  grow.
 
 ## The bands
 
-Names are drawn in six bands, because what changes between a wide view and a close one is *when* a
-name should appear at all, and a MapLibre layer's zoom range is a layer property rather than a filter's:
+Names appear in six bands. What changes between a wide view and a close one is *when* a name is worth
+showing at all.
 
-| Band | What it draws | Filed under | Appears | Size |
-| --- | --- | --- | --- | --- |
-| `linz-place-towns` | `city`, `town` | `place` | zoom 6 | 11 → 14 |
-| `linz-place-lakes` | `lake` | `place` | zoom 7 | 11 → 14 |
-| `linz-place-bays` | `bay` | `water` | zoom 7 | 11 → 13 |
-| `linz-place-localities` | `village`, `locality`, `suburb` | `place` | zoom 10 | 10 → 13 |
-| `linz-place-peaks` | `peak` | `natural` | zoom 11 | 10 → 12 |
-| `linz-place-rivers` | `river`, from `water_lines`, **along the line** | `kind` | zoom 12 | 10 → 12 |
+| Band | What it draws | Appears at | Size |
+| --- | --- | --- | --- |
+| Towns | city, town | zoom 6 | 11 to 14 |
+| Lakes | lake | zoom 7 | 11 to 14 |
+| Bays | bay | zoom 7 | 11 to 13 |
+| Localities | village, locality, suburb | zoom 10 | 10 to 13 |
+| Peaks | peak | zoom 11 | 10 to 12 |
+| Rivers | river, along the line | zoom 12 | 10 to 12 |
 
-A wide view with every locality on it is a muddle; a town name is what the operator zoomed out to
-find. The same argument the app's own track names are held back with, and the same shape LINZ's own
-topographic style uses.
+A wide view with every locality on it is a muddle, and a town name is what you zoomed out to find.
 
-**The bays carry the sounds.** Milford Sound, Doubtful Sound and Dusky Sound are all `water=bay` in
-this data, so a band called "bays" is the one that labels a fiord - which, in Southland, is most of
-what a coastline has to say.
+**Bays carry the sounds.** Milford, Doubtful and Dusky Sound are all `water=bay` in this data, so the
+band that labels a bay is the band that labels a fiord.
 
-**Peaks wait** further than a named summit might seem to deserve: LINZ publishes them from low zooms, a
-range has dozens, and a wide view with every summit named is a screen of names with the ground lost
-underneath. They are also the band no spray decision is made from.
+**Peaks wait.** LINZ publishes them from low zooms, a range has dozens, and a wide view with every
+summit named is a screen of names with the ground lost underneath.
 
-**Rivers are the exception in this file**: the only band that comes from another layer
-(`water_lines`) and the only one whose name is placed **along** the thing rather than at a point. A
-river is long and thin - a name at one point on it would say neither which way it goes nor how far -
-so the text runs with the river and may bend with it. They are also the densest band by a distance: a
-Fiordland tile at zoom 11 has over a hundred named streams in it, which is why they wait for zoom 12
-and why the map drops a river's name that will not fit without touching another.
+**Rivers are the one band drawn along the thing** rather than at a point, because a river is long and
+thin and a name at one point on it would say neither which way it goes nor how far. It is also the
+densest band: a Fiordland tile at zoom 11 holds over a hundred named streams, which is why they wait
+until zoom 12. The map drops a name that will not fit without touching another.
 
-LINZ files these under three properties, and a band says which it means: everything a person lives in
-or near is `place` (city, town, village, locality, suburb, **lake**, island, archipelago), the
-landscape is `natural` (peak, bay, cape, peninsula), and what a place is on or in is `water` (bay,
-lagoon, sea, seachannel). The rivers are the fourth: in `water_lines`, where everything that flows -
-burns and creeks included - is filed as `kind=river`.
+## On the map
 
-**Not drawn**, though they are there in the same layer: capes, peninsulas, lagoons, seachannels, the
-open sea, islands and archipelagoes. Each is a band away, and each is more clutter over a paddock; see
-`build/verify/place-name-kinds.txt` and `build/verify/southland-data.txt` for what else the tiles
-carry.
+Names are written white with a dark outline, so they read over a photograph of anything. The switch is
+one row in the map's sheet, beside the other layers, and it is remembered.
 
-## How they are drawn
-
-- **Over the imagery, under the work.** The layers are added straight after the raster source, so an
-  operator's lines, track names and markers are never covered by a town name. The work is what the map
-  is for; a place name is the furniture around it.
-- **White letters with a dark outline**, as the app writes its own names - white because it is the one
-  colour the traffic light never uses, and because over a photograph (green paddocks, grey roads, brown
-  hills) white with a dark edge is what is readable. The outline is thicker than a track name's: what
-  is behind it is a photograph rather than a flat map.
-- **A name that will not fit is dropped**, rather than drawn over the name it would touch. This is the
-  opposite of how the app treats its own track names - which are never allowed to vanish - and
-  deliberately so: a track's name is something the operator put there, and a town's is not.
-- **The letters travel in the app.** The names are text the map writes, from the same Noto Sans files
-  the track names use (`GlyphFonts`), so a name on the desk is written from the letters that ship in
-  the APK rather than from a font the laptop happens to have - and Māori names draw with their macrons.
-
-Every number above lives in `domain/tiles/PlaceLabels.kt`, and both maps read it from there: a town
-written one size on the phone and another on the desk is the drift the file exists to stop.
-
-## The switch
-
-The switch is **off by default**, and it lives in the map's own **"What the map draws"** sheet - the
-layers button on the map - where its row reads *"Towns, lakes, peaks, bays and rivers from LINZ, drawn
-over the imagery."* It is there because that is where this app puts every question about what is on the
-map, and because the question "why is that town name there" is asked while looking at the map.
-
-It is the one switch in that sheet that starts *off* (everything else there is the work, which is why
-the app was opened) and the one that fetches something new. Turned on, `place_names` is written to
-preferences and the map reloads its style: unlike a layer being hidden, the names are a **source** the
-style either has or has not got.
-
-**The desk follows the phone.** The page's style is built by the phone
-(`WebStyleJson`), so the names appear on the laptop exactly as they are switched on the phone, fetched
-from the phone - the page never talks to LINZ, and the key never leaves the phone.
+The band table, the colours and the sizes are all in one file (`domain/tiles/PlaceLabels.kt`), and both
+the phone's map and the laptop page read every number from it, so a town cannot be one size on the
+phone and another on the laptop.
 
 ## Offline
 
-The names go through the app's own tile server, the same as the imagery: fetched from LINZ on the way
-past, kept in the store, and served to both maps from there. So **anywhere that has been looked at
-keeps its names with no reception**, and nowhere that has not, has none - the same rule the imagery
-follows, and the reason the two are worth having together.
+The names go through the phone's own tile server, the same as the imagery: fetched from LINZ on the way
+past, kept, and served from there afterwards. So anywhere you have looked at keeps its names with no
+reception, and anywhere you have not has none.
 
-They are kept in the **cache** directory rather than the app's own files: what is here is what the map
-picked up on its way past, not something downloaded on purpose, so it is not carried in a backup and
-may be reclaimed under storage pressure. Folding the names into the **Offline areas** download - so a
-block downloaded for a trip with no reception keeps its names too - is the obvious next step, and it
-is not done yet.
+They are kept in the cache directory, not in the app's files: they are what the map picked up on its way
+past, so they are not in a backup and Android may reclaim them. Folding them into the imagery download,
+so a downloaded area keeps its names too, is an obvious next step and is not done yet.
+
+## The credit
+
+The names' own style carries `LINZ CC BY 4.0 © Topographic data`, but the map's credit strip does not
+repeat it: the imagery's credit already names LINZ and the licence, and a second credit for the same
+publisher was a third more strip for something you had already read.
 
 ## Files
 
 | File | What it is |
 | --- | --- |
-| `domain/tiles/PlaceLabels.kt` | **The one table**: the tileset (`topographic-v2`), the layer (`place_labels`), the property the name is in (`label`), the zooms, the bands with their kinds and sizes, the colours, the outline, the credit, and the URLs (a tile, and the template a style is given). Both maps read every number from here. |
-| `map/BasemapStyles.kt` | The phone's style document: the vector source and one symbol layer per band, when the operator has asked for them *and* there is a server to fetch them from. |
-| `map/WebStyleJson.kt` | The desk's style, built from the same table: the same source, the same bands, the same numbers. |
-| `offline/TileServerHolder.kt` | The source in the app's tile server: the LINZ fetcher with the vector URL, the store in the cache directory, the content type. No key, no names. |
-| `data/SettingsRepository.kt` | `place_names`, **off** when unset, with the reasoning on the preference. |
-| `viewmodel/MapViewModel.kt` | The switch, written straight through like the layer switches. |
-| `ui/screens/MapScreen.kt` | The row in "What the map draws". |
-| `map/BasemapView.kt` | `placeNames`, which reloads the style rather than hiding a layer - the names are a source. |
-| `web/WebEditorDocuments.kt` | Reads the switch when the desk asks for its style, so a page reload is enough for a change to take effect. |
-| `app/src/test/.../PlaceLabelsTest.kt` | The tileset, the URLs and the bands, held by a test. |
-
-## Notes and limits
-
-- **The dataset is LINZ's**, under CC BY 4.0, the same as the imagery. Its credit,
-  `LINZ CC BY 4.0 © Topographic data`, is drawn by the **style document** the names are served in -
-  the one place a source has to speak for itself. The map's own credit strip does **not** add it: the
-  imagery's credit there already names the publisher and the licence, so a second credit was a third
-  more strip for a fact the walker had already read, and the strip was made smaller by dropping it
-  (0.3.91). The strip's only second credit is the trail's, which is a different publisher's.
-- **Names are only as current as the tiles**, which are LINZ's own and updated by them.
-- **A town name is furniture, not work.** Nothing here is stored against an asset, nothing is imported,
-  and switching the names off changes nothing but the picture.
-- **The phone's own map draws them too**, from the same style document: the feature is not a desk
-  feature that the phone happens to serve - it is one map drawn on two screens.
+| `domain/tiles/PlaceLabels.kt` | The tileset, the layer, the six bands and their numbers |
+| `map/BasemapStyles.kt` | The phone's style: one symbol layer per band |
+| `map/WebStyleJson.kt` | The laptop page's style, built from the same numbers |
+| `offline/TileServerHolder.kt` | The source in the tile server, cached rather than downloaded |
+| `data/SettingsRepository.kt` | `place_names`, off when unset |
+| `ui/screens/MapScreen.kt` | The row in **What the map draws** |

@@ -1,303 +1,102 @@
-# DOC tracks
+# DOC tracks, huts, camps and bike trails
 
-A screen that searches the Department of Conservation's published track network and imports the
-tracks the operator ticks, as ordinary assets. It is how a track that DOC already holds gets into
-this app without anyone exporting a file first.
+DOC publishes four sets of data as online map services: walking tracks, huts, campsites and mountain
+bike locations. The app searches those services when you ask it to, rather than downloading the whole
+network, and imports whatever you tick as ordinary places on your own phone.
 
-## Four services, one screen
+All four are one browser with a bar across the top to choose between them.
 
-DOC publishes four things, and the same browser searches all four: **tracks**, **huts**, **campsites**
-and **bike trails** (`DocSource`). They are one screen rather than four because the question is the
-same - what does DOC publish near here, or under this name - and because the answer is imported the
-same way: an asset with DOC's own number written against it.
+## The four services
 
-They are chosen from a **segmented bar** on the deck at the top, and the page is titled after the
-choice ("DOC huts"). What each page offers differs, because what DOC publishes differs: kinds and
-track types belong to tracks, the **Bike** filter belongs to tracks and bike trails (the two services
-describe one thing, so both are read and a bike trail is matched to the track it runs along), and a
-hut or a campsite has its own facts instead. Nothing carries across a change of service: a filter from
-the last search would be a filter on fields the next one has not got.
+| Service | What it is | Shape |
+| --- | --- | --- |
+| **Tracks** | DOC's walking and tramping network (`DOC_Tracks_Open_Data`) | lines |
+| **Huts** | `DOC_Huts` | points |
+| **Camps** | `DOC_Campsites` | points |
+| **Bike Trails** | `DOC_Mountain_Bike_Tracks` | points |
 
-Most of what follows was written about tracks, and says so where the difference matters. The
-download side of DOC's material - all four services, with their pictures, kept by region - is in
-[README.md](../README.md) and `OfflineDocStore`.
+The bike service publishes where riding is allowed, with a difficulty and a time, not the shape of the
+track. It is a finder for somewhere worth riding, and drawing it as a line would be the app inventing a
+route.
 
-## The source
+Each page offers only the filters its own service can answer: a hut has no "how it is walked" and a
+track has nobody to book with. The choices themselves come from what the search returned, so a filter
+can only ever offer something that is actually on the page.
 
-DOC publishes its tracks as a hosted **ArcGIS Feature Service**, not a file store:
+## Searching
 
-- item `8de802e1239c4906947c3b4b8a98c1e3`, **"DOC Tracks"**, public, CC-BY 4.0, Crown copyright;
-- one polyline layer, native **NZTM2000 (EPSG:2193)**, refreshed upstream;
-- `https://services1.arcgis.com/3JjYDyG3oajxU6HO/arcgis/rest/services/DOC_Tracks_Open_Data/FeatureServer/0`
+The phone asks DOC, and DOC answers a page of about 300 rows:
 
-**The deprecated dataset is not read.** Item `5cba3b0a2e1041c9ad02ec694f3f3d37` ("DOC Tracks —
-Deprecated Dataset", service `DOC_Tracks_EAM`) carried the old object ids and characteristic slots.
-The replacement numbers its tracks differently and keeps characteristics in slots **2-9 and 14-15**
-rather than 1-11, so the field list changes with the URL. Cached tracks from the old service are
-cleared once on upgrade; huts, campsites and bike locations are untouched, and the area can be
-downloaded again for tracks.
+- **By name**: part of a name, matched without caring about capitals.
+- **Near me**: within a distance you set, measured from the phone's own position. The phone asks in
+  rings rather than in one big box - 5, 10, 25, 50, 100, 150, then 200 km, whichever of those are
+  inside your distance - so widening the distance only ever adds results and never reshuffles or drops
+  the ones already on screen. A row inside two rings arrives twice and is kept once.
+- Both together narrow each other.
 
-**The companion layer, `DOC_Walking_Experiences`, is also deprecated**, but DOC has not published a
-replacement yet. It is still read for the website summary; the day a replacement appears, the layer
-name is the one line to change.
+The search runs 350 milliseconds after you stop typing, so a word is one request rather than one per
+letter, and a slow answer cannot land on top of a newer one. The button and the keyboard's search key
+still work and go through the same call.
 
-## The DOC Tracks API and the proxy
+A page that comes back full says so, rather than looking like a complete answer.
 
-DOC also publishes a **Tracks API** at `api.doc.govt.nz/v1`, with a richer record than the companion
-layer: introduction, thumbnail, exact walking time, walking category, difficulty, permitted
-activities, wheelchair/buggy notes, mountain-bike and kayaking fields, fuller dog rules, location,
-region and page link. It also publishes current alerts per track and in bulk.
+## Ordering
 
-The API needs an `x-api-key`, and a key in an Android APK can be extracted. The app therefore reads
-it through a small Cloudflare Worker in `worker/`, deployed at
-`trailday-doc-proxy.le-mckenzies.workers.dev`. The Worker holds the key, exposes only a handful of
-read-only routes, caches the index and detail for a day and alerts for five minutes, and rate limits
-per IP. See `worker/README.md`.
+Results are narrowed and reordered without asking DOC again:
 
-The API does not publish track status or track type, so ArcGIS remains the source for those, for
-geometry and for offline area downloads. The app matches an API record to an ArcGIS track by name
-plus position, and falls back to the companion layer and alert endpoint when the proxy is
-unavailable.
-
-An **offline area download** also uses the proxy: `POST /v1/enrich` takes up to 40 tracks per request
-and returns their details, so the cached track carries the same richer facts as the online page. A
-track the proxy cannot answer for keeps the public layer's summary, and a download with no proxy is
-unchanged. Alerts are not cached; they are checked live when a card is shown.
-
-## How it searches
-
-Searching happens at DOC; the phone never downloads the whole network. A search is an ArcGIS REST
-query (`DocTracksUrl`), and asking for `f=geojson` with `outSR=4326` has ArcGIS reproject from NZTM
-to WGS84 for us — so there is no projection arithmetic in the app, and the answer is the GeoJSON the
-importer already reads.
-
-- **A name** becomes `UPPER(TechObjectName) LIKE UPPER('%…%')`, case-insensitively. A quote in the
-  name is doubled, so it searches for a name rather than ending the clause.
-- **Near me** adds an envelope around the phone's newest fix, **25 km by default and set by the
-  operator** (the phone screen's km field, the desk's "Within … km"). A degree of longitude is shorter
-  this far south, so the box is wider than it is tall. The box is only the service's quick filter,
-  though: its corners reach about 1.4× the radius, and any long track that clips it passes right
-  through, so what comes back is then **kept only where the nearest point is truly within the radius**
-  — the circle the operator asked for. A near-me search with no fix yet is refused rather than done
-  without the place, which is how tracks 80 km away used to turn up under a 50 km radius. Each row
-  says how far away it is, from the phone's own fix.
-- Either alone is enough, and both together narrow each other.
-
-The service answers a **page** (300 tracks). A page that comes back full says so, rather than letting
-a capped search look like a complete one.
-
-**Near me reads outward in rings** rather than asking one big box: the same inner rings are read first
-whatever radius is set, so raising the distance from 25 km to 50 km can only add rows, never reorder
-or lose the ones already on screen. Each ring is the circle, and a row inside two rings arrives twice
-and is kept once - a few hundred rows of allowance per ring is cheaper than a wrong order.
-
-**The field searches as it is typed into**, 350 milliseconds after the typing stops, so "Lake Hayes"
-is one request rather than ten and a slow answer cannot land on top of a newer one. The button and the
-keyboard's search key still work; they go through the same function, so the two cannot mean different
-things.
-
-## Filtering and ordering
-
-A search's results are narrowed and reordered **without asking DOC again** — the page already holds
-what it found:
-
-- **Kinds** and **track types** are offered as filters, each taken from what the search actually
-  returned: the kinds (`Tramping Track`, `Short Walk`, `Walking Track`, `Great Walk`, `Easy Tramping
-  Track`, `Route`) and DOC's own `WEB_TRACK_TYPE` (`One way`, `Loop`, `Return`, and the like). Any of
-  them can be picked, together or alone, and a kind and a type together keep only the tracks that are
-  both. Picking none is every one. The choices come from the results rather than from DOC's taxonomy
-  kept here, so a filter can only ever offer what is on the page.
-- **Nearest to phone** orders by the distance from the phone's own fix to the **nearest vertex** of
-  each track — a long line passing beside you is near you, where its middle would not be — and it
-  needs no second request: the phone sends each track's distance, so the desk's order is the phone's.
-  With no fix it falls back to **Name**, A to Z.
-
-They are **labelled controls rather than a row of sliding chips**: on the phone a **Filter** menu — its
-count on the button, so a list that looks short says why — and a **Sort** menu; on the desk a **Filter**
-group and a **Sort** group. A row to read is a row to tick, so the chrome stays thin and the list takes
-the screen.
-
-It is all the phone's arithmetic and the phone's answers, so both browsers order the same list the
-same way, and the nearest order re-sorts as the phone moves.
+- **Nearest to phone** sorts by the distance from you to the nearest point of each track, so a long
+  line that passes beside you counts as near you. With no position it falls back to name, A to Z.
+- The order updates as you move.
 
 ## What a row says
 
-Each row is titled with **the name the import will give the asset** — the place the `FlocID` names,
-then DOC's own name, "Catlins Coast Historic House Walk" — rather than DOC's bare name, so a site the
-app names wrongly is seen at a glance here, before the track lands. Beneath it are the kind, the track
-type, the length and, from the phone's own fix, how far away it is. The **track type** stands where a
-vertex count used to: "584 points" is nothing an operator acts on, where *One way* tells them what
-they are taking on.
+A track row is titled with the name the import will give it: the place DOC's site code names, then
+DOC's own name. `CATLNSCO-TK11` "Historic House Walk" becomes **Catlins Coast Historic House Walk**,
+so your list reads by where the walk is. A site code the app does not know leaves DOC's own name alone,
+because a wrong place is worse than no place.
 
-## Already-imported tracks
+Beneath the name are the kind, the length, and how far away it is. The place a track is in travels with
+it everywhere: onto the map, into a download, and into a backup.
 
-A track that is already on the phone is shown in the list but **cannot be ticked or imported again**,
-on either surface. The list says *already imported* beside it, the box is off, and the phone refuses
-it at the door that writes as well as in the list — so a second search cannot double the work.
+## Already imported
 
-It is known by an **exact source reference**, not a name: importing writes `doc:<OBJECTID>` into
-`AssetEntity.sourceRef`, and a search reads every such reference once and marks each candidate against
-it. So a renamed asset is still recognised, and deleting the asset makes the track importable again.
-The reference travels in a backup too, so a restore does not forget which tracks are already here.
+A thing already on your phone is shown but cannot be imported again, so a second search cannot give you
+the same hut twice.
 
-`sourceRef` arrived with schema **v8** (`MIGRATION_7_8`, an `ALTER TABLE assets ADD COLUMN sourceRef
-TEXT`). Existing rows are left with none — nothing in a v7 database came from a service, and inventing
-a source would claim a provenance nobody gave — and the migration is proved against a populated v7
-database like every migration before it.
+It is recognised by DOC's own number, not by its name, so renaming a place does not make it look new,
+and deleting it makes it importable again.
 
-## Place names on import
+## Alerts
 
-DOC's tracks carry **no place name**, and nothing DOC publishes expands its `FlocID` site codes — there
-is no reference table in the open data, and DOC's own place boundaries are far coarser than a site
-("Lowlands Te Rā a Takitimu Place" for a Waipapa Point track). So the app keeps its own map,
-`DocPlaces`, from `FlocID` prefix to place, in one file.
-
-Importing names the asset **place-first**: `CATLNSCO-TK11` "Historic House Walk" becomes
-**Catlins Coast Historic House Walk**, so the list reads by where the work is. A prefix the map does not
-know gives no place and the track keeps the name DOC gave it — better the name alone than the wrong
-place — and a track already named after its place is left alone rather than named twice. **The map is
-the thing to edit** as new sites are met; the seed is the sites seen in the data so far.
-
-The site travels with a track everywhere it goes, so the name is the same however it is brought in: on
-the wire to the desk, and in the offline cache (schema **v10**, `MIGRATION_9_10`).
-
-## What it reads, and what it writes
-
-`DocTracksJson` reads the answer with `GeoJsonParser` — the same reader a GeoJSON file gets — and
-keeps **each feature's own paths**: DOC's `line` is a multi-path polyline, which every renderer draws
-as separate lines, so a track published in pieces is drawn in pieces.
-
-It is deliberately **not** read through `TrackInterchange`'s file rule, and that is worth knowing
-before changing it back. That rule joins paths that do not meet into one line — right for a file a
-tool cut a track up into, wrong for a service that publishes a track in pieces. "Breast Hill Track" is
-four paths, one of them 18 km away near the Timaru River, and joining them drew a straight line across
-the lake; `AssetGeometry.lengthM` counts every metre of every path, so the join was counted as distance
-the track does not have. Sampled against the live service: **13 tracks fetched, 4 of them with more than
-one path, and every one of those 4 flattened** — with jumps of 116 m, 244 m, 1,487 m and 18 km. Fixed in
-0.3.93.
-
-A **cached** track keeps whatever the reader produced, so an offline area downloaded before 0.3.93
-still holds the flattened line until it is downloaded again.
-
-It keeps what the browser needs beyond the name: `OBJECTID`
-(its key), `SubObjectType` (its kind), `FlocID` (its site), and its **track type**; `DocTrack.sourceRef`
-is `doc:<OBJECTID>`.
-
-DOC keeps the type as one of **eleven characteristic slots** (`CharName1..11` paired with
-`CharValue1..11`) rather than as a column, and which slot holds it varies by row — so
-`DocTracksUrl.OUT_FIELDS` asks for all of them and the reader finds `WEB_TRACK_TYPE` by its name. That
-is the one field worth the extra columns: it is what a row shows in place of a vertex count, and what
-the type filter narrows by.
-
-Importing is the same `AssetRepository.createAsset` every drawn or imported track goes through, one
-asset per ticked track, named as DOC names it. So the moment it lands a DOC track is a track like any
-other: it can be edited, sprayed, blocked, exported.
-
-## On the computer
-
-The editor served to a laptop has the same browser. It is the same search and the same import, and
-**the phone does the asking there too**: the page calls the phone (`GET /api/doc`) and the phone
-calls DOC, so the laptop never reaches the service itself and the service is still named in one place.
-
-On the desk it is a **dialog over the work** — the page dimmed behind it, closed by its own `×`, by
-Escape, or by a click on the dimmed page — rather than a block in the sidebar. A browser is a way of
-bringing work in: read once and closed. And a list of tracks wants width, which a 460px sidebar has
-none of.
-
-There are two answers to "where", and they are one answer:
-
-- **Near the phone** is the **phone's** own fix from the state document, not the browser's location —
-  the work and the service are the phone's, and a desk has no business pretending to be the tractor.
-- **Only what's on the map** is the desk's own view, turned into a box (`map.getBounds()`) and sent as
-  `bounds=minLat,minLng,maxLat,maxLng`. It is a different question — *the paddock I am looking at* —
-  and it is the desk's to answer, because the desk is where the map is.
-- Turning one on turns the other off, so a search never carries both and the operator is never unsure
-  which it used. A view wins if both are somehow given.
-- **Within … km** sets the radius Near the phone searches; 25 is the default. It goes with the place,
-  not with the view, which has no radius to send.
-
-A track the phone already has is marked **already imported** on the desk too: the row is drawn, its
-box is off and disabled, and it is left out of the request even if a page sends it.
-
-A row is titled with the **name the import will give the asset**, and carries the kind, the track type,
-the length and the distance the phone measured — the same row the phone shows, from the same figures.
-Filtering and ordering are **labelled controls** (`Filter`, `Sort`) rather than chips. The search and
-those controls stand in a column on the left; **the list is the pane beside them**, more than three
-quarters of the dialog's width and the whole of its height, which is the point of the dialog.
-
-- `GET /api/doc?name=…&near=lat,lng&radiusKm=…&bounds=minLat,minLng,maxLat,maxLng` answers with the
-  tracks, which of them are already here, and the phone's own word when there is one to say.
-- `POST /api/doc/import` carries the ticked tracks' keys, names and the geometry the phone already
-  showed, and makes them with the same `createAsset` every drawn track goes through — so each records
-  the `doc:…` reference that keeps it from being imported twice. One request for the lot.
-- `app/src/main/assets/web/doc.mjs` is the desk's half — the query and the import body — pure, and
-  tested under node like `wire.mjs`.
+A DOC page shows any current alerts for it. If the app could not check, it says so rather than implying
+there are none. Alerts are not stored: they are asked for when the page opens.
 
 ## Offline
 
-The browser is useless with no reception unless the tracks are already on the phone. The **Offline
-areas** screen has two tabs — **Imagery** and **DOC tracks** — because the two are **independent
-caches**: imagery makes the map work offline, DOC's tracks make this browser work offline, and neither
-has anything to do with the other. They are counted, cleared and filled separately.
+DOC's material can be downloaded by region, which brings all four services with their pictures. In the
+browser, if DOC cannot be reached, the app falls back to what you have downloaded and says so.
 
-They choose an area the same way: **Choose an area on the map** opens the picker, two opposite
-corners are tapped, and the download runs. There is no area offered by location any more — the
-operator says where, on the map, which is the one thing a location guess was standing in for.
+## Where the data comes from
 
-Each listing shows **where** as well as what: a small map with the cached ground drawn as a white box
-over the imagery, fitted to the area. An imagery area carries its own box; the DOC cache is a set of
-tracks rather than a rectangle, so its box is the extent of the tracks themselves, worked out from
-their vertices. The previews are **pictures, not maps**: nothing on them can be dragged, and the
-phone's own dot is not drawn, because neither is what a thumbnail of a downloaded area is about.
+The four services are hosted by ArcGIS, in WGS84 once the service has reprojected for us, and the app
+reads the answer as GeoJSON - the same reader a file gets.
 
-- **Download DOC tracks** pulls every track the service has inside the box, a page at a time
-  (`DocTrackDownloader`; 2,000 a request, capped at 4,000), and stores them keyed by the service's own
-  `OBJECTID` — so two overlapping areas end with one copy, not two. It is independent of the imagery:
-  no LINZ key is needed, and an operator who only wants tracks pays for nothing else.
-- The store is a **cache**, not the record of the farm: it is not backed up, and *Clear downloaded DOC
-  tracks* costs nothing but the download.
-- With no service, both browsers fall back to the cache: the search is filtered by name — the download
-  is the place filter, because the cache only holds the areas asked for — and the list says
-  *Could not reach DOC. Showing N downloaded tracks.* Importing works exactly as it does online,
-  because it always did: the geometry is already in hand.
+The richer text - a track's summary, its alert, its picture - comes from DOC's own API, which needs a
+key. That key lives in the Cloudflare Worker in `worker/`, never in the app, because a key in an APK can
+be taken out of it.
 
-`DocTrackCache` is the interface the browsers depend on; `OfflineDocTrackStore` is the Room-backed
-one, beside the offline imagery. `DocPathsJson` is how a cached track's geometry travels — `[lat, lng]`
-pairs in one JSON column — because a cache row is written once and read whole and nothing joins to it.
-
-The table arrived with schema **v9** (`MIGRATION_8_9`), and has grown as the browser learned more
-about a track: its `FlocID` in **v10** (`MIGRATION_9_10`), so an offline import is named by its place,
-and its `WEB_TRACK_TYPE` in **v11** (`MIGRATION_10_11`), so the type filter works offline too. Each is
-proved against a populated database of the version before it, like every migration in the app.
+The service addresses are named in one place (`DocSource`), so the day DOC replaces a service it is one
+line to change.
 
 ## Files
 
-| File | What it is |
+| File | What it does |
 | --- | --- |
-| `domain/doc/DocTrackQuery.kt` | The question and the URL that asks it: the `where` clause, the near-me envelope, the characteristic slots the type is read from, `f=geojson&outSR=4326`. Pure, so the URL is held by a JVM test. |
-| `domain/doc/DocTrack.kt` | One track the service holds: its key, name, kind, track type, `FlocID` and the reading of its paths; its own metres and points. |
-| `domain/doc/DocPlaces.kt` | The app's own `FlocID` prefix → place map, and the place-first asset name an import is given. |
-| `domain/doc/DocTracksJson.kt` | The service's answer read as tracks, through `GeoJsonParser` and `TrackInterchange`. |
-| `doc/ArcGisDocTracks.kt` | The live service, asked over HTTP. An interface (`DocTracksSource`) so the screen is tested against a fake. |
-| `viewmodel/DocTracksViewModel.kt` | The search, the ticks, the import, and the phone's own newest fix for "Near me". |
-| `ui/screens/DocTracksScreen.kt` | The screen: a name field, Near me with a km field, Search, labelled Filter and Sort menus, a tickable list, Import. |
-| `data/db/AssetEntity.kt`, `Migrations.kt` | `sourceRef`, the exact key a service track was imported under, and `MIGRATION_7_8` that adds it (schema v8). |
-| `data/db/OfflineDocTrackEntity.kt`, `OfflineDocTrackDao.kt`, `MIGRATION_8_9` | The offline DOC cache table and its v9 migration. |
-| `domain/doc/DocTrackCache.kt` | The cache the browsers depend on, and the name filter used when DOC cannot be reached. |
-| `domain/doc/DocPathsJson.kt` | A cached track's geometry as `[lat, lng]` pairs in one JSON column. |
-| `doc/DocTrackDownloader.kt` | Reading a whole area's tracks a page at a time, keeping what arrived when it stops short. |
-| `offline/OfflineDocTrackStore.kt` | The Room-backed cache beside the offline imagery, and the download that fills it. |
-| `web/WebEditorDocuments.kt` | The desk's two asks: `docSearch` runs the same `DocTracksSource` the phone screen does and marks what is already here, and `docImport` makes the ticked tracks with `createAsset`. |
-| `web/WebEditorServer.kt` | `GET /api/doc` and `POST /api/doc/import`, beside the other routes and behind the same token gate. |
-| `web/WebEditorJson.kt` | The documents those two answer with, and the two data shapes `doc.mjs` sends and reads. |
-| `app/src/main/assets/web/doc.mjs` | The desk's half: the query a search is and the body an import is. Pure, tested under node. |
-| `test/.../domain/doc/` | The URL and the answer, held by JVM tests. |
-
-## Notes and limits
-
-- **The dataset is deprecated.** It still answers, and the app will keep working, but a replacement is
-  coming; see the one-line change above.
-- **Attribution.** DOC's data is CC-BY 4.0 and Crown copyright. The tracks are DOC's, not the app's;
-  any handover or report derived from them should carry DOC's acknowledgement.
-- **Offline** there is no search: the answer is a sentence naming the fault, not a crash, and the
-  app's own files still import as before.
+| `domain/doc/DocSource.kt` | The four services, their fields, their filters and their names |
+| `doc/ArcGisDoc.kt` | Reading an answer from the services |
+| `doc/DocJson.kt` | The wire shapes |
+| `doc/DocDetailReader.kt` | The richer facts from DOC's API, through the Worker |
+| `doc/DocNearestSearcher.kt` | The rings a near-me search reads outward |
+| `offline/OfflineDocStore.kt` | The downloaded copy, its areas, and deleting one |
+| `viewmodel/DocBrowserViewModel.kt` | The search, the filters and the sort |
+| `ui/screens/DocBrowserScreen.kt` | The page |
