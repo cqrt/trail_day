@@ -1,5 +1,8 @@
 package nz.mckenzie.trailday.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,12 +10,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -25,15 +30,26 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.doc.whatDocHasIn
+import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.map.BasemapView
+import nz.mckenzie.trailday.map.MapProjection
 import nz.mckenzie.trailday.offline.DownloadService
 import nz.mckenzie.trailday.offline.DownloadState
 import nz.mckenzie.trailday.offline.OfflineAreaDraft
@@ -45,7 +61,9 @@ import nz.mckenzie.trailday.viewmodel.OfflineAreaPickerViewModel
 import kotlin.math.roundToInt
 
 /**
- * Picks an offline area on the map: two taps for the corners, then a download.
+ * Picks an offline area on the map: two taps for the corners, then a download - and the corners can be
+ * dragged afterwards, so the box the walker ends up with is the one they meant rather than the one their
+ * thumbs landed on.
  *
  * **One screen, two packs.** The offline imagery and DOC's tracks are independent caches, but they
  * are chosen the same way - a box on the map - so this is the same screen choosing for either, and
@@ -164,6 +182,11 @@ fun OfflineAreaPickerScreen(
             )
         }
     ) { innerPadding ->
+        // The way between the glass and the ground, once the map is up, and a nudge on every camera move:
+        // a handle drawn on a corner has to follow the ground, or it sits where the corner used to be.
+        var projection by remember { mutableStateOf<MapProjection?>(null) }
+        var cameraMoves by remember { mutableIntStateOf(0) }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -182,8 +205,21 @@ fun OfflineAreaPickerScreen(
                 // they are not a thing to read on the ground but the choosing of the ground itself.
                 regionsGeoJson = regionsGeoJson,
                 regionPickedGeoJson = pickedRegionGeoJson,
+                onProjection = { projection = it },
+                onCameraMove = { cameraMoves++ },
                 modifier = Modifier.fillMaxSize()
             )
+
+            // A drawn box can be adjusted rather than redrawn: a handle on each corner, dragged to where
+            // the edge should be.
+            if (!regionMode && draft.isComplete) {
+                BoxHandles(
+                    projection = projection,
+                    cameraMoves = cameraMoves,
+                    corners = draft.corners,
+                    onCorner = { index, point -> viewModel.dragCorner(index, point.lat, point.lng) }
+                )
+            }
 
             AttributionStrip(
                 basemap = mapBasemap,
@@ -211,7 +247,7 @@ fun OfflineAreaPickerScreen(
                             regionMode -> "Tap another region to change it"
                             draft.corners.size == 0 -> "Tap one corner of the area"
                             draft.corners.size == 1 -> "Now tap the opposite corner"
-                            else -> "Tap again for a new box."
+                            else -> "Drag a corner to adjust it, or tap for a new box"
                         },
                         style = MaterialTheme.typography.titleSmall
                     )
@@ -458,3 +494,61 @@ private fun ZoomSlider(
         )
     }
 }
+
+/**
+ * The corners of a drawn box, as handles to drag.
+ *
+ * Drawn over the map rather than inside it, because this map has no draggable rectangle: a box that can
+ * only be redrawn by tapping twice turns a small correction - one edge two hundred metres too far - into
+ * choosing both corners again, and both corners means finding the first one a second time.
+ *
+ * A handle is a place on the glass worked out from the corner it sits on, and worked out again whenever
+ * the camera moves or a corner does, so a pan or a zoom carries it with the ground it names. The drag
+ * reads the finger's own point back into a place, which is the same arithmetic the map tells the screen
+ * when the map is tapped - so a handle put back exactly where it was is the same box exactly.
+ */
+@Composable
+private fun BoxHandles(
+    projection: MapProjection?,
+    cameraMoves: Int,
+    corners: List<GeoPoint>,
+    onCorner: (index: Int, point: GeoPoint) -> Unit
+) {
+    if (projection == null) return
+    val places = remember(cameraMoves, corners, projection) { corners.map { projection.toScreen(it) } }
+    // The drag outlives a recomposition, so it reads the newest places rather than the ones it started with.
+    val latest = rememberUpdatedState(places)
+    val half = with(LocalDensity.current) { (HANDLE_TOUCH / 2).toPx() }
+    places.forEachIndexed { index, at ->
+        Box(
+            modifier = Modifier
+                .offset { IntOffset((at.x - half).roundToInt(), (at.y - half).roundToInt()) }
+                .size(HANDLE_TOUCH)
+                .pointerInput(index, projection) {
+                    var finger = Offset.Zero
+                    detectDragGestures(
+                        onDragStart = { finger = latest.value.getOrNull(index) ?: finger },
+                        onDrag = { change, delta ->
+                            change.consume()
+                            finger += delta
+                            onCorner(index, projection.toGround(finger))
+                        }
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(HANDLE_DOT)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
+            )
+        }
+    }
+}
+
+/** A finger-sized target, and the dot drawn inside it: the dot says where, the ring says what to grab. */
+private val HANDLE_TOUCH = 48.dp
+private val HANDLE_DOT = 22.dp
+

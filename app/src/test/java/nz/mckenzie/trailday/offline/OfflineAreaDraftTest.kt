@@ -79,6 +79,38 @@ class OfflineAreaDraftTest {
     }
 
     @Test
+    fun `a dragged corner moves its own end and leaves the other alone`() {
+        val moved = draft().withDraggedCorner(1, GeoPoint(-46.4000, 168.4000))
+
+        assertEquals("the first corner has not moved", southWest, moved.firstCorner)
+        assertEquals(GeoPoint(-46.4000, 168.4000), moved.secondCorner)
+        assertEquals("the box follows the finger", -46.4000, moved.bounds!!.maxLat, 1e-9)
+        assertEquals(168.4000, moved.bounds!!.maxLng, 1e-9)
+        assertEquals("and the other end of the box is where it was", -46.4200, moved.bounds!!.minLat, 1e-9)
+    }
+
+    @Test
+    fun `a corner dragged past the other one is still a box, not an inside-out one`() {
+        // The corner that was south-west is dragged north-east of the other: the bounds sort the two, so
+        // the box is the same rectangle whichever corner is which.
+        val crossed = draft().withDraggedCorner(0, GeoPoint(-46.3900, 168.3700))
+
+        val bounds = crossed.bounds!!
+        assertEquals(-46.4100, bounds.minLat, 1e-9)
+        assertEquals(168.3550, bounds.minLng, 1e-9)
+        assertEquals(-46.3900, bounds.maxLat, 1e-9)
+        assertEquals(168.3700, bounds.maxLng, 1e-9)
+        assertTrue("still two corners, still a box", crossed.isComplete)
+    }
+
+    @Test
+    fun `a handle that is not a corner changes nothing`() {
+        val third = draft().withDraggedCorner(2, GeoPoint(-46.0, 168.0))
+
+        assertEquals(draft(), third)
+    }
+
+    @Test
     fun `each extra zoom level costs about four times as much`() {
         val upToTwelve = bigDraft(minZoom = 10, maxZoom = 12)
         val oneMore = bigDraft(minZoom = 10, maxZoom = 13)

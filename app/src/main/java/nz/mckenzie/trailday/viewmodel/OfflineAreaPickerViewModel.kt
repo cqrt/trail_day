@@ -283,6 +283,18 @@ class OfflineAreaPickerViewModel(
     }
 
     /**
+     * A corner dragged to a new place: the box grows or shrinks towards the finger, and the corner at the
+     * other end stays where it was put.
+     *
+     * Which is the whole reason for a handle: correcting one edge of a box should not mean choosing both
+     * corners again, and a second tap on this screen has always started a new box.
+     */
+    fun dragCorner(index: Int, latitude: Double, longitude: Double) {
+        _error.value = null
+        _draft.value = _draft.value.withDraggedCorner(index, GeoPoint(latitude, longitude))
+    }
+
+    /**
      * Takes [region] as this run's ground, and asks the service what it holds there.
      *
      * The count is asked on every tap rather than for all sixteen up front: sixteen questions when the

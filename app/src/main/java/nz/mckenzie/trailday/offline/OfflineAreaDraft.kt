@@ -66,6 +66,19 @@ data class OfflineAreaDraft(
     fun withCorner(point: GeoPoint): OfflineAreaDraft =
         if (isComplete) copy(corners = listOf(point)) else copy(corners = corners + point)
 
+    /**
+     * Moves one of the two corners, keeping the box the walker has already drawn.
+     *
+     * A handle has an index, so the corner under the finger is the one that moves and the other stays
+     * where it was put: the box grows or shrinks towards the finger rather than being drawn again. The
+     * corners may be dragged past one another - the bounds sort them - so the box never turns inside out,
+     * and an index that is not a corner leaves the draft alone rather than throwing.
+     */
+    fun withDraggedCorner(index: Int, point: GeoPoint): OfflineAreaDraft {
+        if (index !in corners.indices) return this
+        return copy(corners = corners.toMutableList().also { it[index] = point })
+    }
+
     fun withoutCorners(): OfflineAreaDraft = copy(corners = emptyList())
 
     /** Keeps the range sane: the two sliders are not allowed to cross. */

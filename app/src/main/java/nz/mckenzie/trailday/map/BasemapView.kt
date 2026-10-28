@@ -380,7 +380,23 @@ fun BasemapView(
      * When true the first-look frame is skipped: the walker is coming back to ground they chose,
      * not opening the app.
      */
-    restoreCamera: Boolean = false
+    restoreCamera: Boolean = false,
+    /**
+     * The map in the two directions a screen needs when it has to put something on a place: where a
+     * place lands on the glass, and which place a point is. Null until the map is up.
+     *
+     * Two questions rather than the map itself, so a screen that needs to know where a corner is cannot
+     * reach for the camera and the layers as well - there is one way to drive the map and this is not it.
+     */
+    onProjection: ((MapProjection?) -> Unit)? = null,
+    /**
+     * The camera moved, at any point in the gesture.
+     *
+     * [onCameraIdle] is the end of one, which is enough for a remembered camera or a count of what is on
+     * screen; an overlay drawn *on* the map - a handle sitting on a corner - has to keep up during the
+     * gesture or it slides off the ground it names while the ground moves under it.
+     */
+    onCameraMove: (() -> Unit)? = null
 ) {
     val mapState = remember { mutableStateOf<MapLibreMap?>(null) }
     val styleState = remember { mutableStateOf<Style?>(null) }
@@ -435,6 +451,8 @@ fun BasemapView(
     val currentOnFollowBroken by rememberUpdatedState(onFollowBroken)
     val currentOnCameraIdle by rememberUpdatedState(onCameraIdle)
     val currentOnRecentreHandled by rememberUpdatedState(onRecentreHandled)
+    val currentOnProjection by rememberUpdatedState(onProjection)
+    val currentOnCameraMove by rememberUpdatedState(onCameraMove)
 
     // Where the phone is. Every map in the app shows it, and this is the whole of how: the
     // marker is built here from the app's own stream rather than handed in per screen, so a
@@ -462,6 +480,10 @@ fun BasemapView(
                 onResume()
                 getMapAsync { map ->
                     mapState.value = map
+                    // Handed out once, here: the map is up and its projection can answer, and this is the
+                    // only moment in the view's life when that becomes true.
+                    currentOnProjection?.invoke(MapProjection(map))
+                    map.addOnCameraMoveListener { currentOnCameraMove?.invoke() }
                     map.uiSettings.isCompassEnabled = true
                     // The licence requires attribution to be visible; MapLibre's own
                     // control is backed up by an always-visible overlay in MapScreen.
