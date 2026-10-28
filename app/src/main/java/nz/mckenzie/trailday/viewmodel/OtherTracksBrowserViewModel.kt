@@ -31,6 +31,7 @@ import nz.mckenzie.trailday.domain.reference.ReferenceSort
 import nz.mckenzie.trailday.domain.tiles.boxAround
 import nz.mckenzie.trailday.offline.OfflineOtherTrackStore
 import nz.mckenzie.trailday.other.ArcGisOtherTracks
+import nz.mckenzie.trailday.other.OtherTracksSearcher
 import nz.mckenzie.trailday.other.OtherTracksReadResult
 import nz.mckenzie.trailday.other.OtherTracksReader
 import nz.mckenzie.trailday.tracking.DevicePosition
@@ -203,26 +204,28 @@ class OtherTracksBrowserViewModel(
         viewModelScope.launch {
             _busy.value = true
             _message.value = null
-            val query = OtherTracksQuery(
-                nameContains = name,
-                // The service takes a box, and a circle is what was meant: the box is the quick filter
-                // and the corners are trimmed below, as DOC's search does.
-                bounds = position?.let { at -> boxAround(at, radius) }
-            )
 
-            when (val result = reader.read(query)) {
+            val read = if (position == null) {
+                reader.read(OtherTracksQuery(nameContains = name))
+            } else {
+                // Nearest first, in rings outward: see [OtherTracksSearcher].
+                OtherTracksSearcher(reader).nearest(name = name, at = position, radiusKm = radius)
+            }
+
+            when (read) {
                 is OtherTracksReadResult.Found -> {
                     // The pieces of a walkway the dataset has cut up are joined before the circle is
                     // trimmed, so a walker near one end sees the walkway rather than a quarter of it.
-                    val page = result.tracks.joinedByName().within(radius * 1000.0, position)
+                    val page = read.tracks.joinedByName().within(radius * 1000.0, position)
                     _results.value = page
                     // A new set of results, so a filter from the last search is not carried onto it.
                     _filters.value = emptyMap()
                     _searched.value = true
                     _message.value = referencePageMessage(
-                        sent = result.tracks.size,
+                        sent = read.tracks.size,
                         shown = page.size,
-                        limit = OtherTracksQuery.DEFAULT_LIMIT
+                        limit = OtherTracksQuery.DEFAULT_LIMIT,
+                        nearest = position != null
                     )
                 }
 
@@ -242,13 +245,14 @@ class OtherTracksBrowserViewModel(
                         cache.count() > 0 -> "Could not reach the tracks service, and nothing " +
                             "downloaded matches."
 
-                        else -> result.message
+                        else -> read.message
                     }
                 }
             }
             _busy.value = false
         }
     }
+
 
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L

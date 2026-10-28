@@ -62,8 +62,22 @@ internal fun docPageMessage(sent: Int, shown: Int): String? =
  * Here rather than in either browser's view model, because both publishers answer a page at a time and the
  * sentence about it is one sentence.
  */
-internal fun referencePageMessage(sent: Int, shown: Int, limit: Int): String? {
+internal fun referencePageMessage(
+    sent: Int,
+    shown: Int,
+    limit: Int,
+    /**
+     * Whether these are the tracks **nearest the phone** rather than the first matches for a name.
+     *
+     * It changes the advice, which is the point: a name search is capped by how many rows one page holds,
+     * so narrowing the search really does show the rest - but a near-me search reads its rings nearest
+     * first, so narrowing the radius shows *fewer*. Telling a walker to do that was telling them to make
+     * the thing they were already reading smaller.
+     */
+    nearest: Boolean = false
+): String? {
     if (sent < limit) return null
+    if (nearest) return "Showing the nearest $shown tracks. There are more within the radius than one page holds."
     val rest = "Narrow the search to see the rest."
     return if (shown < sent) {
         "Showing $shown of the first $sent matches. $rest"

@@ -37,4 +37,16 @@ class DocPageMessageTest {
         assertTrue("and the page it came out of", said.contains("${DocQuery.DEFAULT_LIMIT}"))
         assertTrue("with the way out", said.contains("Narrow the search"))
     }
+
+    @Test
+    fun `a nearest-first page does not tell the walker to narrow the radius`() {
+        // Narrowing a near-me search shows *fewer* tracks: the rings are read nearest first, so "narrow the
+        // search to see the rest" was advice to make the list smaller.
+        val said = referencePageMessage(sent = 301, shown = 84, limit = 300, nearest = true)!!
+
+        assertTrue("what is shown", said.contains("84"))
+        assertTrue("that it is the nearest", said.contains("nearest"))
+        assertTrue("and that more is there", said.contains("more within the radius"))
+        assertTrue("but not the wrong way out", !said.contains("Narrow the search"))
+    }
 }
