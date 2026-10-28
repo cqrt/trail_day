@@ -30,29 +30,29 @@ class OfflineSummaryTest {
 
     @Test
     fun `an empty cache says so rather than saying nought areas`() {
-        assertEquals("Nothing downloaded yet", imagerySummary(emptyList(), "0 B", tiles = 0L))
+        assertEquals("Nothing downloaded yet", imagerySummary(areaCount = 0, "0 B", tiles = 0L))
         assertEquals(
             "and tiles from browsing are not called an area",
             "No areas yet \u00b7 22 tiles from browsing",
-            imagerySummary(emptyList(), "155 KB", tiles = 22L)
+            imagerySummary(areaCount = 0, "155 KB", tiles = 22L)
         )
     }
 
     @Test
-    fun `one area is one area, with its size and its name`() {
+    fun `one area is one area and its size, without repeating the name`() {
+        // The name is on the row directly under this line; saying it twice made the subtitle the longest
+        // thing on the card.
         assertEquals(
-            "1 area \u00b7 61 MB \u00b7 Nelson Lakes",
-            imagerySummary(listOf(area("Nelson Lakes")), "61 MB", tiles = 0L)
+            "1 area \u00b7 61 MB",
+            imagerySummary(areaCount = 1, "61 MB", tiles = 0L)
         )
     }
 
     @Test
-    fun `more than two areas are named two and then an ellipsis`() {
-        val areas = listOf(area("Nelson Lakes"), area("Mt Aspiring"), area("Arthurs Pass"))
-
+    fun `several areas are counted, not named`() {
         assertEquals(
-            "3 areas \u00b7 61 MB \u00b7 Nelson Lakes, Mt Aspiring\u2026",
-            imagerySummary(areas, "61 MB", tiles = 0L)
+            "3 areas \u00b7 61 MB",
+            imagerySummary(areaCount = 3, "61 MB", tiles = 0L)
         )
     }
 

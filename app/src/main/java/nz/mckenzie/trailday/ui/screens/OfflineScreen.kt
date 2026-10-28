@@ -128,20 +128,29 @@ fun OfflineScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // **The way in comes first.** Downloading is what this page is for, and it used to sit under
+            // four cards of things already kept - so a walker arriving here had to read past their own
+            // library to find the one action that adds to it.
+            Button(
+                onClick = { choosingDownload = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Download an area")
+            }
+
             DownloadCard(
                 title = OfflinePack.IMAGERY.title,
                 icon = { AppIcon(glyph = IconGlyph.MAP, tint = MaterialTheme.colorScheme.primary) },
                 // While it is downloading the card's own line is the live sentence: a count of what is
                 // held so far would be a second, staler number beside the one that matters.
                 summary = imageryLive?.let { downloadProgressWords(it) }
-                    ?: imagerySummary(stored, summary.sizeLabel, summary.tiles),
+                    ?: imagerySummary(stored.size, summary.sizeLabel, summary.tiles),
                 progress = imageryLive?.let { it.percent / 100f } ?: active?.let { it.percent / 100f },
                 progressLabel = if (imageryLive != null) {
                     null
                 } else {
                     active?.takeIf { !it.isComplete }?.let { "Downloading\u2026 ${it.percent}%" }
                 },
-                footnote = "LINZ's aerial photographs, kept on the phone.",
                 error = error,
                 clearLabel = "Clear all imagery".takeIf { summary.tiles > 0L },
                 onClear = { confirmingClearImagery = true }
@@ -175,12 +184,10 @@ fun OfflineScreen(
                     },
                 progress = docLive?.let { it.percent / 100f },
                 progressLabel = null,
-                footnote = if (docAreas.isEmpty()) {
-                    "Read offline by the map and the DOC browser."
-                } else {
-                    "Read offline by the map and the DOC browser. Forgetting an area leaves its records " +
-                        "on the phone until you clear them."
-                },
+                // The desk's own line about reading the material offline went with the rest of the
+                // preambles; what stays is the one thing a walker cannot guess - what Forget does.
+                footnote = "Forgetting an area leaves its records on the phone until you clear them."
+                    .takeIf { docAreas.isNotEmpty() },
                 error = null,
                 clearLabel = "Clear all DOC data".takeIf { docDataCount > 0 },
                 onClear = { confirmingClearDocData = true }
@@ -203,8 +210,8 @@ fun OfflineScreen(
                     ?: otherTracksSummary(otherTrackAreas, otherTracksDataCount),
                 progress = otherTracksLive?.let { it.percent / 100f },
                 progressLabel = null,
-                footnote = "Read offline by the map, beside DOC's material. Forgetting an area leaves " +
-                    "its tracks on the phone until you clear them.",
+                footnote = "Forgetting an area leaves its tracks on the phone until you clear them."
+                    .takeIf { otherTrackAreas.isNotEmpty() },
                 error = null,
                 clearLabel = "Clear other tracks".takeIf { otherTracksDataCount > 0 },
                 onClear = { confirmingClearOtherTracks = true }
@@ -230,7 +237,6 @@ fun OfflineScreen(
                     },
                 progress = topoLive?.let { it.percent / 100f },
                 progressLabel = null,
-                footnote = "LINZ's drawn map, with the heights its hillshade is shaded from.",
                 error = null,
                 clearLabel = "Clear the map".takeIf { topoSummary.tiles > 0L },
                 onClear = { confirmingClearTopo = true }
@@ -250,19 +256,6 @@ fun OfflineScreen(
                     )
                 }
             }
-
-            Button(
-                onClick = { choosingDownload = true },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Download an area")
-            }
-
-            Text(
-                text = "What you look at is kept. Downloads need no reception.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 
@@ -444,7 +437,13 @@ private fun DownloadCard(
     summary: String,
     progress: Float?,
     progressLabel: String?,
-    footnote: String?,
+    /**
+     * A line under the card, when there is one worth saying.
+     *
+     * Mostly there is not: a walker who has opened the Offline screen knows what LINZ imagery is, and a
+     * sentence describing the thing above it is a sentence in the way of the thing above it.
+     */
+    footnote: String? = null,
     error: String?,
     clearLabel: String?,
     onClear: () -> Unit,
@@ -601,19 +600,20 @@ private fun OtherTrackAreaRow(area: OtherTrackArea, onForget: () -> Unit) {
 }
 
 /**
- * "2 areas - 61 MB - Nelson Lakes, Mt Aspiring", or that there is nothing yet.
+ * "2 areas · 61 MB", or that there is nothing yet.
+ *
+ * **Without the names.** They are on the rows directly under this line, and saying them twice made the
+ * subtitle the longest thing on the card while the list below said it better.
  *
  * With no areas but tiles on the phone, it says where those tiles came from: the map keeps what the walker
  * has looked at, so "nothing downloaded" beside a clear button would be two lines disagreeing.
  */
-internal fun imagerySummary(stored: List<OfflineArea>, sizeLabel: String, tiles: Long): String {
-    if (stored.isEmpty()) {
+internal fun imagerySummary(areaCount: Int, sizeLabel: String, tiles: Long): String {
+    if (areaCount == 0) {
         return if (tiles > 0L) "No areas yet \u00b7 $tiles tiles from browsing" else "Nothing downloaded yet"
     }
-    val areas = if (stored.size == 1) "1 area" else "${stored.size} areas"
-    val names = stored.map { it.name }.take(2).joinToString(", ")
-    val more = if (stored.size > 2) "\u2026" else ""
-    return "$areas \u00b7 $sizeLabel \u00b7 $names$more"
+    val areas = if (areaCount == 1) "1 area" else "$areaCount areas"
+    return "$areas \u00b7 $sizeLabel"
 }
 
 /** What an imagery area is doing: how much of it is here, or that it is still coming. */
