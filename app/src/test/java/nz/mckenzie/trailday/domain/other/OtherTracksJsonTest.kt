@@ -62,50 +62,48 @@ class OtherTracksJsonTest {
     }
 
     @Test
-    fun `a row the dataset gave no name to is named by its locality`() {
-        val tracks = OtherTracksJson.parse(
-            feature(name = "Unnamed Track", locality = "Mount Victoria")
+    fun `a row the dataset gave no name is dropped, locality or not`() {
+        // It used to be renamed after its locality, so a list could at least tell one from another. A row
+        // with no name is not a track a walker can ask for, recognise, or say out loud - and if a council
+        // names one next month it comes back.
+        assertEquals(
+            0,
+            OtherTracksJson.parse(feature(name = "Unnamed Track", locality = "Mount Victoria")).size
         )
-
-        assertEquals("Mount Victoria", tracks[0].name)
     }
 
     @Test
     fun `the placeholder is a value rather than a name, however it is spelled`() {
-        // Measured: 2,610 rows of the app's set say "Unnamed Track", 652 say exactly "Track" and 22 say
-        // "Track 7" and the like. It is not a name, and a list of rows all called "Track" tells the
-        // walker nothing.
-        listOf("Unnamed Track", "unnamed track", "UNNAMED TRACK", "Track", "track", "Track 7").forEach { placeholder ->
+        // Measured: 2,699 rows of the app's set say "Unnamed Track", 676 say exactly "Track", 97 say
+        // "Unnamed", four say "Track unnamed" and 22 say "Track 7" and the like.
+        listOf(
+            "Unnamed Track", "unnamed track", "UNNAMED TRACK", "Unnamed", "unnamed",
+            "Track", "track", "Track unnamed", "Track 7", "track 16"
+        ).forEach { placeholder ->
             assertEquals(
                 "\"$placeholder\" is a placeholder, not a name",
-                "Richmond",
-                OtherTracksJson.parse(feature(name = placeholder, locality = "Richmond")).single().name
+                0,
+                OtherTracksJson.parse(feature(name = placeholder, locality = "Richmond")).size
             )
         }
     }
 
     @Test
     fun `a name that merely starts with the placeholder is a name`() {
-        // Anchored, so a track genuinely called "Trackway" keeps the name it was given.
-        val track = OtherTracksJson.parse(feature(name = "Trackway", locality = "Richmond")).single()
-
-        assertEquals("Trackway", track.name)
+        // Anchored, so a track genuinely called "Trackway" or "Track to Crows Nest" keeps the name it was
+        // given - which is why the numbered placeholders are dropped here rather than by a query pattern.
+        listOf("Trackway", "Track to Crows Nest", "Track - Woodchipped Pathway").forEach { named ->
+            assertEquals(
+                named,
+                OtherTracksJson.parse(feature(name = named, locality = "Richmond")).single().name
+            )
+        }
     }
 
     @Test
-    fun `a row with neither a name nor a locality says so in the app's own words`() {
-        val track = OtherTracksJson.parse(
-            feature(name = "Unnamed Track", locality = null)
-        ).single()
-
-        assertEquals("Unnamed track", track.name)
-    }
-
-    @Test
-    fun `a blank name is no name, and takes the locality too`() {
-        val track = OtherTracksJson.parse(feature(name = "   ", locality = "Richmond")).single()
-
-        assertEquals("Richmond", track.name)
+    fun `a blank name is no name either`() {
+        assertEquals(0, OtherTracksJson.parse(feature(name = "   ", locality = "Richmond")).size)
+        assertEquals(0, OtherTracksJson.parse(feature(name = "", locality = null)).size)
     }
 
     @Test

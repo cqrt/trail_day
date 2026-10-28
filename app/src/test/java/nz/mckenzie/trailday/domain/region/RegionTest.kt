@@ -107,7 +107,7 @@ class RegionTest {
     fun `the district names are the dataset's own spelling`() {
         // Copied from the service: it writes plain ASCII apart from this one, and an exact match means a
         // macron in the wrong place downloads nothing.
-        assertTrue(RegionDistricts.of("Waikato").contains("Otorohanga District"))
+        assertTrue(RegionDistricts.of("Waikato").contains("Ōtorohanga District"))
         assertTrue(RegionDistricts.of("Wellington").contains("Kapiti Coast District"))
         assertTrue(RegionDistricts.of("Bay of Plenty").contains("Whakatane District"))
         assertTrue(RegionDistricts.of("Waikato").contains("Taupo District"))

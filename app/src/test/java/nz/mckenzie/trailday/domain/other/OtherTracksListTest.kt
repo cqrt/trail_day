@@ -177,16 +177,35 @@ class OtherTracksListTest {
     }
 
     @Test
-    fun `even one publisher's name does not reach across a kilometre`() {
-        // A council with two places called "Domain Walkway" keeps two rows: a kilometre is a neighbourhood,
-        // not a region.
+    fun `a name in one district reaches ten kilometres, and no further`() {
+        // A council with two places called "Domain Walkway" 30 km apart in one district keeps two rows: ten
+        // kilometres is where the measurements stop agreeing - the same-named groups beyond it read as
+        // different places ("Short walk" 13.5 km apart in Waimakariri, "Round Hill Route" 22 km).
         val otherTown = thomsonsNetwork.copy(
             paths = listOf(
-                listOf(GeoPoint(-46.38242, 168.38174), GeoPoint(-46.38262, 168.38215))
+                listOf(GeoPoint(-46.38242, 168.68174), GeoPoint(-46.38262, 168.68215))
             )
         )
 
         assertEquals(2, listOf(thomsonsLoop, otherTown).joinedByName().size)
+    }
+
+    @Test
+    fun `a walkway one publisher's sections and another's pieces make up is one track`() {
+        // Lake Hayes Walkway is five rows - three the council's, two the Trust's - and their pieces are 496
+        // metres to 5,030 metres apart. The publisher used to be part of the test, which kept the council's
+        // walkway and the Trust's section in two rows.
+        val council = lakeHayes.copy(
+            facts = lakeHayes.facts + ("DataSupplier" to "Queenstown Lakes District Council"),
+            globalId = "l1"
+        )
+        val trust = lakeHayes.copy(
+            paths = listOf(listOf(GeoPoint(-44.9, 168.7), GeoPoint(-44.9, 168.75))),
+            facts = lakeHayes.facts + ("DataSupplier" to "Te Araroa"),
+            globalId = "l2"
+        )
+
+        assertEquals(1, listOf(council, trust).joinedByName().size)
     }
 
     @Test
@@ -357,6 +376,18 @@ class OtherTracksListTest {
         ),
         paths = listOf(listOf(GeoPoint(-46.38242, 168.36174), GeoPoint(-46.38262, 168.36215))),
         id = "t2"
+    )
+
+    /** Lake Hayes Walkway's own ground, which the council and the Trust both publish a piece of. */
+    private val lakeHayes = track(
+        name = "Lake Hayes Walkway",
+        facts = arrayOf(
+            "Walk" to "3",
+            "DataSupplier" to "Queenstown Lakes District Council",
+            "LocalAuthority" to "Queenstown-Lakes District"
+        ),
+        paths = listOf(listOf(GeoPoint(-44.95, 168.65), GeoPoint(-44.95, 168.66))),
+        id = "lh"
     )
 
     private fun track(

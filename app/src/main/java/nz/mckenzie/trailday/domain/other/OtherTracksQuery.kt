@@ -141,7 +141,8 @@ object OtherTracksUrl {
      * That is the cheaper mistake: a duplicated line is visible and harmless, and a missing walkway is
      * neither.
      *
-     * Together they leave **16,893** of the dataset's 25,349.
+     * Together they leave **16,893** of the dataset's 25,349 - and then the unnamed rows go too: **4,130
+     * of those 16,893** have no name of their own, which leaves **12,763** that a walker can ask for.
      */
     fun where(nameContains: String = "", districts: List<String> = emptyList()): String {
         val name = nameContains.trim()
@@ -162,11 +163,27 @@ object OtherTracksUrl {
      */
     private const val REMOVED = "Decommisioned"
 
-    /** The three exclusions, in the order they are worth reading. */
+    /**
+     * The rows that are the app's to show: everything but DOC's, the removed ones, the ones nobody may
+     * walk on, and **the ones the dataset never named.**
+     *
+     * Almost a quarter of what the app reads is unnamed: 2,699 rows say "Unnamed Track", 676 say exactly
+     * "Track", 97 say "Unnamed", four say "Track unnamed", and **739 have nothing at all** - 4,130 of
+     * 16,893. A row nobody named is not a track a walker can ask for or recognise, and the app used to
+     * rename them after their locality to make a list of them look like something. It does not any more: a
+     * name that arrives later brings the track back.
+     *
+     * **`Track 7` and the like are left to the reader**, because a pattern that caught the numbered ones
+     * (`LIKE 'TRACK %'`) would also drop `Track to Crows Nest`, which somebody named. Sixteen rows of
+     * 16,893 are therefore counted here and dropped when they arrive, a difference nobody can see.
+     */
     val EXCLUSIONS: String =
         "NOT (DataSupplier LIKE '%DOC%')" +
             " AND Status <> '$REMOVED'" +
-            " AND Walk <> 0"
+            " AND Walk <> 0" +
+            // No TRIM: this service rejects it outright - "the 'where' parameter is invalid", measured.
+            " AND Name IS NOT NULL AND Name <> ''" +
+            " AND UPPER(Name) NOT IN ('UNNAMED', 'UNNAMED TRACK', 'TRACK', 'TRACK UNNAMED')"
 
     /**
      * The whole URL for [query].

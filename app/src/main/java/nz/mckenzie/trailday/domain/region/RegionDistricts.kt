@@ -42,7 +42,7 @@ object RegionDistricts {
             "Auckland"
         ),
         "Waikato" to listOf(
-            "Waikato District", "Hamilton City", "Waipa District", "Otorohanga District",
+            "Waikato District", "Hamilton City", "Waipa District", "Ōtorohanga District",
             "South Waikato District", "Waitomo District", "Thames-Coromandel District",
             "Hauraki District", "Matamata-Piako District", "Taupo District"
         ),

@@ -44,9 +44,12 @@ object OtherTracksJson {
         val paths = feature.paths.filter { it.size >= 2 }
         if (paths.isEmpty()) return null
 
+        // **A row with no name of its own is dropped.** See [nameOf].
+        val name = nameOf(feature) ?: return null
+
         return OtherTrack(
             globalId = globalId,
-            name = nameOf(feature),
+            name = name,
             paths = paths,
             // The key is a field like any other on the wire and is not a fact about the track, so it does
             // not travel twice.
@@ -55,30 +58,24 @@ object OtherTracksJson {
     }
 
     /**
-     * What the row is called.
+     * What the row is called, or **null when the dataset gave it no name at all** - which drops the row.
      *
-     * **The dataset's own placeholders are not names.** Of the 15,973 rows this app reads, 2,610 say
-     * "Unnamed Track", 652 say exactly "Track" and 22 say "Track 7" and the like - 21% of the set with a
-     * value where a name goes. A list of rows all called "Track" tells the walker nothing, so a row whose
-     * name is blank *or* one of those takes its **locality** instead, which is the dataset's own word for
-     * the area a track is in ("Mount Victoria", "Richmond"). A row with neither keeps the app's own words
-     * for an unnamed track.
+     * **The dataset's own placeholders are not names, and these rows are not shown.** 2,699 of the rows the
+     * app reads say "Unnamed Track", 676 say exactly "Track", 22 say "Track 7" and the like, 97 say
+     * "Unnamed", four say "Track unnamed", and 739 have nothing at all: **4,130 rows of 16,893**, almost a
+     * quarter of the set, with a value where a name goes.
      *
-     * The locality alone rather than "Mount Victoria track": a row's second line already says what it is
-     * ("Walking Track · Wellington City Council"), and the place is the useful half of the name.
+     * They used to be renamed after their **locality**, so a list could at least tell one from another. That
+     * was wrong for a simpler reason: a row with no name is not a track a walker can ask for, recognise, or
+     * say out loud, and a list of "Mount Victoria" repeated twelve times is a list of nothing. **If a council
+     * names one, it comes back** - the drop is of this month's rows, not of the ground.
      *
-     * **A name made up here is never used to join rows into one walkway** - see `publishedName` - which is
-     * why twelve unnamed tracks in one suburb, all showing the suburb's name, stay twelve rows.
+     * The big families are also excluded in the query, so a count and a download agree; see
+     * [OtherTracksUrl.where]. This is the exact rule those cannot express - `Track 7` needs a pattern, and a
+     * pattern that also matched `Track to Crows Nest` would drop a track somebody named.
      */
-    private fun nameOf(feature: GeoJsonParser.Feature): String {
+    private fun nameOf(feature: GeoJsonParser.Feature): String? {
         val given = feature.name?.trim().orEmpty()
-        if (given.isNotEmpty() && !isPlaceholderName(given)) return given
-        return feature.properties[LOCALITY]?.trim()?.takeIf { it.isNotEmpty() } ?: UNNAMED_FALLBACK
+        return given.takeIf { it.isNotEmpty() && !isPlaceholderName(it) }
     }
-
-    /** What a row with neither a name nor a locality is left saying, in the app's own casing. */
-    private const val UNNAMED_FALLBACK = "Unnamed track"
-
-    /** The dataset's own field for the area a track sits in, which names an unnamed row. */
-    private const val LOCALITY = "Locality"
 }

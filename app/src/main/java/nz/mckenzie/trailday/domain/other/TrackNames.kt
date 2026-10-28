@@ -17,12 +17,13 @@ package nz.mckenzie.trailday.domain.other
 /**
  * Whether the dataset put something in the name field that is not a name.
  *
- * Anchored and case-blind, so a track genuinely called "Trackway" is left alone - the three values it catches
- * were read off the live service rather than guessed at.
+ * Anchored and case-blind, so a track genuinely called "Trackway" is left alone - the values it catches
+ * were read off the live service rather than guessed at: "Unnamed Track" (2,699 rows), "Unnamed" (97),
+ * "Track" (676), "Track unnamed" (4) and "Track 16" and the like (22).
  */
 fun isPlaceholderName(name: String): Boolean = PLACEHOLDER.matches(name.trim())
 
-private val PLACEHOLDER = Regex("(?i)unnamed track|track( \\d+)?")
+private val PLACEHOLDER = Regex("(?i)unnamed( track)?|track( unnamed| \\d+)?")
 
 /**
  * The name the publisher gave this row, or null when it gave none worth having.

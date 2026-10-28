@@ -121,22 +121,28 @@ fun List<OtherTrack>.matching(nameContains: String): List<OtherTrack> {
 private const val JOIN_TOLERANCE_M = 200.0
 
 /**
- * How near two pieces **of one publisher's, in one district** have to be, in metres.
+ * How near two pieces **in one district** have to be, in metres, when their names are the same.
  *
- * Measured, and it is the allowance most walkways actually need. Of the **1,710** names the dataset gives
- * to more than one row, **43 have a smallest gap of between 200 metres and a kilometre** - and **42 of
- * those 43 are one publisher's rows in one district**:
+ * Measured, and it is the allowance sections actually need. Grouping the app's rows by **name and
+ * district**, the smallest gap between pieces falls into four bands: **43** groups at 200 metres to a
+ * kilometre, **16** at one to three kilometres, **12** at three to ten, and **6** beyond ten.
  *
- *  - "Thomsons Bush Walking Track" is **35 rows**: a whole reserve's network, named once and published as
- *    the paths that make it up. At two hundred metres one 607 m loop stayed a second row, 235 m from the
- *    rest, which is what a walker reported.
- *  - "Harper Pass HDC" is ten, "Lake Hayes Walkway" five, "Downhill Path" two 594 m apart.
+ *  - "Lake Hayes Walkway" is **five rows**: three the council's, two the Trust's, their pieces 496 metres
+ *    to 5,030 metres apart, and a walker reported it as still in sections.
+ *  - "Bald Hill Longwood Forest" is **two**: Te Araroa's own, 2,750 metres apart.
+ *  - The examples between three and ten kilometres are almost all the same story - "Ohau Lakeside Cycleway"
+ *    5,843 m, "Ara Harakeke Walkway" 4,842 m, "Paihia - Opua Coastal Walkway" 3,377 m - because **a long
+ *    trail is published in long sections**, and the section boundaries are kilometres apart.
  *
- * A council naming a network is the ordinary case here rather than a curiosity, so a name *and* a
- * publisher *and* a district are what say two pieces are one walk. The thirteenth gap measured, and the
- * one this allowance must never bridge, is the 900 km between the two Otataras.
+ * Ten kilometres is where the measurements stop agreeing: the six groups beyond it are pairs that read as
+ * different places ("Short walk" 13,513 m apart in Waimakariri, "Motatapu Route" 20,263 m, "Round Hill
+ * Route" 21,913 m), and joining those would put two walks under one row with no way to tell them apart.
+ *
+ * **The publisher is no longer part of this test**, which is the change that "Lake Hayes" needed: the
+ * council's three pieces and the Trust's two are the same walkway, and requiring one publisher kept them in
+ * two rows. A name that appears twice in one district is one walk.
  */
-private const val SAME_PUBLISHER_TOLERANCE_M = 1_000.0
+private const val SAME_DISTRICT_TOLERANCE_M = 10_000.0
 
 /**
  * The walkways the dataset publishes in pieces, as one track each.
@@ -148,11 +154,10 @@ private const val SAME_PUBLISHER_TOLERANCE_M = 1_000.0
  *
  * **A name is not enough, and the same example proves it**: there is an Otatara walkway in Invercargill and
  * another in Napier. Two rows join only when their names are the same *and* they are near each other - an
- * end of one within [JOIN_TOLERANCE_M] of an end of the other, or within [SAME_PUBLISHER_TOLERANCE_M] when
- * the same body published them for the same district. End to end, because a walkway cut into pieces is cut
- * at points. Pieces are then gathered into whole walkways, so four rows that meet in a loop become one track
- * rather than two pairs, and a reserve whose whole network carries one name becomes one row rather than
- * thirty-five.
+ * end of one within [JOIN_TOLERANCE_M] of an end of the other, or within [SAME_DISTRICT_TOLERANCE_M] when
+ * they are in the same district. End to end, because a walkway cut into pieces is cut at points. Pieces are
+ * then gathered into whole walkways, so four rows that meet in a loop become one track rather than two pairs,
+ * and a reserve whose whole network carries one name becomes one row rather than thirty-five.
  *
  * **The name that counts is the publisher's, not the one the app shows.** A fifth of the dataset's rows have
  * a placeholder in the name field and are renamed after their locality, so twelve unnamed tracks in Mount
@@ -222,13 +227,13 @@ private fun List<OtherTrack>.componentsOf(indices: List<Int>, toleranceM: Double
 /**
  * Whether these two rows are pieces of one walkway.
  *
- * Two allowances, and the wide one is only open to pieces that agree about who made them: see
- * [JOIN_TOLERANCE_M] and [SAME_PUBLISHER_TOLERANCE_M].
+ * Two allowances, and the wide one is only open to rows that agree about **where** they are: see
+ * [JOIN_TOLERANCE_M] and [SAME_DISTRICT_TOLERANCE_M].
  */
 private fun OtherTrack.meets(other: OtherTrack, toleranceM: Double): Boolean {
     val gap = endsGap(other) ?: return false
     if (gap <= toleranceM) return true
-    return gap <= SAME_PUBLISHER_TOLERANCE_M && samePublisherAndDistrict(other)
+    return gap <= SAME_DISTRICT_TOLERANCE_M && sameDistrict(other)
 }
 
 /** The shortest distance between an end of this track and an end of [other], or null without two lines. */
@@ -240,17 +245,14 @@ private fun OtherTrack.endsGap(other: OtherTrack): Double? {
 }
 
 /**
- * Whether one body published both rows for the same district.
+ * Whether both rows are in the same district - the dataset's own word for where a track is.
  *
- * The suppliers are compared as sets rather than as text, because a row the dataset merged upstream names
- * several: "Top of The South Biking Tracks, Top of The South Walking Tracks" is the same walker's walkway as
- * "Top of The South Walking Tracks". A district of nothing matches nothing - without one of the dataset's
- * own words for where a track is, only the near allowance is on offer.
+ * A row with no district matches nothing: without one of the dataset's own words for the place, only the
+ * near allowance is on offer.
  */
-private fun OtherTrack.samePublisherAndDistrict(other: OtherTrack): Boolean {
-    val district = localAuthority ?: return false
-    return district.equals(other.localAuthority, ignoreCase = true) &&
-        suppliers.any { it in other.suppliers }
+private fun OtherTrack.sameDistrict(other: OtherTrack): Boolean {
+    val district = localAuthority?.trim().orEmpty()
+    return district.isNotEmpty() && district.equals(other.localAuthority?.trim(), ignoreCase = true)
 }
 
 /** The vertices at the two ends of a track's paths. A path of one point is not a line. */
