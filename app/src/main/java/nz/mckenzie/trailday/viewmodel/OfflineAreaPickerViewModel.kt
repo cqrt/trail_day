@@ -476,6 +476,8 @@ class OfflineAreaPickerViewModel(
             _docWorking.value = true
             _docMessage.value = null
             val startedAt = System.nanoTime()
+            // Asked before the download, because the download is what replaces the row.
+            val replacing = docStore.hasArea(name)
             try {
                 val download = docStore.download(bounds, name = name, rings = rings) {
                     reportDoc(it, startedAt)
@@ -483,8 +485,15 @@ class OfflineAreaPickerViewModel(
                 // One sentence for the whole act: what arrived, and which of the four did not answer. A
                 // download that stopped short still kept what arrived, so the walker stays here and can
                 // read it rather than being sent back with half an answer.
-                _docMessage.value = docDownloadedMessage(download)
-                _saved.value = download.items.isNotEmpty()
+                _docMessage.value = if (replacing) {
+                    "$name was already downloaded, so this updated it. " + docDownloadedMessage(download)
+                } else {
+                    docDownloadedMessage(download)
+                }
+                // **A repeat download stays here**, because it has something to say: the first one ends the
+                // errand and goes back to the list, while this one has just replaced a row the walker can
+                // see, and leaving before the sentence is read would make it a sentence nobody reads.
+                _saved.value = download.items.isNotEmpty() && !replacing
             } catch (cancelled: CancellationException) {
                 // Leaving the screen is not a failure; what already arrived is kept.
                 throw cancelled
@@ -524,14 +533,22 @@ class OfflineAreaPickerViewModel(
             _otherTracksWorking.value = true
             _otherTracksMessage.value = null
             val startedAt = System.nanoTime()
+            // Asked before the download, because the download is what replaces the row.
+            val replacing = otherTracksStore.hasArea(name)
             try {
                 val download = otherTracksStore.download(selection, name) {
                     reportOtherTracks(it, startedAt)
                 }
                 // A download that stopped short still kept what arrived, so the walker stays here and can
                 // read what came of it rather than being sent back with half an answer.
-                _otherTracksMessage.value = otherTracksDownloadedMessage(download)
-                _saved.value = download.tracks.isNotEmpty()
+                _otherTracksMessage.value = if (replacing) {
+                    "$name was already downloaded, so this updated it. " +
+                        otherTracksDownloadedMessage(download)
+                } else {
+                    otherTracksDownloadedMessage(download)
+                }
+                // A repeat download stays, so the sentence about the row it replaced can be read.
+                _saved.value = download.tracks.isNotEmpty() && !replacing
             } catch (cancelled: CancellationException) {
                 // Leaving the screen is not a failure; what already arrived is kept.
                 throw cancelled

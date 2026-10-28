@@ -23,6 +23,10 @@ abstract class OfflineOtherTrackAreaDao {
     @Query("SELECT * FROM offline_other_track_areas ORDER BY downloadedAtEpochMs DESC")
     abstract suspend fun getAll(): List<OfflineOtherTrackAreaEntity>
 
+    /** The row for this name, when it is already here: downloading a region twice updates it. */
+    @Query("SELECT * FROM offline_other_track_areas WHERE name = :name LIMIT 1")
+    abstract suspend fun find(name: String): OfflineOtherTrackAreaEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insert(area: OfflineOtherTrackAreaEntity): Long
 

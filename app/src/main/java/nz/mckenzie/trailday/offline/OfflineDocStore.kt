@@ -20,6 +20,7 @@ import nz.mckenzie.trailday.domain.cache.FactsJson
 import nz.mckenzie.trailday.domain.cache.PathsJson
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
+import nz.mckenzie.trailday.domain.region.Region
 import nz.mckenzie.trailday.domain.doc.bounds
 import nz.mckenzie.trailday.domain.doc.withoutRepeats
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
@@ -85,13 +86,49 @@ class OfflineDocStore(
         ?: emptyFlow()
 
     /**
-     * Forgets one named download, and nothing else.
+     * Removes the row only, for an area that predates regions.
      *
-     * What it brought stays: another named area may cover the same ground, and the cache is one copy keyed
-     * by DOC's own numbers. [clear] is what reclaims the space.
+     * Such a name is not one of the sixteen, so there is nothing that can be said about the ground it
+     * covered: the walker's own list loses the entry and the material stays until Clear. Nothing in this
+     * build makes one; this is for rows written by an older one.
      */
     suspend fun forgetArea(id: Long) = areaDao?.delete(id)
 
+    /** Whether a download for [name] is already on the phone: downloading it again updates that row. */
+    suspend fun hasArea(name: String): Boolean = areaDao?.find(name.trim()) != null
+
+    /**
+     * Deletes what a region covers - its row, and the records inside it.
+     *
+     * **DOC publishes no district, so "inside Otago" is the region's own outline.** A track that crosses a
+     * boundary is inside two regions - measured, six of them between Canterbury and Otago, three between
+     * Otago and Southland, one between Nelson and Tasman - so a record is **kept when a region that still
+     * has its own row covers it too**. Deleting Canterbury therefore leaves the six that Otago still lists,
+     * and Otago keeps meaning what its row says.
+     *
+     * Its pictures go with it: a picture left behind is storage nobody can see or get rid of.
+     */
+    suspend fun deleteRegion(region: Region, stillKept: List<Region>, areaId: Long): Int {
+        var removed = 0
+        val pictures = mutableListOf<String>()
+        for (source in DocSource.entries) {
+            val doomed = dao.getAll(source.id).mapNotNull { it.toItem() }
+                .filter { item ->
+                    val here = item.paths.flatten().any { region.holds(it) }
+                    if (!here) return@filter false
+                    stillKept.none { other -> item.paths.flatten().any { other.holds(it) } }
+                }
+            if (doomed.isEmpty()) continue
+            // In chunks: a region's thousands of numbers is more than SQLite takes as parameters in one
+            // statement, and a delete that threw half way would leave a row claiming ground it had lost.
+            doomed.map { it.objectId }.chunked(DELETE_CHUNK).forEach { dao.deleteItems(source.id, it) }
+            pictures += doomed.mapNotNull { it.pictureUrl }
+            removed += doomed.size
+        }
+        pictures.distinct().chunked(DELETE_CHUNK).forEach { dao.deletePictures(it) }
+        areaDao?.delete(areaId)
+        return removed
+    }
     /** A named download's row back into the walker's own view of it. */
     private fun OfflineDocAreaEntity.toArea() = DocArea(
         id = id,
@@ -207,6 +244,9 @@ class OfflineDocStore(
     private companion object {
         /** What a download nobody named is still called, so the list has no blank rows in it. */
         const val UNNAMED_AREA = "Unnamed area"
+
+        /** How many identifiers go into one statement: well under SQLite's own limit on parameters. */
+        const val DELETE_CHUNK = 400
     }
 }
 

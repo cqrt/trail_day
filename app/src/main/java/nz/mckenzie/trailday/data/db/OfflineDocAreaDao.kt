@@ -23,6 +23,10 @@ abstract class OfflineDocAreaDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insert(area: OfflineDocAreaEntity): Long
 
+    /** The row for this name, when it is already here: downloading a region twice updates it. */
+    @Query("SELECT * FROM offline_doc_areas WHERE name = :name LIMIT 1")
+    abstract suspend fun find(name: String): OfflineDocAreaEntity?
+
     /** Forgets one named download. What it brought stays until the card's Clear. */
     @Query("DELETE FROM offline_doc_areas WHERE id = :id")
     abstract suspend fun delete(id: Long)

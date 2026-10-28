@@ -14,6 +14,8 @@ import nz.mckenzie.trailday.domain.other.OtherTrackArea
 import nz.mckenzie.trailday.domain.other.OtherTracksCache
 import nz.mckenzie.trailday.domain.other.OtherTracksQuery
 import nz.mckenzie.trailday.domain.other.joinedByName
+import nz.mckenzie.trailday.domain.region.Region
+import nz.mckenzie.trailday.domain.region.RegionDistricts
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.other.OtherTracksDownloadResult
 import nz.mckenzie.trailday.other.OtherTracksDownloader
@@ -75,15 +77,6 @@ class OfflineOtherTrackStore(
         ?: emptyFlow()
 
     /**
-     * Forgets one named download, and nothing else.
-     *
-     * The tracks it brought stay: another named area may cover the same ground, and the cache is one copy
-     * keyed by the service's identifier. [clear] is what reclaims the space, which is the same bargain the
-     * drawn map's areas make.
-     */
-    suspend fun forgetArea(id: Long) = areaDao?.delete(id)
-
-    /**
      * When the newest download of this source happened, or null when nothing is held.
      *
      * The licence asks for the moment the data was acquired to be stated, and this is the only place the
@@ -126,9 +119,14 @@ class OfflineOtherTrackStore(
     private suspend fun record(area: LatLngBounds?, name: String, count: Int) {
         val areas = areaDao ?: return
         if (count <= 0 || area == null) return
+        val trimmed = name.trim().ifEmpty { UNNAMED_AREA }
         areas.insert(
             OfflineOtherTrackAreaEntity(
-                name = name.trim().ifEmpty { UNNAMED_AREA },
+                // **The same region downloaded again updates its row** rather than adding a second one: two
+                // rows for one region would each claim the same tracks, and deleting one would leave the
+                // other describing a region that is no longer on the phone.
+                id = areas.find(trimmed)?.id ?: 0L,
+                name = trimmed,
                 minLat = area.minLat,
                 minLng = area.minLng,
                 maxLat = area.maxLat,
@@ -139,6 +137,43 @@ class OfflineOtherTrackStore(
         )
     }
 
+    /** Whether a download for [name] is already on the phone: downloading it again updates that row. */
+    suspend fun hasArea(name: String): Boolean = areaDao?.find(name.trim()) != null
+
+    /**
+     * Removes the row only, for an area that predates regions.
+     *
+     * Such a name is not one of the sixteen, so there is nothing that can be said about the ground it
+     * covered. Nothing in this build makes one; this is for rows written by an older one.
+     */
+    suspend fun forgetArea(id: Long) = areaDao?.delete(id)
+
+    /**
+     * Deletes the tracks a region brought, and nothing else - then its row.
+     *
+     * **By district name, which is exact.** Every row carries one, and the table gives each district to
+     * exactly one region, so no two regions can claim the same row: what is deleted here cannot belong to
+     * another region's row.
+     *
+     * A row downloaded before regions existed is deleted too when its district is in the region - it is the
+     * same track in the same place, and a row the walker cannot see is one they cannot remove.
+     */
+    suspend fun deleteRegion(region: Region, areaId: Long): Int {
+        val districts = region.districts.map { RegionDistricts.plain(it) }.toSet()
+        val doomed = dao.getAll()
+            .filter { row ->
+                val authority = FactsJson.read(row.factsJson)[LOCAL_AUTHORITY].orEmpty()
+                RegionDistricts.plain(authority) in districts
+            }
+            .map { it.globalId }
+        // In chunks, because a region's thousands of identifiers in one statement is more than SQLite
+        // will take as parameters: a country's worth of tracks is over its limit, and a delete that threw
+        // half way would leave a row saying a region was downloaded when half of it was not.
+        doomed.chunked(DELETE_CHUNK).forEach { dao.deleteByIds(it) }
+        areaDao?.delete(areaId)
+        return doomed.size
+    }
+
     private suspend fun store(tracks: List<OtherTrack>) {
         if (tracks.isEmpty()) return
         dao.insertAll(tracks.map { it.toEntity(now()) })
@@ -147,6 +182,12 @@ class OfflineOtherTrackStore(
     private companion object {
         /** What a download nobody named is still called, so the list has no blank rows in it. */
         const val UNNAMED_AREA = "Unnamed area"
+
+        /** The dataset's own field for the district a track is in. */
+        const val LOCAL_AUTHORITY = "LocalAuthority"
+
+        /** How many identifiers go into one statement: well under SQLite's own limit on parameters. */
+        const val DELETE_CHUNK = 400
     }
 }
 

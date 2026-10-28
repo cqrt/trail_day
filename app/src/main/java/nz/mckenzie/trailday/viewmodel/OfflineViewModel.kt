@@ -19,11 +19,13 @@ import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.domain.doc.DocArea
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.other.OtherTrackArea
+import nz.mckenzie.trailday.domain.region.Regions
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.offline.OfflineArea
 import nz.mckenzie.trailday.offline.OfflineAreaManager
 import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.offline.OfflineOtherTrackStore
+import nz.mckenzie.trailday.offline.RegionAsset
 import nz.mckenzie.trailday.offline.OfflineTileStore
 import nz.mckenzie.trailday.offline.TileServerHolder
 import nz.mckenzie.trailday.offline.TileStoreSummary
@@ -49,7 +51,14 @@ class OfflineViewModel(
      * Its own store beside DOC's, because it is a second publisher's cache: the two are counted and
      * cleared apart, so a walker clearing DOC's material keeps their council's walkways.
      */
-    private val otherTracksStore: OfflineOtherTrackStore
+    private val otherTracksStore: OfflineOtherTrackStore,
+    /**
+     * The sixteen regions, for turning a row's name into the ground it covers.
+     *
+     * An area's row stores a *name*, not a shape; deleting it needs the shape to say what it brought, and
+     * for DOC's material that is the outline. Read from the phone's own assets.
+     */
+    private val regions: Regions = Regions.EMPTY
 ) : ViewModel() {
 
     /** The imagery areas on the device. Chosen elsewhere; managed here. */
@@ -243,10 +252,21 @@ class OfflineViewModel(
         }
     }
 
-    /** Forgets one named box of them. The tracks stay until [clearOtherTracksData]. */
-    fun forgetOtherTrackArea(areaId: Long) {
+    /**
+     * Deletes one named region of somebody else's tracks: the tracks it brought, and its row.
+     *
+     * By district name, which is exact - every row carries one and each district sits in one region - so
+     * nothing another region's row claims can be taken here.
+     */
+    fun deleteOtherTrackArea(area: OtherTrackArea) {
         viewModelScope.launch {
-            runCatching { otherTracksStore.forgetArea(areaId) }
+            val region = regions.byName(area.name)
+            if (region == null) {
+                // An area from before regions existed: its name says nothing about the ground it covered.
+                runCatching { otherTracksStore.forgetArea(area.id) }
+            } else {
+                runCatching { otherTracksStore.deleteRegion(region, area.id) }
+            }
         }
     }
 
@@ -270,10 +290,24 @@ class OfflineViewModel(
         }
     }
 
-    /** Forgets one named box of DOC's material. What it brought stays until [clearDocData]. */
-    fun forgetDocArea(areaId: Long) {
+    /**
+     * Deletes one named region of DOC's material: the records only it covered, and its row.
+     *
+     * A record another region that still has its own row also covers is kept - a track that crosses a
+     * boundary belongs to both, and deleting one region must not empty the other's row.
+     */
+    fun deleteDocArea(area: DocArea) {
         viewModelScope.launch {
-            runCatching { docStore.forgetArea(areaId) }
+            val region = regions.byName(area.name)
+            if (region == null) {
+                // An area from before regions existed: its name says nothing about the ground it covered.
+                runCatching { docStore.forgetArea(area.id) }
+                return@launch
+            }
+            val stillKept = docAreas.value
+                .filter { it.id != area.id }
+                .mapNotNull { regions.byName(it.name) }
+            runCatching { docStore.deleteRegion(region, stillKept, area.id) }
         }
     }
 
@@ -322,7 +356,9 @@ class OfflineViewModel(
                         otherTracksStore = OfflineOtherTrackStore(
                             dao = database.offlineOtherTrackDao(),
                             areaDao = database.offlineOtherTrackAreaDao()
-                        )
+                        ),
+                        // The region rows say what ground each area covers; the shapes are the phone's own.
+                        regions = RegionAsset.load(appContext)
                     )
                 }
             }

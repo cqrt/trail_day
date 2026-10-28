@@ -185,9 +185,8 @@ fun OfflineScreen(
                 progress = docLive?.let { it.percent / 100f },
                 progressLabel = null,
                 // The desk's own line about reading the material offline went with the rest of the
-                // preambles; what stays is the one thing a walker cannot guess - what Forget does.
-                footnote = "Forgetting an area leaves its records on the phone until you clear them."
-                    .takeIf { docAreas.isNotEmpty() },
+                // preambles, and with Delete in the rows there is nothing left that needs explaining.
+                footnote = null,
                 error = null,
                 clearLabel = "Clear all DOC data".takeIf { docDataCount > 0 },
                 onClear = { confirmingClearDocData = true }
@@ -196,7 +195,7 @@ fun OfflineScreen(
                 // once and shared, so this is the walker's own list of places rather than a second copy.
                 docAreas.forEachIndexed { index, area ->
                     if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    DocAreaRow(area = area, onForget = { viewModel.forgetDocArea(area.id) })
+                    DocAreaRow(area = area, onDelete = { viewModel.deleteDocArea(area) })
                 }
             }
 
@@ -210,8 +209,7 @@ fun OfflineScreen(
                     ?: otherTracksSummary(otherTrackAreas, otherTracksDataCount),
                 progress = otherTracksLive?.let { it.percent / 100f },
                 progressLabel = null,
-                footnote = "Forgetting an area leaves its tracks on the phone until you clear them."
-                    .takeIf { otherTrackAreas.isNotEmpty() },
+                footnote = null,
                 error = null,
                 clearLabel = "Clear other tracks".takeIf { otherTracksDataCount > 0 },
                 onClear = { confirmingClearOtherTracks = true }
@@ -220,7 +218,7 @@ fun OfflineScreen(
                 // and shared, so this is the walker's own list of places rather than a second copy of them.
                 otherTrackAreas.forEachIndexed { index, area ->
                     if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    OtherTrackAreaRow(area = area, onForget = { viewModel.forgetOtherTrackArea(area.id) })
+                    OtherTrackAreaRow(area = area, onDelete = { viewModel.deleteOtherTrackArea(area) })
                 }
             }
 
@@ -546,14 +544,13 @@ private fun AreaRow(
 }
 
 /**
- * One named box DOC's material was downloaded for: what it is called, and what came back from it.
+ * One named region of DOC's material: what it is called, and what came back from it.
  *
- * **Forget rather than Delete**, for the same reason as somebody else's tracks: the records it brought are
- * still on the phone and may belong to another named area too. The card's Clear is the one that empties the
- * cache, and the card says so.
+ * **Delete, and it deletes**: the records inside the region go, except any that another region still
+ * listed also covers - a track that crosses a boundary belongs to both.
  */
 @Composable
-private fun DocAreaRow(area: DocArea, onForget: () -> Unit) {
+private fun DocAreaRow(area: DocArea, onDelete: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -568,19 +565,17 @@ private fun DocAreaRow(area: DocArea, onForget: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        DestructiveTextButton(text = "Forget", onClick = onForget)
+        DestructiveTextButton(text = "Delete", onClick = onDelete)
     }
 }
 
 /**
- * One named box somebody else's tracks were downloaded for: what it is called, and what came back from it.
+ * One named region of somebody else's tracks: what it is called, and what came back from it.
  *
- * **Forget rather than Delete**, because that is what it does: the tracks it brought are still on the phone
- * and may belong to another named area too. The card's Clear is the one that empties the cache, and the
- * card says so - a Delete that quietly left the tracks would be worse than a word that is honest.
+ * **Delete, and it deletes** - by district name, which is exact: no two regions can claim the same row.
  */
 @Composable
-private fun OtherTrackAreaRow(area: OtherTrackArea, onForget: () -> Unit) {
+private fun OtherTrackAreaRow(area: OtherTrackArea, onDelete: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -595,7 +590,7 @@ private fun OtherTrackAreaRow(area: OtherTrackArea, onForget: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        DestructiveTextButton(text = "Forget", onClick = onForget)
+        DestructiveTextButton(text = "Delete", onClick = onDelete)
     }
 }
 

@@ -61,4 +61,12 @@ abstract class OfflineDocItemDao {
 
     @Query("DELETE FROM offline_doc_pictures")
     abstract suspend fun deletePictures()
+
+    /** Removes one service's rows by DOC's own numbers: what a deleted region covered. */
+    @Query("DELETE FROM offline_doc_items WHERE source = :source AND objectId IN (:objectIds)")
+    abstract suspend fun deleteItems(source: String, objectIds: List<Long>)
+
+    /** The pictures of the records that have just gone. */
+    @Query("DELETE FROM offline_doc_pictures WHERE url IN (:urls)")
+    abstract suspend fun deletePictures(urls: List<String>)
 }

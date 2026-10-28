@@ -42,4 +42,13 @@ abstract class OfflineOtherTrackDao {
 
     @Query("DELETE FROM offline_other_tracks")
     abstract suspend fun deleteAll()
+
+    /**
+     * Removes rows by the service's own identifier: what a deleted region brought.
+     *
+     * See [nz.mckenzie.trailday.offline.OfflineOtherTrackStore.deleteRegion] for why this is not a delete of
+     * everything.
+     */
+    @Query("DELETE FROM offline_other_tracks WHERE globalId IN (:ids)")
+    abstract suspend fun deleteByIds(ids: List<String>)
 }
