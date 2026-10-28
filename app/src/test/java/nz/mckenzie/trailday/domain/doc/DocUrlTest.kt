@@ -176,4 +176,50 @@ class DocUrlTest {
         assertTrue("the narrowed question goes in the where clause", url.contains("introductionThumbnail"))
         assertTrue("and the count is still a count", url.contains("returnCountOnly=true"))
     }
+
+    @Test
+    fun `a region is asked for as its own outline, closed, rather than the box around it`() {
+        // DOC publishes no district on any row, so a region cannot be asked for by name - and the box
+        // around Otago holds pieces of Canterbury and Southland that the walker did not ask for.
+        val rings = listOf(
+            listOf(
+                GeoPoint(-46.0, 169.0),
+                GeoPoint(-46.0, 171.0),
+                GeoPoint(-44.0, 171.0),
+                GeoPoint(-44.0, 169.0)
+            )
+        )
+        val url = DocUrl.of(DocQuery(source = DocSource.TRACKS, rings = rings))
+        val geometry = java.net.URLDecoder.decode(
+            url.substringAfter("geometry=").substringBefore("&"),
+            "UTF-8"
+        )
+
+        assertTrue("a polygon, not an envelope", url.contains("geometryType=esriGeometryPolygon"))
+        assertTrue("WGS84, as everything else in the app", url.contains("inSR=4326"))
+        assertTrue("in GeoJSON's own order, longitude first", geometry.contains("[169.0,-46.0]"))
+        // A ring that does not come back to where it started is not a polygon, and a service is free to
+        // treat it as a line and answer with nothing: the first point appears twice and no others do.
+        assertEquals(
+            "the ring is closed, first point last",
+            2,
+            geometry.split("[169.0,-46.0]").size - 1
+        )
+    }
+
+    @Test
+    fun `a box is still a box, and a region is not asked as a box`() {
+        val box = DocBounds(minLat = -46.0, minLng = 169.0, maxLat = -44.0, maxLng = 171.0)
+
+        assertTrue(
+            "a drawn box stays an envelope",
+            DocUrl.of(DocQuery(source = DocSource.TRACKS, bounds = box))
+                .contains("geometryType=esriGeometryEnvelope")
+        )
+        assertTrue(
+            "and a count of a region is a polygon too",
+            DocUrl.countOf(DocQuery(source = DocSource.HUTS, rings = listOf(listOf(GeoPoint(-46.0, 169.0), GeoPoint(-44.0, 170.0), GeoPoint(-45.0, 171.0)))))
+                .contains("geometryType=esriGeometryPolygon")
+        )
+    }
 }

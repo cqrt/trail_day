@@ -307,9 +307,12 @@ class OfflineAreaPickerViewModel(
                 .map { draft -> draft.plan(name = draft.name, fallbackName = "") }
                 .distinctUntilChanged()
                 .collectLatest { plan ->
-                    if (mode == OfflinePickerMode.IMAGERY || plan == null) {
-                        _docInventory.value = null
-                        _docCounting.value = false
+                    if (mode == OfflinePickerMode.IMAGERY || plan == null || choosingRegion) {
+                        // A region's own count is asked for when it is tapped; a box's is cleared here.
+                        if (!choosingRegion) {
+                            _docInventory.value = null
+                            _docCounting.value = false
+                        }
                         return@collectLatest
                     }
                     _docCounting.value = true
@@ -401,6 +404,24 @@ class OfflineAreaPickerViewModel(
                 otherTracksStore.inventory(OtherTracksQuery(region = region))
             }.getOrNull()
             _otherTracksCounting.value = false
+        }
+        // DOC is asked the same question of the same region, as its outline: its rows carry no district, so
+        // the shape is the only thing that can say "inside Otago" - and asking it as the box would promise
+        // the neighbouring regions' huts as well.
+        if (mode == OfflinePickerMode.DOC_DATA) {
+            val box = region.bounds?.toDocBounds()
+            if (box == null) {
+                _docInventory.value = null
+                _docCounting.value = false
+                return
+            }
+            viewModelScope.launch {
+                _docCounting.value = true
+                _docInventory.value = runCatching {
+                    docStore.inventory(box, region.rings)
+                }.getOrNull()
+                _docCounting.value = false
+            }
         }
     }
 
@@ -582,29 +603,46 @@ class OfflineAreaPickerViewModel(
     }
 
     /**
-     * Downloads everything DOC publishes in the box drawn here, so the browser and the map's reference
+     * Downloads everything DOC publishes in the ground chosen here, so the browser and the map's reference
      * layer work with no reception.
      *
      * **All four services in one act** - the tracks to walk, the huts and campsites to stop at, the bike
      * locations to ride - because that is what a walker keeps for an area, and asking for them one at a
-     * time is the walker doing the app's bookkeeping. Independent of the imagery: no LINZ key is needed,
-     * and nothing here is an area record - DOC's cache is the walker's own, held once.
+     * time is the walker doing the app's bookkeeping. Independent of the imagery: no LINZ key is needed.
+     *
+     * A **region** is asked for as its outline rather than as the box around it, because DOC publishes no
+     * district on any row and a box round Otago holds pieces of Canterbury and Southland. Either way the
+     * download leaves a **named record** beside the material, so the offline screen lists the ground that
+     * was kept rather than only counting the records in it.
      */
     private fun downloadDocData() {
         if (_docWorking.value) return
+        val region = _region.value.takeIf { choosingRegion }
         val current = _draft.value
-        val plan = current.plan(name = current.name, fallbackName = defaultName())
-        if (plan == null) {
-            _docMessage.value = "Tap two opposite corners on the map to choose the area."
+        val plan = if (region == null) current.plan(name = current.name, fallbackName = defaultName()) else null
+        if (region == null && plan == null) {
+            _docMessage.value = if (mode.offersRegions && _choice.value == OfflineChoice.REGION) {
+                "Tap one of the regions on the map."
+            } else {
+                "Tap two opposite corners on the map to choose the area."
+            }
             return
         }
+
+        // A region is a box for the request and an outline for the answer: DOC's service takes both, and the
+        // box is what its answers are described by everywhere else in the app.
+        val bounds = (region?.bounds?.toDocBounds() ?: plan!!.bounds.toDocBounds())
+        val rings = region?.rings.orEmpty()
+        val name = region?.name ?: plan!!.name
 
         viewModelScope.launch {
             _docWorking.value = true
             _docMessage.value = null
             val startedAt = System.nanoTime()
             try {
-                val download = docStore.download(plan.bounds.toDocBounds()) { reportDoc(it, startedAt) }
+                val download = docStore.download(bounds, name = name, rings = rings) {
+                    reportDoc(it, startedAt)
+                }
                 // One sentence for the whole act: what arrived, and which of the four did not answer. A
                 // download that stopped short still kept what arrived, so the walker stays here and can
                 // read it rather than being sent back with half an answer.
@@ -788,7 +826,10 @@ class OfflineAreaPickerViewModel(
                         // The tracks the DOC browser falls back to when the service cannot be reached.
                         docStore = OfflineDocStore(
                             dao = database.offlineDocItemDao(),
-                            downloader = DocDownloader.online()
+                            downloader = DocDownloader.online(),
+                            // The walker's own record of each download: a region or a boxed area is named,
+                            // and the offline screen lists the ground that was kept.
+                            areaDao = database.offlineDocAreaDao()
                         ),
                         // The tracks other people publish: its own cache, and no key or proxy between the
                         // phone and the service. Its named downloads are recorded here rather than by the

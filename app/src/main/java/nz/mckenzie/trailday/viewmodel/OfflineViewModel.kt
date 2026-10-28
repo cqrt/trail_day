@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.doc.DocDownloader
+import nz.mckenzie.trailday.domain.doc.DocArea
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.other.OtherTrackArea
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
@@ -128,6 +129,14 @@ class OfflineViewModel(
      */
     val docPictures: StateFlow<Int> = docStore.observePictureCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0)
+
+    /**
+     * The named boxes DOC's material was downloaded for: **the walker's own list of places.**
+     *
+     * Listed rather than counted, because a count of records cannot say which hillsides are on the phone.
+     */
+    val docAreas: StateFlow<List<DocArea>> = docStore.observeAreas()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     init {
         refreshSummary()
@@ -261,6 +270,13 @@ class OfflineViewModel(
         }
     }
 
+    /** Forgets one named box of DOC's material. What it brought stays until [clearDocData]. */
+    fun forgetDocArea(areaId: Long) {
+        viewModelScope.launch {
+            runCatching { docStore.forgetArea(areaId) }
+        }
+    }
+
     /** Forgets one named piece of the drawn map, and the tiles of it that no other piece needs. */
     fun deleteTopoArea(areaId: Long) {
         viewModelScope.launch {
@@ -295,7 +311,10 @@ class OfflineViewModel(
                         // fall back to when the service cannot be reached.
                         docStore = OfflineDocStore(
                             dao = database.offlineDocItemDao(),
-                            downloader = DocDownloader.online()
+                            downloader = DocDownloader.online(),
+                            // The walker's own record of each download, so the DOC card can list the
+                            // ground that was kept rather than only counting the records.
+                            areaDao = database.offlineDocAreaDao()
                         ),
                         // The tracks other people publish: its own cache, filled by its own picker and
                         // drawn by the map's second reference layer - and its list of named downloads,

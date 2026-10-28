@@ -49,7 +49,10 @@ enum class OfflinePickerMode {
 /**
  * Whether this pack's ground can be chosen as a **region** as well as drawn as a box.
  *
- * Only the track packs, because a region is a way of asking a service that knows about districts. The
- * imagery and the drawn map are fetched tile by tile for a rectangle, and no rectangle is a region.
+ * The two track packs, because a region is a way of asking either service where a thing is: somebody else's
+ * tracks carry a district on every row, and DOC's carry nothing of the sort - so DOC's region is asked for
+ * as an outline, which its service accepts as readily as a box. The imagery and the drawn map are fetched
+ * tile by tile for a rectangle, and no rectangle is a region.
  */
-val OfflinePickerMode.offersRegions: Boolean get() = this == OfflinePickerMode.OTHER_TRACKS
+val OfflinePickerMode.offersRegions: Boolean
+    get() = this == OfflinePickerMode.OTHER_TRACKS || this == OfflinePickerMode.DOC_DATA

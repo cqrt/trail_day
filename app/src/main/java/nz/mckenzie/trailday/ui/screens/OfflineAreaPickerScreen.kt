@@ -39,6 +39,7 @@ import nz.mckenzie.trailday.offline.DownloadState
 import nz.mckenzie.trailday.offline.OfflineAreaDraft
 import nz.mckenzie.trailday.offline.OfflineChoice
 import nz.mckenzie.trailday.offline.OfflinePickerMode
+import nz.mckenzie.trailday.offline.offersRegions
 import nz.mckenzie.trailday.offline.downloadProgressWords
 import nz.mckenzie.trailday.offline.formatBytes
 import nz.mckenzie.trailday.viewmodel.OfflineAreaPickerViewModel
@@ -117,16 +118,16 @@ fun OfflineAreaPickerScreen(
     val region by viewModel.region.collectAsStateWithLifecycle()
     val regionsGeoJson by viewModel.regionsGeoJson.collectAsStateWithLifecycle()
     val pickedRegionGeoJson by viewModel.pickedRegionGeoJson.collectAsStateWithLifecycle()
-    val regionMode = keepsOtherTracks && choice == OfflineChoice.REGION
+    val regionMode = viewModel.mode.offersRegions && choice == OfflineChoice.REGION
     // How much of the screen the card covers, in the pixels the map camera wants: the country is framed
     // above it rather than behind it.
     val regionCardPaddingPx = with(LocalDensity.current) { 210.dp.roundToPx() }
     // A zoom range is what any pack of tiles is asked, and the imagery and the drawn map are both that.
     val keepsZooms = keepsImagery || topography
-    // A name belongs to a pack that keeps **areas** - imagery, the drawn map, and somebody else's tracks -
-    // because an area is a row the walker finds again later: "the Tararuas", "the Routeburn". DOC's material
-    // is one cache with no rows, so there is nothing to name.
-    val keepsAreas = keepsImagery || topography || keepsOtherTracks
+    // A name belongs to a pack that keeps **areas** - imagery, the drawn map, and either publisher's
+    // records - because an area is a row the walker finds again later: "the Tararuas", "the Routeburn". A
+    // region names itself, so there is nothing to type in that mode.
+    val keepsAreas = keepsImagery || topography || keepsOtherTracks || keepsDocData
 
     /**
      * The map the box is drawn on: **the pack's own, where it has one.**
@@ -226,7 +227,7 @@ fun OfflineAreaPickerScreen(
                     // Two ways of choosing ground, and only one of them holding an answer at a time: a
                     // region names itself and needs no drawing, and a box covers the ground no region
                     // describes - the end of a beach, one valley.
-                    if (keepsOtherTracks) {
+                    if (viewModel.mode.offersRegions) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             FilterChip(
                                 selected = choice == OfflineChoice.REGION,
@@ -333,24 +334,28 @@ fun OfflineAreaPickerScreen(
                     // What DOC publishes in the same box: the whole download for a DOC area, and the half
                     // that goes on top of the map for a track's ground.
                     if (keepsDocData) {
-                        // What the box would take on, asked before the button is tapped: the size of the
+                        // What the ground would take on, asked before the button is tapped: the size of the
                         // download is the one thing a phone in the hills cannot change its mind about.
                         // DOC's own counts, and the app's own rough arithmetic for the bytes.
+                        if (regionMode) region?.let { chosen -> Text(chosen.name, style = MaterialTheme.typography.titleMedium) }
                         val inventory = docInventory
+                        val what = if (regionMode) region?.name ?: "this region" else "this box"
                         Text(
                             text = when {
-                                docCounting -> "Asking DOC what is in this box..."
+                                docCounting -> "Asking DOC what is in $what..."
+
+                                regionMode && region == null -> "Tap a region to see what DOC has inside it."
 
                                 inventory == null -> "Draw a box to see what DOC has inside it."
 
                                 !inventory.complete ->
-                                    "DOC could not be asked what is in this box. Try again in a moment."
+                                    "DOC could not be asked what is in $what. Try again in a moment."
 
                                 inventory.totalRecords == 0 && inventory.pictures == 0 ->
-                                    "DOC has nothing inside this box."
+                                    "DOC has nothing inside $what."
 
                                 else ->
-                                    "${whatDocHasIn(inventory)} inside this box, roughly " +
+                                    "${whatDocHasIn(inventory)} inside $what, roughly " +
                                         "${formatBytes(inventory.estimatedBytes)}."
                             },
                             style = MaterialTheme.typography.bodyMedium
@@ -359,7 +364,7 @@ fun OfflineAreaPickerScreen(
                             text = if (around) {
                                 "Everything DOC publishes here is kept and drawn on the map."
                             } else {
-                                "Everything DOC publishes inside the box is downloaded and drawn on the map."
+                                "Everything DOC publishes inside $what is downloaded and drawn on the map."
                             },
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -434,7 +439,8 @@ fun OfflineAreaPickerScreen(
                                 keepsOtherTracks -> (if (regionMode) region != null else draft.isComplete) &&
                                     !otherTracksWorking
 
-                                else -> draft.isComplete && !docWorking
+                                // DOC has no corners in region mode either: the region is the whole answer.
+                                else -> (if (regionMode) region != null else draft.isComplete) && !docWorking
                             }
                         ) {
                             Text(
@@ -448,6 +454,7 @@ fun OfflineAreaPickerScreen(
                                         "Download ${region?.name ?: "region"}"
                                     keepsOtherTracks -> "Download other tracks"
                                     !imagery && docWorking -> "Downloading DOC data…"
+                                    !imagery && regionMode -> "Download ${region?.name ?: "region"}"
                                     !imagery -> "Download DOC data"
                                     else -> "Download area"
                                 }

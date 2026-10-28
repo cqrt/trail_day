@@ -236,3 +236,36 @@ internal val MIGRATION_8_9 = object : Migration(8, 9) {
         )
     }
 }
+
+/**
+ * DOC's material could be downloaded but not **named**, for the same reason somebody else's tracks could
+ * not: three hillsides read as one number of records, with no way to tell "Otago" from a box drawn by
+ * accident.
+ *
+ * The material stays where it is. This adds the walker's own record of each download beside it, which is a
+ * name, the ground, how many records came back and when. Nothing is backfilled: an area downloaded before
+ * this build was never named, and inventing a name for it would be making one up.
+ */
+internal val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS offline_doc_areas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                name TEXT NOT NULL,
+                minLat REAL NOT NULL,
+                minLng REAL NOT NULL,
+                maxLat REAL NOT NULL,
+                maxLng REAL NOT NULL,
+                itemCount INTEGER NOT NULL,
+                downloadedAtEpochMs INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_offline_doc_areas_downloadedAtEpochMs " +
+                "ON offline_doc_areas (downloadedAtEpochMs)"
+        )
+    }
+}

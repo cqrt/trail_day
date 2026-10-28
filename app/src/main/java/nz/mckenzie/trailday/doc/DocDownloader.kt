@@ -4,6 +4,7 @@ import nz.mckenzie.trailday.domain.doc.DocBounds
 import nz.mckenzie.trailday.domain.doc.DocCompanion
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocQuery
+import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.DocTrackCompanions
 import nz.mckenzie.trailday.domain.doc.pictureWhere
@@ -96,6 +97,13 @@ class DocDownloader(
     suspend fun downloadArea(
         bounds: DocBounds,
         /**
+         * A region's outline, when the ground was chosen as a region rather than drawn as a box.
+         *
+         * DOC publishes no district on any row, so its own outline is what says "inside Otago" - and the
+         * box around Otago holds pieces of Canterbury and Southland that a walker did not ask for.
+         */
+        rings: List<List<GeoPoint>> = emptyList(),
+        /**
          * How many records have been read for the whole act so far, called after each page.
          *
          * Cumulative across the four services, because one line for the whole act is what a walker reads -
@@ -110,7 +118,7 @@ class DocDownloader(
 
         var readSoFar = 0
         for (source in DocSource.entries) {
-            when (val result = download(bounds, source) { read -> onProgress(readSoFar + read) }) {
+            when (val result = download(bounds, source, rings) { read -> onProgress(readSoFar + read) }) {
                 is DocDownloadResult.Done -> {
                     counts[source] = result.items.size
                     items += result.items
@@ -176,13 +184,13 @@ class DocDownloader(
      * same filters, that the download itself would read, because a count of something else is worse than
      * no count at all.
      */
-    suspend fun inventory(bounds: DocBounds): DocInventory {
+    suspend fun inventory(bounds: DocBounds, rings: List<List<GeoPoint>> = emptyList()): DocInventory {
         val records = mutableMapOf<DocSource, Int>()
         val failed = mutableMapOf<DocSource, String>()
         var pictures = 0
 
         for (source in DocSource.entries) {
-            val query = DocQuery(source = source, bounds = bounds, limit = 1)
+            val query = DocQuery(source = source, bounds = bounds, rings = rings, limit = 1)
             when (val result = reader.count(query)) {
                 is DocCountResult.Done -> records[source] = result.count
                 is DocCountResult.Failed -> failed[source] = result.message
@@ -202,6 +210,8 @@ class DocDownloader(
     suspend fun download(
         bounds: DocBounds,
         source: DocSource,
+        /** A region's outline, when the ground was chosen as a region: see [downloadArea]. */
+        rings: List<List<GeoPoint>> = emptyList(),
         /** How many have been read for this service so far, called after each page. */
         onProgress: (read: Int) -> Unit = {}
     ): DocDownloadResult {
@@ -209,7 +219,7 @@ class DocDownloader(
         var offset = 0
         while (true) {
             val page = reader.search(
-                DocQuery(source = source, bounds = bounds, limit = pageSize, offset = offset)
+                DocQuery(source = source, bounds = bounds, rings = rings, limit = pageSize, offset = offset)
             )
             when (page) {
                 is DocReadResult.Failed -> return DocDownloadResult.Failed(page.message, all)

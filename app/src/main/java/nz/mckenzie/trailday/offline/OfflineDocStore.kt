@@ -1,6 +1,10 @@
 package nz.mckenzie.trailday.offline
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.map
+import nz.mckenzie.trailday.data.db.OfflineDocAreaDao
+import nz.mckenzie.trailday.data.db.OfflineDocAreaEntity
 import nz.mckenzie.trailday.data.db.OfflineDocItemDao
 import nz.mckenzie.trailday.data.db.OfflineDocItemEntity
 import nz.mckenzie.trailday.doc.DocAreaDownload
@@ -8,8 +12,10 @@ import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.doc.DocInventory
 import nz.mckenzie.trailday.doc.DocPictures
 import nz.mckenzie.trailday.doc.DocReadProgress
+import nz.mckenzie.trailday.domain.doc.DocArea
 import nz.mckenzie.trailday.domain.doc.DocBounds
 import nz.mckenzie.trailday.domain.doc.DocCache
+import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.cache.FactsJson
 import nz.mckenzie.trailday.domain.cache.PathsJson
 import nz.mckenzie.trailday.domain.doc.DocItem
@@ -37,6 +43,14 @@ class OfflineDocStore(
      * download and are cleared with it.
      */
     private val pictures: DocPictureCache = DocPictureCache(dao),
+    /**
+     * The walker's own record of each download, or null where this store is only ever read.
+     *
+     * The browser and the desk read DOC's cache and never download into it, so they have no names to write -
+     * and a store that cannot record a download is a smaller thing to hand them than a second way of
+     * reaching the database.
+     */
+    private val areaDao: OfflineDocAreaDao? = null,
     private val now: () -> Long = System::currentTimeMillis
 ) : DocCache {
 
@@ -59,10 +73,32 @@ class OfflineDocStore(
 
     override suspend fun clear() {
         dao.deleteAll()
+        areaDao?.deleteAll()
         // The pictures go with the material they are pictures of: one entry, cleared as one thing - a
         // picture left behind would be storage nobody could see or get rid of.
         pictures.clear()
     }
+
+    /** The named downloads, newest first, for the offline screen's list. */
+    fun observeAreas(): Flow<List<DocArea>> = areaDao?.observeAll()
+        ?.map { areas -> areas.map { it.toArea() } }
+        ?: emptyFlow()
+
+    /**
+     * Forgets one named download, and nothing else.
+     *
+     * What it brought stays: another named area may cover the same ground, and the cache is one copy keyed
+     * by DOC's own numbers. [clear] is what reclaims the space.
+     */
+    suspend fun forgetArea(id: Long) = areaDao?.delete(id)
+
+    /** A named download's row back into the walker's own view of it. */
+    private fun OfflineDocAreaEntity.toArea() = DocArea(
+        id = id,
+        name = name,
+        itemCount = itemCount,
+        downloadedAtEpochMs = downloadedAtEpochMs
+    )
 
     /** A live count, for the offline screen to say what is stored, and for the map to redraw on. */
     override fun observeCount(): Flow<Int> = dao.observeCount()
@@ -117,13 +153,18 @@ class OfflineDocStore(
      */
     suspend fun download(
         bounds: DocBounds,
+        /** What the walker called this ground: "Otago", "the Tararuas". Named before it gets here. */
+        name: String = "",
+        /** A region's outline, when the ground was chosen as a region rather than drawn as a box. */
+        rings: List<List<GeoPoint>> = emptyList(),
         /** How far through the act the phone is: the records being read, then the pictures being kept. */
         onProgress: (DocReadProgress) -> Unit = {}
     ): DocAreaDownload {
-        val result = downloader.downloadArea(bounds) { read ->
+        val result = downloader.downloadArea(bounds, rings) { read ->
             onProgress(DocReadProgress(pictures = false, done = read))
         }
         store(result.items)
+        record(name, bounds, result.items.size)
         return result.copy(
             pictures = pictures.keep(result.items.mapNotNull { it.pictureUrl }) { kept ->
                 onProgress(DocReadProgress(pictures = true, done = kept))
@@ -132,12 +173,41 @@ class OfflineDocStore(
     }
 
     /**
+     * Leaves the walker's own record of the download beside the material.
+     *
+     * An area that turned out to hold nothing is not recorded: the walker was told so at the time, and a row
+     * reading "0 records" is a list of places with nothing in them, which is not the list this is.
+     */
+    private suspend fun record(name: String, bounds: DocBounds, count: Int) {
+        val areas = areaDao ?: return
+        if (count <= 0) return
+        areas.insert(
+            OfflineDocAreaEntity(
+                name = name.trim().ifEmpty { UNNAMED_AREA },
+                minLat = bounds.minLat,
+                minLng = bounds.minLng,
+                maxLat = bounds.maxLat,
+                maxLng = bounds.maxLng,
+                itemCount = count,
+                downloadedAtEpochMs = now()
+            )
+        )
+    }
+
+    /**
      * What DOC says is in [bounds], for the picker to show before anything is downloaded.
      *
      * Nothing is stored and nothing is written: it is the same services asked a smaller question, and
-     * the answer is a figure for a walker to decide on.
+     * the answer is a figure for a walker to decide on. A region is asked as its outline, so the figure is
+     * of exactly what a region download would keep.
      */
-    suspend fun inventory(bounds: DocBounds): DocInventory = downloader.inventory(bounds)
+    suspend fun inventory(bounds: DocBounds, rings: List<List<GeoPoint>> = emptyList()): DocInventory =
+        downloader.inventory(bounds, rings)
+
+    private companion object {
+        /** What a download nobody named is still called, so the list has no blank rows in it. */
+        const val UNNAMED_AREA = "Unnamed area"
+    }
 }
 
 /**
@@ -231,3 +301,25 @@ fun docHeldWords(counts: Map<DocSource, Int>): String =
         val count = counts[source] ?: return@mapNotNull null
         if (count == 0) null else "$count ${whatFromDoc(source, count)}"
     }.joinToString(", ")
+
+/**
+ * What the DOC card says once its downloads have been named: **"2 areas · 673 records · Otago, the
+ * Tararuas"**.
+ *
+ * The same shape as the other-tracks card's line, because the two cards are read the same way - how many
+ * boxes, how much is in them, and which ones - and the names are the point of naming them. Only called when
+ * there is at least one name; a card with records held and no names on them says what is held, the way it
+ * always did.
+ */
+fun docAreasSummary(areas: List<DocArea>, count: Int): String {
+    val boxes = if (areas.size == 1) "1 area" else "${areas.size} areas"
+    val names = areas.map { it.name }.take(2).joinToString(", ")
+    val more = if (areas.size > 2) "\u2026" else ""
+    return "$boxes \u00b7 ${recordsWord(count)} \u00b7 $names$more"
+}
+
+/** One named download in the card: what it is called, and what came back from it. */
+fun docAreaWords(area: DocArea): String = recordsWord(area.itemCount)
+
+/** "1 record", "412 records": one word, so a card and a row cannot disagree about a plural. */
+private fun recordsWord(count: Int): String = if (count == 1) "1 record" else "$count records"

@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.asset.AssetKind
+import nz.mckenzie.trailday.domain.doc.DocArea
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.other.OtherTrackArea
 import nz.mckenzie.trailday.offline.DownloadService
@@ -46,6 +47,8 @@ import nz.mckenzie.trailday.offline.OfflineArea
 import nz.mckenzie.trailday.offline.OfflinePack
 import nz.mckenzie.trailday.offline.docHeldWords
 import nz.mckenzie.trailday.offline.downloadProgressWords
+import nz.mckenzie.trailday.offline.docAreasSummary
+import nz.mckenzie.trailday.offline.docAreaWords
 import nz.mckenzie.trailday.offline.otherTracksHeldWords
 import nz.mckenzie.trailday.offline.otherTracksSummary
 import nz.mckenzie.trailday.offline.otherTrackAreaWords
@@ -79,6 +82,7 @@ fun OfflineScreen(
     val docDataCount by viewModel.docDataCount.collectAsStateWithLifecycle()
     val docCounts by viewModel.docCounts.collectAsStateWithLifecycle()
     val docPictures by viewModel.docPictures.collectAsStateWithLifecycle()
+    val docAreas by viewModel.docAreas.collectAsStateWithLifecycle()
     val otherTracksDataCount by viewModel.otherTracksDataCount.collectAsStateWithLifecycle()
     val otherTrackAreas by viewModel.otherTrackAreas.collectAsStateWithLifecycle()
     val topoSummary by viewModel.topoSummary.collectAsStateWithLifecycle()
@@ -156,23 +160,37 @@ fun OfflineScreen(
             DownloadCard(
                 title = OfflinePack.DOC.title,
                 icon = { AssetKindIcon(kind = AssetKind.HUT, dimension = 24.dp) },
-                summary = docLive?.let { downloadProgressWords(it) } ?: if (docDataCount == 0) {
-                    "Nothing downloaded yet"
-                } else {
-                    docHeldWords(docCounts) + docPictures
-                        .takeIf { it > 0 }
-                        ?.let { " \u00b7 ${pictureCountWords(it)}" }
-                        .orEmpty()
-                },
+                // A named download says which ground it was: "2 areas · 673 records · Otago, the Tararuas".
+                // With no names on it - everything kept before areas were recorded - it says what is held.
+                summary = docLive?.let { downloadProgressWords(it) }
+                    ?: if (docAreas.isNotEmpty()) {
+                        docAreasSummary(docAreas, docDataCount)
+                    } else if (docDataCount == 0) {
+                        "Nothing downloaded yet"
+                    } else {
+                        docHeldWords(docCounts) + docPictures
+                            .takeIf { it > 0 }
+                            ?.let { " \u00b7 ${pictureCountWords(it)}" }
+                            .orEmpty()
+                    },
                 progress = docLive?.let { it.percent / 100f },
                 progressLabel = null,
-                footnote = "Read offline by the map and the DOC browser.",
+                footnote = if (docAreas.isEmpty()) {
+                    "Read offline by the map and the DOC browser."
+                } else {
+                    "Read offline by the map and the DOC browser. Forgetting an area leaves its records " +
+                        "on the phone until you clear them."
+                },
                 error = null,
                 clearLabel = "Clear all DOC data".takeIf { docDataCount > 0 },
                 onClear = { confirmingClearDocData = true }
             ) {
-                // No rows: DOC's material arrives by area and is counted as one thing, which is the whole
-                // point of it being one entry.
+                // **The named boxes DOC's material was downloaded for**, each one a row: the material is held
+                // once and shared, so this is the walker's own list of places rather than a second copy.
+                docAreas.forEachIndexed { index, area ->
+                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    DocAreaRow(area = area, onForget = { viewModel.forgetDocArea(area.id) })
+                }
             }
 
             // The second publisher's tracks, on their own card: their own cache, their own download and
@@ -525,6 +543,33 @@ private fun AreaRow(
             TextButton(onClick = onResume, enabled = !working) { Text("Resume") }
         }
         DestructiveTextButton(text = "Delete", onClick = onDelete)
+    }
+}
+
+/**
+ * One named box DOC's material was downloaded for: what it is called, and what came back from it.
+ *
+ * **Forget rather than Delete**, for the same reason as somebody else's tracks: the records it brought are
+ * still on the phone and may belong to another named area too. The card's Clear is the one that empties the
+ * cache, and the card says so.
+ */
+@Composable
+private fun DocAreaRow(area: DocArea, onForget: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(text = area.name, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = docAreaWords(area),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        DestructiveTextButton(text = "Forget", onClick = onForget)
     }
 }
 

@@ -18,6 +18,17 @@ data class DocQuery(
     val near: GeoPoint? = null,
     val radiusKm: Double = 25.0,
     val bounds: DocBounds? = null,
+    /**
+     * A region's outline, when the question is about one of the sixteen rather than a box.
+     *
+     * DOC's rows carry **no district, region or place name at all** - its fields are the object type, a
+     * technical name and paired attributes - so a region cannot be asked for by name the way somebody
+     * else's tracks can. Its own outline is the only thing that can say "inside Otago", and asking for the
+     * outline rather than the box around it keeps the neighbouring regions' corners out.
+     *
+     * A question carrying one is **posted rather than fetched**: see [ArcGisDoc].
+     */
+    val rings: List<List<GeoPoint>> = emptyList(),
     val limit: Int = DEFAULT_LIMIT,
     val offset: Int = 0
 ) {
@@ -54,17 +65,7 @@ object DocUrl {
         val source = query.source
         val parameters = linkedMapOf("where" to where(source, query.nameContains))
 
-        val envelope = when {
-            query.bounds != null -> envelope(query.bounds)
-            query.near != null -> envelope(query.near, query.radiusKm)
-            else -> null
-        }
-        if (envelope != null) {
-            parameters["geometry"] = envelope
-            parameters["geometryType"] = "esriGeometryEnvelope"
-            parameters["inSR"] = "4326"
-            parameters["spatialRel"] = "esriSpatialRelIntersects"
-        }
+        parameters.putAll(area(query))
 
         parameters["outFields"] = source.outFields
         parameters["returnGeometry"] = "true"
@@ -97,17 +98,7 @@ object DocUrl {
      */
     fun countOf(query: DocQuery, where: String = where(query.source, query.nameContains)): String {
         val parameters = linkedMapOf("where" to where)
-        val envelope = when {
-            query.bounds != null -> envelope(query.bounds)
-            query.near != null -> envelope(query.near, query.radiusKm)
-            else -> null
-        }
-        if (envelope != null) {
-            parameters["geometry"] = envelope
-            parameters["geometryType"] = "esriGeometryEnvelope"
-            parameters["inSR"] = "4326"
-            parameters["spatialRel"] = "esriSpatialRelIntersects"
-        }
+        parameters.putAll(area(query))
         parameters["returnCountOnly"] = "true"
         parameters["f"] = "json"
 
@@ -115,6 +106,43 @@ object DocUrl {
             "$key=${URLEncoder.encode(value, "UTF-8")}"
         }
         return "${query.source.serviceUrl}?$queryString"
+    }
+
+    /**
+     * Where the question is asked: a region's own outline, a box, or a square around the walker.
+     *
+     * **An outline rather than the box around it**, because the corners of that box belong to the
+     * neighbouring regions - a box round Otago holds a piece of Canterbury and a piece of Southland, and a
+     * walker who asked for Otago would get DOC's Canterbury huts with it.
+     *
+     * Empty when the question is not about a place at all.
+     */
+    private fun area(query: DocQuery): Map<String, String> {
+        query.rings.takeIf { it.isNotEmpty() }?.let { rings ->
+            // GeoJSON's own order, longitude first, and a ring that is closed - the same shape the region
+            // layer hands the map, written for ARC GIS instead of MapLibre.
+            val value = rings.joinToString(",") { ring ->
+                val closed = if (ring.first() == ring.last()) ring else ring + ring.first()
+                "[" + closed.joinToString(",") { point -> "[${point.lng},${point.lat}]" } + "]"
+            }
+            return mapOf(
+                "geometry" to """{"rings":[$value],"spatialReference":{"wkid":4326}}""",
+                "geometryType" to "esriGeometryPolygon",
+                "inSR" to "4326",
+                "spatialRel" to "esriSpatialRelIntersects"
+            )
+        }
+        val envelope = when {
+            query.bounds != null -> envelope(query.bounds)
+            query.near != null -> envelope(query.near, query.radiusKm)
+            else -> return emptyMap()
+        }
+        return mapOf(
+            "geometry" to envelope,
+            "geometryType" to "esriGeometryEnvelope",
+            "inSR" to "4326",
+            "spatialRel" to "esriSpatialRelIntersects"
+        )
     }
 
     /**

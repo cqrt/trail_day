@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.offline
 
 import nz.mckenzie.trailday.doc.DocAreaDownload
 import nz.mckenzie.trailday.doc.DocPictures
+import nz.mckenzie.trailday.domain.doc.DocArea
 import nz.mckenzie.trailday.domain.doc.DocSource
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -119,4 +120,25 @@ class DocWordsTest {
         assertEquals("1 picture", pictureCountWords(1))
         assertEquals("12 pictures", pictureCountWords(12))
     }
+
+    @Test
+    fun `a card with named downloads says how many places and how much is in them`() {
+        val areas = listOf(area(1, "Otago", 631), area(2, "the Tararuas", 42))
+
+        assertEquals("2 areas \u00b7 673 records \u00b7 Otago, the Tararuas", docAreasSummary(areas, 673))
+        assertEquals("1 area \u00b7 631 records \u00b7 Otago", docAreasSummary(areas.take(1), 631))
+        assertEquals(
+            "3 areas \u00b7 700 records \u00b7 Otago, the Tararuas\u2026",
+            docAreasSummary(areas + area(3, "Auckland", 30), 700)
+        )
+    }
+
+    @Test
+    fun `an area's own row says what came back from it`() {
+        assertEquals("1 record", docAreaWords(area(1, "Home", 1)))
+        assertEquals("631 records", docAreaWords(area(1, "Otago", 631)))
+    }
+
+    private fun area(id: Long, name: String, count: Int) =
+        DocArea(id = id, name = name, itemCount = count, downloadedAtEpochMs = 0L)
 }

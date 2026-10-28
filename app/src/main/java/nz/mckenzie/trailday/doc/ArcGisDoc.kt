@@ -99,13 +99,7 @@ class ArcGisDoc(
 
     override suspend fun search(query: DocQuery): DocReadResult = withContext(Dispatchers.IO) {
         runCatching {
-            val connection = (URL(urlFor(query)).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = connectTimeoutMs
-                readTimeout = readTimeoutMs
-                setRequestProperty("Accept", "application/json")
-                setRequestProperty("User-Agent", USER_AGENT)
-            }
+            val connection = open(urlFor(query), post = query.rings.isNotEmpty())
             try {
                 val status = connection.responseCode
                 if (status != HttpURLConnection.HTTP_OK) {
@@ -186,14 +180,7 @@ class ArcGisDoc(
     override suspend fun count(query: DocQuery, where: String): DocCountResult =
         withContext(Dispatchers.IO) {
             runCatching {
-                val connection = (URL(countUrlFor(query, where)).openConnection() as HttpURLConnection)
-                    .apply {
-                        requestMethod = "GET"
-                        connectTimeout = connectTimeoutMs
-                        readTimeout = readTimeoutMs
-                        setRequestProperty("Accept", "application/json")
-                        setRequestProperty("User-Agent", USER_AGENT)
-                    }
+                val connection = open(countUrlFor(query, where), post = query.rings.isNotEmpty())
                 try {
                     val status = connection.responseCode
                     if (status != HttpURLConnection.HTTP_OK) {
@@ -214,6 +201,32 @@ class ArcGisDoc(
                 DocCountResult.Failed(error.message ?: error::class.java.simpleName)
             }
         }
+
+    /**
+     * A connection for [url] - **posted rather than fetched when the question carries a region's outline.**
+     *
+     * ARC GIS takes a whole question in its URL, and a URL holding a region's boundary is not a URL any
+     * more: Otago's 128 points make 3.9 KB and Southland's 316 make 9.1 KB, and at those lengths DOC's
+     * service answers with an error page rather than a result. Measured, not assumed. The same parameters
+     * as a form body are accepted, so an outline goes that way and every other question in the app stays a
+     * plain GET - which is also what the tests override, so nothing about the ordinary path changes.
+     */
+    private fun open(url: String, post: Boolean): HttpURLConnection {
+        val connection = (URL(if (post) url.substringBefore('?') else url).openConnection()
+            as HttpURLConnection).apply {
+            requestMethod = if (post) "POST" else "GET"
+            connectTimeout = connectTimeoutMs
+            readTimeout = readTimeoutMs
+            setRequestProperty("Accept", "application/json")
+            setRequestProperty("User-Agent", USER_AGENT)
+        }
+        if (post) {
+            connection.doOutput = true
+            connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+            connection.outputStream.use { out -> out.write(url.substringAfter('?').toByteArray()) }
+        }
+        return connection
+    }
 
     companion object {
         const val USER_AGENT = "TrailDay-Android"
