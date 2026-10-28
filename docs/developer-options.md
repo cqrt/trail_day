@@ -86,6 +86,13 @@ The map's notice after a run of failed tiles (`TileTrouble`) asks **whichever se
 tiles**: with a key of the walker's own it probes LINZ with it, and with none it asks the proxy's
 `/health`. Asking the proxy about somebody else's key would be a sentence about the wrong thing.
 
+Two things keep it from crying wolf. **A tile is asked for three times** before it counts as failed -
+again after 250 ms, then after 500 - so a blip that lasted two seconds is a tile that took three
+quarters of a second longer rather than a map that does not draw; a refused key is not retried,
+because the same request three times reads the same. And **the answer is only shown if the trouble is
+still there**: working out what is wrong takes a round trip, and tiles can come back while it is being
+asked, so a tile that arrives first means nothing is said.
+
 ## What was verified, and how
 
 On the emulator, with a deliberately **bogus** key — no real key is needed to prove the mode, because a

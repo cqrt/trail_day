@@ -4,6 +4,24 @@ A screen that searches the Department of Conservation's published track network 
 tracks the operator ticks, as ordinary assets. It is how a track that DOC already holds gets into
 this app without anyone exporting a file first.
 
+## Four services, one screen
+
+DOC publishes four things, and the same browser searches all four: **tracks**, **huts**, **campsites**
+and **bike trails** (`DocSource`). They are one screen rather than four because the question is the
+same - what does DOC publish near here, or under this name - and because the answer is imported the
+same way: an asset with DOC's own number written against it.
+
+They are chosen from a **segmented bar** on the deck at the top, and the page is titled after the
+choice ("DOC huts"). What each page offers differs, because what DOC publishes differs: kinds and
+track types belong to tracks, the **Bike** filter belongs to tracks and bike trails (the two services
+describe one thing, so both are read and a bike trail is matched to the track it runs along), and a
+hut or a campsite has its own facts instead. Nothing carries across a change of service: a filter from
+the last search would be a filter on fields the next one has not got.
+
+Most of what follows was written about tracks, and says so where the difference matters. The
+download side of DOC's material - all four services, with their pictures, kept by region - is in
+[README.md](../README.md) and `OfflineDocStore`.
+
 ## The source
 
 DOC publishes its tracks as a hosted **ArcGIS Feature Service**, not a file store:
@@ -67,6 +85,16 @@ importer already reads.
 
 The service answers a **page** (300 tracks). A page that comes back full says so, rather than letting
 a capped search look like a complete one.
+
+**Near me reads outward in rings** rather than asking one big box: the same inner rings are read first
+whatever radius is set, so raising the distance from 25 km to 50 km can only add rows, never reorder
+or lose the ones already on screen. Each ring is the circle, and a row inside two rings arrives twice
+and is kept once - a few hundred rows of allowance per ring is cheaper than a wrong order.
+
+**The field searches as it is typed into**, 350 milliseconds after the typing stops, so "Lake Hayes"
+is one request rather than ten and a slow answer cannot land on top of a newer one. The button and the
+keyboard's search key still work; they go through the same function, so the two cannot mean different
+things.
 
 ## Filtering and ordering
 
