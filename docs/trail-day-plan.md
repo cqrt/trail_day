@@ -1024,3 +1024,11 @@ The **laptop's** dialogs still have their Search button. They are a different pa
 **And the notice no longer appears for trouble that has ended.** Working out *what* is wrong takes a round trip to the health check or the key probe, and the tiles can come back while that is being asked - which put a card on screen that was already untrue and took it away again a second later. If a tile has arrived by the time the answer comes, nothing is said.
 
 Measured on the emulator with the network cut: no notice while it is working, the notice with **"The map service could not be reached"** once it is off and the map is panned, and the notice gone again once the network is back. It shipped as 0.4.7.
+
+**Then the Offline page was tidied, on the argument that a screen about keeping things should be readable at a glance.** **Download an area is now the first thing on the page.** It used to sit under four cards of things already kept, so a walker arriving to add something had to read past their whole library to find the one action that adds to it. The line under it - *"What you look at is kept. Downloads need no reception."* - went with it: it described what the download button does, next to a download button.
+
+**Every card lost its preamble.** "LINZ's aerial photographs, kept on the phone", "Read offline by the map and the DOC browser", "Read offline by the map, beside DOC's material", "LINZ's drawn map, with the heights its hillshade is shaded from" - four sentences that told a walker what the card's own title had already told them. What stayed is the one line a walker cannot guess: on DOC's and other tracks' cards, **"Forgetting an area leaves its records on the phone until you clear them"**, and only while there is an area to forget - because that is the sentence that stops Forget reading as Delete.
+
+**And the imagery card stopped naming its areas twice.** Its line read *"3 areas · 61 MB · Nelson Lakes, Mt Aspiring…"*, and the three rows directly underneath said the same three names in the same order. It reads **"3 areas · 61 MB"** now, and the list under it does the naming.
+
+The page is four lines of card where it was fourteen. It shipped as 0.4.8.
