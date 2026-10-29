@@ -62,7 +62,9 @@ class TrackingService : Service() {
     override fun onCreate() {
         super.onCreate()
         recordings = RecordingRepository(TrailDayDatabase.get(this))
-        locationSource = FusedLocationSource(this)
+        // The recorder waits for a fix the phone is confident in before it starts: the first point of a
+        // track is the start of the walk, and a rough one puts the whole line out of place.
+        locationSource = FusedLocationSource(this, waitForAccurate = true)
         createChannel()
     }
 

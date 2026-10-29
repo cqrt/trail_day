@@ -90,6 +90,7 @@ import nz.mckenzie.trailday.ui.theme.TrailDayElevation
 import nz.mckenzie.trailday.ui.docBikeFacts
 import nz.mckenzie.trailday.ui.docCardFacts
 import nz.mckenzie.trailday.ui.formatDate
+import nz.mckenzie.trailday.tracking.LocationPermission
 import nz.mckenzie.trailday.ui.docCardProse
 import nz.mckenzie.trailday.ui.formatLengthOf
 import nz.mckenzie.trailday.viewmodel.MapFocus
@@ -161,7 +162,13 @@ fun MapScreen(
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) viewModel.recentreOnDevice() else viewModel.onLocationRefused()
+        // A granted "Approximate" arrives here as a refusal, and it is not the same refusal: the fix
+        // exists, it is just too rough to draw a dot from, and only the walker can change that.
+        if (granted) {
+            viewModel.recentreOnDevice()
+        } else {
+            viewModel.onLocationRefused(LocationPermission.refusal(context))
+        }
     }
 
     val locate = {

@@ -56,6 +56,7 @@ import nz.mckenzie.trailday.map.AssetStretch
 import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.tracking.DevicePosition
 import nz.mckenzie.trailday.tracking.FusedLocationSource
+import nz.mckenzie.trailday.tracking.LocationPermission
 import nz.mckenzie.trailday.tracking.LocationSource
 import nz.mckenzie.trailday.tracking.TrackingService
 import nz.mckenzie.trailday.tracking.TrackingState
@@ -469,12 +470,16 @@ class RecordingViewModel(
         }
     }
 
-    fun hasLocationPermission(): Boolean =
-        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
-            PackageManager.PERMISSION_GRANTED
+    fun hasLocationPermission(): Boolean = LocationPermission.granted(context)
 
+    /**
+     * The permission was refused, or granted as Approximate.
+     *
+     * The sentence distinguishes them, because they are two different trips into Settings: one asks for
+     * location at all, the other for Precise rather than Approximate on a permission that already exists.
+     */
     fun onPermissionDenied() {
-        _message.value = "Location permission is needed to record a track"
+        _message.value = LocationPermission.refusal(context)
     }
 
     /**
@@ -867,7 +872,7 @@ class RecordingViewModel(
                         assetRepository = AssetRepository(database),
                         settingsRepository = SettingsRepository(appContext),
                         context = appContext,
-                        locationSource = FusedLocationSource(appContext),
+                        locationSource = FusedLocationSource(appContext, waitForAccurate = true),
                         // What DOC has published for this area, so the chooser can offer its tracks.
                         docStore = OfflineDocStore(
                             dao = database.offlineDocItemDao(),

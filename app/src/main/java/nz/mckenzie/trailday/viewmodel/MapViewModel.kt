@@ -797,8 +797,8 @@ class MapViewModel(
     }
 
     /** The permission was refused, so there will be no marker: the screen says why, once. */
-    fun onLocationRefused() {
-        _locationNotice.value = LocationUnavailable.MESSAGE
+    fun onLocationRefused(words: String = LocationUnavailable.MESSAGE) {
+        _locationNotice.value = words
     }
 
     /**

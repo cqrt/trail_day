@@ -42,11 +42,18 @@ interface LocationSource {
  * Fused is battery-aware (it fuses GPS with the device's other sensors), which
  * matters for a recorder that runs for the length of a trip. Accuracy is
  * still filtered downstream by [nz.mckenzie.trailday.domain.geo.TrackPointFilter].
+ *
+ * [waitForAccurate] is for the recorder and nothing else: with it on, the **first** fix is held back
+ * until the phone is confident in it, which may take ten or thirty seconds, instead of handing over the
+ * rough one it has straight away. That is right for a track, whose first point is the start of the walk,
+ * and wrong for the map's dot, where a walker who has just opened the app would rather see roughly where
+ * they are than nothing at all. Only the first fix is delayed; everything after it arrives as usual.
  */
 class FusedLocationSource(
     context: Context,
     private val intervalMs: Long = 2_000L,
-    private val minDistanceM: Float = 3f
+    private val minDistanceM: Float = 3f,
+    private val waitForAccurate: Boolean = false
 ) : LocationSource {
 
     private val appContext: Context = context.applicationContext
@@ -102,7 +109,7 @@ class FusedLocationSource(
 
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervalMs)
             .setMinUpdateDistanceMeters(minDistanceM)
-            .setWaitForAccurateLocation(false)
+            .setWaitForAccurateLocation(waitForAccurate)
             .build()
 
         val callback = object : LocationCallback() {
