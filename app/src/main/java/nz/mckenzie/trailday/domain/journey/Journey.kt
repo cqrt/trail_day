@@ -71,10 +71,14 @@ object JourneyBuilder {
     /**
      * How close a tap has to be to a track to land on it.
      *
-     * A hundred metres is a thumb on a phone at a usable zoom: far enough that a tap beside a line is
-     * taken as being on it, near enough that the line chosen is the one the walker meant.
+     * **A quarter of a kilometre, because a thumb is that wide on a phone.** At the zoom a journey is
+     * built at, the whole of a valley is on the screen and a finger covers a couple of hundred metres of
+     * it, so a hundred metres had walkers tapping again and again at a line they could see they were
+     * touching. It is still the *nearest* track that is taken, so a tap between two of DOC's lines lands
+     * on the nearer one, and a tap that misses by more than this is told how far off it was rather than
+     * quietly snapping to somewhere the walker did not mean.
      */
-    const val SNAP_M = 100.0
+    const val SNAP_M = 250.0
 
     /** Two ends this close are the same place on the ground: one section carrying on from another. */
     const val TOUCH_M = 60.0

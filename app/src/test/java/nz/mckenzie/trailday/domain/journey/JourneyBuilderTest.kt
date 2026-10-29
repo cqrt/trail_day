@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.domain.journey
 
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -31,6 +32,28 @@ class JourneyBuilderTest {
     private fun built(result: JourneyResult): JourneyPlan {
         assertTrue("expected a journey, was $result", result is JourneyResult.Built)
         return (result as JourneyResult.Built).plan
+    }
+
+    /** A point [metres] north of a place: a thumb's width, in the units the rule is written in. */
+    private fun northOf(lat: Double, lng: Double, metres: Double) =
+        GeoPoint(lat = lat + metres / 111_320.0, lng = lng)
+
+    @Test
+    fun `a tap beside the line lands on it, and one well off it does not`() {
+        val tracks = listOf(JourneyTrack("Kepler Track - One", listOf(line(-45.0, 167.000, 167.010))))
+
+        assertTrue(
+            "on the line, of course",
+            JourneyBuilder.isOnATrack(GeoPoint(lat = -45.0, lng = 167.005), tracks)
+        )
+        assertTrue(
+            "200 m off is a thumb beside the line, and is taken as on it",
+            JourneyBuilder.isOnATrack(northOf(-45.0, 167.005, 200.0), tracks)
+        )
+        assertFalse(
+            "300 m off is a tap in the wrong place",
+            JourneyBuilder.isOnATrack(northOf(-45.0, 167.005, 300.0), tracks)
+        )
     }
 
     @Test
