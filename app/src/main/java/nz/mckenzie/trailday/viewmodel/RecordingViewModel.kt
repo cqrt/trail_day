@@ -44,6 +44,8 @@ import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.reference.Followable
 import nz.mckenzie.trailday.domain.geo.RecordingBreak
 import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
+import nz.mckenzie.trailday.domain.journey.JourneyTrack
+import nz.mckenzie.trailday.domain.journey.SectionHandOver
 import nz.mckenzie.trailday.domain.geo.splitAtBreaks
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.domain.recording.recordingSourceRef
@@ -132,10 +134,25 @@ class RecordingViewModel(
     /** The frame for the camera when the map opens: around the phone, if it knows. */
     val initialFrame: StateFlow<LatLngBounds?> = _initialFrame
 
+    /**
+     * How far the walker has been from each end of the section being followed, since it became the target.
+     *
+     * The hand-over's own guard: standing at a junction is being at the end of a section, and without this
+     * the recorder would hand straight back to the section just walked and go nowhere for ever.
+     */
+    private var furthestFromStartM = 0.0
+    private var furthestFromEndM = 0.0
+
+    /** The line those two distances are about, so a new target starts them again. */
+    private var handOverLine: List<GeoPoint> = emptyList()
+
     init {
         viewModelScope.launch {
             _initialFrame.value = locationSource.frameOnDevice()
         }
+
+
+
     }
 
     private val _selectedAssetId = MutableStateFlow<Long?>(null)
@@ -850,6 +867,59 @@ class RecordingViewModel(
         // Applied here rather than beside the other initialiser: choosing a target reads the properties above
         // it, and a property declared below an init block is not there yet when the block runs.
         initialTargetId?.let { selectTrack(it) }
+    }
+
+    /**
+     * **Carrying on to the next section without the walker touching the phone.**
+     *
+     * Watched here rather than in the tracking service because this is where the follow readout already
+     * lives: the same four numbers that say how much is left are what say the section's end has been
+     * reached. It sits at the foot of the class on purpose - every state flow it reads has to be built
+     * before this runs, and property initialisers run in the order they are written.
+     */
+    private fun watchForHandOver() {
+        viewModelScope.launch {
+            follow.collect { progress ->
+                val line = targetLine.value
+                if (line !== handOverLine) {
+                    handOverLine = line
+                    furthestFromStartM = 0.0
+                    furthestFromEndM = 0.0
+                }
+                if (progress == null || line.size < 2) return@collect
+                furthestFromStartM = maxOf(furthestFromStartM, progress.alongM)
+                furthestFromEndM = maxOf(furthestFromEndM, progress.totalM - progress.alongM)
+                if (TrackingState.current.status != RecordingStatus.RECORDING) return@collect
+
+                val doc = _selectedDoc.value ?: return@collect
+                val position = here.value ?: return@collect
+                val next = SectionHandOver.next(
+                    line = line,
+                    at = position,
+                    travelledM = progress.alongM,
+                    furthestFromStartM = furthestFromStartM,
+                    furthestFromEndM = furthestFromEndM,
+                    candidates = _docTracks.value.map { item -> JourneyTrack(item.name, item.paths) },
+                    notThis = doc.name
+                ) ?: return@collect
+
+                val item = _docTracks.value.firstOrNull { kept -> kept.name == next.name } ?: return@collect
+                selectDoc(item)
+                furthestFromStartM = 0.0
+                furthestFromEndM = 0.0
+                handOverLine = emptyList()
+                _message.value = "Now following ${item.name}"
+            }
+        }
+    }
+
+    init {
+        // **The sections DOC publishes for this area, ready before they are needed.** The chooser reads them
+        // when it opens; the hand-over has to have them while the walker is walking. Called from here rather
+        // than from the init above because it writes a state flow that is declared below that one - and a
+        // property is not there yet when an init block above it runs.
+        refreshDocTracks()
+        watchForHandOver()
     }
 
     companion object {
