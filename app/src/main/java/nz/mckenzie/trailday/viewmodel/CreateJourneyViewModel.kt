@@ -164,8 +164,7 @@ class CreateJourneyViewModel(
         // DOC's track, and accepting it would only fail at the next tap, which reads as the wrong thing
         // being blamed.
         if (!JourneyBuilder.isOnATrack(point, tracks)) {
-            _message.value = "DEBUG ${point.lat}, ${point.lng} nearest=" +
-                "${JourneyBuilder.nearestDistanceM(point, tracks).toInt()} m of ${tracks.size} tracks"
+            _message.value = notOnATrack(point)
             return
         }
 
@@ -177,8 +176,7 @@ class CreateJourneyViewModel(
 
         when (val result = JourneyBuilder.build(candidate, tracks)) {
             JourneyResult.NotOnATrack -> {
-                _message.value = "DEBUG ${point.lat}, ${point.lng} nearest=" +
-                "${JourneyBuilder.nearestDistanceM(point, tracks).toInt()} m of ${tracks.size} tracks"
+                _message.value = notOnATrack(point)
             }
             JourneyResult.NotConnected -> {
                 _message.value = "DOC's tracks don't join between that point and the last one. Tap " +
@@ -191,6 +189,18 @@ class CreateJourneyViewModel(
             }
         }
     }
+
+    /**
+     * Why a tap went nowhere, in the walker's terms.
+     *
+     * A distance rather than "that is not a track": a tap twelve metres off the line is a slip of the
+     * finger and one three hundred metres off means the map was read wrong, and the number is what tells
+     * those two apart. This was a DEBUG line of coordinates while journeys were being built, and it
+     * shipped like that in 0.4.13 - the walker saw latitude and longitude where an instruction belongs.
+     */
+    private fun notOnATrack(point: GeoPoint): String =
+        "Tap on one of DOC's tracks. The nearest is " +
+            "${JourneyBuilder.nearestDistanceM(point, tracks).toInt()} m away."
 
     /** Takes the last point off, and the walk back with it. */
     fun undo() {
