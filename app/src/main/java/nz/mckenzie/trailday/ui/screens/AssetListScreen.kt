@@ -46,6 +46,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.domain.asset.AssetKind
+import nz.mckenzie.trailday.domain.geo.TravelMode
+import nz.mckenzie.trailday.domain.geo.TravelTime
+import nz.mckenzie.trailday.domain.journey.JourneyNote
+import nz.mckenzie.trailday.ui.formatDistance
+import nz.mckenzie.trailday.ui.formatEstimate
 import nz.mckenzie.trailday.domain.asset.AssetPhrase
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.ui.formatLengthOf
@@ -72,6 +77,8 @@ fun AssetListScreen(
     onShowOnMap: (AssetEntity) -> Unit,
     onOpenDocDetail: (DocItem, DocItem?) -> Unit,
     onAddSpot: () -> Unit,
+    /** Opens the screen that builds a walk out of DOC's separate tracks. */
+    onCreateJourney: () -> Unit = {},
     onOpenDoc: () -> Unit,
     /** Opens the browser for the tracks other people publish: see [OtherTracksBrowserScreen]. */
     onOpenOtherTracks: () -> Unit = {},
@@ -90,8 +97,12 @@ fun AssetListScreen(
     ) { uri -> uri?.let(viewModel::importTrackFile) }
 
     val searching = query.isNotBlank()
-    val counts = remember(assets) {
-        assets.groupingBy { AssetKind.fromStorage(it.kind) }.eachCount()
+    // The journeys are the page's own group, and they are tracks: counted with the places they would
+    // inflate every kind's number and the "All" chip.
+    val places = remember(assets) { assets.filter { it.journey == null } }
+    val journeys = remember(assets) { assets.filter { it.journey != null } }
+    val counts = remember(places) {
+        places.groupingBy { AssetKind.fromStorage(it.kind) }.eachCount()
     }
     val openPlace: (AssetEntity) -> Unit = { item ->
         // A track is a line on the ground, and the map is where a line is read; a spot opens the
@@ -140,6 +151,7 @@ fun AssetListScreen(
             // screen rather than the tools.
             if (!searching) {
                 AddSpotAction(onClick = onAddSpot)
+                JourneyAction(onClick = onCreateJourney)
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -174,12 +186,12 @@ fun AssetListScreen(
                 // five of them wrapped is a row of screen before the first place, and the rarer kinds are a
                 // swipe away. All leads, so the way back is always at the left - and tapping the chip
                 // already showing is the same way back, from wherever the walker is.
-                if (assets.isNotEmpty()) {
+                if (places.isNotEmpty()) {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         item(key = "all") {
                             ChoiceChip(
                                 selected = filter.kind == null,
-                                label = "All ${assets.size}",
+                                label = "All ${places.size}",
                                 onClick = { viewModel.showOnly(null) }
                             )
                         }
@@ -205,6 +217,15 @@ fun AssetListScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
+                // **The journeys are listed before whatever the places list is doing**, because they are
+                // walks rather than places: a page whose only walk is a journey must still show it.
+                if (!searching && filter.kind == null && journeys.isNotEmpty()) {
+                    item(key = "journeys") { GroupLabel("Journeys · ${journeys.size}") }
+                    items(journeys, key = { item -> "journey-${item.id}" }) { item ->
+                        JourneyCard(item = item, onOpen = { onOpenAsset(item.id) })
+                    }
+                }
+
                 when {
                     assets.isEmpty() -> item {
                         EmptyState(
@@ -213,6 +234,10 @@ fun AssetListScreen(
                             body = "Add a spot, or bring in a GPX, KML, KMZ or GeoJSON file."
                         )
                     }
+
+                    // Journeys are the group above, so a page of nothing but journeys is not a page with
+                    // nothing on it.
+                    places.isEmpty() && journeys.isNotEmpty() -> item { }
 
                     // Nothing shown is worth one line rather than an empty list: the search field and the
                     // chips are still above, so the way out is in sight, and the line says which question
@@ -242,6 +267,10 @@ fun AssetListScreen(
                             PlaceCard(item = item, onOpen = { openPlace(item) })
                         }
                     }
+
+                    // Journeys are the group above, so a page of nothing but journeys is not a page with
+                    // nothing on it.
+
 
                     else -> {
                         item(key = "your-places") {
@@ -529,3 +558,109 @@ private fun PlaceCard(item: AssetEntity, onOpen: () -> Unit) {
  */
 internal fun assetRowDetail(item: AssetEntity): String =
     formatLengthOf(AssetShape.fromStorage(item.shape), item.lengthM)
+
+/**
+ * The second way to make something: **a walk put together from DOC's separate tracks.**
+ *
+ * Its own tile rather than a fourth small button, because it is a thing you make rather than a source of
+ * places, and because it opens the map straight away - a walker who taps it has already decided what
+ * they are doing.
+ */
+@Composable
+private fun JourneyAction(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                AppIcon(
+                    glyph = IconGlyph.TRAIL,
+                    dimension = 19.dp,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Create a journey", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = "Build a walk along DOC's tracks",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            AppIcon(
+                glyph = IconGlyph.CHEVRON,
+                dimension = 18.dp,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/**
+ * One journey in the list: what it is called and what it asks of a walker.
+ *
+ * The walking time comes from the note the journey was kept with rather than from its heights, because a
+ * list of ten rows must not read ten geometries to say how long each one takes.
+ */
+@Composable
+private fun JourneyCard(item: AssetEntity, onOpen: () -> Unit) {
+    val note = remember(item.journey) { JourneyNote.of(item.journey) }
+    val climb = note?.climbM ?: 0.0
+    Surface(
+        onClick = onOpen,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                AppIcon(
+                    glyph = IconGlyph.TRAIL,
+                    dimension = 17.dp,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(item.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                Text(
+                    text = listOf(
+                        formatDistance(item.lengthM),
+                        formatEstimate(TravelTime.seconds(item.lengthM, climb, TravelMode.WALKING))
+                    ).joinToString("  ·  "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            AppIcon(
+                glyph = IconGlyph.CHEVRON,
+                dimension = 18.dp,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}

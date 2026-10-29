@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.first
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.ui.screens.AddSpotScreen
+import nz.mckenzie.trailday.ui.screens.CreateJourneyScreen
 import nz.mckenzie.trailday.ui.screens.DocBrowserScreen
 import nz.mckenzie.trailday.ui.screens.DocDetailScreen
 import nz.mckenzie.trailday.ui.screens.MapScreen
@@ -40,6 +41,7 @@ import nz.mckenzie.trailday.ui.theme.TrailDayTheme
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.other.OtherTrack
 import nz.mckenzie.trailday.viewmodel.AddSpotViewModel
+import nz.mckenzie.trailday.viewmodel.CreateJourneyViewModel
 import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
 import nz.mckenzie.trailday.viewmodel.DocDetailViewModel
 import nz.mckenzie.trailday.viewmodel.MapFocus
@@ -62,7 +64,7 @@ import nz.mckenzie.trailday.web.WebEditorService
 import nz.mckenzie.trailday.web.WebEditorState
 
 /** Destinations for now; swap for a NavHost when routes need arguments. */
-private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, OFFLINE_OTHER_TRACKS_PICKER, OFFLINE_TOPO_PICKER, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC, DOC_DETAIL, OTHER_TRACK_DETAIL, OTHER_TRACKS_BROWSER }
+private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, OFFLINE_OTHER_TRACKS_PICKER, OFFLINE_TOPO_PICKER, CREATE_JOURNEY, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC, DOC_DETAIL, OTHER_TRACK_DETAIL, OTHER_TRACKS_BROWSER }
 
 class MainActivity : ComponentActivity() {
 
@@ -124,6 +126,9 @@ class MainActivity : ComponentActivity() {
                 // model: a shared one would carry the previous visit's draft (and
                 // its "just saved" signal) into the next one.
                 var addSpotVisit by rememberSaveable { mutableStateOf(0) }
+
+    // And for the journey builder, for the same reason: its points are a draft too.
+    var journeyVisit by rememberSaveable { mutableStateOf(0) }
 
                 // The same for the offline area picker, and for the same reason: a shared view model opened
                 // the next area on the last one's name, corners and zoom range, so a walker downloading a
@@ -209,6 +214,7 @@ class MainActivity : ComponentActivity() {
                                 docDetailOrigin = Destination.ASSETS
                                 destination = Destination.DOC_DETAIL
                             },
+                            onCreateJourney = { destination = Destination.CREATE_JOURNEY },
                             onAddSpot = {
                                 addSpotVisit++
                                 destination = Destination.ADD_SPOT
@@ -352,6 +358,24 @@ class MainActivity : ComponentActivity() {
                         RecordScreen(
                             viewModel = recordingViewModel,
                             onOpenTab = { destination = destinationOf(it) }
+                        )
+                    }
+
+                    Destination.CREATE_JOURNEY -> {
+                        val journeyViewModel: CreateJourneyViewModel = viewModel(
+                            // A fresh one per visit: a shared view model would open the last journey's
+                            // points, which is the same fault the picker's own visit counter answers.
+                            key = "journey-$journeyVisit",
+                            factory = CreateJourneyViewModel.factory(applicationContext)
+                        )
+                        CreateJourneyScreen(
+                            viewModel = journeyViewModel,
+                            onBack = { destination = Destination.ASSETS },
+                            onSaved = { assetId ->
+                                journeyVisit++
+                                selectedAssetId = assetId
+                                destination = Destination.ASSET_DETAIL
+                            }
                         )
                     }
 

@@ -129,7 +129,11 @@ class AssetListViewModel(
     val shown: StateFlow<List<AssetEntity>> = combine(assets, _filter, _query) { all, filter, query ->
         val typed = query.trim()
         all.filter { asset ->
-            filter.keeps(asset.kind) &&
+            // **Journeys are the page's own group, not rows in it.** A journey is a track, so without
+            // this it would appear twice: once as a place and once as a journey, the same walk under two
+            // headings, which reads as two walks.
+            asset.journey == null &&
+                filter.keeps(asset.kind) &&
                 (typed.isEmpty() || asset.name.contains(typed, ignoreCase = true))
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())

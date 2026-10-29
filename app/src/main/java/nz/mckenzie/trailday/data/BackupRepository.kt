@@ -156,7 +156,8 @@ private fun AssetEntity.toRecord(points: List<AssetPointEntity>) = AssetRecord(
     lengthM = lengthM,
     sourceRef = sourceRef,
     points = points.path(0),
-    spurs = points.pathsFrom(1)
+    spurs = points.pathsFrom(1),
+    journey = journey
 )
 
 /** One path of an asset's rows, in order, or nothing at all when the asset has no such path. */
@@ -183,7 +184,8 @@ private fun AssetRecord.toEntity() = AssetEntity(
     active = active,
     createdAtEpochMs = createdAtEpochMs,
     lengthM = lengthM,
-    sourceRef = sourceRef
+    sourceRef = sourceRef,
+    journey = journey
 )
 
 private fun RecordedSessionEntity.toRecord(

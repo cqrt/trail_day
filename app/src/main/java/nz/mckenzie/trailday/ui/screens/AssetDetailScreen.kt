@@ -46,6 +46,8 @@ import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetPhrase
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.ElevationPhrase
+import nz.mckenzie.trailday.domain.journey.JourneyNote
+import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.domain.geo.ElevationProfile
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.TravelMode
@@ -244,6 +246,21 @@ fun AssetDetailScreen(
                     }
                 }
 
+                // What a journey was made from, for the one kind of track that was made from anything.
+                JourneyNote.of(track?.journey)?.let { note ->
+                    Text(
+                        text = buildString {
+                            append(if (note.sections == 1) "Made from 1 section of DOC's tracks." else "Made from ${note.sections} sections of DOC's tracks.")
+                            if (note.bridgeM > 0.0) {
+                                append(" One part of ${formatDistance(note.bridgeM)} where DOC's line ")
+                                append("breaks is joined straight.")
+                            }
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 photoImage?.let { image ->
                     Image(
                         bitmap = image,
@@ -278,7 +295,13 @@ fun AssetDetailScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(onClick = onRecord, modifier = Modifier.weight(1f)) {
-                            Text(if (shape == AssetShape.LINE) "Record this" else "Head for this")
+                            Text(
+                                when {
+                                    track?.journey != null -> "Follow this journey"
+                                    shape == AssetShape.LINE -> "Record this"
+                                    else -> "Head for this"
+                                }
+                            )
                         }
                         OutlinedButton(
                             onClick = { actionsOpen = true },

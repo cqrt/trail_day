@@ -37,5 +37,15 @@ data class AssetEntity(
      * made from one it has not, and it is a plain string so a later source can use its own prefix
      * without another migration.
      */
-    val sourceRef: String? = null
+    val sourceRef: String? = null,
+
+    /**
+     * What a journey was made from, as JSON, or null for every other place.
+     *
+     * A journey is an ordinary track - that is what lets it be followed, exported, backed up and deleted
+     * with nothing new - and this is the one thing that makes it a journey: which sections DOC published
+     * it from, and how long the holes in DOC's line were. Null means "not a journey", so every row
+     * written before this existed simply is not one.
+     */
+    val journey: String? = null
 )

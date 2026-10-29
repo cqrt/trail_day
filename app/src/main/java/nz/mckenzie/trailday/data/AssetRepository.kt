@@ -110,7 +110,9 @@ class AssetRepository(
         notes: String? = null,
         createdAtEpochMs: Long = System.currentTimeMillis(),
         /** Where it came from, when it came from a service: see [AssetEntity.sourceRef]. */
-        sourceRef: String? = null
+        sourceRef: String? = null,
+        /** What a journey was made from, when this row is a journey: see [AssetEntity.journey]. */
+        journey: String? = null
     ): Long = createAsset(
         name = name,
         geometry = AssetGeometry.of(geometry),
@@ -118,7 +120,8 @@ class AssetRepository(
         shape = shape,
         notes = notes,
         createdAtEpochMs = createdAtEpochMs,
-        sourceRef = sourceRef
+        sourceRef = sourceRef,
+        journey = journey
     )
 
     /** The same, for a track that is a line with side tracks hanging off it: what the drawing saves. */
@@ -130,7 +133,9 @@ class AssetRepository(
         notes: String? = null,
         createdAtEpochMs: Long = System.currentTimeMillis(),
         /** Where it came from, when it came from a service: see [AssetEntity.sourceRef]. */
-        sourceRef: String? = null
+        sourceRef: String? = null,
+        /** What a journey was made from, when this row is a journey: see [AssetEntity.journey]. */
+        journey: String? = null
     ): Long = insertAsset(
         asset = AssetEntity(
             name = name,
@@ -138,7 +143,8 @@ class AssetRepository(
             shape = shape.name,
             notes = notes,
             createdAtEpochMs = createdAtEpochMs,
-            sourceRef = sourceRef
+            sourceRef = sourceRef,
+            journey = journey
         ),
         geometry = geometry
     )

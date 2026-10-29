@@ -269,3 +269,16 @@ internal val MIGRATION_9_10 = object : Migration(9, 10) {
         )
     }
 }
+/**
+ * Journeys: **one optional column on an asset, saying what a journey was made from.**
+ *
+ * A journey is an ordinary track - that is the whole point of it - so it needs nowhere to live and
+ * nothing new to follow, export or back up. This column is the only thing that tells the app one track
+ * is a journey and which of DOC's sections it came from. Every row written before this build is null,
+ * which is exactly right: none of them was a journey.
+ */
+internal val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE assets ADD COLUMN journey TEXT")
+    }
+}

@@ -96,7 +96,16 @@ data class AssetRecord(
      * rule is that a key a build does not know is ignored, and this key is one an older build does not
      * know. That is the trade the rule makes.
      */
-    val spurs: List<List<LinePointRecord>> = emptyList()
+    val spurs: List<List<LinePointRecord>> = emptyList(),
+
+    /**
+     * What a journey was made from, when this asset is one, as the same small JSON the database keeps.
+     *
+     * Optional and added without a version bump, like the side tracks and the heights before it: a file
+     * written before journeys has no such key, and an asset restored from one is an ordinary track -
+     * which is what a journey is.
+     */
+    val journey: String? = null
 )
 
 /**
