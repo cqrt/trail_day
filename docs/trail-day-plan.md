@@ -1077,3 +1077,9 @@ Measured on the emulator, with the phone's permission set to approximate: the Re
 Measured on the emulator: following **TK01** (Control Gates to Brod Bay, 4.71 km) and walking to its end at Brod Bay, the recorder moved itself onto **TK02** - *"0 m of 8.21 km · about 1h 40 min to go"* - which is the section's own measured length. Seven tests hold the rule, including the one that stops it oscillating.
 
 One fault came out of building it: the first version read a state flow declared below the init block that watched it, and **the recorder crashed on opening** rather than on the walk. Kotlin builds properties in the order they are written, so the watching now sits at the foot of the class with everything it reads above it. It shipped as 0.4.14.
+
+**Then the two cards of tiles on the offline page stopped counting different things.** The imagery card said how many areas it held and the drawn map's card said how many tiles, so the same page answered the same question two ways - and neither card said both. Both now read the same line: **"1 area · 74 tiles · 593.4 KB"** for the imagery and **"1 area · 19 tiles · 1.9 MB"** for the drawn map, from one function (`keptTilesSummary`) so they cannot drift apart again. Only the words for nothing differ: the imagery is *downloaded* and the drawn map is *kept*, which is how the page already talked about them.
+
+The browsing case is unchanged in substance and tidier in words: with no areas and tiles on the phone from looking around, a card still says **"No areas yet · 41 tiles from browsing"**, now with "1 tile" for one.
+
+Measured on the emulator: a small imagery area and a small piece of the drawn map, both listed as the line above. Held by five unit tests, including one that fails if either card ever counts only one thing again. It shipped as 0.4.15.
