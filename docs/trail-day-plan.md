@@ -1066,4 +1066,4 @@ Measured on the emulator, with the phone's permission set to approximate: the Re
 
 **One thing does not work yet: the climb reads 0.** The heights are meant to come from LINZ's terrain-rgb tile at each point and be stored on the points, which is what would make the profile, the walking time and a GPX free. **Every elevation tile this proxy returns is flat 0 m** - 1,831 bytes of one colour, measured against LINZ through the Worker at three zooms and two places - so a journey carries heights that all say sea level and the time is the flat one. The sampling and the decode are right, and are held by tests; the tile route is a fault of its own and was left open rather than hidden.
 
-**The map opens where the walker is, about ten kilometres across**, because fitted to a whole region a hundred metres is a third of a pixel and no thumb can land on a line. Zoom keys were added for the same reason. It shipped as 0.4.12.
+**The map opens where the walker is, about ten kilometres across**, because fitted to a whole region a hundred metres is a third of a pixel and no thumb can land on a line. Zoom keys were added for the same reason. It shipped as 0.4.13.
