@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
@@ -52,13 +54,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -84,6 +91,8 @@ import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.map.DEFAULT_CAMERA_TARGET
 import nz.mckenzie.trailday.map.DEFAULT_CAMERA_ZOOM
 import nz.mckenzie.trailday.map.OtherTracksLayerIds
+import nz.mckenzie.trailday.map.ScaleBar
+import nz.mckenzie.trailday.map.ScaleBarSpan
 import org.maplibre.android.geometry.LatLng
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.theme.TrailDayElevation
@@ -137,6 +146,12 @@ fun MapScreen(
 
     var layersOpen by remember { mutableStateOf(false) }
     val mapScope = rememberCoroutineScope()
+
+    // How far across the ground one pixel of the map covers, as the map reports it on every camera
+    // move, and the room the bar is allowed to take. Null until the map has said, which is a moment
+    // after it opens: the bar is drawn only from an answer the map itself gave.
+    var metresPerPixel by remember { mutableStateOf<Double?>(null) }
+    val scaleWidthPx = with(LocalDensity.current) { ScaleBar.MAX_WIDTH_DP.dp.toPx() }
 
     // The zoom keys under the map's own controls, and the level between them. The level is the map's own
     // answer, so it is filled in by the camera-idle callback below rather than kept here.
@@ -246,6 +261,10 @@ fun MapScreen(
                     // pinch, so the number is where the camera ended up rather than where a key put it.
                     zoom.reported(level)
                 },
+                // How far a pixel of this map covers, for the scale bar at the map's foot. The map
+                // measures it, being the only thing that knows its own projection; this screen draws
+                // it, because the corner it goes in is this screen's furniture.
+                onMetresPerPixel = { metresPerPixel = it },
                 // The zoom keys, which on this map are the second way to do what a pinch does - the first
                 // being the pinch itself. **The step and the count go to the map**: the keys only ask.
                 zoomStep = zoom.step,
@@ -387,6 +406,14 @@ fun MapScreen(
                         onClose = viewModel::clearPickedPlace,
                         modifier = Modifier.widthIn(max = 250.dp)
                     )
+                }
+
+                // The scale bar, above the credit line: the strip owns the very corner, so a bar
+                // drawn into it would be two plates on top of each other. Nothing is drawn until the
+                // map has said how far a pixel covers.
+                metresPerPixel?.let { perPixel ->
+                    ScaleBar.span(metresAcross = perPixel * scaleWidthPx, maxWidthPx = scaleWidthPx)
+                        ?.let { span -> MapScaleBar(span = span) }
                 }
 
                 AttributionStrip(basemap = basemap, teAraroa = teAraroa)
@@ -964,6 +991,78 @@ private fun LocationNoticeCard(message: String, onDismiss: () -> Unit, modifier:
 }
 
 /**
+ * The plate both things drawn at the foot of the map wear.
+ *
+ * One constant for the scale bar and the credit strip, because the two are stacked in the same corner
+ * and two nearly-identical blacks is how one of them comes to look like a mistake.
+ */
+private val MAP_PLATE = Color(0x99000000)
+
+/**
+ * The bar that says how far across the ground the map is: a distance over a white line with a tick at
+ * each end, on the same plate the credit strip wears so it can be read over pale imagery and dark.
+ *
+ * **The line's own width is the measurement.** The plate is wider than the line by its own padding,
+ * and the label sits above the line rather than setting its length, so the distance written is the
+ * distance drawn. That is why the width goes on the line and not on the plate - and why the line is a
+ * `Canvas` rather than a `Box` with borders: a border is drawn inside its own box and would leave the
+ * line a stroke shorter than the ground it stands for.
+ *
+ * The distance and the width both come from the map, through [ScaleBar]: this draws, the map measures,
+ * because where a bar sits is the screen's business and how far a pixel covers is the map's.
+ */
+@Composable
+private fun MapScaleBar(span: ScaleBarSpan, modifier: Modifier = Modifier) {
+    val lineWidth = with(LocalDensity.current) { span.widthPx.toDp() }
+
+    Column(
+        modifier = modifier
+            .background(MAP_PLATE, RoundedCornerShape(4.dp))
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = ScaleBar.label(span.metres),
+            color = Color.White,
+            style = TextStyle(
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                // No room above the line: this is a number in a plate a few pixels deep, and the room
+                // Android reserves for accents pushes it off the middle of that - the same reason the
+                // zoom level turns it off.
+                platformStyle = PlatformTextStyle(includeFontPadding = false)
+            )
+        )
+        Canvas(modifier = Modifier.width(lineWidth).height(5.dp)) {
+            val stroke = 1.5.dp.toPx()
+            val tick = 4.dp.toPx()
+            val foot = size.height - stroke / 2f
+
+            drawLine(
+                color = Color.White,
+                start = Offset(stroke / 2f, foot),
+                end = Offset(size.width - stroke / 2f, foot),
+                strokeWidth = stroke
+            )
+            // A tick rising from each end of the line: the ends are what a walker lays against the
+            // ground, and a bare line has no ends to read.
+            drawLine(
+                color = Color.White,
+                start = Offset(stroke / 2f, foot),
+                end = Offset(stroke / 2f, foot - tick),
+                strokeWidth = stroke
+            )
+            drawLine(
+                color = Color.White,
+                start = Offset(size.width - stroke / 2f, foot),
+                end = Offset(size.width - stroke / 2f, foot - tick),
+                strokeWidth = stroke
+            )
+        }
+    }
+}
+
+/**
  * The credit the basemap's licence requires, visible on the map rather than behind a tap.
  *
  * Both licences say the same thing in different words: LINZ requires attribution to be shown,
@@ -999,7 +1098,7 @@ internal fun AttributionStrip(
     val uriHandler = LocalUriHandler.current
     FlowRow(
         modifier = modifier
-            .background(Color(0x99000000), RoundedCornerShape(4.dp))
+            .background(MAP_PLATE, RoundedCornerShape(4.dp))
             .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)

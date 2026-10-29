@@ -10,8 +10,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds as DomainBounds
@@ -396,12 +398,30 @@ fun BasemapView(
      * screen; an overlay drawn *on* the map - a handle sitting on a corner - has to keep up during the
      * gesture or it slides off the ground it names while the ground moves under it.
      */
-    onCameraMove: (() -> Unit)? = null
+    onCameraMove: (() -> Unit)? = null,
+    /**
+     * How far across the ground one pixel of this map covers, handed out as the camera moves.
+     *
+     * **A scale bar is a thing *on* the map rather than a thing the map owns.** It has to change as
+     * the ground does - a bar that described the last zoom is a bar nobody can use - and it is drawn
+     * where the screen's own furniture leaves room for it, which is the screen's business and not
+     * this one's. So the map measures and the screen draws: the same split as [onProjection] and
+     * [onCameraIdle], and for the same reason - one way to ask the map a question, rather than a way
+     * for every screen to reach into its camera.
+     *
+     * The measurement is taken along the foot of the map, which is where a bar is drawn: see
+     * [ScaleBar.metresPerPixel]. Null while the map is not up yet, or has no size to measure across.
+     */
+    onMetresPerPixel: ((Double) -> Unit)? = null
 ) {
     val mapState = remember { mutableStateOf<MapLibreMap?>(null) }
     val styleState = remember { mutableStateOf<Style?>(null) }
     val mapViewState = remember { mutableStateOf<MapView?>(null) }
     var boundsApplied by remember { mutableStateOf(restoreCamera) }
+
+    // The map's own size in pixels of the glass, as the layout gives it. Kept because the scale bar
+    // is measured across the map rather than reasoned about: see [ScaleBar.metresPerPixel].
+    var mapSize by remember { mutableStateOf(IntSize.Zero) }
 
     // The first style load is the map opening; every later one is a basemap change, and a walker
     // switching maps is reading the ground under them, not asking to be sent home. So the camera is
@@ -453,6 +473,16 @@ fun BasemapView(
     val currentOnRecentreHandled by rememberUpdatedState(onRecentreHandled)
     val currentOnProjection by rememberUpdatedState(onProjection)
     val currentOnCameraMove by rememberUpdatedState(onCameraMove)
+    val currentOnMetresPerPixel by rememberUpdatedState(onMetresPerPixel)
+
+    // The scale bar's answer, measured and handed out. A measurement rather than a value watched for
+    // changes, because it is only ever wanted at the moment the camera moves: taking it then is what
+    // keeps a bar drawn on the map standing on the ground it names.
+    val reportMetresPerPixel: (MapLibreMap) -> Unit = { map ->
+        currentOnMetresPerPixel?.let { report ->
+            ScaleBar.metresPerPixel(map, mapSize.width, mapSize.height)?.let(report)
+        }
+    }
 
     // Where the phone is. Every map in the app shows it, and this is the whole of how: the
     // marker is built here from the app's own stream rather than handed in per screen, so a
@@ -472,7 +502,13 @@ fun BasemapView(
     }
 
     AndroidView(
-        modifier = modifier,
+        // The map's own size is taken as the layout gives it, and the scale bar measured the moment it
+        // is known: a map that opened without a camera move - which is most of them, the camera being
+        // set before the first frame - would otherwise have no bar until the walker touched it.
+        modifier = modifier.onSizeChanged { size ->
+            mapSize = size
+            mapState.value?.let(reportMetresPerPixel)
+        },
         factory = { context ->
             MapView(context).apply {
                 onCreate(null)
@@ -483,7 +519,10 @@ fun BasemapView(
                     // Handed out once, here: the map is up and its projection can answer, and this is the
                     // only moment in the view's life when that becomes true.
                     currentOnProjection?.invoke(MapProjection(map))
-                    map.addOnCameraMoveListener { currentOnCameraMove?.invoke() }
+                    map.addOnCameraMoveListener {
+                        currentOnCameraMove?.invoke()
+                        reportMetresPerPixel(map)
+                    }
                     map.uiSettings.isCompassEnabled = true
                     // The licence requires attribution to be visible; MapLibre's own
                     // control is backed up by an always-visible overlay in MapScreen.
