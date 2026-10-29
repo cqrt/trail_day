@@ -502,9 +502,10 @@ fun BasemapView(
     }
 
     AndroidView(
-        // The map's own size is taken as the layout gives it, and the scale bar measured the moment it
-        // is known: a map that opened without a camera move - which is most of them, the camera being
-        // set before the first frame - would otherwise have no bar until the walker touched it.
+        // The map's own size is taken as the layout gives it, and the scale bar measured again the
+        // moment it is known. The camera is set before the first frame, so the camera move that would
+        // report the measurement arrives while there is still no size to measure across - and a map
+        // nobody touched would otherwise show no bar at all.
         modifier = modifier.onSizeChanged { size ->
             mapSize = size
             mapState.value?.let(reportMetresPerPixel)
