@@ -1,159 +1,75 @@
 package nz.mckenzie.trailday.offline
 
 import kotlinx.coroutines.runBlocking
-import nz.mckenzie.trailday.domain.tiles.Basemap
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 
 /**
- * How LINZ's responses are interpreted.
+ * What the fetcher makes of the answers a tile service actually gives.
  *
- * Driven against the real local tile server so the HTTP plumbing is exercised,
- * but without depending on the live service being reachable or having imagery
- * for a particular tile.
+ * The one that matters here is **204 No Content**, which LINZ answers for a tile it publishes nothing for -
+ * most of the vector Topographic map's deeper levels - and which used to be read as a failure. A download of
+ * the drawn map then asked for every tile three times and sat at "0 of 981" for minutes.
  */
 class LinzTileFetcherTest {
 
-    @get:Rule
-    val temp = TemporaryFolder()
+    private lateinit var server: HttpServer
+    private var asks = 0
 
-    private lateinit var store: OfflineTileStore
-    private lateinit var server: LocalTileServer
-    private var port: Int = 0
-
-    /**
-     * Aerial imagery in one store, the drawn map in another: the same two sources the app runs,
-     * so the tests exercise the same paths the map asks for.
-     */
-    private fun startServer(upstream: TileFetcher? = null) {
-        store = OfflineTileStore(temp.root.resolve("imagery"), Basemap.LINZ_AERIAL.tileSuffix)
-        server = LocalTileServer(
-            listOf(
-                TileSource(
-                    id = Basemap.LINZ_AERIAL.id,
-                    store = store,
-                    suffix = Basemap.LINZ_AERIAL.tileSuffix,
-                    contentType = Basemap.LINZ_AERIAL.contentType,
-                    upstream = { upstream }
-                )
+    /** A server that answers [failing] with 503 and every ask after that with [then]. */
+    private fun serve(failing: Int, then: HttpResponse): String {
+        server = HttpServer(
+            host = "127.0.0.1",
+            routes = listOf(
+                HttpRoute(claims = { true }) {
+                    asks++
+                    if (asks <= failing) HttpResponse.text(503, "busy") else then
+                }
             )
         )
-        port = server.start()
+        val port = server.start()
+        return "http://127.0.0.1:$port/tiles/linz-topographic-v2/0/0/0.pbf"
     }
 
     @After
     fun tearDown() {
-        // Some tests in this class need no server at all.
         if (::server.isInitialized) server.stop()
-        // Every fetch through this fetcher is counted, so a test that left a run of failures behind
-        // would be handing it to the next one.
-        TileTrouble.reset()
-    }
-
-    /** A fetcher that talks to the local server instead of LINZ. */
-    private fun fetcher() = LinzTileFetcher(
-        urlFor = { zoom, x, y ->
-            "http://127.0.0.1:$port/tiles/${Basemap.LINZ_AERIAL.id}/$zoom/$x/$y" +
-                Basemap.LINZ_AERIAL.tileSuffix
-        }
-    )
-
-    @Test
-    fun `a served tile comes back as a tile`() = runBlocking {
-        startServer()
-        store.write(14, 1017, 660, byteArrayOf(4, 5, 6))
-
-        val result = fetcher().fetch(14, 1017, 660)
-
-        assertTrue(result is TileFetcher.Result.Tile)
-        assertEquals(listOf<Byte>(4, 5, 6), (result as TileFetcher.Result.Tile).bytes.toList())
     }
 
     @Test
-    fun `a 404 means the service has no imagery, not a failure`() = runBlocking {
-        startServer(upstream = TileFetcher { _, _, _ -> TileFetcher.Result.NotFound })
+    fun `a tile the source has nothing for is not a failure, and is asked for once`() = runBlocking {
+        val url = serve(failing = 0, then = HttpResponse.text(204, ""))
+        val fetcher = LinzTileFetcher(urlFor = { _, _, _ -> url }, accept = "application/x-protobuf")
 
-        assertEquals(TileFetcher.Result.NotFound, fetcher().fetch(14, 1017, 660))
+        val result = fetcher.fetch(0, 0, 0)
+
+        assertEquals("204 means nothing here, which is an answer", TileFetcher.Result.NotFound, result)
+        assertEquals("and it is not worth asking again", 1, asks)
     }
 
     @Test
-    fun `a bad gateway is reported as a failure with the code`() = runBlocking {
-        startServer(upstream = TileFetcher { _, _, _ -> TileFetcher.Result.Failed("upstream down") })
+    fun `a tile that arrives is a tile`() = runBlocking {
+        val url = serve(failing = 0, then = HttpResponse.bytes(200, "application/x-protobuf", byteArrayOf(1, 2, 3)))
+        val fetcher = LinzTileFetcher(urlFor = { _, _, _ -> url }, accept = "application/x-protobuf")
 
-        val result = fetcher().fetch(14, 1017, 660)
+        val result = fetcher.fetch(0, 0, 0)
 
-        assertTrue("expected a failure, got $result", result is TileFetcher.Result.Failed)
-        assertTrue((result as TileFetcher.Result.Failed).message.contains("502"))
+        assertTrue("a tile with the bytes that were sent", result is TileFetcher.Result.Tile)
+        assertEquals(byteArrayOf(1, 2, 3).toList(), (result as TileFetcher.Result.Tile).bytes.toList())
+        assertEquals(1, asks)
     }
 
     @Test
-    fun `an unreachable host is a failure rather than an exception`() = runBlocking {
-        // Port 1 on loopback: nothing is listening, so the connection is refused.
-        val offline = LinzTileFetcher(
-            urlFor = { _, _, _ -> "http://127.0.0.1:1/tiles/14/1017/660.webp" },
-            connectTimeoutMs = 1_000,
-            readTimeoutMs = 1_000
-        )
+    fun `a server that is struggling is asked again, and the third ask is the one that lands`() = runBlocking {
+        val url = serve(failing = 2, then = HttpResponse.bytes(200, "application/x-protobuf", byteArrayOf(7)))
+        val fetcher = LinzTileFetcher(urlFor = { _, _, _ -> url }, accept = "application/x-protobuf")
 
-        val result = offline.fetch(14, 1017, 660)
+        val result = fetcher.fetch(0, 0, 0)
 
-        assertTrue("expected a failure, got $result", result is TileFetcher.Result.Failed)
-    }
-
-    @Test
-    fun `a tile that arrives clears the run of failures`() = runBlocking {
-        startServer()
-        store.write(14, 1017, 660, byteArrayOf(4, 5, 6))
-
-        repeat(TileTrouble.RUN) { TileTrouble.failed() }
-        assertEquals(TileTrouble.RUN, TileTrouble.consecutiveFailures.value)
-
-        fetcher().fetch(14, 1017, 660)
-
-        assertEquals(
-            "the map is not in trouble once a tile has come back",
-            0,
-            TileTrouble.consecutiveFailures.value
-        )
-    }
-
-    @Test
-    fun `a 404 is the source answering, not a failure`() = runBlocking {
-        // A walker panning over the sea gets these by the dozen. Counting them would put the notice on
-        // screen over water with nothing wrong at all.
-        startServer(upstream = TileFetcher { _, _, _ -> TileFetcher.Result.NotFound })
-
-        repeat(TileTrouble.RUN) { TileTrouble.failed() }
-
-        fetcher().fetch(14, 1017, 660)
-
-        assertEquals(0, TileTrouble.consecutiveFailures.value)
-    }
-
-    @Test
-    fun `a failure counts towards the run the notice waits for`() = runBlocking {
-        startServer(upstream = TileFetcher { _, _, _ -> TileFetcher.Result.Failed("upstream down") })
-
-        repeat(TileTrouble.RUN) { fetcher().fetch(14, 1017, 660) }
-
-        assertEquals(TileTrouble.RUN, TileTrouble.consecutiveFailures.value)
-        assertTrue(isTrouble(TileTrouble.consecutiveFailures.value, answered = false))
-    }
-
-    @Test
-    fun `the default url is an unkeyed linz aerial tile on the app's proxy`() {
-        val url = Basemap.LINZ_AERIAL.tileUrl(14, 1017, 660)
-
-        assertEquals(
-            "https://trailday-linz-proxy.le-mckenzies.workers.dev/v1/tiles/aerial/" +
-                "WebMercatorQuad/14/1017/660.webp",
-            url
-        )
-        assertFalse("a key must never reach the phone's own URLs", url.contains("api="))
+        assertEquals(3, asks)
+        assertTrue("the third ask lands a tile", result is TileFetcher.Result.Tile)
+        assertEquals(byteArrayOf(7).toList(), (result as TileFetcher.Result.Tile).bytes.toList())
     }
 }

@@ -86,6 +86,14 @@ class LinzTileFetcher(
 
                     HttpURLConnection.HTTP_NOT_FOUND -> TileFetcher.Result.NotFound
 
+                    // **204 is an answer, not a failure: there is no tile here.** The vector Topographic
+                    // map is published sparsely in depth - asked for the deepest levels it answers 204 with
+                    // no body for most tiles - and reading that as a failure made a download of the drawn
+                    // map retry three times a tile, so nine hundred tiles sat at "0 of 981" for minutes.
+                    // A tile the source has nothing for is a tile to move on from, which is what [NotFound]
+                    // already means everywhere else.
+                    HttpURLConnection.HTTP_NO_CONTENT -> TileFetcher.Result.NotFound
+
                     HttpURLConnection.HTTP_BAD_REQUEST ->
                         TileFetcher.Result.Failed(KEY_REFUSED)
 
