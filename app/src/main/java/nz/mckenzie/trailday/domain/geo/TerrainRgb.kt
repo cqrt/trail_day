@@ -1,10 +1,9 @@
 package nz.mckenzie.trailday.domain.geo
 
 import kotlin.math.PI
-import kotlin.math.atan
+import kotlin.math.tan
 import kotlin.math.floor
 import kotlin.math.ln
-import kotlin.math.sinh
 
 /**
  * LINZ's height tiles, as numbers.
@@ -35,8 +34,13 @@ object TerrainRgb {
         val scale = (1 shl zoom).toDouble()
         val across = (point.lng + 180.0) / 360.0 * scale
         val latRad = point.lat * PI / 180.0
-        // Mercator's y in radians, which is what asinh(tan) is; then the same 0..1 the x axis uses.
-        val northSouth = atan(sinh(latRad))
+        // **Mercator's y, which is asinh(tan(lat))**, written as ln(tan(pi/4 + lat/2)) because that is
+        // the same number and reads as the projection rather than as its inverse. It was the inverse -
+        // atan(sinh(lat)) - for the whole of this file's first life, and that put every height sample
+        // about seven hundred kilometres north of the point it was asked about: the summit of Ben
+        // Lomond read 0 m because the tile being read was sea off Tauranga, and a journey there had no
+        // climb. Tested now against a tile a person can go and look at, not only for direction.
+        val northSouth = ln(tan(PI / 4.0 + latRad / 2.0))
         val down = (1.0 - northSouth / PI) / 2.0 * scale
         val tileX = floor(across).toInt()
         val tileY = floor(down).toInt()

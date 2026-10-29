@@ -41,6 +41,23 @@ class TerrainRgbTest {
     }
 
     @Test
+    fun `a place falls in the tile a tile service would give for it`() {
+        // The summit of Ben Lomond, and the tile LINZ publishes for it at zoom 15. This is the check the
+        // first version of this file needed and did not have: it was reading the tile at 15/31734/20115,
+        // seven hundred kilometres north, which holds sea and no height at all.
+        val summit = TerrainRgb.pixelFor(GeoPoint(lat = -45.02637, lng = 168.64686), 15)
+        assertEquals(31_734, summit.x)
+        assertEquals(20_983, summit.y)
+
+        // And a well-known one: the corner of the world at zoom 0 is one tile, and its middle is 0,0.
+        val origin = TerrainRgb.pixelFor(GeoPoint(lat = 0.0, lng = 0.0), 0)
+        assertEquals(0, origin.x)
+        assertEquals(0, origin.y)
+        assertEquals("the middle of the world's one tile", 128, origin.px)
+        assertEquals(128, origin.py)
+    }
+
+    @Test
     fun `a place falls in a tile and a pixel of it`() {
         val pixel = TerrainRgb.pixelFor(GeoPoint(lat = -45.0, lng = 167.0), TerrainRgb.ZOOM)
 
