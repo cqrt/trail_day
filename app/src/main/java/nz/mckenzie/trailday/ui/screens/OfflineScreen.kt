@@ -147,7 +147,12 @@ fun OfflineScreen(
                 // While it is downloading the card's own line is the live sentence: a count of what is
                 // held so far would be a second, staler number beside the one that matters.
                 summary = imageryLive?.let { downloadProgressWords(it) }
-                    ?: imagerySummary(stored.size, summary.sizeLabel, summary.tiles),
+                    ?: keptTilesSummary(
+                        areaCount = stored.size,
+                        sizeLabel = summary.sizeLabel,
+                        tiles = summary.tiles,
+                        nothing = "Nothing downloaded yet"
+                    ),
                 progress = imageryLive?.let { it.percent / 100f } ?: active?.let { it.percent / 100f },
                 progressLabel = if (imageryLive != null) {
                     null
@@ -238,11 +243,12 @@ fun OfflineScreen(
                 title = OfflinePack.TOPOGRAPHY.title,
                 icon = { AppIcon(glyph = IconGlyph.LAYERS, tint = MaterialTheme.colorScheme.primary) },
                 summary = topoLive?.let { downloadProgressWords(it) }
-                    ?: if (topoSummary.tiles == 0L) {
-                        "Nothing kept yet"
-                    } else {
-                        "${topoSummary.tiles} ${tileWord(topoSummary.tiles)} \u00b7 ${topoSummary.sizeLabel}"
-                    },
+                    ?: keptTilesSummary(
+                        areaCount = topoAreas.size,
+                        sizeLabel = topoSummary.sizeLabel,
+                        tiles = topoSummary.tiles,
+                        nothing = "Nothing kept yet"
+                    ),
                 progress = topoLive?.let { it.percent / 100f },
                 progressLabel = null,
                 error = null,
@@ -605,7 +611,11 @@ private fun OtherTrackAreaRow(area: OtherTrackArea, onDelete: () -> Unit) {
 }
 
 /**
- * "2 areas · 61 MB", or that there is nothing yet.
+ * What a card of tiles says: **how many areas, how many tiles, and how much room.**
+ *
+ * One line for both the imagery and the drawn map, because to a walker they are the same thing - a box
+ * downloaded, the tiles in it, and what it cost. A page where one card counts areas and the other counts
+ * tiles reads as two different kinds of pack.
  *
  * **Without the names.** They are on the rows directly under this line, and saying them twice made the
  * subtitle the longest thing on the card while the list below said it better.
@@ -613,12 +623,16 @@ private fun OtherTrackAreaRow(area: OtherTrackArea, onDelete: () -> Unit) {
  * With no areas but tiles on the phone, it says where those tiles came from: the map keeps what the walker
  * has looked at, so "nothing downloaded" beside a clear button would be two lines disagreeing.
  */
-internal fun imagerySummary(areaCount: Int, sizeLabel: String, tiles: Long): String {
+internal fun keptTilesSummary(areaCount: Int, sizeLabel: String, tiles: Long, nothing: String): String {
     if (areaCount == 0) {
-        return if (tiles > 0L) "No areas yet \u00b7 $tiles tiles from browsing" else "Nothing downloaded yet"
+        return if (tiles > 0L) {
+            "No areas yet \u00b7 $tiles ${tileWord(tiles)} from browsing"
+        } else {
+            nothing
+        }
     }
     val areas = if (areaCount == 1) "1 area" else "$areaCount areas"
-    return "$areas \u00b7 $sizeLabel"
+    return "$areas \u00b7 $tiles ${tileWord(tiles)} \u00b7 $sizeLabel"
 }
 
 /** What an imagery area is doing: how much of it is here, or that it is still coming. */

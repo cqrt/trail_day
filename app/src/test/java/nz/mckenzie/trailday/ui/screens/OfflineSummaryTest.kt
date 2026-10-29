@@ -30,29 +30,51 @@ class OfflineSummaryTest {
 
     @Test
     fun `an empty cache says so rather than saying nought areas`() {
-        assertEquals("Nothing downloaded yet", imagerySummary(areaCount = 0, "0 B", tiles = 0L))
+        assertEquals(
+            "Nothing downloaded yet",
+            keptTilesSummary(areaCount = 0, "0 B", tiles = 0L, nothing = "Nothing downloaded yet")
+        )
         assertEquals(
             "and tiles from browsing are not called an area",
             "No areas yet \u00b7 22 tiles from browsing",
-            imagerySummary(areaCount = 0, "155 KB", tiles = 22L)
+            keptTilesSummary(areaCount = 0, "155 KB", tiles = 22L, nothing = "Nothing downloaded yet")
+        )
+        assertEquals(
+            "one tile is one tile",
+            "No areas yet \u00b7 1 tile from browsing",
+            keptTilesSummary(areaCount = 0, "8 KB", tiles = 1L, nothing = "Nothing downloaded yet")
         )
     }
 
     @Test
-    fun `one area is one area and its size, without repeating the name`() {
+    fun `one area is one area, its tiles and its size, without repeating the name`() {
         // The name is on the row directly under this line; saying it twice made the subtitle the longest
         // thing on the card.
         assertEquals(
-            "1 area \u00b7 61 MB",
-            imagerySummary(areaCount = 1, "61 MB", tiles = 0L)
+            "1 area \u00b7 28 tiles \u00b7 61 MB",
+            keptTilesSummary(areaCount = 1, "61 MB", tiles = 28L, nothing = "Nothing downloaded yet")
         )
     }
 
     @Test
     fun `several areas are counted, not named`() {
         assertEquals(
-            "3 areas \u00b7 61 MB",
-            imagerySummary(areaCount = 3, "61 MB", tiles = 0L)
+            "3 areas \u00b7 940 tiles \u00b7 61 MB",
+            keptTilesSummary(areaCount = 3, "61 MB", tiles = 940L, nothing = "Nothing downloaded yet")
+        )
+    }
+
+    @Test
+    fun `the drawn map's card says the same things as the imagery's`() {
+        // The two cards answer the same question - a box, the tiles in it, what it cost - so one line answers
+        // both. Only the words for "nothing" differ, because the drawn map is kept rather than downloaded.
+        assertEquals(
+            "2 areas \u00b7 410 tiles \u00b7 12 MB",
+            keptTilesSummary(areaCount = 2, "12 MB", tiles = 410L, nothing = "Nothing kept yet")
+        )
+        assertEquals(
+            "Nothing kept yet",
+            keptTilesSummary(areaCount = 0, "0 B", tiles = 0L, nothing = "Nothing kept yet")
         )
     }
 
