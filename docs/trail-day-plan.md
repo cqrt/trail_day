@@ -1101,3 +1101,8 @@ The test that should have caught it asked only which way north was, and the inve
 Measured on the emulator after the fix: three points up that hillside read 799 m, 349.8 m and 309.2 m, and a journey from Queenstown up the Ben Lomond track came out at **1.92 km, 1h, 349 m**. The same two taps had given 16 minutes and no climb at all.
 
 **A DEBUG line had shipped with journeys.** A tap that missed DOC's tracks answered with latitude, longitude and a count of every track on the phone, which is what the walker saw instead of an instruction. It now says *"Tap on one of DOC's tracks. The nearest is 374 m away."*, the number being what tells a slip of the finger from a map read wrong. It shipped as 0.4.17.
+
+
+**A thumb is wider than a hundred metres.** Building a journey is done by tapping DOC's line on a phone, and the tap had to land within a hundred metres of it. At the zoom the whole of a valley is on the screen, so a walker tapping a line they could see they were touching was told they had missed it, and tapped again. A tap within **250 m** is now taken as being on the line. It is still the nearest track that is chosen, so a tap between two of DOC's lines lands on the nearer one, and a tap further off than that is still refused with the distance: *"Tap on one of DOC's tracks. The nearest is 374 m away."*
+
+Measured on the emulator with the Ben Lomond track at 5.8 m a pixel: a tap 34 pixels beside the line, about 200 m, was taken, and one 64 pixels beside it, the 374 m above, was refused. One test holds both sides of the number. It shipped as 0.4.18.
