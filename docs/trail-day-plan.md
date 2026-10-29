@@ -1083,3 +1083,12 @@ One fault came out of building it: the first version read a state flow declared 
 The browsing case is unchanged in substance and tidier in words: with no areas and tiles on the phone from looking around, a card still says **"No areas yet · 41 tiles from browsing"**, now with "1 tile" for one.
 
 Measured on the emulator: a small imagery area and a small piece of the drawn map, both listed as the line above. Held by five unit tests, including one that fails if either card ever counts only one thing again. It shipped as 0.4.15.
+
+
+**Downloading the drawn map went nowhere, and the map itself was not the problem.** Choosing an area of LINZ's Topographic map and starting the download left it at *"0 of 981 tiles"* for two minutes, and a second try kept 19 tiles and stopped with the area on *Not started*. The cause was one line of the fetcher. Asked for a vector tile it publishes nothing for, LINZ answers **204 No Content** with an empty body, and that was read as a failure, so every tile was asked for three times and thrown away when it did not come. Nine hundred tiles therefore took minutes to get nowhere, and imagery beside them downloaded perfectly, which is why it looked like the phone.
+
+Measured at the source, with and without the Worker in the way, and at several places and zooms: zoom 12 comes back with 2.6 KB of map, most tiles at zoom 13 come back 204 with nothing in them, and what arrives at 14 and 15 is 91 bytes holding no features at all. So the deeper levels of that tileset are mostly empty, and the app was treating each empty answer as a broken request.
+
+A 204 now means what a 404 already meant: the source has nothing here, so move on. The same 981-tile area gets through the map pass in seconds afterwards and finishes in about two minutes at *"1 area · 1,000 tiles · 5.3 MB"*, after 1.7 MB of heights at 16 tiles a second. Three tests hold it over a real socket, including the one that counts the asks. It shipped as 0.4.16.
+
+**One thing it exposed and did not fix.** On the emulator the Topographic map is washed grey and empty of contours above zoom 12, and two faults make it so. The elevation tiles this app fetches are a flat 0 m, so the hillshade shades the whole map a uniform grey, and the vector tiles at the deepest levels hold no features. The flat heights are the same fault that makes a journey's climb read 0, and they come first.
