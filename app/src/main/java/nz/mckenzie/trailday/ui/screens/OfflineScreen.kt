@@ -49,6 +49,7 @@ import nz.mckenzie.trailday.offline.docHeldWords
 import nz.mckenzie.trailday.offline.downloadProgressWords
 import nz.mckenzie.trailday.offline.docAreasSummary
 import nz.mckenzie.trailday.offline.docAreaWords
+import nz.mckenzie.trailday.offline.formatBytes
 import nz.mckenzie.trailday.offline.otherTracksHeldWords
 import nz.mckenzie.trailday.offline.otherTracksSummary
 import nz.mckenzie.trailday.offline.otherTrackAreaWords
@@ -80,10 +81,12 @@ fun OfflineScreen(
     val summary by viewModel.summary.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     val docDataCount by viewModel.docDataCount.collectAsStateWithLifecycle()
+    val docBytes by viewModel.docBytes.collectAsStateWithLifecycle()
     val docCounts by viewModel.docCounts.collectAsStateWithLifecycle()
     val docPictures by viewModel.docPictures.collectAsStateWithLifecycle()
     val docAreas by viewModel.docAreas.collectAsStateWithLifecycle()
     val otherTracksDataCount by viewModel.otherTracksDataCount.collectAsStateWithLifecycle()
+    val otherTracksBytes by viewModel.otherTracksBytes.collectAsStateWithLifecycle()
     val otherTrackAreas by viewModel.otherTrackAreas.collectAsStateWithLifecycle()
     val topoSummary by viewModel.topoSummary.collectAsStateWithLifecycle()
     val topoAreas by viewModel.topoAreas.collectAsStateWithLifecycle()
@@ -169,11 +172,12 @@ fun OfflineScreen(
             DownloadCard(
                 title = OfflinePack.DOC.title,
                 icon = { AssetKindIcon(kind = AssetKind.HUT, dimension = 24.dp) },
-                // A named download says which ground it was: "2 areas · 673 records · Otago, the Tararuas".
-                // With no names on it - everything kept before areas were recorded - it says what is held.
+                // What is held, how much of it, and what it costs on disk: "1 area - 543 records - 5.7 MB".
+                // The regions are named by the rows underneath, so this line does not repeat them, and
+                // the size is the one thing those names cannot say.
                 summary = docLive?.let { downloadProgressWords(it) }
                     ?: if (docAreas.isNotEmpty()) {
-                        docAreasSummary(docAreas, docDataCount)
+                        docAreasSummary(docAreas.size, docDataCount, formatBytes(docBytes))
                     } else if (docDataCount == 0) {
                         "Nothing downloaded yet"
                     } else {
@@ -205,8 +209,14 @@ fun OfflineScreen(
             DownloadCard(
                 title = OfflinePack.OTHER_TRACKS.title,
                 icon = { AppIcon(glyph = IconGlyph.TRAIL, tint = MaterialTheme.colorScheme.primary) },
+                // How many regions, how many tracks, and what they cost on disk. The regions are named by
+                // the rows underneath, so this line does not repeat them.
                 summary = otherTracksLive?.let { downloadProgressWords(it) }
-                    ?: otherTracksSummary(otherTrackAreas, otherTracksDataCount),
+                    ?: otherTracksSummary(
+                        otherTrackAreas.size,
+                        otherTracksDataCount,
+                        formatBytes(otherTracksBytes)
+                    ),
                 progress = otherTracksLive?.let { it.percent / 100f },
                 progressLabel = null,
                 footnote = null,

@@ -26,6 +26,23 @@ abstract class OfflineDocItemDao {
     @Query("SELECT COUNT(*) FROM offline_doc_items")
     abstract suspend fun count(): Int
 
+    /**
+     * What the cached records cost on disk, in bytes.
+     *
+     * Measured rather than counted, because "543 records" says nothing about whether the phone has room
+     * for another region. The text columns are cast to BLOB so the answer is bytes rather than characters:
+     * a place name with a macron in it is two bytes on disk and one character to SQLite.
+     */
+    @Query(
+        "SELECT COALESCE(SUM(LENGTH(CAST(pathsJson AS BLOB)) + LENGTH(CAST(factsJson AS BLOB)) + " +
+            "LENGTH(CAST(name AS BLOB))), 0) FROM offline_doc_items"
+    )
+    abstract suspend fun bytes(): Long
+
+    /** What the pictures cost on disk, in bytes. They arrive with the records and go with them. */
+    @Query("SELECT COALESCE(SUM(LENGTH(bytes)), 0) FROM offline_doc_pictures")
+    abstract suspend fun pictureBytes(): Long
+
     /** By source and service key, so something downloaded again is updated rather than doubled. */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insertAll(items: List<OfflineDocItemEntity>)

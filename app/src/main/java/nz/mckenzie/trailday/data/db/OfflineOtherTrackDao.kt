@@ -44,6 +44,19 @@ abstract class OfflineOtherTrackDao {
     abstract suspend fun deleteAll()
 
     /**
+     * What the kept tracks cost on disk, in bytes.
+     *
+     * Measured rather than counted, because "2,837 tracks" says nothing about whether the phone has room
+     * for another region. The text columns are cast to BLOB so the answer is bytes rather than characters:
+     * a place name with a macron in it is two bytes on disk and one character to SQLite.
+     */
+    @Query(
+        "SELECT COALESCE(SUM(LENGTH(CAST(pathsJson AS BLOB)) + LENGTH(CAST(factsJson AS BLOB)) + " +
+            "LENGTH(CAST(name AS BLOB))), 0) FROM offline_other_tracks"
+    )
+    abstract suspend fun bytes(): Long
+
+    /**
      * Removes rows by the service's own identifier: what a deleted region brought.
      *
      * See [nz.mckenzie.trailday.offline.OfflineOtherTrackStore.deleteRegion] for why this is not a delete of

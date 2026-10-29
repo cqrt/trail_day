@@ -122,15 +122,12 @@ class DocWordsTest {
     }
 
     @Test
-    fun `a card with named downloads says how many places and how much is in them`() {
-        val areas = listOf(area(1, "Otago", 631), area(2, "the Tararuas", 42))
-
-        assertEquals("2 areas \u00b7 673 records \u00b7 Otago, the Tararuas", docAreasSummary(areas, 673))
-        assertEquals("1 area \u00b7 631 records \u00b7 Otago", docAreasSummary(areas.take(1), 631))
-        assertEquals(
-            "3 areas \u00b7 700 records \u00b7 Otago, the Tararuas\u2026",
-            docAreasSummary(areas + area(3, "Auckland", 30), 700)
-        )
+    fun `a card with named downloads says how many places, how much is in them, and the room it takes`() {
+        // The regions are named by the rows underneath, so this line carries a size instead: it is the
+        // one thing those names cannot say, and the question a walker asks before downloading another.
+        assertEquals("2 areas \u00b7 673 records \u00b7 18 MB", docAreasSummary(2, 673, "18 MB"))
+        assertEquals("1 area \u00b7 631 records \u00b7 18 MB", docAreasSummary(1, 631, "18 MB"))
+        assertEquals("3 areas \u00b7 700 records \u00b7 24.6 MB", docAreasSummary(3, 700, "24.6 MB"))
     }
 
     @Test

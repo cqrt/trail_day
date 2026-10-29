@@ -118,6 +118,21 @@ class OfflineViewModel(
 
     private val _docBounds = MutableStateFlow<LatLngBounds?>(null)
 
+    private val _docBytes = MutableStateFlow(0L)
+
+    /**
+     * What DOC's material costs on disk, in bytes.
+     *
+     * Beside the count rather than instead of it: "543 records" says what is in it, and the size says
+     * whether another region will fit. The card shows both, the way the imagery's does.
+     */
+    val docBytes: StateFlow<Long> = _docBytes
+
+    private val _otherTracksBytes = MutableStateFlow(0L)
+
+    /** What the kept tracks cost on disk, in bytes, for the same reason. */
+    val otherTracksBytes: StateFlow<Long> = _otherTracksBytes
+
     /** The ground the downloaded DOC data covers, for the tab's map. Null when nothing is downloaded. */
     val docBounds: StateFlow<LatLngBounds?> = _docBounds
 
@@ -180,6 +195,16 @@ class OfflineViewModel(
                 } else {
                     runCatching { docStore.counts() }.getOrDefault(emptyMap())
                 }
+                _docBytes.value = if (count == 0) 0L else runCatching { docStore.bytes() }.getOrDefault(0L)
+            }
+        }
+
+        // The same figure for the second publisher, kept the same way: a size is a question about the
+        // phone, and both cards answer it beside their own row count.
+        viewModelScope.launch {
+            otherTracksStore.observeCount().collect { count ->
+                _otherTracksBytes.value =
+                    if (count == 0) 0L else runCatching { otherTracksStore.bytes() }.getOrDefault(0L)
             }
         }
     }

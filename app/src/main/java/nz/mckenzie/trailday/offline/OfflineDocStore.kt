@@ -156,6 +156,14 @@ class OfflineDocStore(
     suspend fun pictureCount(): Int = pictures.count()
 
     /**
+     * What the material costs on disk, in bytes: the records, and the pictures that came with them.
+     *
+     * The card says a size for the reason the imagery's does. A walker deciding whether to download
+     * another region is deciding about room on the phone, and a count of records is not that.
+     */
+    suspend fun bytes(): Long = dao.bytes() + dao.pictureBytes()
+
+    /**
      * A live count of the pictures, for the offline screen's own line.
      *
      * Live, and not a figure refreshed with the material: the records are written before the pictures are
@@ -343,19 +351,18 @@ fun docHeldWords(counts: Map<DocSource, Int>): String =
     }.joinToString(", ")
 
 /**
- * What the DOC card says once its downloads have been named: **"2 areas · 673 records · Otago, the
- * Tararuas"**.
+ * What the DOC card says once its downloads have been named: **"2 areas - 673 records - 18 MB"**.
  *
- * The same shape as the other-tracks card's line, because the two cards are read the same way - how many
- * boxes, how much is in them, and which ones - and the names are the point of naming them. Only called when
- * there is at least one name; a card with records held and no names on them says what is held, the way it
- * always did.
+ * A size rather than the names of the regions, because the rows underneath already name every one of
+ * them. What those names cannot say is whether another region will fit, and that is what a walker is
+ * deciding when they read this line.
+ *
+ * Only called when there is at least one name; a card with records held and no names on them says what is
+ * held, the way it always did.
  */
-fun docAreasSummary(areas: List<DocArea>, count: Int): String {
-    val boxes = if (areas.size == 1) "1 area" else "${areas.size} areas"
-    val names = areas.map { it.name }.take(2).joinToString(", ")
-    val more = if (areas.size > 2) "\u2026" else ""
-    return "$boxes \u00b7 ${recordsWord(count)} \u00b7 $names$more"
+fun docAreasSummary(areaCount: Int, count: Int, sizeLabel: String): String {
+    val boxes = if (areaCount == 1) "1 area" else "$areaCount areas"
+    return "$boxes \u00b7 ${recordsWord(count)} \u00b7 $sizeLabel"
 }
 
 /** One named download in the card: what it is called, and what came back from it. */

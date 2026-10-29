@@ -66,6 +66,14 @@ class OfflineOtherTrackStore(
     /** A live count, for the offline screen to say what is stored, and for the map to redraw on. */
     override fun observeCount(): Flow<Int> = dao.observeCount()
 
+    /**
+     * What the kept tracks cost on disk, in bytes.
+     *
+     * The card says a size for the reason the imagery's does. A walker deciding whether to download
+     * another region is deciding about room on the phone, and a count of tracks is not that.
+     */
+    suspend fun bytes(): Long = dao.bytes()
+
     suspend fun clear() {
         dao.deleteAll()
         areaDao?.deleteAll()
@@ -236,23 +244,21 @@ fun otherTracksHeldWords(count: Int): String =
     if (count == 1) "1 track" else "$count tracks"
 
 /**
- * What the card says: **"3 areas · 412 tracks · the Tararuas, Home…"**, or what is held with no names on it.
+ * What the card says: **"3 areas - 412 tracks - 9 MB"**, or what is held with no areas on it.
  *
- * The same shape as the imagery's line, because the two cards are read the same way - how many boxes, how
- * much is in them, and which ones - and the names are the point of naming them: a walker who downloaded
- * three hillsides should be able to see at a glance which three.
+ * A size rather than the names of the regions, because the rows underneath already name every one of
+ * them. What those names cannot say is whether another region will fit, and that is what a walker is
+ * deciding when they read this line.
  *
- * With tracks held and no areas listed, it says only how many: everything kept before this build was
- * downloaded without a name, and inventing names for those would be making them up.
+ * With tracks held and no areas listed, it says only how many: those were downloaded before areas were
+ * recorded, and inventing names for them would be making them up.
  */
-fun otherTracksSummary(areas: List<OtherTrackArea>, count: Int): String {
-    if (areas.isEmpty()) {
+fun otherTracksSummary(areaCount: Int, count: Int, sizeLabel: String): String {
+    if (areaCount == 0) {
         return if (count == 0) "Nothing downloaded yet" else otherTracksHeldWords(count)
     }
-    val boxes = if (areas.size == 1) "1 area" else "${areas.size} areas"
-    val names = areas.map { it.name }.take(2).joinToString(", ")
-    val more = if (areas.size > 2) "\u2026" else ""
-    return "$boxes \u00b7 ${otherTracksHeldWords(count)} \u00b7 $names$more"
+    val boxes = if (areaCount == 1) "1 area" else "$areaCount areas"
+    return "$boxes \u00b7 ${otherTracksHeldWords(count)} \u00b7 $sizeLabel"
 }
 
 /** One named download in the card: what it is called, and what came back from it. */

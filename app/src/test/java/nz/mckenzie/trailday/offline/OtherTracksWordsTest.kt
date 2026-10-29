@@ -24,29 +24,19 @@ class OtherTracksWordsTest {
     }
 
     @Test
-    fun `the card names the places the tracks were downloaded for`() {
-        // What was missing before: three downloads of three hillsides read as one number of tracks, with no
-        // way to tell "the Tararuas" from a box drawn by accident.
-        assertEquals(
-            "2 areas \u00b7 412 tracks \u00b7 the Tararuas, Home",
-            otherTracksSummary(areas("the Tararuas", "Home"), 412)
-        )
-    }
-
-    @Test
-    fun `more than two names are cut short rather than wrapped`() {
-        assertEquals(
-            "3 areas \u00b7 90 tracks \u00b7 Wellington, Home\u2026",
-            otherTracksSummary(areas("Wellington", "Home", "Nelson Lakes"), 90)
-        )
+    fun `the card says how many places, how many tracks, and the room they take`() {
+        // Not the regions' names: the rows underneath name every one of them, and a walker reading this
+        // line is asking whether another region will fit.
+        assertEquals("2 areas \u00b7 412 tracks \u00b7 9 MB", otherTracksSummary(2, 412, "9 MB"))
+        assertEquals("1 area \u00b7 1 track \u00b7 0.4 MB", otherTracksSummary(1, 1, "0.4 MB"))
     }
 
     @Test
     fun `tracks with no named area are counted and not named`() {
         // Everything downloaded before this build was kept without a name, and inventing one would be
         // making it up - so the card says only how much is there.
-        assertEquals("412 tracks", otherTracksSummary(emptyList(), 412))
-        assertEquals("Nothing downloaded yet", otherTracksSummary(emptyList(), 0))
+        assertEquals("412 tracks", otherTracksSummary(0, 412, "9 MB"))
+        assertEquals("Nothing downloaded yet", otherTracksSummary(0, 0, "0 B"))
     }
 
     @Test
