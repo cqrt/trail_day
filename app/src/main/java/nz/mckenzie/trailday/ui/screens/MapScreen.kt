@@ -89,9 +89,11 @@ import nz.mckenzie.trailday.viewmodel.PendingFollow
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.domain.tiles.TeAraroa
+import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.map.DEFAULT_CAMERA_TARGET
 import nz.mckenzie.trailday.map.DEFAULT_CAMERA_ZOOM
+import nz.mckenzie.trailday.map.KindTileLook
 import nz.mckenzie.trailday.map.OtherTracksLayerIds
 import nz.mckenzie.trailday.map.ScaleBar
 import nz.mckenzie.trailday.map.ScaleBarSpan
@@ -430,7 +432,6 @@ fun MapScreen(
             onShowAll = viewModel::showEveryLayer,
             hiddenYourPlaces = hiddenYourPlaces,
             onYourPlaceHidden = viewModel::setYourPlaceHidden,
-            onAllYourPlaces = viewModel::setAllYourPlacesHidden,
             yourPlaceCounts = yourPlaceCounts,
             placeNames = placeNames,
             onPlaceNames = viewModel::setPlaceNames,
@@ -445,17 +446,7 @@ fun MapScreen(
 }
 
 /**
- * The pages of the layers sheet: the walker's own map, DOC's reference material, and the tracks other
- * people publish.
- *
- * Three pages rather than two, and the third is not a section of the second: the walker's question when
- * they open this sheet is *whose line is that*, and a publisher per page answers it exactly. A council
- * walkway tucked under a page headed "DOC" would be a switch nobody would find.
- */
-private enum class LayerTab { YOUR_MAP, DOC, OTHER_TRACKS }
-
-/**
- * What the map draws, and the switches for it.
+ * What the map draws, and the switches for it: **one page, eleven switches.**
  *
  * A sheet rather than a settings screen, because the question "why is that not on the map" is
  * asked while looking at the map, and is answered by switches in front of you. It also says what
@@ -463,10 +454,15 @@ private enum class LayerTab { YOUR_MAP, DOC, OTHER_TRACKS }
  * still draws that place, whatever is switched off here - a switch that left one of those blank
  * would have gone too far.
  *
- * **Two pages, because two things are called "tracks".** **Your map** holds the walker's own work -
- * spots, their planned or imported tracks, their bike tracks, the raw recorded lines and the place
- * names. **DOC** holds the reference material underneath it. Switching page changes which switches
- * are in front of the walker; it never changes what is drawn.
+ * **One page, against the three tabs it had.** Three pages were how a thousand dp of rows fitted the
+ * eight hundred a phone gives the sheet, and the cost was that two of them were never seen: the
+ * question this sheet answers is *whose line is that*, and a tab is a page you have to find before you
+ * can ask it. The count beside each name in place of a second line made a row 49 dp, the whole list
+ * 770 dp, and the DOC rows now say DOC - which is the whole of what the third tab was saying.
+ *
+ * **A second line stays where it names somebody.** "The whole route, Te Araroa Trust" and "From
+ * councils, trusts and clubs" are a publisher's credit rather than a description of a switch, and a
+ * licence is not the count's to replace.
  *
  * **The content scrolls.** Opened at its full height (`skipPartiallyExpanded`) *and* scrollable is what
  * makes every switch reachable on a short screen: the height is so that the sheet does not open halfway up
@@ -481,7 +477,6 @@ private fun LayersSheet(
     onShowAll: () -> Unit,
     hiddenYourPlaces: Set<YourPlaceLayer>,
     onYourPlaceHidden: (layer: YourPlaceLayer, hide: Boolean) -> Unit,
-    onAllYourPlaces: (hide: Boolean) -> Unit,
     yourPlaceCounts: YourPlaceCounts,
     placeNames: Boolean,
     onPlaceNames: (show: Boolean) -> Unit,
@@ -495,10 +490,6 @@ private fun LayersSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scrollState = rememberScrollState()
-    val shownYourPlaces = YourPlaceLayer.ALL.count { it !in hiddenYourPlaces }
-    val allYourPlacesHidden = shownYourPlaces == 0
-    val mixedYourPlaces = shownYourPlaces in 1 until YourPlaceLayer.ALL.size
-    var tab by remember { mutableStateOf(LayerTab.YOUR_MAP) }
 
     // The sheet is the page's own pale sage, and each row is a white strip on it: the app's cards on the
     // app's page, the same pairing as every other list.
@@ -534,177 +525,114 @@ private fun LayersSheet(
                 }
             }
 
-            LayerTabs(selected = tab, onSelect = { tab = it })
-
-            when (tab) {
-                LayerTab.YOUR_MAP -> {
-                    LayerSection("Your Places")
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 2.dp)
-                            .heightIn(min = 54.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Your Places", style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                text = "${yourPlaceCounts.total} saved",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Text(
-                            text = when {
-                                allYourPlacesHidden -> "OFF"
-                                mixedYourPlaces -> "MIXED"
-                                else -> "ON"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (allYourPlacesHidden) {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            } else {
-                                MaterialTheme.colorScheme.primary
-                            },
-                            letterSpacing = 1.1.sp
-                        )
-                        Switch(
-                            checked = !allYourPlacesHidden,
-                            onCheckedChange = onAllYourPlaces,
-                            modifier = Modifier.padding(start = 8.dp)
-                        )
-                    }
-
-                    LayerPanel {
-                        LayerSwitchRow(
-                            icon = { KindTile(kind = AssetKind.WAYPOINT, size = 34.dp) },
-                            title = "Spots",
-                            subtitle = "${yourPlaceCounts.spots} saved",
-                            checked = YourPlaceLayer.SPOTS !in hiddenYourPlaces,
-                            onToggle = { onYourPlaceHidden(YourPlaceLayer.SPOTS, !it) }
-                        )
-                        LayerDivider()
-                        LayerSwitchRow(
-                            icon = { KindTile(kind = AssetKind.TRACK, size = 34.dp) },
-                            title = "Tracks",
-                            subtitle = "${yourPlaceCounts.tracks} saved",
-                            checked = YourPlaceLayer.TRACKS !in hiddenYourPlaces,
-                            onToggle = { onYourPlaceHidden(YourPlaceLayer.TRACKS, !it) }
-                        )
-                        LayerDivider()
-                        LayerSwitchRow(
-                            icon = { KindTile(kind = AssetKind.BIKE_TRACK, size = 34.dp) },
-                            title = "Bike tracks",
-                            subtitle = "${yourPlaceCounts.bikeTracks} saved",
-                            checked = YourPlaceLayer.BIKE_TRACKS !in hiddenYourPlaces,
-                            onToggle = { onYourPlaceHidden(YourPlaceLayer.BIKE_TRACKS, !it) }
-                        )
-                        LayerDivider()
-                        LayerSwitchRow(
-                            icon = {
-                                GlyphTile(
-                                    glyph = IconGlyph.RECORDINGS,
-                                    background = MaterialTheme.colorScheme.primaryContainer,
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            },
-                            title = "Recordings",
-                            subtitle = "${yourPlaceCounts.recordings} standalone",
-                            checked = YourPlaceLayer.RECORDINGS !in hiddenYourPlaces,
-                            onToggle = { onYourPlaceHidden(YourPlaceLayer.RECORDINGS, !it) }
-                        )
-                    }
-
-                    LayerSection("Map")
-                    LayerPanel {
-                        LayerSwitchRow(
-                            icon = {
-                                GlyphTile(
-                                    glyph = IconGlyph.MAP,
-                                    background = MaterialTheme.colorScheme.tertiaryContainer,
-                                    tint = MaterialTheme.colorScheme.onTertiaryContainer
-                                )
-                            },
-                            title = "Place names",
-                            subtitle = "Fetched names over the imagery",
-                            checked = placeNames,
-                            onToggle = onPlaceNames
-                        )
-                        LayerDivider()
-                        LayerSwitchRow(
-                            icon = {
-                                GlyphTile(
-                                    glyph = IconGlyph.TRAIL,
-                                    background = MaterialTheme.colorScheme.secondaryContainer,
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            },
-                            title = "Te Araroa trail",
-                            // The Trust's own route, named with the Trust: the layer is drawn under a
-                            // licence that asks for exactly this.
-                            subtitle = "The whole route, Te Araroa Trust",
-                            checked = teAraroa,
-                            onToggle = onTeAraroa
-                        )
-                    }
-                }
-
-                LayerTab.DOC -> {
-                    LayerSection("DOC reference")
-                    LayerPanel {
-                        LayerSwitchRow(
-                            icon = { KindTile(kind = AssetKind.TRACK, size = 34.dp) },
-                            title = "Tracks",
-                            subtitle = "All DOC tracks",
-                            checked = AssetLayer.TRACKS !in hidden,
-                            onToggle = { onHide(AssetLayer.TRACKS, !it) }
-                        )
-                        LayerDivider()
-                        LayerSwitchRow(
-                            icon = { KindTile(kind = AssetKind.BIKE_TRACK, size = 34.dp) },
-                            title = "Bike trails",
-                            subtitle = "Bike friendly DOC tracks",
-                            checked = AssetLayer.BIKE_TRACKS !in hidden,
-                            onToggle = { onHide(AssetLayer.BIKE_TRACKS, !it) }
-                        )
-                        LayerDivider()
-                        LayerSwitchRow(
-                            icon = { KindTile(kind = AssetKind.HUT, size = 34.dp) },
-                            title = "Huts",
-                            subtitle = "DOC huts",
-                            checked = AssetLayer.HUTS !in hidden,
-                            onToggle = { onHide(AssetLayer.HUTS, !it) }
-                        )
-                        LayerDivider()
-                        LayerSwitchRow(
-                            icon = { KindTile(kind = AssetKind.CAMPSITE, size = 34.dp) },
-                            title = "Campsites",
-                            subtitle = "DOC campsites",
-                            checked = AssetLayer.CAMPSITES !in hidden,
-                            onToggle = { onHide(AssetLayer.CAMPSITES, !it) }
-                        )
-                    }
-                }
-
-                LayerTab.OTHER_TRACKS -> {
-                    LayerSection("Other tracks")
-                    LayerPanel {
-                        LayerSwitchRow(
-                            icon = { OtherTracksTile() },
-                            title = "Other tracks",
-                            // Who publishes them, in the walker's own terms: the dataset is councils,
-                            // regional councils, trail trusts and a couple of clubs, and "authority" or
-                            // "supplier" is nobody's word for any of that.
-                            subtitle = "From councils, trusts and clubs",
-                            checked = otherTracks,
-                            onToggle = onOtherTracks
-                        )
-                    }
-                    // The publisher's licence, on the page the layer is switched on from - which is where
-                    // a walker is when they wonder whose tracks these are.
-                    OtherTracksCredit(downloadedAtEpochMs = otherTracksDownloadedAt)
-                }
+            LayerSection("Your Places")
+            LayerPanel {
+                LayerSwitchRow(
+                    icon = { KindTile(kind = AssetKind.WAYPOINT, size = 34.dp) },
+                    title = "Spots",
+                    count = "${yourPlaceCounts.spots} saved",
+                    checked = YourPlaceLayer.SPOTS !in hiddenYourPlaces,
+                    onToggle = { onYourPlaceHidden(YourPlaceLayer.SPOTS, !it) }
+                )
+                LayerDivider()
+                LayerSwitchRow(
+                    icon = { KindTile(kind = AssetKind.TRACK, size = 34.dp) },
+                    title = "Tracks",
+                    count = "${yourPlaceCounts.tracks} saved",
+                    checked = YourPlaceLayer.TRACKS !in hiddenYourPlaces,
+                    onToggle = { onYourPlaceHidden(YourPlaceLayer.TRACKS, !it) }
+                )
+                LayerDivider()
+                LayerSwitchRow(
+                    icon = { KindTile(kind = AssetKind.BIKE_TRACK, size = 34.dp) },
+                    title = "Bike tracks",
+                    count = "${yourPlaceCounts.bikeTracks} saved",
+                    checked = YourPlaceLayer.BIKE_TRACKS !in hiddenYourPlaces,
+                    onToggle = { onYourPlaceHidden(YourPlaceLayer.BIKE_TRACKS, !it) }
+                )
+                LayerDivider()
+                LayerSwitchRow(
+                    icon = { RecordedTile() },
+                    title = "Recordings",
+                    count = "${yourPlaceCounts.recordings} standalone",
+                    checked = YourPlaceLayer.RECORDINGS !in hiddenYourPlaces,
+                    onToggle = { onYourPlaceHidden(YourPlaceLayer.RECORDINGS, !it) }
+                )
             }
+
+            LayerSection("Map")
+            LayerPanel {
+                LayerSwitchRow(
+                    icon = {
+                        GlyphTile(
+                            glyph = IconGlyph.MAP,
+                            background = MaterialTheme.colorScheme.tertiaryContainer,
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    },
+                    title = "Place names",
+                    checked = placeNames,
+                    onToggle = onPlaceNames
+                )
+                LayerDivider()
+                LayerSwitchRow(
+                    icon = { TargetTile(target = LookTarget.TE_ARAROA, glyph = IconGlyph.TRAIL) },
+                    title = "Te Araroa trail",
+                    // The Trust's own route, named with the Trust: the layer is drawn under a
+                    // licence that asks for exactly this.
+                    subtitle = "The whole route, Te Araroa Trust",
+                    checked = teAraroa,
+                    onToggle = onTeAraroa
+                )
+            }
+
+            LayerSection("DOC")
+            LayerPanel {
+                LayerSwitchRow(
+                    icon = { KindTile(kind = AssetKind.TRACK, size = 34.dp) },
+                    title = "DOC tracks",
+                    checked = AssetLayer.TRACKS !in hidden,
+                    onToggle = { onHide(AssetLayer.TRACKS, !it) }
+                )
+                LayerDivider()
+                LayerSwitchRow(
+                    icon = { KindTile(kind = AssetKind.BIKE_TRACK, size = 34.dp) },
+                    title = "DOC bike trails",
+                    checked = AssetLayer.BIKE_TRACKS !in hidden,
+                    onToggle = { onHide(AssetLayer.BIKE_TRACKS, !it) }
+                )
+                LayerDivider()
+                LayerSwitchRow(
+                    icon = { KindTile(kind = AssetKind.HUT, size = 34.dp) },
+                    title = "DOC huts",
+                    checked = AssetLayer.HUTS !in hidden,
+                    onToggle = { onHide(AssetLayer.HUTS, !it) }
+                )
+                LayerDivider()
+                LayerSwitchRow(
+                    icon = { KindTile(kind = AssetKind.CAMPSITE, size = 34.dp) },
+                    title = "DOC campsites",
+                    checked = AssetLayer.CAMPSITES !in hidden,
+                    onToggle = { onHide(AssetLayer.CAMPSITES, !it) }
+                )
+            }
+
+            LayerSection("Other tracks")
+            LayerPanel {
+                LayerSwitchRow(
+                    icon = { TargetTile(target = LookTarget.OTHER_TRACKS, glyph = IconGlyph.LINES) },
+                    title = "Other tracks",
+                    // Who publishes them, in the walker's own terms: the dataset is councils,
+                    // regional councils, trail trusts and a couple of clubs, and "authority" or
+                    // "supplier" is nobody's word for any of that.
+                    subtitle = "From councils, trusts and clubs",
+                    checked = otherTracks,
+                    onToggle = onOtherTracks
+                )
+            }
+            // The publisher's licence, under the switch it belongs to - which is where a walker is when
+            // they wonder whose tracks these are.
+            OtherTracksCredit(downloadedAtEpochMs = otherTracksDownloadedAt)
         }
     }
 }
@@ -719,69 +647,6 @@ private fun LayerSection(title: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = 6.dp, start = 2.dp)
     )
-}
-
-/** The switch at the top of the sheet: the walker's map, then DOC's material, then anybody else's. */
-@Composable
-private fun LayerTabs(selected: LayerTab, onSelect: (LayerTab) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(3.dp)
-    ) {
-        LayerTabButton(
-            label = "Your map",
-            selected = selected == LayerTab.YOUR_MAP,
-            onClick = { onSelect(LayerTab.YOUR_MAP) },
-            modifier = Modifier.weight(1f)
-        )
-        LayerTabButton(
-            label = "DOC",
-            selected = selected == LayerTab.DOC,
-            onClick = { onSelect(LayerTab.DOC) },
-            modifier = Modifier.weight(0.7f)
-        )
-        // The third page is the one row it holds, and the label is that row's own name rather than a
-        // category it belongs to: "Other tracks" is what the walker reads on the map's own switch too.
-        LayerTabButton(
-            label = "Other tracks",
-            selected = selected == LayerTab.OTHER_TRACKS,
-            onClick = { onSelect(LayerTab.OTHER_TRACKS) },
-            modifier = Modifier.weight(1.4f)
-        )
-    }
-}
-
-@Composable
-private fun LayerTabButton(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .heightIn(min = 38.dp)
-            .clip(RoundedCornerShape(9.dp))
-            .background(
-                if (selected) MaterialTheme.colorScheme.surfaceContainerLow else Color.Transparent
-            )
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (selected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            }
-        )
-    }
 }
 
 /** A rounded white list of rows, the same card-on-sage pairing as the rest of the app. */
@@ -810,7 +675,12 @@ private fun LayerDivider() {
 }
 
 /**
- * One row of the layers sheet: a coloured icon, its name, a line about it, and its switch.
+ * One row of the layers sheet: a coloured icon, its name, how many of them there are, and its switch.
+ *
+ * **The count sits beside the name, not under it**, which is what took a row from 54 dp to 48: eleven
+ * rows of second lines is a hundred dp of the sheet spent on numbers. A second line is kept only where
+ * it names somebody - the Trust's route, the councils' and clubs' tracks - because a licence is not the
+ * count's to replace.
  *
  * The whole row is the switch, because this is a screen used with gloves on. The Switch itself is
  * only the state: the row owns the tap, so a thumb on the switch does not toggle twice.
@@ -819,15 +689,17 @@ private fun LayerDivider() {
 private fun LayerSwitchRow(
     icon: @Composable () -> Unit,
     title: String,
-    subtitle: String?,
     checked: Boolean,
-    onToggle: (Boolean) -> Unit
+    onToggle: (Boolean) -> Unit,
+    count: String? = null,
+    subtitle: String? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .toggleable(value = checked, role = Role.Switch, onValueChange = onToggle)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            // 34 dp of tile and 7 either side: 48 dp, the smallest a gloved thumb should have to hit.
+            .padding(horizontal = 12.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -836,11 +708,26 @@ private fun LayerSwitchRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    // `fill = false` so a short name does not push its own count to the switch.
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                count?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
+            }
             subtitle?.let {
                 Text(
                     text = it,
@@ -855,29 +742,52 @@ private fun LayerSwitchRow(
 }
 
 /**
- * The tile for the "Other tracks" row: **the layer's own colour**, so the sheet and the map agree about
- * whose lines are whose.
+ * A tile in **the layer's own colour**, so the sheet and the map agree about whose line is whose.
  *
- * Not [KindTile], which draws one of the app's own kinds: these tracks are not a kind of anything, they
- * are somebody else's material, and the colour the map draws them in is the one thing that says so. The
- * map's copy of that colour is a hex string for its style; this is the same string, drawn - at a low
- * alpha over the page rather than as a container colour of its own, which is what makes one pair of
- * constants enough for both the light and the dark set.
+ * Used by the two rows that are not one of the app's kinds: Te Araroa, which is a route, and Other
+ * tracks, which is a publisher. Both have a row on the Colours & Styles screen, and this is that row's
+ * answer drawn as a tile - the deep tone on a light screen, the light one on a dark screen, over the page
+ * at the same low alpha [KindTile] uses so the two kinds of tile sit together.
+ *
+ * The map's copy of a colour is a hex string for its style; this is the same string, drawn. Which is the
+ * point: one choice, and neither the map nor the sheet can disagree with it.
  */
 @Composable
-private fun OtherTracksTile() {
-    // The row's colour as chosen, and the tone its card needs on either theme: the same two answers the
-    // map and the look screen draw with, so the sheet cannot disagree about whose lines are whose.
+private fun TargetTile(target: LookTarget, glyph: IconGlyph) {
     val look by Look.current.collectAsStateWithLifecycle()
     val dark = isSystemInDarkTheme()
-    val hex = remember(look, dark) {
-        if (dark) look.colourOnDark(LookTarget.OTHER_TRACKS)
-        else look.colourOnLight(LookTarget.OTHER_TRACKS)
+    val hex = remember(look, dark, target) {
+        if (dark) look.colourOnDark(target) else look.colourOnLight(target)
     }
     val colour = remember(hex) { Color(android.graphics.Color.parseColor(hex)) }
     GlyphTile(
-        glyph = IconGlyph.LINES,
-        background = colour.copy(alpha = 0.22f),
+        glyph = glyph,
+        background = colour.copy(
+            alpha = if (dark) KindTileLook.TINT_ALPHA_DARK else KindTileLook.TINT_ALPHA_LIGHT
+        ),
+        tint = colour
+    )
+}
+
+/**
+ * The recordings row's tile: **the recorded green**, because that is what the map draws.
+ *
+ * The green is not on the colour shelf - it is nobody's kind - so there is no look row to read and this
+ * cannot use [TargetTile]. It is the same green either way: a line that has been walked is green with its
+ * gold edge whatever the walker has chosen for their tracks, and a tile in any other colour would promise
+ * something the map does not do.
+ */
+@Composable
+private fun RecordedTile() {
+    val dark = isSystemInDarkTheme()
+    val colour = remember(dark) {
+        Color(android.graphics.Color.parseColor(if (dark) AssetColors.RECORDED_DARK else AssetColors.RECORDED))
+    }
+    GlyphTile(
+        glyph = IconGlyph.RECORDINGS,
+        background = colour.copy(
+            alpha = if (dark) KindTileLook.TINT_ALPHA_DARK else KindTileLook.TINT_ALPHA_LIGHT
+        ),
         tint = colour
     )
 }

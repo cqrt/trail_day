@@ -47,7 +47,7 @@ class MapRecordingsTest {
         db = Room.inMemoryDatabaseBuilder(context, TrailDayDatabase::class.java).build()
         assetRepository = AssetRepository(db)
         recordings = RecordingRepository(db)
-        SettingsRepository(context).setAllYourPlacesHidden(false)
+        SettingsRepository(context).showAllYourPlaces()
     }
 
     @After

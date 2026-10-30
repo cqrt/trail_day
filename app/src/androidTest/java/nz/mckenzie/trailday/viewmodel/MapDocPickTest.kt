@@ -56,7 +56,7 @@ class MapDocPickTest {
         assetRepository = AssetRepository(db)
         SettingsRepository(context).apply {
             setHiddenMapLayers(emptySet())
-            setAllYourPlacesHidden(false)
+            showAllYourPlaces()
         }
         Unit
     }
@@ -67,7 +67,7 @@ class MapDocPickTest {
         DevicePosition.useForTest(null)
         SettingsRepository(context).apply {
             setHiddenMapLayers(emptySet())
-            setAllYourPlacesHidden(false)
+            showAllYourPlaces()
         }
         Unit
     }

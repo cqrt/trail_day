@@ -47,7 +47,7 @@ class MapGeometryRefreshTest {
         // The map's switches are one DataStore for the whole device, so a walker who left
         // Your Tracks off would otherwise make every track in these tests invisible - and
         // untappable - before they began.
-        SettingsRepository(context).setAllYourPlacesHidden(false)
+        SettingsRepository(context).showAllYourPlaces()
     }
 
     @After

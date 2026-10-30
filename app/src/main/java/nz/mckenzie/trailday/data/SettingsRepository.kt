@@ -222,7 +222,7 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
      *
      * Stored as what is **hidden**, like the DOC switches: an install that has never touched the
      * sheet draws everything, and a layer added in a later build arrives visible. Empty means every
-     * part is shown; all four means the master **Your Places** switch is off.
+     * part is shown; all four means the walker has cleared every row of that section.
      *
      * A preference written before this sheet existed is read as the nearest equivalent rather than
      * dropped: the old "Your Tracks" switch hid the planned tracks and the recorded lines, and the
@@ -263,14 +263,15 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
         }
     }
 
-    /** The master switch: hide all of the walker's own work, or put all of it back. */
-    suspend fun setAllYourPlacesHidden(hidden: Boolean) {
+    /**
+     * Puts all of the walker's own work back on the map, in one write.
+     *
+     * This is the whole of what the sheet's old master switch wrote: hiding everything is now four taps of
+     * the four rows, but "Show everything" is still one, and it has to put these back too.
+     */
+    suspend fun showAllYourPlaces() {
         context.settingsDataStore.edit { prefs ->
-            prefs[hiddenYourPlacesPref] = if (hidden) {
-                YourPlaceLayer.ALL.mapTo(mutableSetOf()) { it.id }
-            } else {
-                setOf(ALL_VISIBLE)
-            }
+            prefs[hiddenYourPlacesPref] = setOf(ALL_VISIBLE)
         }
     }
 

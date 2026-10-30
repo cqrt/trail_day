@@ -202,8 +202,8 @@ class MapViewModel(
     /**
      * Which parts of the walker's own work are left off the map: the **Your Places** tiles.
      *
-     * Empty means every part is shown; all four means the master is off. The old single "Your
-     * Tracks" switch is read by the settings store as the nearest pair of these.
+     * Empty means every part is shown; all four means every row of that section is off. The old single
+     * "Your Tracks" switch is read by the settings store as the nearest pair of these.
      */
     val hiddenYourPlaces: StateFlow<Set<YourPlaceLayer>> = settingsRepository.hiddenYourPlaces
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
@@ -934,16 +934,11 @@ class MapViewModel(
         viewModelScope.launch { settingsRepository.setYourPlaceHidden(layer, hidden) }
     }
 
-    /** The master **Your Places** switch: all four on the map, or all four off. */
-    fun setAllYourPlacesHidden(hidden: Boolean) {
-        viewModelScope.launch { settingsRepository.setAllYourPlacesHidden(hidden) }
-    }
-
     /** Puts every layer back on the map: one switch to undo the lot. */
     fun showEveryLayer() {
         viewModelScope.launch {
             settingsRepository.setHiddenMapLayers(emptySet())
-            settingsRepository.setAllYourPlacesHidden(false)
+            settingsRepository.showAllYourPlaces()
         }
     }
 

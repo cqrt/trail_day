@@ -28,7 +28,7 @@ import org.junit.runner.RunWith
  * The switches that leave a layer of the work off the map.
  *
  * What matters is not the switch on the screen but what it leaves behind: the choice is stored, so
- * it is still there when the tab is opened tomorrow, and it is stored as what is **hidden** - which
+ * it is still there when the sheet is opened tomorrow, and it is stored as what is **hidden** - which
  * is what makes the map an install has never touched the map it always was.
  *
  * The settings DataStore is one per device rather than one per test, so this clears the choice
@@ -48,13 +48,13 @@ class MapLayersTest {
         db = Room.inMemoryDatabaseBuilder(context, TrailDayDatabase::class.java).build()
         settings = SettingsRepository(context)
         settings.setHiddenMapLayers(emptySet())
-        settings.setAllYourPlacesHidden(false)
+        settings.showAllYourPlaces()
     }
 
     @After
     fun tearDown() = runBlocking {
         settings.setHiddenMapLayers(emptySet())
-        settings.setAllYourPlacesHidden(false)
+        settings.showAllYourPlaces()
         // And the one switch in that sheet that starts off goes back to off: a run that left the
         // place names on would change the map the next run looks at, and the emulator somebody then
         // looks at.
@@ -138,7 +138,9 @@ class MapLayersTest {
         val viewModel = viewModel()
         viewModel.setLayerHidden(AssetLayer.TRACKS, hidden = true)
         viewModel.setLayerHidden(AssetLayer.HUTS, hidden = true)
-        viewModel.setAllYourPlacesHidden(true)
+        // Hiding all of the walker's own work is four rows now that the master switch has gone, and
+        // "Show everything" still has to put back what four taps took away.
+        YourPlaceLayer.ALL.forEach { viewModel.setYourPlaceHidden(it, hidden = true) }
         withTimeout(5_000) { viewModel.hiddenLayers.first { it.size == 2 } }
         withTimeout(5_000) { viewModel.hiddenYourPlaces.first { it.size == YourPlaceLayer.ALL.size } }
 
