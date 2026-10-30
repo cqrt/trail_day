@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.backup.BackupScheduler
 import nz.mckenzie.trailday.data.SettingsRepository
+import nz.mckenzie.trailday.domain.look.Look
 import nz.mckenzie.trailday.domain.tiles.LinzAccess
 import nz.mckenzie.trailday.map.BasemapPreviewCache
 import nz.mckenzie.trailday.offline.TileServerHolder
@@ -47,6 +48,14 @@ class TrailDayApplication : Application() {
         // the next launch. See [LinzAccess].
         LinzAccess.follow(
             settings.developerLinzKey,
+            CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        )
+
+        // The look the walker has chosen for the map, followed the same way: every colour and width in
+        // the app is asked of one place, so a look has to arrive there at launch rather than be carried
+        // through every screen. See [Look].
+        Look.follow(
+            settings.mapLook,
             CoroutineScope(SupervisorJob() + Dispatchers.Default)
         )
 

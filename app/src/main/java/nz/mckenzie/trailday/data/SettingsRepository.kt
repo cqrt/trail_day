@@ -17,6 +17,7 @@ import nz.mckenzie.trailday.domain.asset.YourPlaceLayer
 import nz.mckenzie.trailday.domain.backup.BackupDestination
 import nz.mckenzie.trailday.domain.backup.BackupSettingsRecord
 import nz.mckenzie.trailday.domain.backup.BackupSwitches
+import nz.mckenzie.trailday.domain.look.MapLook
 import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.domain.tiles.Basemap
 
@@ -37,6 +38,7 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
 
     private val basemapPref = stringPreferencesKey("basemap")
     private val themeChoicePref = stringPreferencesKey("theme_choice")
+    private val mapLookPref = stringPreferencesKey("map_look")
     private val hiddenMapLayersPref = stringSetPreferencesKey("hidden_map_layers")
     private val hiddenYourPlacesPref = stringSetPreferencesKey("hidden_your_places")
     /** The old "Your Tracks" switch: read once to seed [hiddenYourPlaces], never written again. */
@@ -156,6 +158,27 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
 
     suspend fun setThemeChoice(value: ThemeChoice) {
         context.settingsDataStore.edit { prefs -> prefs[themeChoicePref] = value.id }
+    }
+
+    /**
+     * The width and colour of everything the map draws.
+     *
+     * **Not carried in a backup**, for the reason the theme is not: a look is an answer about this
+     * phone's screen and this walker's eyes, not about the work, and [BackupSettingsRecord] carries
+     * the work. A restored phone starts at the app's own look and is dressed again in a minute.
+     *
+     * A look that is the app's own is written as no value at all, which keeps a fresh install's file
+     * to what has actually been chosen - the same rule the hidden layers follow.
+     */
+    val mapLook: Flow<MapLook> = context.settingsDataStore.data.map { prefs ->
+        MapLook.fromStorage(prefs[mapLookPref])
+    }
+
+    suspend fun setMapLook(value: MapLook) {
+        context.settingsDataStore.edit { prefs ->
+            val stored = value.toStorage()
+            if (stored.isEmpty()) prefs.remove(mapLookPref) else prefs[mapLookPref] = stored
+        }
     }
 
     /**
