@@ -155,7 +155,10 @@ class TileDownloaderTest {
         val final = downloader.download(bounds, 14, 14) { reports += it }
 
         assertTrue("expected progress reports", reports.isNotEmpty())
-        assertEquals(final, reports.last())
+        // **The clock is left out of the comparison.** The last report and the returned value are two
+        // separate reads of it a millisecond apart, so comparing them whole fails now and then on a
+        // loaded machine for a reason that says nothing about progress.
+        assertEquals(final.copy(elapsedMs = 0), reports.last().copy(elapsedMs = 0))
         assertEquals(100, reports.last().percent)
     }
 
