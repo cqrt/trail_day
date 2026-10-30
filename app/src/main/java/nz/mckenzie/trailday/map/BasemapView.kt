@@ -105,17 +105,13 @@ internal const val TRAIL_LAYER = "trailday-te-araroa-line"
  */
 private const val TRAIL_COLOR = "#C1440E"
 
-/** The trail's edge: white, for the reason the position dot's ring is - imagery is pale or dark. */
+/**
+ * The trail's edge: white, for the reason the position dot's ring is - imagery is pale or dark.
+ */
 private const val TRAIL_CASING_COLOR = "#FFFFFF"
 
-/** Narrower than the walker's own lines, so the trail is the ground they sit on rather than a rival. */
-private const val TRAIL_WIDTH = 4f
-
-/** Its casing, wider than the line by the same margin the recorded line's gold edge wears. */
-private const val TRAIL_CASING_WIDTH = 7f
-
 /**
- * The white outline drawn under every reference line, and how much wider it is than the line it holds.
+ * The white outline drawn under every reference line, and how wide it is.
  *
  * **One outline for every publisher**, which is why it is here rather than in either publisher's file:
  * DOC's tracks and the tracks councils and trusts publish are drawn by the same rule - a line over a
@@ -124,7 +120,6 @@ private const val TRAIL_CASING_WIDTH = 7f
  */
 private const val REFERENCE_CASING_COLOUR = "#FFFFFF"
 
-private const val REFERENCE_CASING_WIDTH_PX = 4f
 
 // The layers of the work are named in [AssetLayerIds], which is also where the map's own switches
 // find them: the layer that is created and the layer a switch hides are the same name by
@@ -136,9 +131,6 @@ private const val REFERENCE_CASING_WIDTH_PX = 4f
  */
 internal const val TARGET_SOURCE = "trailday-target"
 internal const val TARGET_LAYER = "trailday-target-line"
-
-/** How wide the followed line is: nearly twice a track of the walker's, so it is the thing in view. */
-private const val TARGET_WIDTH = 9f
 
 internal const val POSITION_SOURCE = "trailday-position"
 internal const val POSITION_ACCURACY_LAYER = "trailday-position-accuracy"
@@ -153,11 +145,6 @@ internal const val POSITION_DOT_LAYER = "trailday-position-dot"
  */
 private const val POSITION_ACCURACY_FILL = "rgba(33, 33, 33, 0.16)"
 private const val POSITION_ACCURACY_OUTLINE = "rgba(33, 33, 33, 0.38)"
-
-/**
- * How wide a line of the work is drawn: a track and a bike track.
- */
-private const val ASSET_LINE_WIDTH = 5f
 
 /** Padding around the track network when the camera frames it. */
 private const val BOUNDS_PADDING_PX = 96
@@ -944,7 +931,7 @@ internal fun MapLibreMap.loadTrailDayStyle(
                 LineLayer(TRAIL_CASING_LAYER, TRAIL_SOURCE)
                     .withProperties(
                         PropertyFactory.lineColor(Expression.literal(TRAIL_CASING_COLOR)),
-                        PropertyFactory.lineWidth(Expression.literal(TRAIL_CASING_WIDTH)),
+                        PropertyFactory.lineWidth(Expression.literal(LineWeight.TRAIL_EDGE)),
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                     )
@@ -955,7 +942,7 @@ internal fun MapLibreMap.loadTrailDayStyle(
                 LineLayer(TRAIL_LAYER, TRAIL_SOURCE)
                     .withProperties(
                         PropertyFactory.lineColor(Expression.literal(TRAIL_COLOR)),
-                        PropertyFactory.lineWidth(Expression.literal(TRAIL_WIDTH)),
+                        PropertyFactory.lineWidth(Expression.literal(LineWeight.TRAIL)),
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                     )
@@ -1004,7 +991,7 @@ internal fun MapLibreMap.loadTrailDayStyle(
                         // Its own kind's colour, like every other line of the walker's: what makes it bold
                         // is the width, because a followed bike track should still look like a bike track.
                         PropertyFactory.lineColor(Expression.get("stroke")),
-                        PropertyFactory.lineWidth(Expression.literal(TARGET_WIDTH)),
+                        PropertyFactory.lineWidth(Expression.literal(LineWeight.FOLLOWED)),
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                     )
@@ -1030,7 +1017,7 @@ internal fun MapLibreMap.loadTrailDayStyle(
                 LineLayer(YourPlaceLayerIds.YOUR_TRACKS_CASING, YOUR_TRACKS_SOURCE)
                     .withProperties(
                         PropertyFactory.lineColor(Expression.literal(AssetColors.RECORDED_EDGE)),
-                        PropertyFactory.lineWidth(Expression.literal(ASSET_LINE_WIDTH + 4f)),
+                        PropertyFactory.lineWidth(Expression.literal(LineWeight.EDGE)),
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                     )
@@ -1044,7 +1031,7 @@ internal fun MapLibreMap.loadTrailDayStyle(
                 LineLayer(YourPlaceLayerIds.YOUR_TRACKS_LINE, YOUR_TRACKS_SOURCE)
                     .withProperties(
                         PropertyFactory.lineColor(Expression.literal(AssetColors.RECORDED)),
-                        PropertyFactory.lineWidth(Expression.literal(ASSET_LINE_WIDTH)),
+                        PropertyFactory.lineWidth(Expression.literal(LineWeight.TRACK)),
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                     )
@@ -1109,7 +1096,7 @@ private fun addRecordedCasing(style: Style, id: String, kind: AssetKind) {
         LineLayer(id, ASSETS_SOURCE)
             .withProperties(
                 PropertyFactory.lineColor(Expression.literal(AssetColors.RECORDED_EDGE)),
-                PropertyFactory.lineWidth(Expression.literal(ASSET_LINE_WIDTH + 4f)),
+                PropertyFactory.lineWidth(Expression.literal(LineWeight.EDGE)),
                 PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                 PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
             )
@@ -1298,7 +1285,7 @@ private fun addLineLayer(
 
     val properties = mutableListOf<PropertyValue<*>>(
         PropertyFactory.lineColor(Expression.get("stroke")),
-        PropertyFactory.lineWidth(Expression.literal(ASSET_LINE_WIDTH)),
+        PropertyFactory.lineWidth(Expression.literal(LineWeight.TRACK)),
         PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
         PropertyFactory.lineOpacity(Expression.literal(0.9f))
@@ -1450,7 +1437,7 @@ private fun addReferenceCasing(
             .withProperties(
                 PropertyFactory.lineColor(Expression.literal(REFERENCE_CASING_COLOUR)),
                 PropertyFactory.lineWidth(
-                    Expression.literal(ASSET_LINE_WIDTH + REFERENCE_CASING_WIDTH_PX)
+                    Expression.literal(LineWeight.EDGE)
                 ),
                 PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                 PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),

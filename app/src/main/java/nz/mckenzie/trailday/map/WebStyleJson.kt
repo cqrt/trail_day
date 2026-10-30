@@ -30,8 +30,14 @@ import nz.mckenzie.trailday.domain.tiles.PlaceLabels
  */
 object WebStyleJson {
 
-    /** The width the app draws its own lines at, so the two maps agree about a line's weight. */
-    private const val LINE_WIDTH = 5
+    /**
+     * The width the app draws its own lines at, read from the app rather than copied.
+     *
+     * It was a copy of the number, with a comment saying the two must agree - which is exactly the kind
+     * of agreement that fails quietly. The desk is the same map at a different size, so it asks
+     * [LineWeight] what a line weighs and draws it at that.
+     */
+    private const val LINE_WIDTH = LineWeight.TRACK
 
     /** Just short of opaque, as the app's own map has it, so the imagery reads underneath. */
     private const val LINE_OPACITY = 0.9
