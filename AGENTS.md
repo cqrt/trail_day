@@ -163,5 +163,5 @@ than assuming it is a bug:
   keeps the words they were given - "nothing you've downloaded covers this spot" - until the notice is
   dismissed and a new run of failures asks again. Recomputing on every camera idle was left out because
   it would mean a database read per pan.
-- Two tests that wait on a stored preference have been flaky on a loaded emulator — three CI runs,
+- Two tests that wait on a stored preference have been flaky on a loaded emulator — four CI runs,
   each passing on a re-run. Waiting on the thing rather than on a clock is worth a change of its own.
