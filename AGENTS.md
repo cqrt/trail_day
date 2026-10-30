@@ -158,5 +158,10 @@ than assuming it is a bug:
   the walker is standing still.
 - DOC's API publishes no description, access or facilities text, and scraping its pages was rejected.
   If that content is wanted it is a decision, not a task.
+- **The map's trouble notice does not recompute while it is up.** It appears once, a run of failed tiles
+  later, and stays until tiles arrive again. So a walker who is offline and pans into a downloaded box
+  keeps the words they were given - "nothing you've downloaded covers this spot" - until the notice is
+  dismissed and a new run of failures asks again. Recomputing on every camera idle was left out because
+  it would mean a database read per pan.
 - Two tests that wait on a stored preference have been flaky on a loaded emulator — three CI runs,
   each passing on a re-run. Waiting on the thing rather than on a clock is worth a change of its own.
