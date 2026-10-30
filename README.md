@@ -39,7 +39,7 @@ If the LINZ imagery fails to load, the app tells you why (for example, the key w
 
 ## How the map draws what you have
 
-Each kind of thing the map draws has its own colour and weight: your tracks, your bike tracks, other organisations' tracks, and the huts, campsites and waypoints you've saved. Settings has a screen for them, **Tracks and places**, with a sample of all six drawn on the map you were last looking at, so you see a colour over the ground it will be seen over ([details](docs/tracks-and-places.md)).
+Each kind of thing the map draws has its own colour and weight: your tracks, your bike tracks, other organisations' tracks, and the huts, campsites and waypoints you've saved. Settings has a screen for them, **Colours & Styles**, with a sample of all six drawn on the map you were last looking at, so you see a colour over the ground it will be seen over ([details](docs/tracks-and-places.md)).
 
 There's no Save. The sample and the map change as you tap, and **Back to how it came** puts all six back. A recorded walk stays green with its gold edge, Te Araroa stays rust, and the dot that says where you are doesn't change either, whatever you pick.
 

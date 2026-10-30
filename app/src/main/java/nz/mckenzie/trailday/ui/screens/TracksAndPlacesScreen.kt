@@ -62,7 +62,7 @@ private val PREVIEW_HEIGHT = 240.dp
 private const val PREVIEW_FOOT_ROOM_PX = 112
 
 /**
- * **Tracks and places**: a width and a colour for each of the six things the map draws.
+ * **Colours & Styles**: a width and a colour for each of the six things the map draws.
  *
  * The order of the screen is the order of the map: the three lines from the top down, then the three
  * places. Every row is one thing the walker can see drawn, and the preview above them is the map they
@@ -100,7 +100,7 @@ fun TracksAndPlacesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Tracks and places") },
+                title = { Text("Colours & Styles") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         AppIcon(IconGlyph.BACK, contentDescription = "Back")

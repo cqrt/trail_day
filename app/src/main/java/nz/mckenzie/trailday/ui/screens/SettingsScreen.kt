@@ -257,7 +257,7 @@ fun SettingsScreen(
                     Text("Appearance", style = MaterialTheme.typography.titleMedium)
 
                     ChoiceRow(
-                        label = "Light or dark",
+                        label = "Display",
                         choices = ThemeChoice.entries,
                         selected = themeChoice,
                         onChoose = viewModel::setThemeChoice,
@@ -275,14 +275,12 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Tracks and places", style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                text = "Width and colour for each kind.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        // Named the same as the screen it opens, so the row and its heading agree.
+                        Text(
+                            text = "Colours & Styles",
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier.weight(1f)
+                        )
                         AppIcon(
                             glyph = IconGlyph.CHEVRON,
                             dimension = 18.dp,

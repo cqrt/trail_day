@@ -1,8 +1,8 @@
-# Tracks and places
+# Colours & Styles
 
 The map draws a handful of things: your tracks, your bike tracks, other organisations' tracks, and the
 huts, campsites and waypoints you have saved. Each of them is drawn in a colour and at a weight, and
-**Tracks and places** is where you set them. It's in Settings, under the theme chips.
+**Colours & Styles** is where you set them. It's in Settings, in the Appearance card.
 
 The screen is six cards and a sample. The sample is the map itself, with one of each thing drawn on it,
 on the ground the map was last looking at. A colour on a card says what the colour is. The same line over
