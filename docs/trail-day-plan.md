@@ -1130,3 +1130,7 @@ Measured on the emulator, where a style pixel is 2.625 screen pixels: a DOC trac
 **Two things only the screen showed.** The sample's zoom had been picked by hand at 15, and on the emulator it cut four of the six things off an edge, so the sample now frames its own box, with a little room at the foot for the credit strip. And a row's own glyph kept the colour it was first drawn in, because that colour was remembered against the kind alone and never asked again: set tracks to crimson, press **Back to how it came**, and the swatch went back to blue while the squiggle beside the row name stayed crimson. The glyph now follows the look like everything else.
 
 144 device tests ran with none failing, and the unit suite and lint are green. It shipped as 0.4.21.
+
+**Two rows in Appearance said less than they could.** "Light or dark" is now **Display**, and "Tracks and places" is now **Colours & Styles**, drawn in the same one-line label where it used to have a name and a subtitle under it. The page the row opens carries the same heading, so the word you tap is the word you land on. Both labels measured 53 px tall in a uiautomator dump - the same style rather than a near match - and the chevron at the right still says the row opens something.
+
+144 device tests ran on the emulator and on the tablet with none failing, and the unit suite and lint are green. It shipped as 0.4.22.
