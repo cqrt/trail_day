@@ -69,6 +69,7 @@ import nz.mckenzie.trailday.viewmodel.UpdateViewModel
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     updateViewModel: UpdateViewModel,
+    onOpenTracksAndPlaces: () -> Unit,
     onBack: () -> Unit
 ) {
     val updateState by updateViewModel.state.collectAsStateWithLifecycle()
@@ -262,6 +263,32 @@ fun SettingsScreen(
                         onChoose = viewModel::setThemeChoice,
                         text = { it.displayName }
                     )
+
+                    // The look of the map: a width and a colour for each kind of thing it draws. It is a
+                    // row rather than a section here because it is the same sort of answer as the theme -
+                    // how the app is drawn - and the questions it asks are six, which is a screen.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onOpenTracksAndPlaces)
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Tracks and places", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                text = "Width and colour for each kind.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        AppIcon(
+                            glyph = IconGlyph.CHEVRON,
+                            dimension = 18.dp,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 

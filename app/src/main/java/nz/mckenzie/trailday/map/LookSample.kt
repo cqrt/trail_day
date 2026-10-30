@@ -5,6 +5,7 @@ import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.look.LookTarget
 import nz.mckenzie.trailday.domain.look.MapLook
+import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import kotlin.math.cos
 
 /**
@@ -118,6 +119,26 @@ data class LookSample(
                 )
             )
         )
+
+        /**
+         * The box [build] draws [centre] in, for a map that has to frame the whole sample.
+         *
+         * The preview is a small map with no gestures, so how much of the sample it shows cannot be
+         * left to a zoom somebody picked: at the map's own reading zoom the box is a fifth of the
+         * preview and four of the six things are off the edge. Framing the box is the same answer as
+         * the map's own "fit my tracks", and the padding it brings is what keeps the sample clear of
+         * the credit strip along the foot.
+         */
+        fun bounds(centre: GeoPoint): LatLngBounds {
+            val northSouth = HALF_HEIGHT_M / METRES_PER_DEGREE
+            val eastWest = HALF_WIDTH_M / (METRES_PER_DEGREE * cos(Math.toRadians(centre.lat)))
+            return LatLngBounds(
+                minLat = centre.lat - northSouth,
+                minLng = centre.lng - eastWest,
+                maxLat = centre.lat + northSouth,
+                maxLng = centre.lng + eastWest
+            )
+        }
 
         /**
          * A line with a bend in it, [northM] from [centre].

@@ -31,6 +31,7 @@ import nz.mckenzie.trailday.ui.screens.RecordScreen
 import nz.mckenzie.trailday.ui.screens.RecordingDetailScreen
 import nz.mckenzie.trailday.ui.screens.RecordingsScreen
 import nz.mckenzie.trailday.ui.screens.SettingsScreen
+import nz.mckenzie.trailday.ui.screens.TracksAndPlacesScreen
 import nz.mckenzie.trailday.ui.screens.Tab
 import nz.mckenzie.trailday.ui.screens.AssetDetailScreen
 import nz.mckenzie.trailday.ui.screens.AssetEditScreen
@@ -56,6 +57,7 @@ import nz.mckenzie.trailday.viewmodel.RecordingDetailViewModel
 import nz.mckenzie.trailday.viewmodel.RecordingsViewModel
 import nz.mckenzie.trailday.viewmodel.RecordingViewModel
 import nz.mckenzie.trailday.viewmodel.SettingsViewModel
+import nz.mckenzie.trailday.viewmodel.TracksAndPlacesViewModel
 import nz.mckenzie.trailday.viewmodel.UpdateViewModel
 import nz.mckenzie.trailday.viewmodel.AssetDetailViewModel
 import nz.mckenzie.trailday.viewmodel.AssetListViewModel
@@ -64,7 +66,7 @@ import nz.mckenzie.trailday.web.WebEditorService
 import nz.mckenzie.trailday.web.WebEditorState
 
 /** Destinations for now; swap for a NavHost when routes need arguments. */
-private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, OFFLINE_OTHER_TRACKS_PICKER, OFFLINE_TOPO_PICKER, CREATE_JOURNEY, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, DOC, DOC_DETAIL, OTHER_TRACK_DETAIL, OTHER_TRACKS_BROWSER }
+private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, OFFLINE_OTHER_TRACKS_PICKER, OFFLINE_TOPO_PICKER, CREATE_JOURNEY, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, TRACKS_AND_PLACES, DOC, DOC_DETAIL, OTHER_TRACK_DETAIL, OTHER_TRACKS_BROWSER }
 
 class MainActivity : ComponentActivity() {
 
@@ -140,6 +142,10 @@ class MainActivity : ComponentActivity() {
                     destination = when (destination) {
                         Destination.DOC_DETAIL -> docDetailOrigin
                         Destination.OTHER_TRACK_DETAIL -> otherTrackDetailOrigin
+                        // The look screen is reached from Settings and goes back there, so a walker
+                        // fiddling with a colour and pressing back lands on the screen they left
+                        // rather than on the map.
+                        Destination.TRACKS_AND_PLACES -> Destination.SETTINGS
                         else -> Destination.MAP
                     }
                 }
@@ -430,7 +436,18 @@ class MainActivity : ComponentActivity() {
                         SettingsScreen(
                             viewModel = settingsViewModel,
                             updateViewModel = updateViewModel,
+                            onOpenTracksAndPlaces = { destination = Destination.TRACKS_AND_PLACES },
                             onBack = { destination = Destination.MAP }
+                        )
+                    }
+
+                    Destination.TRACKS_AND_PLACES -> {
+                        val lookViewModel: TracksAndPlacesViewModel = viewModel(
+                            factory = TracksAndPlacesViewModel.factory(applicationContext)
+                        )
+                        TracksAndPlacesScreen(
+                            viewModel = lookViewModel,
+                            onBack = { destination = Destination.SETTINGS }
                         )
                     }
 

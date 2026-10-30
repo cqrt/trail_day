@@ -69,6 +69,8 @@ import nz.mckenzie.trailday.offline.ProxyHealthCheck
 import nz.mckenzie.trailday.offline.TileTrouble
 import nz.mckenzie.trailday.map.AssetHitTest
 import nz.mckenzie.trailday.map.AssetLine
+import nz.mckenzie.trailday.map.MapCamera
+import nz.mckenzie.trailday.map.MapCameraMemory
 import nz.mckenzie.trailday.tracking.DevicePosition
 import nz.mckenzie.trailday.tracking.FusedLocationSource
 import nz.mckenzie.trailday.tracking.LocationSource
@@ -83,15 +85,6 @@ import nz.mckenzie.trailday.tracking.frameOnDevice
  * emit - so tapping "where am I" twice in a row would otherwise move the map once.
  */
 data class RecentreRequest(val bounds: LatLngBounds, val count: Int)
-
-/**
- * Where the map was last looking.
- *
- * Held by the view model rather than by the map view because the map is rebuilt when the walker
- * leaves the tab: without this, coming back from Settings - or from changing the basemap - opens on
- * the work or the phone instead of the ground they were reading.
- */
-data class MapCamera(val lat: Double, val lng: Double, val zoom: Double)
 
 /** What the four **Your Places** tiles count, shown under their names. */
 data class YourPlaceCounts(
@@ -774,13 +767,15 @@ class MapViewModel(
     /**
      * Where the map was last looking, so leaving the tab and coming back - or changing the basemap -
      * opens on the same ground rather than on the work or the phone.
+     *
+     * Kept in [MapCameraMemory] rather than here, because this is no longer the only screen that needs
+     * the ground: the look screen's preview draws its sample on it.
      */
-    private val _camera = MutableStateFlow<MapCamera?>(null)
-    val camera: StateFlow<MapCamera?> = _camera
+    val camera: StateFlow<MapCamera?> = MapCameraMemory.current
 
     /** The map has settled; keep where it settled. */
     fun rememberCamera(lat: Double, lng: Double, zoom: Double) {
-        _camera.value = MapCamera(lat = lat, lng = lng, zoom = zoom)
+        MapCameraMemory.remember(MapCamera(lat = lat, lng = lng, zoom = zoom))
     }
 
     private val _locationNotice = MutableStateFlow<String?>(null)
