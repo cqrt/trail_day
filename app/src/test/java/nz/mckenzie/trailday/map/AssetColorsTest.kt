@@ -14,10 +14,10 @@ import org.junit.Test
  * The colours the map and the list are built on.
  *
  * The five kinds' colours are no longer constants the app draws with - they are the five answers the
- * look is defaulted to ([MapLook.DEFAULT]), and the walker can choose any of the eight on the shelf
+ * look is defaulted to ([MapLook.DEFAULT]), and the walker can choose any of the eleven on the shelf
  * instead. So what is held here is the relationship between the two: the default is the shelf, the
- * recorded line is nobody's colour on it, and every colour on it can be read on the cards the app draws
- * on.
+ * recorded line is nobody's colour on it, and every colour on it has a tone that can be read on the
+ * cards the app draws on.
  *
  * Two of these were real bugs before the shelf existed: a brown that read on white and vanished on the
  * dark card, and a deep purple with the same story. A colour offered to the walker has to survive both.
@@ -76,7 +76,7 @@ class AssetColorsTest {
     @Test
     fun `every colour on the shelf is readable on the light card the list uses`() {
         LookColour.entries.forEach { colour ->
-            val ratio = contrastRatio(colour.hex, LIGHT_CARD)
+            val ratio = contrastRatio(colour.onLight, LIGHT_CARD)
             assertTrue("${colour.id} on a light card is only ${round(ratio)}:1", ratio >= MIN_CONTRAST)
         }
     }

@@ -46,10 +46,21 @@ class LookTargetTest {
     }
 
     @Test
+    fun `the trail has a row no kind answers to either, and it is a line's`() {
+        // The trail is a route rather than a kind or a publisher: it has a row because its colour and
+        // weight are the walker's, and a line's row because a route is drawn with a width.
+        assertTrue("the trail is a line's row", LookTarget.TE_ARAROA.control == LookControl.LINE)
+        assertTrue(
+            "no kind lands on the trail",
+            AssetKind.entries.none { LookTarget.of(it) == LookTarget.TE_ARAROA }
+        )
+    }
+
+    @Test
     fun `the lines and the places between them are every row`() {
         assertEquals(LookTarget.entries.size, LookTarget.LINES.size + LookTarget.PLACES.size)
         assertTrue("a row cannot be both", LookTarget.LINES.none { it in LookTarget.PLACES })
-        assertEquals("three lines", 3, LookTarget.LINES.size)
+        assertEquals("four lines", 4, LookTarget.LINES.size)
         assertEquals("three places", 3, LookTarget.PLACES.size)
     }
 

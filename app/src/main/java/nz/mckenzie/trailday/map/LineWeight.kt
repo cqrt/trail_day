@@ -40,6 +40,11 @@ value class LineWeight(val stylePx: Float) {
      *
      * Its edge is a touch narrower than the reference edge above, as it always has been - 1.4 against 1.8 -
      * because the trail is a long line seen from far off rather than a route you read up close.
+     *
+     * **The trail has a width row of its own now, and these two ratios are what its three chips are
+     * drawn with.** Normal is the 0.8 of a track it has been since the trail was first drawn, so the
+     * default look is unchanged; a thick trail is then allowed to be heavier than a thin track, which is
+     * the walker's answer rather than the app's ratio.
      */
     val trail: Float get() = stylePx * TRAIL_RATIO
     val trailEdge: Float get() = stylePx * TRAIL_EDGE_RATIO

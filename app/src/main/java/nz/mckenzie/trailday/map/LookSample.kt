@@ -15,11 +15,16 @@ import kotlin.math.cos
  * does not do that - a colour on a card says nothing about how it reads over aerial imagery. So the
  * preview is the map itself, with one of each thing drawn on it in the colours and widths in force.
  *
- * **Six things, and every row of the screen is one of them.** A track and a bike track are the walker's
- * own lines; the DOC line is the same track drawn from a publisher's source, so the white edge that
- * only a published line wears is in the picture; the fourth is the other tracks' line. Then a hut, a
- * campsite and a waypoint. Nothing is drawn that the screen cannot change, so what the walker sees is
- * exactly what a tap affects.
+ * **Seven things, and every row of the screen is one of them.** Te Araroa is the line across the top,
+ * because it is drawn under everything on the map: the one thing in the picture that is a route rather
+ * than somebody's work. A track and a bike track are the walker's own lines; the DOC line is the same
+ * track drawn from a publisher's source, so the white edge that only a published line wears is in the
+ * picture; the fourth is the other tracks' line. Then a hut, a campsite and a waypoint. Nothing is drawn
+ * that the screen cannot change, so what the walker sees is exactly what a tap affects.
+ *
+ * **The trail's colour is not in its document.** On the map the trail is drawn by a layer whose colour
+ * is set from the look, so the sample's trail is a geometry and nothing more - which is why it is built
+ * like the others and read for its shape alone.
  *
  * **Laid out in metres, not in map units.** The preview follows the ground the map was left on, which
  * may be a valley or a coastline, so the sample is placed relative to a centre and comes out the same
@@ -27,8 +32,8 @@ import kotlin.math.cos
  * Invercargill than in Kaitaia.
  *
  * A kilometre across at the preview's zoom is a picture a few hundred pixels wide: close enough to read
- * a colour, far enough apart that the six do not touch. The builder is the type's companion so that a
- * sample cannot be built for one look and drawn beside another.
+ * a colour, far enough apart that nothing touches. The builder is the type's companion so that a sample
+ * cannot be built for one look and drawn beside another.
  */
 data class LookSample(
     /** The walker's own work: a track, a bike track and the three places, in one source. */
@@ -36,7 +41,9 @@ data class LookSample(
     /** The same kind of line as a publisher's, which is the one that wears the white edge. */
     val doc: String,
     /** The councils' and trusts' line, in its own row's colour. */
-    val otherTracks: String
+    val otherTracks: String,
+    /** Te Araroa, whose colour the layer has: see [MapLook.colourOf]. */
+    val trail: String
 ) {
 
     companion object {
@@ -50,7 +57,8 @@ data class LookSample(
         /** A degree of latitude, in metres. The same number anywhere on the globe. */
         private const val METRES_PER_DEGREE = 111_320.0
 
-        /** The four lines, north to south, and the row under them that the three places sit in. */
+        /** The five lines, north to south, and the row under them that the three places sit in. */
+        private const val TRAIL_NORTH_M = 380.0
         private const val TRACK_NORTH_M = 240.0
         private const val BIKE_NORTH_M = 100.0
         private const val DOC_NORTH_M = -40.0
@@ -117,6 +125,18 @@ data class LookSample(
                         points = line(centre, OTHER_NORTH_M)
                     )
                 )
+            ),
+            // The trail's colour is the layer's, not its document's; the hex below is written because
+            // every line this builder draws carries one, and the trail layer never reads it.
+            trail = AssetGeoJson.build(
+                listOf(
+                    AssetLine(
+                        assetId = 0L,
+                        name = "",
+                        colorHex = look.colourOf(LookTarget.TE_ARAROA).hex,
+                        points = line(centre, TRAIL_NORTH_M)
+                    )
+                )
             )
         )
 
@@ -125,7 +145,7 @@ data class LookSample(
          *
          * The preview is a small map with no gestures, so how much of the sample it shows cannot be
          * left to a zoom somebody picked: at the map's own reading zoom the box is a fifth of the
-         * preview and four of the six things are off the edge. Framing the box is the same answer as
+         * preview and most of what it draws is off the edge. Framing the box is the same answer as
          * the map's own "fit my tracks", and the padding it brings is what keeps the sample clear of
          * the credit strip along the foot.
          */

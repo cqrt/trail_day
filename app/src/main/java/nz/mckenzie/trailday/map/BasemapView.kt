@@ -102,14 +102,10 @@ internal const val TRAIL_CASING_LAYER = "trailday-te-araroa-casing"
 internal const val TRAIL_LAYER = "trailday-te-araroa-line"
 
 /**
- * The trail's own colour: the rust a long-distance route is drawn in on a paper map, and the one strong
- * colour on the map that is nobody's kind - a track is blue, a bike track purple, a hut orange, a
- * campsite teal, a waypoint slate, and a line that was actually walked is green with a gold edge.
- */
-private const val TRAIL_COLOR = "#C1440E"
-
-/**
  * The trail's edge: white, for the reason the position dot's ring is - imagery is pale or dark.
+ *
+ * Its colour is the walker's now, and the only fixed thing about the trail's drawing is this edge. See
+ * [LookTarget.TE_ARAROA].
  */
 private const val TRAIL_CASING_COLOR = "#FFFFFF"
 
@@ -914,6 +910,9 @@ internal fun MapLibreMap.loadTrailDayStyle(
         val trackWeight = LineWeight(look.widthOf(LookTarget.TRACKS).stylePx)
         val bikeWeight = LineWeight(look.widthOf(LookTarget.BIKE_TRACKS).stylePx)
         val otherWeight = LineWeight(look.widthOf(LookTarget.OTHER_TRACKS).stylePx)
+        // The trail has a row of its own now, and its three widths are drawn at the trail's own ratios:
+        // Normal is the 0.8 of a track it has always been, so an untouched install draws what it drew.
+        val trailWeight = LineWeight(look.widthOf(LookTarget.TE_ARAROA).stylePx)
         // The regions first of all, under **everything**: on the picker they are not a line to read on the
         // ground, they are the choosing of the ground, and every route and place on the map belongs on top
         // of the shape that was chosen.
@@ -975,7 +974,7 @@ internal fun MapLibreMap.loadTrailDayStyle(
                 LineLayer(TRAIL_CASING_LAYER, TRAIL_SOURCE)
                     .withProperties(
                         PropertyFactory.lineColor(Expression.literal(TRAIL_CASING_COLOR)),
-                        PropertyFactory.lineWidth(Expression.literal(trackWeight.trailEdge)),
+                        PropertyFactory.lineWidth(Expression.literal(trailWeight.trailEdge)),
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                     )
@@ -985,8 +984,12 @@ internal fun MapLibreMap.loadTrailDayStyle(
             style.addLayer(
                 LineLayer(TRAIL_LAYER, TRAIL_SOURCE)
                     .withProperties(
-                        PropertyFactory.lineColor(Expression.literal(TRAIL_COLOR)),
-                        PropertyFactory.lineWidth(Expression.literal(trackWeight.trail)),
+                        // The row's colour rather than one baked in here: the trail's rust was the
+                        // walker's to change the day it got a row.
+                        PropertyFactory.lineColor(
+                            Expression.literal(look.colourOf(LookTarget.TE_ARAROA).hex)
+                        ),
+                        PropertyFactory.lineWidth(Expression.literal(trailWeight.trail)),
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                     )
@@ -1155,9 +1158,15 @@ private fun applyLook(style: Style, look: MapLook, density: Float) {
         style.getLayer(id)?.setProperties(PropertyFactory.lineWidth(Expression.literal(value)))
     }
 
-    // The trail, which is nobody's kind and follows the tracks' width because it is drawn under them.
-    width(TRAIL_CASING_LAYER, tracks.trailEdge)
-    width(TRAIL_LAYER, tracks.trail)
+    // The trail: its own row's widths at the trail's own ratios, so its three chips mean what they
+    // always meant - and its colour, which is the one colour on this map that lives in a layer rather
+    // than in the document drawn by it.
+    val trail = LineWeight(look.widthOf(LookTarget.TE_ARAROA).stylePx)
+    width(TRAIL_CASING_LAYER, trail.trailEdge)
+    width(TRAIL_LAYER, trail.trail)
+    style.getLayer(TRAIL_LAYER)?.setProperties(
+        PropertyFactory.lineColor(Expression.literal(look.colourOf(LookTarget.TE_ARAROA).hex))
+    )
     // The other publisher's line and its casing.
     width(OtherTracksLayerIds.CASING, others.edge)
     width(OtherTracksLayerIds.LINE, others.stylePx)

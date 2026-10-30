@@ -866,17 +866,17 @@ private fun LayerSwitchRow(
  */
 @Composable
 private fun OtherTracksTile() {
-    // The row's colour as chosen, and its derived tone on a dark screen: the same two answers the map
-    // draws the layer with, so the sheet and the map cannot disagree about whose lines are whose.
+    // The row's colour as chosen, and the tone its card needs on either theme: the same two answers the
+    // map and the look screen draw with, so the sheet cannot disagree about whose lines are whose.
     val look by Look.current.collectAsStateWithLifecycle()
     val dark = isSystemInDarkTheme()
     val hex = remember(look, dark) {
         if (dark) look.colourOnDark(LookTarget.OTHER_TRACKS)
-        else look.colourOf(LookTarget.OTHER_TRACKS).hex
+        else look.colourOnLight(LookTarget.OTHER_TRACKS)
     }
     val colour = remember(hex) { Color(android.graphics.Color.parseColor(hex)) }
     GlyphTile(
-        glyph = IconGlyph.TRAIL,
+        glyph = IconGlyph.LINES,
         background = colour.copy(alpha = 0.22f),
         tint = colour
     )

@@ -46,7 +46,8 @@ enum class IconGlyph {
     PLUS,
     MINUS,
     ALERT,
-    TRAIL
+    TRAIL,
+    LINES
 }
 
 /**
@@ -134,6 +135,17 @@ internal fun AppIcon(
                 line(0.22f, 0.50f, 0.80f, 0.50f)
                 line(0.44f, 0.26f, 0.20f, 0.50f)
                 line(0.20f, 0.50f, 0.44f, 0.74f)
+            }
+
+            // Another publisher's line: two lines running beside each other, which is the question the
+            // walker is answering when they colour the tracks councils and trusts publish - a line that
+            // is not the only one on the ground. The trail's own mark below is a journey; this one is a
+            // line among others.
+            IconGlyph.LINES -> {
+                line(0.22f, 0.36f, 0.46f, 0.28f)
+                line(0.46f, 0.28f, 0.78f, 0.40f)
+                line(0.22f, 0.68f, 0.46f, 0.60f)
+                line(0.46f, 0.60f, 0.78f, 0.72f)
             }
 
             // The long pathway: a route that bends its way up the grid, with a mark at either end. The

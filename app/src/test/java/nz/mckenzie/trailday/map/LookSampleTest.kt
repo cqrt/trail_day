@@ -33,9 +33,10 @@ class LookSampleTest {
         assertEquals("two lines", 2, count(sample.assets, "\"type\":\"LineString\""))
         assertEquals("three places", 3, count(sample.assets, "\"type\":\"Point\""))
 
-        // One published line, which is the cased one, and one other publisher's line.
+        // One published line, which is the cased one, one other publisher's line, and the trail.
         assertEquals("a published line", 1, count(sample.doc, "\"type\":\"LineString\""))
         assertEquals("and another publisher's", 1, count(sample.otherTracks, "\"type\":\"LineString\""))
+        assertEquals("and the trail", 1, count(sample.trail, "\"type\":\"LineString\""))
     }
 
     @Test
@@ -47,6 +48,7 @@ class LookSampleTest {
             .withColour(LookTarget.HUTS, LookColour.BLUE)
             .withColour(LookTarget.CAMPSITES, LookColour.PURPLE)
             .withColour(LookTarget.WAYPOINTS, LookColour.ORANGE)
+            .withColour(LookTarget.TE_ARAROA, LookColour.LEMON)
 
         val sample = LookSample.build(centre, look)
 
@@ -57,6 +59,9 @@ class LookSampleTest {
         assertTrue("the waypoint", sample.assets.contains(LookColour.ORANGE.hex))
         assertTrue("the published line is the track colour", sample.doc.contains(LookColour.CRIMSON.hex))
         assertTrue("the other publisher's line", sample.otherTracks.contains(LookColour.CHARCOAL.hex))
+        // The trail's colour is the layer's on the map, so what is held here is only that the sample
+        // carries the row's answer with it rather than a colour of its own.
+        assertTrue("the trail", sample.trail.contains(LookColour.LEMON.hex))
     }
 
     @Test
@@ -77,7 +82,7 @@ class LookSampleTest {
         // reached beyond the preview's zoom would be drawn over tiles the walker cannot see.
         listOf(GeoPoint(lat = -46.4, lng = 168.3), GeoPoint(lat = -35.0, lng = 173.2)).forEach { ground ->
             val sample = LookSample.build(ground, MapLook.DEFAULT)
-            val documents = listOf(sample.assets, sample.doc, sample.otherTracks)
+            val documents = listOf(sample.assets, sample.doc, sample.otherTracks, sample.trail)
 
             documents.flatMap(::coordinates).forEach { (lng, lat) ->
                 val north = (lat - ground.lat) * METRES_PER_DEGREE
@@ -90,10 +95,11 @@ class LookSampleTest {
 
     @Test
     fun `the sample fills the preview rather than sitting in one corner of it`() {
-        // Six things in a heap would be one colour bobbing about; they are laid out across the box so a
-        // width and a colour can each be read on their own.
+        // Seven things in a heap would be one colour bobbing about; they are laid out across the box so
+        // a width and a colour can each be read on their own.
         val sample = LookSample.build(centre, MapLook.DEFAULT)
-        val points = listOf(sample.assets, sample.doc, sample.otherTracks).flatMap(::coordinates)
+        val points = listOf(sample.assets, sample.doc, sample.otherTracks, sample.trail)
+            .flatMap(::coordinates)
 
         val norths = points.map { (_, lat) -> (lat - centre.lat) * METRES_PER_DEGREE }
         val easts = points.map { (lng, _) ->

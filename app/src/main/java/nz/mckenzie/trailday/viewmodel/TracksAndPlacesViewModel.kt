@@ -22,7 +22,7 @@ import nz.mckenzie.trailday.domain.look.MarkerSizeChoice
 import nz.mckenzie.trailday.domain.tiles.Basemap
 
 /**
- * The look screen: **six rows, and every tap is stored at once.**
+ * The look screen: **seven rows, and every tap is stored at once.**
  *
  * There is no Save. A colour is a thing the walker is looking at - on the preview above the rows and
  * on the map behind them - and a screen that asked them to confirm it would be a screen where the

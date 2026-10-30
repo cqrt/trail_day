@@ -49,7 +49,7 @@ import org.maplibre.android.geometry.LatLng
 /** How many swatches go on one line of the shelf: four and four, whatever the screen width. */
 private const val COLOURS_PER_ROW = 4
 
-/** How much map the preview gets: enough for six things to be told apart, not a whole screen. */
+/** How much map the preview gets: enough for seven things to be told apart, not a whole screen. */
 private val PREVIEW_HEIGHT = 240.dp
 
 /**
@@ -62,19 +62,20 @@ private val PREVIEW_HEIGHT = 240.dp
 private const val PREVIEW_FOOT_ROOM_PX = 112
 
 /**
- * **Colours & Styles**: a width and a colour for each of the six things the map draws.
+ * **Colours & Styles**: a width and a colour for each of the seven things the map draws.
  *
- * The order of the screen is the order of the map: the three lines from the top down, then the three
- * places. Every row is one thing the walker can see drawn, and the preview above them is the map they
- * are looking at rather than a picture of it - see [LookSample].
+ * The order of the screen is the order of the map: the trail first, because it is drawn under
+ * everything else, then the lines from the top down, then the three places. Every row is one thing the
+ * walker can see drawn, and the preview above them is the map they are looking at rather than a picture
+ * of it - see [LookSample].
  *
  * **There is no Save.** A tap is the change: the preview redraws, the map behind this screen redraws,
  * and the place list and the desk pick it up the next time they are drawn. A screen that asked the
  * walker to confirm a colour would be a screen where the picture is a proposal.
  *
- * The six rows are not the five kinds: **other tracks are a publisher, not a kind**, and giving them a
- * row is what lets a walker keep a council's walkway apart from DOC's once they have chosen a colour
- * for tracks. See [LookTarget].
+ * The seven rows are not the five kinds: **other tracks are a publisher, not a kind**, and Te Araroa is a
+ * route - and giving each of them a row is what lets a walker keep a council's walkway apart from DOC's,
+ * or the trail apart from both, once they have chosen a colour for tracks. See [LookTarget].
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -130,15 +131,17 @@ fun TracksAndPlacesScreen(
                     otherTracksGeoJson = sample.otherTracks,
                     // The reference layers are off on every other screen but the map's. Here they are
                     // on, because the sample draws one line from each of the three publishers and the
-                    // walker is choosing a colour for one of them.
+                    // walker is choosing a colour for one of them - and the trail, which has a row too.
                     showOtherTracks = true,
+                    showTeAraroa = true,
+                    teAraroaGeoJson = sample.trail,
                     // A preview: the page is about the look, and a drag would only slide the sample
                     // off the picture it is meant to show.
                     interactive = false,
                     showPosition = false,
                     initialTarget = LatLng(centre.lat, centre.lng),
                     // The whole sample, framed the way the map frames the walker's own work. A zoom
-                    // picked by hand showed a fifth of it and four of the six things fell off an edge.
+                    // picked by hand showed a fifth of it and four of the seven things fell off an edge.
                     fitBounds = remember(centre) { LookSample.bounds(centre) },
                     fitBoundsPaddingBottomPx = PREVIEW_FOOT_ROOM_PX,
                     modifier = Modifier.fillMaxSize()
@@ -213,9 +216,9 @@ private fun LookCard(
             // The whole shelf on every row, so the same colour can be used twice: a walker who wants
             // their campsites the colour of their tracks has no other way to say so.
             //
-            // Two rows of four rather than a wrapping flow: eight swatches come out as seven and one
-            // on a phone this wide, and a lone swatch at the end reads as a mistake rather than as the
-            // last colour. Four and four is the shelf however wide the screen is.
+            // Four to a row rather than a wrapping flow: eleven swatches come out as a ragged last line
+            // either way, and a row of four reads as a shelf however wide the screen is. The last line
+            // of three is the new end of it - the lemon, the sky and the trail's rust.
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 LookColour.entries.chunked(COLOURS_PER_ROW).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -236,37 +239,41 @@ private fun LookCard(
 /**
  * The row's own glyph, in the row's own colour: a hut's roof for huts, a line for a track.
  *
- * The light colour on a light screen and the derived dark tone on a dark one, which is the app's rule
- * for a glyph on a card - a deep purple on charcoal is a glyph nobody sees. The map's own drawing is
- * the light colour whatever the theme, because it is drawn over imagery rather than over a card.
+ * The deep tone on a light card and the derived dark tone on a dark one, which is the app's rule for a
+ * glyph on a card - a deep purple on charcoal is a glyph nobody sees, and a lemon on white is the same
+ * problem the other way round. The map's own drawing is the shelf's colour whatever the theme, because
+ * it is drawn over imagery rather than over a card.
  */
 @Composable
 private fun TargetGlyph(target: LookTarget, look: MapLook) {
-    if (target == LookTarget.OTHER_TRACKS) {
-        // Somebody else's material, which the app marks with the trail glyph because it is not one of
-        // its own five shapes. Its colour is not a kind's, so the look is asked for the row itself.
-        val hex = if (isSystemInDarkTheme()) {
-            look.colourOnDark(target)
-        } else {
-            look.colourOf(target).hex
-        }
-        AppIcon(
-            glyph = IconGlyph.TRAIL,
-            dimension = 24.dp,
-            tint = remember(hex) { Color(android.graphics.Color.parseColor(hex)) }
-        )
-    } else {
+    val kind = kindOf(target)
+    if (kind != null) {
         // A kind draws the glyph it draws everywhere else, in the colour the look gives it.
-        AssetKindIcon(kind = kindOf(target), dimension = 24.dp)
+        AssetKindIcon(kind = kind, dimension = 24.dp)
+        return
     }
+
+    // The two rows that are not a kind: the trail, and the lines other people publish. Each has a mark
+    // of its own, because two rows with one glyph is two rows the walker cannot tell apart at a glance.
+    val hex = if (isSystemInDarkTheme()) {
+        look.colourOnDark(target)
+    } else {
+        look.colourOnLight(target)
+    }
+    AppIcon(
+        glyph = if (target == LookTarget.TE_ARAROA) IconGlyph.TRAIL else IconGlyph.LINES,
+        dimension = 24.dp,
+        tint = remember(hex) { Color(android.graphics.Color.parseColor(hex)) }
+    )
 }
 
-/** The kind a row draws, for the rows that are one. */
-private fun kindOf(target: LookTarget): AssetKind = when (target) {
+/** The kind a row draws, or null for the rows that are not one. */
+private fun kindOf(target: LookTarget): AssetKind? = when (target) {
     LookTarget.TRACKS -> AssetKind.TRACK
     LookTarget.BIKE_TRACKS -> AssetKind.BIKE_TRACK
     LookTarget.HUTS -> AssetKind.HUT
     LookTarget.CAMPSITES -> AssetKind.CAMPSITE
     LookTarget.WAYPOINTS -> AssetKind.WAYPOINT
-    LookTarget.OTHER_TRACKS -> AssetKind.TRACK
+    LookTarget.OTHER_TRACKS -> null
+    LookTarget.TE_ARAROA -> null
 }

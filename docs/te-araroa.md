@@ -65,9 +65,13 @@ notice the file going missing, going empty, or being replaced by one of somewher
 
 ## How it looks
 
-A rust-coloured line (`#C1440E`) with a white edge. It is narrower than a line you drew yourself, and
-the edge is there for the same reason the position dot has a ring: imagery is pale in places and dark in
-others, and a line has to read on both.
+A line with a white edge, in the colour you have chosen for it. It was rust (`#C1440E`) until the trail
+had a row of its own in Settings, and rust is what it still is until you change it.
+
+The width is yours too: Thin, Normal or Thick, drawn at the trail's own proportions. Normal is what it
+has always been, a shade narrower than a track you drew yourself, so a trail switched on for the first
+time looks as it always did. The edge is there for the same reason the position dot has a ring: imagery
+is pale in places and dark in others, and a line has to read on both.
 
 The file is read off the main thread the first time the layer is switched on, and held from then on.
 701 KB is not something a map's first frame should wait for, and somebody who never wants the trail
@@ -89,6 +93,7 @@ is not a credit.
 | --- | --- |
 | `domain/tiles/TeAraroa.kt` | The asset's name, the credit and its link |
 | `map/TeAraroaGeoJson.kt` | Reads the asset once, off the main thread |
-| `map/BasemapView.kt` | Installs the layer first, under everything else |
+| `map/BasemapView.kt` | Installs the layer first, under everything else, in the row's colour |
+| `domain/look/LookTarget.kt` | The `Te Araroa` row, and the widths its chips are drawn at |
 | `ui/screens/MapScreen.kt` | The switch, and the second credit |
 | `app/src/test/.../TeAraroaAssetTest.kt` | Holds the asset to its numbers |

@@ -3,7 +3,7 @@ package nz.mckenzie.trailday.domain.look
 import nz.mckenzie.trailday.domain.asset.AssetKind
 
 /**
- * The whole look: **a colour and a size for each of the six rows**, and nothing else.
+ * The whole look: **a colour and a size for each of the seven rows**, and nothing else.
  *
  * A `MapLook` is a value, not a service. Everything that draws asks one of these for a colour or a
  * width, which is what keeps the map, the list's glyphs, a place's own page and the desk from
@@ -37,6 +37,12 @@ data class MapLook private constructor(
 
     /** A [kind]'s colour at a light tone. */
     fun colourOnDark(kind: AssetKind): String = colourOnDark(LookTarget.of(kind))
+
+    /** [target]'s colour at a deep tone, for a glyph on a light card. */
+    fun colourOnLight(target: LookTarget): String = colourOf(target).onLight
+
+    /** A [kind]'s colour at a deep tone. */
+    fun colourOnLight(kind: AssetKind): String = colourOnLight(LookTarget.of(kind))
 
     /**
      * The colour a place is drawn in: **the recorded green when a walk has been made of it**, its row's
@@ -111,10 +117,12 @@ data class MapLook private constructor(
 
         /**
          * What the app draws before anybody chooses: the five kinds' own colours, the teal the
-         * councils' and trusts' lines have always worn, and the width and size it has always used.
+         * councils' and trusts' lines have always worn, the rust the trail has always worn, and the
+         * width and size it has always used.
          */
         val DEFAULT: MapLook = build(
             colour = mapOf(
+                LookTarget.TE_ARAROA to LookColour.RUST,
                 LookTarget.TRACKS to LookColour.BLUE,
                 LookTarget.BIKE_TRACKS to LookColour.PURPLE,
                 LookTarget.OTHER_TRACKS to LookColour.TEAL,

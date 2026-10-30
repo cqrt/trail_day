@@ -58,7 +58,7 @@ fun KindTile(
 }
 
 /**
- * The kind's colour for the screen it is on: the light set, or the derived dark one.
+ * The kind's colour for the screen it is on: the tone its card needs.
  *
  * **The look is collected rather than read**, so a glyph already on the screen repaints when the
  * walker changes a colour. Reading it inside a `remember` whose key was only the kind is what left a
@@ -75,6 +75,6 @@ internal fun kindColour(kind: AssetKind, dark: Boolean = isSystemInDarkTheme()):
 internal fun kindHex(kind: AssetKind, dark: Boolean = isSystemInDarkTheme()): String {
     val look by Look.current.collectAsStateWithLifecycle()
     return remember(look, kind, dark) {
-        if (dark) look.colourOnDark(kind) else look.colourOf(kind).hex
+        if (dark) look.colourOnDark(kind) else look.colourOnLight(kind)
     }
 }

@@ -128,6 +128,27 @@ class MapLookTest {
         assertEquals(LookColour.CRIMSON.onDark, chosen.colourOnDark(AssetKind.HUT))
     }
 
+    @Test
+    fun `the light tone of a row is its chosen colour's light tone`() {
+        // The lemon is pale enough to need one: a glyph drawn in it on a white card is nearly nothing.
+        val chosen = MapLook.DEFAULT.withColour(LookTarget.HUTS, LookColour.LEMON)
+
+        assertEquals(LookColour.LEMON.onLight, chosen.colourOnLight(AssetKind.HUT))
+    }
+
+    @Test
+    fun `the trail has a row of its own, and it is the rust and the width it has always been`() {
+        val look = MapLook.DEFAULT
+
+        assertEquals("the trail's rust", LookColour.RUST, look.colourOf(LookTarget.TE_ARAROA))
+        assertEquals(
+            "every line's width, drawn at the trail's own ratios",
+            LineWidthChoice.NORMAL,
+            look.widthOf(LookTarget.TE_ARAROA)
+        )
+        assertTrue("an untouched install is still the default", look.isDefault)
+    }
+
     private companion object {
         /** Reached through the map package, where the app's own colours live. */
         val AssetColors = nz.mckenzie.trailday.map.AssetColors

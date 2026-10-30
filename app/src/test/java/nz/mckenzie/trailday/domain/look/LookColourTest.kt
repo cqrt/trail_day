@@ -8,18 +8,19 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The shelf of colours, and the dark tone each one is given.
+ * The shelf of colours, and the tone each one is given for either card.
  *
- * Two things are being held still here. The first is that no colour on the shelf can be mistaken for
- * the line that was walked: a green track beside a recorded green track says nothing. The second is
- * that every colour has a dark-screen tone that reads, because the app follows the phone's theme and a
- * colour chosen on a white page is the colour a walker then takes into a dark one.
+ * Three things are being held still here. The first is that no colour on the shelf can be mistaken for
+ * the line that was walked: a green track beside a recorded green track says nothing. The second is that
+ * every colour has a tone that reads on a dark card, because the app follows the phone's theme and a
+ * colour chosen on a white page is the colour a walker then takes into a dark one - and a third for the
+ * same reason the other way round, since the lemon and the sky nearly vanish on white.
  */
 class LookColourTest {
 
     @Test
-    fun `eight colours, each with its own id and its own value`() {
-        assertEquals("the shelf's size", 8, LookColour.entries.size)
+    fun `eleven colours, each with its own id and its own value`() {
+        assertEquals("the shelf's size", 11, LookColour.entries.size)
         assertEquals(
             "two colours under one id would overwrite each other in preferences",
             LookColour.entries.size,
@@ -50,28 +51,70 @@ class LookColourTest {
 
     @Test
     fun `every colour reads on the page a dark phone draws behind a card`() {
-        val page = LightTone.luminance(LightTone.DARK_PAGE)!!
+        val page = CardTone.luminance(CardTone.DARK_PAGE)!!
 
         LookColour.entries.forEach { colour ->
-            val ratio = contrast(LightTone.luminance(colour.onDark)!!, page)
+            val ratio = contrast(CardTone.luminance(colour.onDark)!!, page)
             assertTrue(
                 "${colour.id}'s dark tone ${colour.onDark} is only ${round(ratio)}:1 on the dark page",
-                ratio >= LightTone.TARGET_CONTRAST
+                ratio >= CardTone.DARK_TARGET_CONTRAST
             )
         }
     }
 
     @Test
-    fun `the dark tone is lighter than the colour it comes from, and adds nothing else`() {
+    fun `every colour reads on the card a light phone draws behind a glyph`() {
+        val card = CardTone.luminance(CardTone.LIGHT_PAGE)!!
+
         LookColour.entries.forEach { colour ->
+            val ratio = contrast(CardTone.luminance(colour.onLight)!!, card)
             assertTrue(
-                "${colour.id} is not lifted at all",
-                LightTone.luminance(colour.onDark)!! > LightTone.luminance(colour.hex)!!
+                "${colour.id}'s light tone ${colour.onLight} is only ${round(ratio)}:1 on a white card",
+                ratio >= CardTone.LIGHT_TARGET_CONTRAST
             )
-            // Only white is mixed in, so no channel of the lifted tone can be dimmer than the colour
-            // it came from. The hue survives because nothing was taken away.
+        }
+    }
+
+    @Test
+    fun `a tone never moves a colour the wrong way, and only moves one that needs it`() {
+        val darkPage = CardTone.luminance(CardTone.DARK_PAGE)!!
+        val lightCard = CardTone.luminance(CardTone.LIGHT_PAGE)!!
+
+        LookColour.entries.forEach { colour ->
+            val value = CardTone.luminance(colour.hex)!!
+
+            // Never dimmer on a dark card, and never brighter on a light one: the tone is the floor,
+            // not an instruction to wash a colour out.
+            assertTrue(
+                "${colour.id} is dimmed rather than lifted",
+                CardTone.luminance(colour.onDark)!! >= value
+            )
+            assertTrue(
+                "${colour.id} is washed out rather than deepened",
+                CardTone.luminance(colour.onLight)!! <= value
+            )
+            // Where the colour already reads, it is handed back as it is: a lemon that reads on the
+            // dark page is the lemon the swatch shows, not a paler one.
+            if (contrast(value, darkPage) >= CardTone.DARK_TARGET_CONTRAST) {
+                assertEquals("${colour.id} was lifted for nothing", colour.hex, colour.onDark)
+            }
+            if (contrast(value, lightCard) >= CardTone.LIGHT_TARGET_CONTRAST) {
+                assertEquals("${colour.id} was deepened for nothing", colour.hex, colour.onLight)
+            }
+        }
+    }
+
+    @Test
+    fun `a tone adds white or black and nothing else`() {
+        LookColour.entries.forEach { colour ->
+            // Only one end is mixed in, so no channel of a lifted tone can be dimmer than the colour it
+            // came from, and none of a deepened one can be brighter. The hue survives because nothing
+            // was taken away.
             channels(colour.hex).zip(channels(colour.onDark)).forEach { (from, to) ->
                 assertTrue("${colour.id} lost some of a channel: $from to $to", to >= from)
+            }
+            channels(colour.hex).zip(channels(colour.onLight)).forEach { (from, to) ->
+                assertTrue("${colour.id} gained some of a channel: $from to $to", to <= from)
             }
         }
     }
@@ -80,16 +123,22 @@ class LookColourTest {
     fun `a colour that already reads on a dark page is handed back as it is`() {
         // The tone is a floor, not an instruction: washing out a colour that was already light enough
         // would make the same choice look different depending on which shade it started from.
-        assertEquals("#FFFFFF", LightTone.of("#FFFFFF"))
-        assertEquals("#EEEEEE", LightTone.of("#EEEEEE"))
+        assertEquals("#FFFFFF", CardTone.lifted("#FFFFFF"))
+        assertEquals("#EEEEEE", CardTone.lifted("#EEEEEE"))
+    }
+
+    @Test
+    fun `a colour that already reads on a white card is handed back as it is`() {
+        assertEquals("#212121", CardTone.deepened("#212121"))
+        assertEquals("#B3261E", CardTone.deepened("#B3261E"))
     }
 
     @Test
     fun `a value that is not a colour is handed back rather than guessed at`() {
-        assertEquals("", LightTone.of(""))
-        assertEquals("not a colour", LightTone.of("not a colour"))
-        assertEquals("#12345", LightTone.of("#12345"))
-        assertNull(LightTone.luminance("nonsense"))
+        assertEquals("", CardTone.lifted(""))
+        assertEquals("not a colour", CardTone.lifted("not a colour"))
+        assertEquals("#12345", CardTone.lifted("#12345"))
+        assertNull(CardTone.luminance("nonsense"))
     }
 
     @Test
