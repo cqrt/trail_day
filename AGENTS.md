@@ -3,7 +3,7 @@
 Trail Day is an Android app for walkers in New Zealand: a map of your own places and DOC's
 published tracks, huts, campsites and bike locations, a recorder for the walk you are on, and the
 offline imagery, drawn map and DOC material to do all of it with no reception. The phone also
-serves a page to a laptop, which is where files are brought in.
+serves a page to a desktop, which is where files are brought in.
 
 This file is the part that is not in the app: where the history is, how a change lands, how to look
 at your work on an emulator, and what was left open on purpose.
@@ -116,6 +116,18 @@ own: `cd worker-linz`, `npx wrangler secret put LINZ_API_KEY`, then `npm run dep
 answering before a release goes out** — `curl https://<worker>/health` — or every map in that release
 is blank. The key is a secret there, so rotating one is a command rather than a release, which is the
 point: LINZ's standard-access keys expire every 90 days.
+
+## Deciding how it looks
+
+When the question is how something should look — a width, a colour, a size — the answer is a mockup
+drawn in the chat, not a description of one. It's the real thing: the app's own imagery, its own
+colours and its own font, with the choice on it as a live control, so the difference between 3 and 5 is
+a click rather than a paragraph. Two or three candidates beside what it is now, over the situations it
+will be seen in.
+
+It stays in the chat. A mockup is the question being answered, not a document to keep, so nothing is
+saved into `docs/` and no picture of it is committed. What comes out of it is a number, and a sentence
+in the plan log.
 
 ## The house voice
 
