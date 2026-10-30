@@ -26,7 +26,7 @@ not 222 m.
 **It is drawn as its own line**, so a spur appears where it actually goes rather than as a straight leap
 from the end of the line back to its junction.
 
-**It travels with the place.** A side track is in the backup file, in the export, and in what the laptop
+**It travels with the place.** A side track is in the backup file, in the export, and in what the desktop
 page is shown.
 
 ## GPX, both ways

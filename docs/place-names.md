@@ -57,8 +57,8 @@ Names are written white with a dark outline, so they read over a photograph of a
 one row in the map's sheet, beside the other layers, and it is remembered.
 
 The band table, the colours and the sizes are all in one file (`domain/tiles/PlaceLabels.kt`), and both
-the phone's map and the laptop page read every number from it, so a town cannot be one size on the
-phone and another on the laptop.
+the phone's map and the desktop page read every number from it, so a town cannot be one size on the
+phone and another on the desktop.
 
 ## Offline
 
@@ -82,7 +82,7 @@ publisher was a third more strip for something you had already read.
 | --- | --- |
 | `domain/tiles/PlaceLabels.kt` | The tileset, the layer, the six bands and their numbers |
 | `map/BasemapStyles.kt` | The phone's style: one symbol layer per band |
-| `map/WebStyleJson.kt` | The laptop page's style, built from the same numbers |
+| `map/WebStyleJson.kt` | The desktop page's style, built from the same numbers |
 | `offline/TileServerHolder.kt` | The source in the tile server, cached rather than downloaded |
 | `data/SettingsRepository.kt` | `place_names`, off when unset |
 | `ui/screens/MapScreen.kt` | The row in **What the map draws** |

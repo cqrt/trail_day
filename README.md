@@ -2,7 +2,7 @@
 
 Trail Day is an Android app for walking and riding in the New Zealand backcountry. It puts DOC's tracks, huts and campsites, tracks published by councils and trusts, your own saved places and your recorded trips on one map, and it can keep all of that on your phone so it still works when you have no reception.
 
-You find a track or hut, save it, download the map around it, and then follow it and record your trip. A lot of it also works from a laptop browser on the same Wi-Fi.
+You find a track or hut, save it, download the map around it, and then follow it and record your trip. A lot of it also works from a desktop browser on the same Wi-Fi.
 
 It's installed straight from GitHub rather than a store, and updates itself from there.
 
@@ -94,11 +94,11 @@ DOC's API key is kept on its own Worker (`worker/`), not in the app.
 
 These come from the National Tracks Dataset published by Herenga ā Nuku Aotearoa (the Outdoor Access Commission), which merges tracks from councils, trusts, clubs and Te Araroa. The app leaves out DOC's own tracks (the DOC browser covers those), tracks that nobody may walk on, and tracks with no name. A track published in sections by different publishers under one name is shown as a single track. Te Araroa's line is drawn as its own separate layer ([details](docs/te-araroa.md)).
 
-## The laptop page
+## The desktop page
 
-The phone can serve a web page to a laptop on the same Wi-Fi. Turn it on in Settings, which shows the address to open. The page shows the same map and places as the phone, lets you import track files, and has the DOC and other-tracks browsers. It reads from the phone's own data, so the two always agree.
+The phone can serve a web page to a desktop on the same Wi-Fi. Turn it on in Settings, which shows the address to open. The page shows the same map and places as the phone, lets you import track files, and has the DOC and other-tracks browsers. It reads from the phone's own data, so the two always agree.
 
-The laptop page doesn't draw or edit lines any more. That was removed, and the phone is the only place you create or change a track. There's a Settings switch to keep the phone awake while it's serving ([details](docs/web-editor.md)).
+The desktop page doesn't draw or edit lines any more. That was removed, and the phone is the only place you create or change a track. There's a Settings switch to keep the phone awake while it's serving ([details](docs/web-editor.md)).
 
 ## Backup and restore
 
@@ -125,7 +125,7 @@ No map key is needed. Then:
 
 ```bash
 ./gradlew assembleDebug testDebugUnitTest lint   # what CI runs
-node --test app/src/test/js/*.test.mjs           # tests for the laptop page's scripts
+node --test app/src/test/js/*.test.mjs           # tests for the desktop page's scripts
 ./gradlew connectedDebugAndroidTest              # needs a device or emulator
 ./gradlew assembleRelease bundleRelease          # needs signing secrets
 ```
@@ -163,7 +163,7 @@ The app is in `app/src/main/java/nz/mckenzie/trailday/`:
 | `ui/` and `viewmodel/` | Screens and their view models |
 | `tracking/` | Recording and its background service |
 | `backup/`, `update/`, `photo/` | Backups, self-update and waypoint photos |
-| `web/` | The server behind the laptop page. The page itself is in `app/src/main/assets/web/` |
+| `web/` | The server behind the desktop page. The page itself is in `app/src/main/assets/web/` |
 
 Outside the app: `worker/` holds the DOC key, `worker-linz/` holds the LINZ key (separate so heavy map tile traffic can't use up DOC's rate limit), and `docs/` has a write-up for each bigger feature.
 

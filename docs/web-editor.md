@@ -1,6 +1,6 @@
-# The laptop page
+# The desktop page
 
-The phone can serve a page to a laptop on the same Wi-Fi. It is for the jobs a bigger screen is better
+The phone can serve a page to a desktop on the same Wi-Fi. It is for the jobs a bigger screen is better
 at: reading the list, comparing two tracks, and bringing a file in.
 
 ## Turning it on
@@ -9,7 +9,7 @@ Settings has a card headed **Serve the editor to a computer on this Wi-Fi**. It 
 open, and a switch to stop serving. It is on from launch until you turn it off, and off stays off.
 
 While it is switched on, the page is served to the whole network the phone is on, which is what lets you
-type the address on a laptop. **Only this address can open it** adds a secret to the links it gives you,
+type the address on a desktop. **Only this address can open it** adds a secret to the links it gives you,
 so the page opens from the address on the card and from nowhere else.
 
 A second switch, **Keep this phone awake while it is serving**, holds the screen on and dimmed so the

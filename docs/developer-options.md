@@ -76,5 +76,5 @@ On the emulator, with a deliberately bogus key - a wrong key is refused where a 
   Settings where they have always been. Moving them in here was considered and left: hiding working
   features to tidy a screen is a loss.
 - **The key travels in the URL.** That is LINZ's own API shape, so it lands in any log on the way,
-  including the browser's when the laptop page fetches a sprite. This is exactly why the key belongs on
+  including the browser's when the desktop page fetches a sprite. This is exactly why the key belongs on
   a Worker for ordinary use, and why this section is hidden.

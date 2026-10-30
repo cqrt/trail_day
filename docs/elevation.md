@@ -38,10 +38,10 @@ Once, in one place: `domain/geo/ElevationProfile.kt` takes a list of points and 
 the highest, the total climb and descent, and the heights laid out for drawing. It is plain Kotlin with
 no Android in it, so it is held by unit tests.
 
-The words are in `ElevationPhrase.kt` beside it, so the phone's card and the laptop page cannot say the
+The words are in `ElevationPhrase.kt` beside it, so the phone's card and the desktop page cannot say the
 same figure two ways.
 
-The laptop page is handed the three figures by the phone and draws the shape from the heights it
+The desktop page is handed the three figures by the phone and draws the shape from the heights it
 already has. The arithmetic stays on the phone, which is the same rule the area figures follow.
 
 ## Where a height is used
@@ -59,7 +59,7 @@ Nothing else is worked out from a height. Distances are measured on the flat.
 ## Anything else worth knowing
 
 - **A height travels with the point.** It is stored with each point of a track, it goes into a backup,
-  and it goes across to the laptop page, so a track that came in with heights still has them tomorrow.
+  and it goes across to the desktop page, so a track that came in with heights still has them tomorrow.
 - **A GPX written back out keeps its heights.** Export a track you imported and the `<ele>` lines are
   still in the file.
 - **A backup made before heights existed restores unchanged**, and one made after keeps them.
