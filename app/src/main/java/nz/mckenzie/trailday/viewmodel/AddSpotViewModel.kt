@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -20,9 +21,9 @@ import nz.mckenzie.trailday.domain.asset.AssetPhrase
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.look.Look
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
-import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.tracking.FusedLocationSource
@@ -67,25 +68,25 @@ class AddSpotViewModel(
     private val _spot = MutableStateFlow<GeoPoint?>(null)
 
     /**
-     * The spot as the map draws it, in the spot kind's own colour and glyph.
+     * The spot as the map draws it, in the waypoint row's colour and glyph.
      *
      * What is being placed is the thing itself, so the walker sees the marker they are about to
-     * keep while they place it.
+     * keep while they place it. The look is combined in rather than read once, so the preview drawn
+     * while placing is in the colour the map will draw it in.
      */
-    val draftGeoJson: StateFlow<String> = _spot
-        .map { spot ->
-            val draft = spot?.let { point ->
-                AssetLine(
-                    assetId = DRAFT_ID,
-                    name = AssetPhrase.kind(AssetKind.WAYPOINT),
-                    colorHex = AssetColors.forKind(AssetKind.WAYPOINT),
-                    points = listOf(point),
-                    kind = AssetKind.WAYPOINT,
-                    shape = AssetShape.POINT
-                )
-            }
-            AssetGeoJson.build(listOfNotNull(draft))
+    val draftGeoJson: StateFlow<String> = combine(_spot, Look.current) { spot, look ->
+        val draft = spot?.let { point ->
+            AssetLine(
+                assetId = DRAFT_ID,
+                name = AssetPhrase.kind(AssetKind.WAYPOINT),
+                colorHex = look.colourOf(AssetKind.WAYPOINT).hex,
+                points = listOf(point),
+                kind = AssetKind.WAYPOINT,
+                shape = AssetShape.POINT
+            )
         }
+        AssetGeoJson.build(listOfNotNull(draft))
+    }
         .stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),

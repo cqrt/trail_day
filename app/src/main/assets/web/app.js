@@ -311,6 +311,17 @@ async function sendJson(path, method, body = null) {
  */
 const placeIconsInFlight = new Set();
 
+/**
+ * How big the page should draw one marker, in its own pixels.
+ *
+ * The phone sets a size per kind, so the style carries a size for each picture. `markerDp` is the
+ * fallback for a style built before that, and 22 for a style that says nothing at all.
+ */
+function markerSizeOf(style, name) {
+  const sizes = style.markerSizes || {};
+  return sizes[name] || style.markerDp || 22;
+}
+
 async function addPlaceIcon(map, name, markerDp) {
   if (map.hasImage(name) || placeIconsInFlight.has(name)) return;
 
@@ -443,7 +454,7 @@ async function boot() {
     // both arrive here.
     map.on('styleimagemissing', (event) => {
       if (!event.id.startsWith('trailday-place-')) return;
-      addPlaceIcon(map, event.id, style.markerDp);
+      addPlaceIcon(map, event.id, markerSizeOf(style, event.id));
     });
 
     map.on('load', () => onStyleLoaded(style));
@@ -458,7 +469,7 @@ function onStyleLoaded(style) {
   // has not listed, or a frame that arrives first, is still fetched by name. Not waited on: the work
   // is what this page is for, and a marker that lands a moment later is a marker added a moment
   // later.
-  for (const name of style.placeIcons || []) addPlaceIcon(map, name, style.markerDp);
+  for (const name of style.placeIcons || []) addPlaceIcon(map, name, markerSizeOf(style, name));
 
   // Where the work is drawn from, so a save can hand the map the phone's new features without asking
   // for the style again.

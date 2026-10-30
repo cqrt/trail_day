@@ -7,6 +7,8 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import nz.mckenzie.trailday.domain.asset.AssetKind
+import nz.mckenzie.trailday.domain.look.MapLook
+import nz.mckenzie.trailday.domain.look.MarkerSizeChoice
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import org.junit.Assert.assertEquals
@@ -78,7 +80,10 @@ class WebStyleJsonTest {
         val bikeTracks = paint(AssetLayerIds.BIKE_TRACKS)["line-dasharray"]!!.jsonArray
             .map { it.jsonPrimitive.content.toDouble() }
 
-        AssetLineStyles.BIKE_TRACK.zip(bikeTracks).forEach { (expected, actual) ->
+        AssetLineStyles.forKind(
+            AssetKind.BIKE_TRACK,
+            LineWeight(MapLook.DEFAULT.widthOf(AssetKind.BIKE_TRACK).stylePx)
+        )!!.zip(bikeTracks).forEach { (expected, actual) ->
             assertEquals(expected.toDouble(), actual, 1e-6)
         }
         // Solid means no dash array at all, rather than a dash of zero.
@@ -365,17 +370,26 @@ class WebStyleJsonTest {
     }
 
     @Test
-    fun `the page is told which pictures to fetch, and how big to draw them`() {
+    fun `the page is told which pictures to fetch, and how big to draw each one`() {
         assertEquals(
             PlaceIcons.IMAGE_NAMES,
             style["placeIcons"]!!.jsonArray.map { it.jsonPrimitive.content }
         )
         assertEquals(
-            "the size the markers are drawn at, which is the phone's own marker size",
-            PlaceIcons.MARKER_DP,
+            "the fallback size, for a page that asks for a name the style does not list",
+            MarkerSizeChoice.NORMAL.dp,
             style["markerDp"]!!.jsonPrimitive.content.toFloat(),
             1e-6f
         )
+        val sizes = style["markerSizes"]!!.jsonObject
+        PlaceIcons.KINDS.forEach { kind ->
+            assertEquals(
+                "a ${kind.name} is drawn on the desk at the size the walker chose for it",
+                MapLook.DEFAULT.sizeOf(kind).dp,
+                sizes[PlaceIcons.imageName(kind)]!!.jsonPrimitive.content.toFloat(),
+                1e-6f
+            )
+        }
     }
 
     @Test

@@ -37,6 +37,7 @@ import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.domain.tiles.withMinimumSpan
+import nz.mckenzie.trailday.domain.look.Look
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.doc.DocDetailReader
 import nz.mckenzie.trailday.doc.DocDownloader
@@ -144,7 +145,7 @@ class MapViewModel(
      * The places a walk or ride has been recorded for, as they change.
      *
      * A place with a recorded pass is a line that was actually walked, and it is drawn in the recorded green
-     * with the gold edge rather than in its kind's colour - see [AssetColors.forPlace]. Fed from the trips
+     * with the gold edge rather than in its kind's colour - see [MapLook.colourOfPlace]. Fed from the trips
      * rather than stored on the place, so a trip deleted puts the line back to what it was.
      */
     private val recordedFor: Flow<Set<Long>> = flowOf(emptySet()),
@@ -317,7 +318,7 @@ class MapViewModel(
     private val _focusedBike = MutableStateFlow<DocItem?>(null)
 
     val docGeoJson: StateFlow<String> =
-        combine(docItems, bikeLinks, _focusedDoc, _focusedBike) { items, links, focus, focusBike ->
+        combine(docItems, bikeLinks, _focusedDoc, _focusedBike, Look.current) { items, links, focus, focusBike, look ->
             // Every bike point is a bike trail badge now, not a waypoint marker.
             val drawn = items.filterNot { it.source == DocSource.BIKES }.toMutableList()
             if (focus != null && focus.source != DocSource.BIKES &&
@@ -329,7 +330,7 @@ class MapViewModel(
             val bikeFriendly = links.linkedTrackRefs + listOfNotNull(
                 focus?.takeIf { focusBike != null }?.sourceRef
             )
-            DocGeoJson.build(drawn, bikeFriendly)
+            DocGeoJson.build(drawn, bikeFriendly, look)
         }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
@@ -343,7 +344,7 @@ class MapViewModel(
      * drawn with the same bicycle. Both go with the Bike tracks switch.
      */
     val docBikeBadgesGeoJson: StateFlow<String> =
-        combine(docItems, _focusedDoc, _focusedBike) { items, focus, focusBike ->
+        combine(docItems, _focusedDoc, _focusedBike, Look.current) { items, focus, focusBike, look ->
             val bikes = items.filter { it.source == DocSource.BIKES }.toMutableList()
             if (focus?.source == DocSource.BIKES &&
                 bikes.none { it.sourceRef == focus.sourceRef }
@@ -353,7 +354,7 @@ class MapViewModel(
             if (focusBike != null && bikes.none { it.sourceRef == focusBike.sourceRef }) {
                 bikes += focusBike
             }
-            DocGeoJson.buildBadges(bikes)
+            DocGeoJson.buildBadges(bikes, look)
         }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
@@ -833,8 +834,9 @@ class MapViewModel(
     val assetGeoJson: StateFlow<String> = combine(
         assets,
         geometryByTrack,
-        recordedPlaces
-    ) { tracks, geometry, recorded ->
+        recordedPlaces,
+        Look.current
+    ) { tracks, geometry, recorded, look ->
         AssetGeoJson.build(
             tracks.map { asset ->
                 val assetGeometry = geometry[asset.id] ?: AssetGeometry.NONE
@@ -844,7 +846,7 @@ class MapViewModel(
                     name = asset.name,
                     // A line a walk has been made of wears the recorded green; the rest wear their kind's
                     // colour, as they always have.
-                    colorHex = AssetColors.forPlace(
+                    colorHex = look.colourOfPlace(
                         kind = AssetKind.fromStorage(asset.kind),
                         recorded = asset.id in recorded
                     ),
@@ -1016,13 +1018,15 @@ class MapViewModel(
      * a map's first frame is not the place to build them.
      */
     val otherTracksGeoJson: StateFlow<String> =
-        combine(otherTracks, otherTracksStore.observeCount()) { shown, _ -> shown }
-            .map { shown ->
+        combine(otherTracks, otherTracksStore.observeCount(), Look.current) { shown, _, look ->
+            shown to look
+        }
+            .map { (shown, look) ->
                 if (!shown) {
                     OtherTracksGeoJson.EMPTY
                 } else {
                     withContext(Dispatchers.Default) {
-                        OtherTracksGeoJson.build(otherTracksStore.cached())
+                        OtherTracksGeoJson.build(otherTracksStore.cached(), look)
                     }
                 }
             }

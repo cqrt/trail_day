@@ -1,91 +1,148 @@
 package nz.mckenzie.trailday.map
 
 import nz.mckenzie.trailday.domain.asset.AssetKind
+import nz.mckenzie.trailday.domain.asset.AssetShape
+import nz.mckenzie.trailday.domain.look.LookColour
+import nz.mckenzie.trailday.domain.look.LookTarget
+import nz.mckenzie.trailday.domain.look.MapLook
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The colours the map and the list draw with.
+ * The colours the map and the list are built on.
  *
- * Every kind must have a colour of its own in both themes, and no kind colour may be the recorded line's or
- * the position marker's - an icon the walker could read as "the recording" would be worse than no icon at
- * all. The mock screens are light only, so the dark set is derived from the light one: the same five hues,
- * light enough to read on a dark card, which is what [AssetColors.forKindOnDark] is for.
+ * The five kinds' colours are no longer constants the app draws with - they are the five answers the
+ * look is defaulted to ([MapLook.DEFAULT]), and the walker can choose any of the eight on the shelf
+ * instead. So what is held here is the relationship between the two: the default is the shelf, the
+ * recorded line is nobody's colour on it, and every colour on it can be read on the cards the app draws
+ * on.
+ *
+ * Two of these were real bugs before the shelf existed: a brown that read on white and vanished on the
+ * dark card, and a deep purple with the same story. A colour offered to the walker has to survive both.
  */
 class AssetColorsTest {
 
     @Test
-    fun `each of the five kinds has its own colour, and no two share one, in both themes`() {
-        val light = AssetKind.entries.map { AssetColors.forKind(it) }
-        val dark = AssetKind.entries.map { AssetColors.forKindOnDark(it) }
+    fun `the five default colours are the shelf's own values`() {
+        val shelf = LookColour.entries.map { it.hex }
 
-        assertEquals("a colour per kind", AssetKind.entries.size, light.size)
+        listOf(
+            AssetColors.TRACK_KIND,
+            AssetColors.BIKE_TRACK_KIND,
+            AssetColors.HUT_KIND,
+            AssetColors.CAMPSITE_KIND,
+            AssetColors.WAYPOINT_KIND
+        ).forEach { value ->
+            assertTrue("$value is not a colour the walker can pick", value in shelf)
+        }
+    }
+
+    @Test
+    fun `the default look gives each kind a colour, and no two share one`() {
+        val colours = AssetKind.entries.map { MapLook.DEFAULT.colourOf(it).hex }
+
+        assertEquals("a colour per kind", AssetKind.entries.size, colours.size)
         assertEquals(
-            "two kinds sharing a light colour would make the list say less than it claims to: $light",
-            light.size,
-            light.toSet().size
-        )
-        assertEquals(
-            "and two sharing a dark one would do the same on a dark phone: $dark",
-            dark.size,
-            dark.toSet().size
+            "two kinds sharing a colour would make the list say less than it claims to: $colours",
+            colours.size,
+            colours.toSet().size
         )
     }
 
     @Test
     fun `the two lines do not share a colour with each other or with a place`() {
-        val track = AssetColors.forKind(AssetKind.TRACK)
-        val bikeTrack = AssetColors.forKind(AssetKind.BIKE_TRACK)
+        val look = MapLook.DEFAULT
+        val track = look.colourOf(AssetKind.TRACK).hex
+        val bikeTrack = look.colourOf(AssetKind.BIKE_TRACK).hex
 
         assertNotEquals("a bike track must not look like a track", track, bikeTrack)
-        AssetKind.entries
-            .filter { it.shape == nz.mckenzie.trailday.domain.asset.AssetShape.POINT }
-            .forEach { place ->
-                assertNotEquals("$place must not look like a track", track, AssetColors.forKind(place))
-                assertNotEquals("$place must not look like a bike track", bikeTrack, AssetColors.forKind(place))
-            }
-    }
-
-    @Test
-    fun `a kind colour is readable on the light card the list uses`() {
-        AssetKind.entries.forEach { kind ->
-            val ratio = contrastRatio(AssetColors.forKind(kind), LIGHT_CARD)
-            assertTrue("$kind on a light card is only ${round(ratio)}:1", ratio >= MIN_CONTRAST)
+        AssetKind.entries.filter { it.shape == AssetShape.POINT }.forEach { place ->
+            assertNotEquals("$place must not look like a track", track, look.colourOf(place).hex)
+            assertNotEquals("$place must not look like a bike track", bikeTrack, look.colourOf(place).hex)
         }
     }
 
     @Test
-    fun `and the derived dark one on the dark card, because the app follows the system theme`() {
-        // This is the case that made a brown icon disappear: fine on white, all but invisible on the dark
-        // grey a phone in dark mode puts behind it. A deep purple is the same story, which is why the dark
-        // set exists rather than the light one being reused.
-        AssetKind.entries.forEach { kind ->
-            val ratio = contrastRatio(AssetColors.forKindOnDark(kind), DARK_CARD)
-            assertTrue("$kind on a dark card is only ${round(ratio)}:1", ratio >= MIN_CONTRAST)
+    fun `the other publisher's line is a colour of its own`() {
+        // Choosing a colour for tracks must not be choosing it for the councils' and trusts' lines: the
+        // whole reason that layer has a colour is so a walker can tell whose line is whose.
+        val look = MapLook.DEFAULT
+
+        assertNotEquals(look.colourOf(LookTarget.TRACKS), look.colourOf(LookTarget.OTHER_TRACKS))
+    }
+
+    @Test
+    fun `every colour on the shelf is readable on the light card the list uses`() {
+        LookColour.entries.forEach { colour ->
+            val ratio = contrastRatio(colour.hex, LIGHT_CARD)
+            assertTrue("${colour.id} on a light card is only ${round(ratio)}:1", ratio >= MIN_CONTRAST)
         }
     }
 
     @Test
-    fun `the recorded line is nobody's kind, in either theme`() {
-        AssetKind.entries.forEach { kind ->
+    fun `and its derived tone on the dark card, because the app follows the system theme`() {
+        LookColour.entries.forEach { colour ->
+            val ratio = contrastRatio(colour.onDark, DARK_CARD)
+            assertTrue("${colour.id} on a dark card is only ${round(ratio)}:1", ratio >= MIN_CONTRAST)
+        }
+    }
+
+    @Test
+    fun `the recorded line is nobody's kind, on the shelf or in either theme`() {
+        // An icon the walker could read as "the recording" would be worse than no icon at all, and the
+        // gold casing under a recorded line filters on this exact value.
+        LookColour.entries.forEach { colour ->
+            assertNotEquals("${colour.id} looks like the line being recorded", AssetColors.RECORDED, colour.hex)
             assertNotEquals(
-                "$kind looks like the line being recorded",
+                "${colour.id}'s dark tone looks like the line being recorded",
                 AssetColors.RECORDED,
-                AssetColors.forKind(kind)
-            )
-            assertNotEquals(
-                "$kind looks like the line being recorded in dark mode",
-                AssetColors.RECORDED,
-                AssetColors.forKindOnDark(kind)
-            )
-            assertNotEquals(
-                "$kind and the position marker are the same colour",
-                AssetColors.forKind(kind),
-                AssetColors.POSITION
+                colour.onDark
             )
         }
+    }
+
+    @Test
+    fun `and no colour on the shelf is the dot that says where the phone is`() {
+        LookColour.entries.forEach { colour ->
+            assertNotEquals(
+                "${colour.id} and the position marker are the same colour",
+                AssetColors.POSITION,
+                colour.hex
+            )
+        }
+    }
+
+    @Test
+    fun `a line a walk has been made of is drawn in the recorded green, whatever its kind`() {
+        // The map draws a place in its kind's colour until a walk has been made of it. From then on it is
+        // the line the walker actually went along, and it wears the recorded green - with the map's own
+        // gold casing, which filters on exactly this colour.
+        val look = MapLook.DEFAULT
+
+        assertEquals(
+            "the recorded green",
+            AssetColors.RECORDED,
+            look.colourOfPlace(AssetKind.TRACK, recorded = true)
+        )
+        assertEquals(
+            "a bike track a ride was made of is recorded too, not its own colour",
+            AssetColors.RECORDED,
+            look.colourOfPlace(AssetKind.BIKE_TRACK, recorded = true)
+        )
+        assertEquals(
+            "and a place with no walk is still drawn in its row's colour",
+            AssetColors.HUT_KIND,
+            look.colourOfPlace(AssetKind.HUT, recorded = false)
+        )
+    }
+
+    @Test
+    fun `the recorded green the look answers with is the one the map's layers filter on`() {
+        // `colourOfPlace` names its own copy of the value, and the gold casing filters on AssetColors'.
+        // Two copies of one number is how a recorded line comes to be drawn with no edge under it.
+        assertEquals(MapLook.RECORDED, AssetColors.RECORDED)
     }
 
     /** WCAG contrast: 1.0 is the same colour, 21.0 is black on white. */
@@ -107,28 +164,6 @@ class AssetColorsTest {
     }
 
     private fun round(value: Double): String = String.format(java.util.Locale.US, "%.1f", value)
-
-    @Test
-    fun `a line a walk has been made of is drawn in the recorded green, whatever its kind`() {
-        // The map draws a place in its kind's colour until a walk has been made of it. From then on it is the
-        // line the walker actually went along, and it wears the recorded green - with the map's own gold
-        // casing, which filters on exactly this colour.
-        assertEquals(
-            "the recorded green",
-            AssetColors.RECORDED,
-            AssetColors.forPlace(AssetKind.TRACK, recorded = true)
-        )
-        assertEquals(
-            "a bike track a ride was made of is recorded too, not purple",
-            AssetColors.RECORDED,
-            AssetColors.forPlace(AssetKind.BIKE_TRACK, recorded = true)
-        )
-        assertEquals(
-            "and a place with no walk is still its kind's own colour",
-            AssetColors.HUT_KIND,
-            AssetColors.forPlace(AssetKind.HUT, recorded = false)
-        )
-    }
 
     private companion object {
         /** Enough for a thin outline to be read on the card behind it. */

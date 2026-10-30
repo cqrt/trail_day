@@ -2,6 +2,9 @@ package nz.mckenzie.trailday.map
 
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
+import nz.mckenzie.trailday.domain.look.Look
+import nz.mckenzie.trailday.domain.look.LookTarget
+import nz.mckenzie.trailday.domain.look.MapLook
 import nz.mckenzie.trailday.domain.other.OtherTrack
 
 /**
@@ -27,28 +30,6 @@ object OtherTracksLayerIds {
 
     /** The tracks themselves, over their own casing. */
     const val LINE = "trailday-other-tracks-line"
-
-    /**
-     * The colour of somebody else's track.
-     *
-     * **Chosen against the colours already on the map**, which is the whole of the reasoning: the
-     * walker's own tracks and DOC's are both blue (`#1565C0`), DOC's bike trails are purple
-     * (`#6A1B9A`) and the Te Araroa trail is rust (`#C1440E`). A teal is the gap left in that set, and
-     * it reads over green bush, pale scree and water alike.
-     *
-     * The casing under it is **not** given its own copy: there is one white casing on this map, under
-     * every line that is not the walker's own, and it is `BasemapView`'s.
-     */
-    const val COLOUR = "#00695C"
-
-    /**
-     * The same colour for a dark screen.
-     *
-     * The layers sheet draws this layer's tile in the layer's own colour, so that the sheet and the map
-     * agree about whose lines are whose - and a deep teal glyph on a dark tile is a glyph nobody sees,
-     * which is the reason [nz.mckenzie.trailday.map.AssetColors] keeps two sets of every kind.
-     */
-    const val COLOUR_DARK = "#4DB6AC"
 }
 
 /** Somebody else's tracks as the map's own document, ready for their source. */
@@ -59,18 +40,17 @@ object OtherTracksGeoJson {
      *
      * Through [AssetGeoJson], as DOC's material is: the map draws every line with one builder, and a
      * second one for the same shape is how the two come to differ about a width or a cap. The colour is
-     * the layer's own and is set on the layer rather than read from the feature - see
-     * [OtherTracksLayerIds.COLOUR] - but it is written here too, so a feature drawn without its layer
+     * the walker's choice for the other tracks' row, written here so a feature drawn without its layer
      * still comes out in the right colour rather than the default.
      */
-    fun build(tracks: List<OtherTrack>): String = AssetGeoJson.build(
+    fun build(tracks: List<OtherTrack>, look: MapLook = Look.value): String = AssetGeoJson.build(
         tracks.map { track ->
             AssetLine(
                 // No asset id: nothing on the map can act on one of these, and an id that matched one
                 // of the walker's own places would be a tap opening the wrong thing.
                 assetId = 0L,
                 name = track.name,
-                colorHex = OtherTracksLayerIds.COLOUR,
+                colorHex = look.colourOf(LookTarget.OTHER_TRACKS).hex,
                 points = track.paths.firstOrNull().orEmpty(),
                 sideTracks = track.paths.drop(1),
                 kind = AssetKind.TRACK,

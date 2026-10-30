@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.map
 
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
+import nz.mckenzie.trailday.domain.look.Look
 
 /**
  * The picture the map draws a place with: the kind's own glyph, in the kind's own colour.
@@ -10,8 +11,9 @@ import nz.mckenzie.trailday.domain.asset.AssetShape
  * carries: a hut as a roof over walls, a campsite as a tent, a waypoint as a dot in a ring. The list
  * and the map agree about what the walker is looking at.
  *
- * **The colour is the kind's.** Every place is drawn in the colour of its kind, so what the map
- * says is what the place *is* - and the shape says it too. See [AssetColors.forKind].
+ * **The colour and the size are the kind's, as the walker has set them.** Every place is drawn in the
+ * colour of its kind's row, so what the map says is what the place *is* - and the shape says it too.
+ * See [nz.mckenzie.trailday.domain.look.Look].
  *
  * **Every marker wears a thin white edge** - [MARKER_OUTLINE_DP] of it, round every shape. A marker
  * has to lift off whatever is behind it and imagery is as often dark as not, but white enough to be
@@ -33,12 +35,13 @@ object PlaceIcons {
     val KINDS: List<AssetKind> = AssetKind.entries.filter { it.shape == AssetShape.POINT }
 
     /**
-     * How big a place is drawn, in density-independent pixels.
+     * How big a place is drawn, in density-independent pixels: the kind's own size, as chosen.
      *
      * Bigger than the dot it replaced, which was 16 of them across: these glyphs have legs, posts and
-     * a ring to read, and at the size of a dot all of it is a smudge.
+     * a ring to read, and at the size of a dot all of it is a smudge. The default is the 22 the app
+     * has always drawn.
      */
-    const val MARKER_DP = 22f
+    fun sizeDp(kind: AssetKind): Float = Look.value.sizeOf(kind).dp
 
     /**
      * The white edge drawn around a marker, in density-independent pixels.
@@ -51,8 +54,8 @@ object PlaceIcons {
     /** The colour of that edge. Its own constant because it is the same white everywhere. */
     const val MARKER_OUTLINE = "#FFFFFF"
 
-    /** The colour a kind is drawn in - its own, from [AssetColors.forKind]. */
-    fun colorOf(kind: AssetKind): String = AssetColors.forKind(kind)
+    /** The colour a kind is drawn on the map in - its row's, as chosen, and always the light tone. */
+    fun colorOf(kind: AssetKind): String = Look.colourOf(kind).hex
 
     /** Every image a place can ask for: one per kind. */
     val IMAGE_NAMES: List<String> = KINDS.map { nameOf(it) }

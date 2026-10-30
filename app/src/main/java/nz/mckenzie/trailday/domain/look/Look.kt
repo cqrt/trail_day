@@ -65,12 +65,5 @@ object Look {
      * not on the shelf ([LookColour]) for exactly this reason.
      */
     fun colourOfPlace(kind: AssetKind, recorded: Boolean): String =
-        if (recorded) RECORDED else colourOf(kind).hex
-
-    /**
-     * The recorded green, fixed on purpose: the same value as
-     * [nz.mckenzie.trailday.map.AssetColors.RECORDED], and a test holds the two together so neither can
-     * be changed without the other.
-     */
-    private const val RECORDED = "#2E7D32"
+        value.colourOfPlace(kind, recorded)
 }

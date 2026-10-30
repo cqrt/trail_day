@@ -66,9 +66,14 @@ data class AssetLine(
 }
 
 /**
- * Colours for what the map draws, matching the Compose theme (ui/theme/Color.kt).
- * Kept here as plain strings so the map layer can be unit tested on the JVM without
- * Compose on the classpath.
+ * The colours the map and the list are built on, matching the Compose theme (ui/theme/Color.kt).
+ * Kept here as plain strings so the map layer can be unit tested on the JVM without Compose on the
+ * classpath.
+ *
+ * **These are the shelf's values and the fixed ones, not the colours in force.** What a track or a
+ * hut is drawn in is the walker's answer, asked of [nz.mckenzie.trailday.domain.look.Look]; what is
+ * here is the five values that answer is defaulted to, plus the three colours the walker cannot
+ * change. A test holds the two together, so the shelf and the app's own look cannot drift apart.
  */
 object AssetColors {
 
@@ -114,20 +119,6 @@ object AssetColors {
     const val WAYPOINT_KIND = "#546E7A"
 
     /**
-     * The same five kinds, for a dark background.
-     *
-     * **Derived, not invented**: each is the light colour's own hue taken to a lighter tone, because a
-     * colour that reads on a white card disappears on a black one - which is exactly what a deep purple
-     * and a brown did before the last look. The app follows the system theme, so the icon beside a place
-     * and the tile behind it have to be readable in both.
-     */
-    const val TRACK_KIND_DARK = "#64B5F6"
-    const val BIKE_TRACK_KIND_DARK = "#CE93D8"
-    const val HUT_KIND_DARK = "#FFB74D"
-    const val CAMPSITE_KIND_DARK = "#4DB6AC"
-    const val WAYPOINT_KIND_DARK = "#90A4AE"
-
-    /**
      * Where the phone is.
      *
      * Blue with a white ring, the way a device marker reads everywhere else. It must not be
@@ -136,41 +127,7 @@ object AssetColors {
      * being taken for a track.
      */
     const val POSITION = "#1A73E8"
-
-    /**
-     * The colour of the icon that says what a place *is*, and the line the map draws it as.
-     */
-    fun forKind(kind: AssetKind): String = when (kind) {
-        AssetKind.TRACK -> TRACK_KIND
-        AssetKind.BIKE_TRACK -> BIKE_TRACK_KIND
-        AssetKind.HUT -> HUT_KIND
-        AssetKind.CAMPSITE -> CAMPSITE_KIND
-        AssetKind.WAYPOINT -> WAYPOINT_KIND
-    }
-
-    /**
-     * The colour a place is drawn in: the recorded green when a walk has been made of it, its kind's own
-     * colour otherwise.
-     *
-     * **A line that has been walked says so.** A place with a recorded pass is the line the walker actually
-     * went along, and drawing it in its kind's colour would put it beside a line that was only ever drawn.
-     * The map, the place's own page and the recorder all ask this, so they cannot disagree about it.
-     */
-    fun forPlace(kind: AssetKind, recorded: Boolean): String = if (recorded) RECORDED else forKind(kind)
-
-    /**
-     * The same kind of thing, on a dark background: [forKind]'s hue, light enough to read there.
-     *
-     * The map keeps the light colours whatever the theme: its lines and markers are over imagery rather
-     * than over a card, and the white edges and casings are what make them readable there.
-     */
-    fun forKindOnDark(kind: AssetKind): String = when (kind) {
-        AssetKind.TRACK -> TRACK_KIND_DARK
-        AssetKind.BIKE_TRACK -> BIKE_TRACK_KIND_DARK
-        AssetKind.HUT -> HUT_KIND_DARK
-        AssetKind.CAMPSITE -> CAMPSITE_KIND_DARK
-        AssetKind.WAYPOINT -> WAYPOINT_KIND_DARK
-    }}
+}
 
 /**
  * Builds the GeoJSON that MapLibre draws for the place network.

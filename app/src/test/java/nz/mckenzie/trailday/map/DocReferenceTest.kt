@@ -9,6 +9,7 @@ import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.look.Look
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -71,7 +72,7 @@ class DocReferenceTest {
 
         assertTrue(json.contains("\"kind\":\"${AssetKind.TRACK.name}\""))
         assertTrue(json.contains("\"shape\":\"${AssetShape.LINE.name}\""))
-        assertTrue("the track's own colour", json.contains(AssetColors.forKind(AssetKind.TRACK)))
+        assertTrue("the track row's colour", json.contains(Look.colourOf(AssetKind.TRACK).hex))
         assertTrue("and its name, which the map never writes for DOC's material", json.contains("Glory Tk"))
         assertTrue(
             "no id: nothing on the map can act on a DOC row, so nothing may look like one of the walker's",

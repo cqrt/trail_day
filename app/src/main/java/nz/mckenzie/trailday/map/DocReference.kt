@@ -5,6 +5,8 @@ import nz.mckenzie.trailday.domain.asset.AssetLayer
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
+import nz.mckenzie.trailday.domain.look.Look
+import nz.mckenzie.trailday.domain.look.MapLook
 
 /**
  * DOC's material, drawn under the walker's own work.
@@ -141,7 +143,9 @@ object DocGeoJson {
      */
     fun build(
         items: List<DocItem>,
-        bikeFriendlyTracks: Set<String> = emptySet()
+        bikeFriendlyTracks: Set<String> = emptySet(),
+        /** The colour in force. Passed in so a look change redraws the layer in the same breath. */
+        look: MapLook = Look.value
     ): String = AssetGeoJson.build(
         items.map { item ->
             AssetLine(
@@ -149,7 +153,7 @@ object DocGeoJson {
                 // the walker's places would be a tap opening the wrong thing.
                 assetId = 0L,
                 name = item.name,
-                colorHex = AssetColors.forKind(item.source.drawingKind()),
+                colorHex = look.colourOf(item.source.drawingKind()).hex,
                 points = item.paths.firstOrNull().orEmpty(),
                 sideTracks = item.paths.drop(1),
                 kind = item.source.drawingKind(),
@@ -167,12 +171,12 @@ object DocGeoJson {
      * waypoint pin: the same point cannot be both a destination and a note about a line. The badge
      * carries only the place it marks; the track it belongs to is the thing that is tapped.
      */
-    fun buildBadges(bikes: List<DocItem>): String = AssetGeoJson.build(
+    fun buildBadges(bikes: List<DocItem>, look: MapLook = Look.value): String = AssetGeoJson.build(
         bikes.map { bike ->
             AssetLine(
                 assetId = 0L,
                 name = bike.name,
-                colorHex = AssetColors.forKind(bike.source.drawingKind()),
+                colorHex = look.colourOf(bike.source.drawingKind()).hex,
                 points = bike.paths.firstOrNull().orEmpty(),
                 kind = bike.source.drawingKind(),
                 shape = AssetShape.POINT

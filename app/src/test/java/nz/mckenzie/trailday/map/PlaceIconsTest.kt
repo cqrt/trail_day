@@ -2,6 +2,10 @@ package nz.mckenzie.trailday.map
 
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
+import nz.mckenzie.trailday.domain.look.Look
+import nz.mckenzie.trailday.domain.look.LookTarget
+import nz.mckenzie.trailday.domain.look.MapLook
+import nz.mckenzie.trailday.domain.look.MarkerSizeChoice
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -77,22 +81,37 @@ class PlaceIconsTest {
     }
 
     @Test
-    fun `a place is drawn in its own kind's colour`() {
+    fun `a place is drawn in the colour its row was given`() {
         PlaceIcons.KINDS.forEach { kind ->
             assertEquals(
-                "a ${kind.name} is drawn in the colour the kind says",
-                AssetColors.forKind(kind),
+                "a ${kind.name} is drawn in the colour the walker chose for its row",
+                Look.colourOf(kind).hex,
                 PlaceIcons.colorOf(kind)
             )
         }
     }
 
     @Test
+    fun `a place is drawn at the size its row was given`() {
+        // A marker is a picture rather than a line, so its size is a marker size and not one of the three
+        // line widths - the two choices are separate types for exactly this reason.
+        MarkerSizeChoice.entries.forEach { size ->
+            val look = MapLook.DEFAULT.withSize(LookTarget.HUTS, size)
+
+            assertEquals(
+                "a hut at ${size.id} is ${size.dp}dp across",
+                size.dp,
+                look.sizeOf(AssetKind.HUT).dp
+            )
+        }
+    }
+
+    @Test
     fun `the marker's white edge is thin`() {
-        val share = PlaceIcons.MARKER_OUTLINE_DP / PlaceIcons.MARKER_DP
+        val share = PlaceIcons.MARKER_OUTLINE_DP / MarkerSizeChoice.NORMAL.dp
 
         assertTrue(
-            "an edge of ${PlaceIcons.MARKER_OUTLINE_DP}dp on a ${PlaceIcons.MARKER_DP}dp marker is " +
+            "an edge of ${PlaceIcons.MARKER_OUTLINE_DP}dp on a ${MarkerSizeChoice.NORMAL.dp}dp marker is " +
                 "${(share * 100).toInt()}% of its width, which is not thin",
             share <= 0.05f
         )
@@ -121,7 +140,7 @@ class PlaceIconsTest {
     fun `a place is drawn wider than the dot it replaced`() {
         assertTrue(
             "the dot was 16dp across, and these glyphs have legs, posts and a ring to read",
-            PlaceIcons.MARKER_DP > 16f
+            MarkerSizeChoice.NORMAL.dp > 16f
         )
     }
 }

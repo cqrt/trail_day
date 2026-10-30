@@ -49,6 +49,7 @@ import nz.mckenzie.trailday.domain.journey.SectionHandOver
 import nz.mckenzie.trailday.domain.geo.splitAtBreaks
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.domain.recording.recordingSourceRef
+import nz.mckenzie.trailday.domain.look.Look
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.map.AssetColors
@@ -293,7 +294,7 @@ class RecordingViewModel(
      * followed bike track should still look like a bike track - and nothing at all when no place is
      * chosen, which is most recordings.
      */
-    val targetGeoJson: StateFlow<String> = combine(targetLine, assets) { line, places ->
+    val targetGeoJson: StateFlow<String> = combine(targetLine, assets, Look.current) { line, places, look ->
         val place = places.firstOrNull { it.id == _selectedAssetId.value }
         val isLine = place != null && AssetShape.fromStorage(place.shape) == AssetShape.LINE
         if (!isLine || line.size < 2) {
@@ -304,7 +305,7 @@ class RecordingViewModel(
                     AssetLine(
                         assetId = 0L,
                         name = place.name,
-                        colorHex = AssetColors.forKind(AssetKind.fromStorage(place.kind)),
+                        colorHex = look.colourOf(AssetKind.fromStorage(place.kind)).hex,
                         points = line,
                         kind = AssetKind.fromStorage(place.kind),
                         shape = AssetShape.LINE

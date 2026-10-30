@@ -12,6 +12,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
+import nz.mckenzie.trailday.domain.look.Look
+import nz.mckenzie.trailday.domain.look.MarkerSizeChoice
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 
@@ -31,13 +33,14 @@ import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 object WebStyleJson {
 
     /**
-     * The width the app draws its own lines at, read from the app rather than copied.
+     * The width the app draws a kind of line at, asked of the app rather than copied.
      *
      * It was a copy of the number, with a comment saying the two must agree - which is exactly the kind
      * of agreement that fails quietly. The desk is the same map at a different size, so it asks
-     * [LineWeight] what a line weighs and draws it at that.
+     * [LineWeight] what a line weighs and draws it at that - and it is the walker's choice, so a track
+     * thinned on the phone is thinned on the desk.
      */
-    private const val LINE_WIDTH = LineWeight.TRACK
+    private fun lineWidth(kind: AssetKind): Float = Look.value.widthOf(kind).stylePx
 
     /** Just short of opaque, as the app's own map has it, so the imagery reads underneath. */
     private const val LINE_OPACITY = 0.9
@@ -109,7 +112,16 @@ object WebStyleJson {
         // How big the page should draw them, in its own pixels times its own pixel ratio: the phone
         // draws a marker at the size it is told, so the page has to say. Without it the page would
         // have to keep its own copy of a size the phone decides.
-        put("markerDp", PlaceIcons.MARKER_DP)
+        //
+        // Per kind, because the walker sets it per kind: a hut drawn at the campsites' size would be the
+        // one thing on the desk the settings screen could not change. `markerDp` stays as the fallback,
+        // so a page written against the old style still draws something.
+        put("markerDp", MarkerSizeChoice.NORMAL.dp)
+        put("markerSizes", buildJsonObject {
+            PlaceIcons.KINDS.forEach { kind ->
+                put(PlaceIcons.imageName(kind), Look.value.sizeOf(kind).dp)
+            }
+        })
         // Where the letters come from: the phone's own server, on the same address the tiles come from, so
         // a name on the desk is written from the letters that travel inside the app rather than from a
         // font the laptop happens to have.
@@ -357,6 +369,7 @@ object WebStyleJson {
         Triple(AssetLayerIds.TRACKS, AssetKind.TRACK, AssetShape.LINE),
         Triple(AssetLayerIds.BIKE_TRACKS, AssetKind.BIKE_TRACK, AssetShape.LINE)
     ).map { (layerId, kind, shape) ->
+        val width = lineWidth(kind)
         buildJsonObject {
             put("id", layerId)
             put("type", "line")
@@ -378,9 +391,9 @@ object WebStyleJson {
                     // The colour is the feature's own, so a track half walked is two colours in
                     // one layer rather than two layers to keep in step.
                     put("line-color", dataProperty("stroke"))
-                    put("line-width", LINE_WIDTH)
+                    put("line-width", width)
                     put("line-opacity", LINE_OPACITY)
-                    AssetLineStyles.forKind(kind)?.let { dash ->
+                    AssetLineStyles.forKind(kind, LineWeight(width))?.let { dash ->
                         // Multiples of the line width, which is what a dasharray is: the same
                         // numbers the app hands its own map, so a dash reads at the same spacing.
                         put("line-dasharray", buildJsonArray { dash.forEach { add(it) } })

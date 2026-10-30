@@ -20,7 +20,7 @@ import nz.mckenzie.trailday.domain.other.OtherTrack
 import nz.mckenzie.trailday.domain.other.distanceM
 import nz.mckenzie.trailday.domain.track.TrackInterchange
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
-import nz.mckenzie.trailday.map.AssetColors
+import nz.mckenzie.trailday.domain.look.Look
 import nz.mckenzie.trailday.map.drawingKind
 import nz.mckenzie.trailday.ui.docRowDetail
 import nz.mckenzie.trailday.ui.otherTrackRowDetail
@@ -173,7 +173,7 @@ object WebEditorJson {
                 // DOC's material wears the kind the map draws it as: a hut's roof, a track's line, and the
                 // colour that kind is drawn in - the same pair the phone's own map uses.
                 kind = source.drawingKind().name,
-                colour = AssetColors.forKind(source.drawingKind()),
+                colour = Look.colourOf(source.drawingKind()).hex,
                 filters = source.filters.map { filter ->
                     WebEditorFilter(field = filter.field, label = filter.label)
                 },

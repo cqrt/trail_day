@@ -18,6 +18,7 @@ import nz.mckenzie.trailday.domain.doc.matching
 import nz.mckenzie.trailday.domain.doc.within
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.look.Look
 import nz.mckenzie.trailday.domain.other.EmptyOtherTracksCache
 import nz.mckenzie.trailday.domain.other.OtherTracksCache
 import nz.mckenzie.trailday.domain.other.OtherTracksQuery
@@ -29,7 +30,6 @@ import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.domain.tiles.boxAround
 import nz.mckenzie.trailday.domain.track.TrackInterchange
 import nz.mckenzie.trailday.domain.tiles.Basemap
-import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.LinzVectorStyle
@@ -44,7 +44,7 @@ import nz.mckenzie.trailday.other.OtherTracksReader
  *
  * Nothing here invents anything, and every write it serves is applied to the row the phone holds now
  * and saved through the repository: the colours are the ones the map colours a line with
- * ([AssetColors.forKind], one colour per family of kind), the features are the ones the map draws
+ * ([Look.colourOf], one colour per family of kind), the features are the ones the map draws
  * ([AssetGeoJson], geometry included), the style is the phone's own layer tables ([WebStyleJson]),
  * and the page is the copy inside the APK. That is the whole reason the editor is
  * served by the phone rather than shipped as a separate thing: one database, one clock, one set of
@@ -140,7 +140,7 @@ class WebEditorDocuments(
             AssetLine(
                 assetId = asset.id,
                 name = asset.name,
-                colorHex = AssetColors.forKind(kind),
+                colorHex = Look.colourOf(kind).hex,
                 points = geometry.line,
                 sideTracks = geometry.sideTracks,
                 kind = kind,

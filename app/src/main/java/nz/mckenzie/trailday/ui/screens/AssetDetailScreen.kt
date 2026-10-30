@@ -53,7 +53,7 @@ import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.TravelMode
 import nz.mckenzie.trailday.domain.geo.TravelTime
 import nz.mckenzie.trailday.domain.tiles.Basemap
-import nz.mckenzie.trailday.map.AssetColors
+import nz.mckenzie.trailday.domain.look.Look
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.BasemapView
@@ -102,7 +102,10 @@ fun AssetDetailScreen(
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
 
-    val geoJson = remember(geometry, track, kind, recordings) {
+    // The look is a key: a colour changed on the settings screen is a line drawn in another colour here
+    // as well as on the map, and this page cannot be the one place that keeps the old one.
+    val look by Look.current.collectAsStateWithLifecycle()
+    val geoJson = remember(geometry, track, kind, recordings, look) {
         AssetGeoJson.build(
             listOf(
                 AssetLine(
@@ -110,7 +113,7 @@ fun AssetDetailScreen(
                     name = track?.name.orEmpty(),
                     // A line a walk has been made of wears the recorded green, with the map's own gold edge:
                     // the place's page and the map cannot disagree about what has been walked.
-                    colorHex = AssetColors.forPlace(kind, recorded = recordings.isNotEmpty()),
+                    colorHex = look.colourOfPlace(kind, recorded = recordings.isNotEmpty()),
                     points = geometry.line,
                     sideTracks = geometry.sideTracks,
                     kind = kind,

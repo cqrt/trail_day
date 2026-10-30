@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import nz.mckenzie.trailday.domain.asset.AssetKind
+import nz.mckenzie.trailday.domain.look.MarkerSizeChoice
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -184,7 +185,7 @@ class MarkerIconsTest {
 
     /** The edge the map draws, in pixels of a picture [size] across. */
     private fun edgePx(size: Int): Float =
-        PlaceIcons.MARKER_OUTLINE_DP * size / PlaceIcons.MARKER_DP
+        PlaceIcons.MARKER_OUTLINE_DP * size / MarkerSizeChoice.NORMAL.dp
 
     private fun Bitmap.whitePixels(): Int = (0 until width).sumOf { x ->
         (0 until height).count { y -> isWhiteAt(x, y) }

@@ -26,7 +26,6 @@ import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import nz.mckenzie.trailday.map.GlyphFonts
 import nz.mckenzie.trailday.domain.asset.AssetKind
-import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.GlyphStyle
 import nz.mckenzie.trailday.map.MarkerIcons
 import nz.mckenzie.trailday.map.PlaceIcons
@@ -37,6 +36,7 @@ import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.look.Look
 import nz.mckenzie.trailday.offline.LocalTileServer
 import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.offline.TileServerHolder
@@ -274,7 +274,9 @@ class WebEditorService : Service() {
             kind = kind,
             colorHex = PlaceIcons.colorOf(kind),
             sizePx = size,
-            outlinePx = size * (PlaceIcons.MARKER_OUTLINE_DP / PlaceIcons.MARKER_DP)
+            // The edge is one dp of the marker's own scale, so a marker drawn larger is the same marker
+            // larger rather than a small one with a fat ring round it.
+            outlinePx = size / PlaceIcons.sizeDp(kind) * PlaceIcons.MARKER_OUTLINE_DP
         )
         return try {
             ByteArrayOutputStream().use { out ->
@@ -297,7 +299,7 @@ class WebEditorService : Service() {
         val kind = AssetKind.entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: return null
         val bitmap = MarkerIcons.bitmap(
             kind = kind,
-            colorHex = if (dark) AssetColors.forKindOnDark(kind) else PlaceIcons.colorOf(kind),
+            colorHex = if (dark) Look.colourOnDark(kind) else PlaceIcons.colorOf(kind),
             sizePx = px.coerceAtLeast(1),
             outlinePx = 0f,
             style = GlyphStyle.LIST

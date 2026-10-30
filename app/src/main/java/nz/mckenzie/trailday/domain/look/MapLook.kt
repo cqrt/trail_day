@@ -38,6 +38,17 @@ data class MapLook private constructor(
     /** A [kind]'s colour at a light tone. */
     fun colourOnDark(kind: AssetKind): String = colourOnDark(LookTarget.of(kind))
 
+    /**
+     * The colour a place is drawn in: **the recorded green when a walk has been made of it**, its row's
+     * colour otherwise.
+     *
+     * A place with a recorded pass is evidence of a walk, whatever the walker has chosen for its kind, and
+     * the green is not on the shelf ([LookColour]) for exactly this reason. The map, the place's own page
+     * and the recorder all ask this, so they cannot disagree about it.
+     */
+    fun colourOfPlace(kind: AssetKind, recorded: Boolean): String =
+        if (recorded) RECORDED else colourOf(kind).hex
+
     /** How wide [target]'s line is drawn. Read for a place row only by mistake - use [sizeOf]. */
     fun widthOf(target: LookTarget): LineWidthChoice = widths.getValue(target)
 
@@ -86,6 +97,17 @@ data class MapLook private constructor(
     }.joinToString(STORAGE_SEPARATOR)
 
     companion object {
+
+        /**
+         * The recorded green, fixed on purpose: the same value as
+         * [nz.mckenzie.trailday.map.AssetColors.RECORDED], and a test holds the two together so neither
+         * can be changed without the other.
+         *
+         * It is here rather than on the shelf because it is nobody's kind. A green line on this map is a
+         * line that has been walked, and a walker who could paint a track green could no longer tell
+         * their own work from the evidence of a walk.
+         */
+        const val RECORDED = "#2E7D32"
 
         /**
          * What the app draws before anybody chooses: the five kinds' own colours, the teal the

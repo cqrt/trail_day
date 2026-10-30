@@ -1,7 +1,7 @@
 package nz.mckenzie.trailday.web
 
+import nz.mckenzie.trailday.domain.look.MarkerSizeChoice
 import nz.mckenzie.trailday.map.GlyphFonts
-import nz.mckenzie.trailday.map.PlaceIcons
 import nz.mckenzie.trailday.offline.HttpRequest
 import nz.mckenzie.trailday.offline.HttpResponse
 import nz.mckenzie.trailday.offline.HttpRoute
@@ -368,11 +368,11 @@ class WebEditorServer(
         return name
     }
 
-    /** The size the browser asked for, or the app's own marker size when it did not say. */
+    /** The size the browser asked for, or the app's middle size when it did not say. */
     private fun pxFor(query: Map<String, String>): Int = query[PX_PARAM]
         ?.toIntOrNull()
         ?.coerceIn(MIN_MARKER_PX, MAX_MARKER_PX)
-        ?: PlaceIcons.MARKER_DP.toInt()
+        ?: MarkerSizeChoice.NORMAL.dp.toInt()
 
         /** Where a new asset is made: `/api/assets`, with no id on the end of it. */
         const val COLLECTION_PATH = "/api/assets"

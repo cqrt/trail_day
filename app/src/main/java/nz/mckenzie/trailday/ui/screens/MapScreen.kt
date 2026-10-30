@@ -83,6 +83,8 @@ import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocPick
 import nz.mckenzie.trailday.domain.other.OtherTrack
 import nz.mckenzie.trailday.domain.doc.DocSource
+import nz.mckenzie.trailday.domain.look.Look
+import nz.mckenzie.trailday.domain.look.LookTarget
 import nz.mckenzie.trailday.viewmodel.PendingFollow
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
@@ -864,7 +866,14 @@ private fun LayerSwitchRow(
  */
 @Composable
 private fun OtherTracksTile() {
-    val hex = if (isSystemInDarkTheme()) OtherTracksLayerIds.COLOUR_DARK else OtherTracksLayerIds.COLOUR
+    // The row's colour as chosen, and its derived tone on a dark screen: the same two answers the map
+    // draws the layer with, so the sheet and the map cannot disagree about whose lines are whose.
+    val look by Look.current.collectAsStateWithLifecycle()
+    val dark = isSystemInDarkTheme()
+    val hex = remember(look, dark) {
+        if (dark) look.colourOnDark(LookTarget.OTHER_TRACKS)
+        else look.colourOf(LookTarget.OTHER_TRACKS).hex
+    }
     val colour = remember(hex) { Color(android.graphics.Color.parseColor(hex)) }
     GlyphTile(
         glyph = IconGlyph.TRAIL,

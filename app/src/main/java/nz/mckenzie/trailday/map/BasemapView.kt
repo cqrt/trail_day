@@ -40,6 +40,9 @@ import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetLayer
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.asset.YourPlaceLayer
+import nz.mckenzie.trailday.domain.look.Look
+import nz.mckenzie.trailday.domain.look.LookTarget
+import nz.mckenzie.trailday.domain.look.MapLook
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LinzAccess
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
@@ -406,6 +409,10 @@ fun BasemapView(
     val mapViewState = remember { mutableStateOf<MapView?>(null) }
     var boundsApplied by remember { mutableStateOf(restoreCamera) }
 
+    // The look the loaded style already draws with. A style is built with the look in force, so this is
+    // what keeps the effect below from going over a style that is already right - see the look effect.
+    var appliedLook by remember { mutableStateOf<MapLook?>(null) }
+
     // The map's own size in pixels of the glass, as the layout gives it. Kept because the scale bar
     // is measured across the map rather than reasoned about: see [ScaleBar.metresPerPixel].
     var mapSize by remember { mutableStateOf(IntSize.Zero) }
@@ -452,6 +459,11 @@ fun BasemapView(
     // in because a style is loaded from two places - the first frame, and a basemap change -
     // and both want the same answer.
     val density = LocalDensity.current.density
+
+    // The widths and colours in force. Collected rather than read once because this is the one screen
+    // that has to redraw when the walker changes them, and collected here rather than in a view model to
+    // keep it to the map: a look is a fact about the whole app.
+    val look by Look.current.collectAsStateWithLifecycle()
 
     // Keeps the tap handler current without rebuilding the map.
     val currentOnMapClick by rememberUpdatedState(onMapClick)
@@ -592,9 +604,11 @@ fun BasemapView(
                         teAraroaGeoJson = teAraroaGeoJson,
                         showTeAraroa = showTeAraroa,
                         showOtherTracks = showOtherTracks,
-                        otherTracksGeoJson = otherTracksGeoJson
+                        otherTracksGeoJson = otherTracksGeoJson,
+                        look = look
                     ) { style ->
                         styleLoadedOnce = true
+                        appliedLook = look
                         styleState.value = style
                     }
                 }
@@ -634,12 +648,28 @@ fun BasemapView(
                 showOtherTracks = showOtherTracks,
                 otherTracksGeoJson = otherTracksGeoJson,
                 regionsGeoJson = regionsGeoJson,
-                regionPickedGeoJson = regionPickedGeoJson
+                regionPickedGeoJson = regionPickedGeoJson,
+                look = look
             ) { style ->
                 styleLoadedOnce = true
+                appliedLook = look
                 styleState.value = style
             }
         }
+    }
+
+    // A look change is **not** a style reload. Choosing a colour must not throw the camera back to its
+    // default and refetch every tile the walker is looking at, so the loaded style is changed in place:
+    // the widths of its layers and the pictures its markers are drawn with. The colours arrive with the
+    // documents, which are rebuilt when the look changes.
+    //
+    // The look the style was built with is remembered, so a style load - which already has the right
+    // widths and pictures - does not go over itself for nothing.
+    LaunchedEffect(look, styleState.value) {
+        val style = styleState.value ?: return@LaunchedEffect
+        if (appliedLook == look) return@LaunchedEffect
+        appliedLook = look
+        applyLook(style, look, density)
     }
 
     LaunchedEffect(assetGeoJson, styleState.value) {
@@ -839,6 +869,14 @@ internal fun MapLibreMap.loadTrailDayStyle(
     /** The offline picker's regions, and the one chosen: see [BasemapView.regionsGeoJson]. */
     regionsGeoJson: String = RegionGeoJson.EMPTY,
     regionPickedGeoJson: String = RegionGeoJson.EMPTY,
+    /**
+     * The width and colour in force: see [nz.mckenzie.trailday.domain.look.MapLook].
+     *
+     * Read once when the style is built, and applied again by [applyLook] when the walker changes it
+     * while a map is on screen - a look is not a style reload, or choosing a colour would drop the
+     * camera and refetch every tile.
+     */
+    look: MapLook = Look.value,
     onLoaded: (Style) -> Unit
 ) {
     val json = when {
@@ -870,6 +908,12 @@ internal fun MapLibreMap.loadTrailDayStyle(
 
     setStyle(Style.Builder().fromJson(json)) { style ->
         preservedCamera?.let { cameraPosition = it }
+        // Every width this style is built with is worked out from the walker's three answers, so a
+        // thicker track is a thicker casing round a published line, a wider trail underneath, and a
+        // wider line being followed - see [LineWeight].
+        val trackWeight = LineWeight(look.widthOf(LookTarget.TRACKS).stylePx)
+        val bikeWeight = LineWeight(look.widthOf(LookTarget.BIKE_TRACKS).stylePx)
+        val otherWeight = LineWeight(look.widthOf(LookTarget.OTHER_TRACKS).stylePx)
         // The regions first of all, under **everything**: on the picker they are not a line to read on the
         // ground, they are the choosing of the ground, and every route and place on the map belongs on top
         // of the shape that was chosen.
@@ -931,7 +975,7 @@ internal fun MapLibreMap.loadTrailDayStyle(
                 LineLayer(TRAIL_CASING_LAYER, TRAIL_SOURCE)
                     .withProperties(
                         PropertyFactory.lineColor(Expression.literal(TRAIL_CASING_COLOR)),
-                        PropertyFactory.lineWidth(Expression.literal(LineWeight.TRAIL_EDGE)),
+                        PropertyFactory.lineWidth(Expression.literal(trackWeight.trailEdge)),
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                     )
@@ -942,7 +986,7 @@ internal fun MapLibreMap.loadTrailDayStyle(
                 LineLayer(TRAIL_LAYER, TRAIL_SOURCE)
                     .withProperties(
                         PropertyFactory.lineColor(Expression.literal(TRAIL_COLOR)),
-                        PropertyFactory.lineWidth(Expression.literal(LineWeight.TRAIL)),
+                        PropertyFactory.lineWidth(Expression.literal(trackWeight.trail)),
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                     )
@@ -955,12 +999,13 @@ internal fun MapLibreMap.loadTrailDayStyle(
         if (style.getSource(OtherTracksLayerIds.SOURCE) == null) {
             style.addSource(GeoJsonSource(OtherTracksLayerIds.SOURCE, otherTracksGeoJson))
         }
-        addReferenceCasing(style, OtherTracksLayerIds.CASING, source = OtherTracksLayerIds.SOURCE)
+        addReferenceCasing(style, OtherTracksLayerIds.CASING, source = OtherTracksLayerIds.SOURCE, weight = otherWeight)
         addLineLayer(
             style,
             OtherTracksLayerIds.LINE,
             AssetKind.TRACK,
-            source = OtherTracksLayerIds.SOURCE
+            source = OtherTracksLayerIds.SOURCE,
+            weight = otherWeight
         )
         // Then DOC's material, so it lies **under** the walker's own work: what you made is what you
         // are reading, and the reference is the ground it sits on.
@@ -972,8 +1017,8 @@ internal fun MapLibreMap.loadTrailDayStyle(
         }
         // The pictures both sets of marker layers draw, handed over once for both: DOC's places wear the
         // same glyphs the walker's do, because a hut is a hut wherever it was published.
-        addPlaceMarkerImages(style, density)
-        addDocLayers(style)
+        addPlaceMarkerImages(style, density, look)
+        addDocLayers(style, trackWeight, bikeWeight)
 
         if (style.getSource(ASSETS_SOURCE) == null) {
             style.addSource(GeoJsonSource(ASSETS_SOURCE, assetGeoJson))
@@ -991,7 +1036,7 @@ internal fun MapLibreMap.loadTrailDayStyle(
                         // Its own kind's colour, like every other line of the walker's: what makes it bold
                         // is the width, because a followed bike track should still look like a bike track.
                         PropertyFactory.lineColor(Expression.get("stroke")),
-                        PropertyFactory.lineWidth(Expression.literal(LineWeight.FOLLOWED)),
+                        PropertyFactory.lineWidth(Expression.literal(trackWeight.followed)),
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                     )
@@ -1000,13 +1045,13 @@ internal fun MapLibreMap.loadTrailDayStyle(
         // The recorded line's own gold edge, under it. One per line kind rather than one for both:
         // an edge with no line over it is a gold ghost, so the edge has to be hidden with the line
         // it belongs to when Tracks and Bike tracks are switched separately.
-        addRecordedCasing(style, YourPlaceLayerIds.RECORDED_TRACK_CASING, AssetKind.TRACK)
-        addRecordedCasing(style, YourPlaceLayerIds.RECORDED_BIKE_CASING, AssetKind.BIKE_TRACK)
+        addRecordedCasing(style, YourPlaceLayerIds.RECORDED_TRACK_CASING, AssetKind.TRACK, trackWeight)
+        addRecordedCasing(style, YourPlaceLayerIds.RECORDED_BIKE_CASING, AssetKind.BIKE_TRACK, bikeWeight)
         // One line layer per kind, because line-dasharray is a constant in MapLibre
         // rather than something a feature can carry. So a track is solid and a bike track
         // is dashed, and the filter is what keeps them apart.
-        addLineLayer(style, AssetLayerIds.TRACKS, AssetKind.TRACK)
-        addLineLayer(style, AssetLayerIds.BIKE_TRACKS, AssetKind.BIKE_TRACK)
+        addLineLayer(style, AssetLayerIds.TRACKS, AssetKind.TRACK, weight = trackWeight)
+        addLineLayer(style, AssetLayerIds.BIKE_TRACKS, AssetKind.BIKE_TRACK, weight = bikeWeight)
         // What was actually walked or ridden, in its own source: evidence rather than a place, and
         // drawn over the planned lines it is read against.
         if (style.getSource(YOUR_TRACKS_SOURCE) == null) {
@@ -1017,7 +1062,7 @@ internal fun MapLibreMap.loadTrailDayStyle(
                 LineLayer(YourPlaceLayerIds.YOUR_TRACKS_CASING, YOUR_TRACKS_SOURCE)
                     .withProperties(
                         PropertyFactory.lineColor(Expression.literal(AssetColors.RECORDED_EDGE)),
-                        PropertyFactory.lineWidth(Expression.literal(LineWeight.EDGE)),
+                        PropertyFactory.lineWidth(Expression.literal(trackWeight.edge)),
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                     )
@@ -1031,7 +1076,7 @@ internal fun MapLibreMap.loadTrailDayStyle(
                 LineLayer(YourPlaceLayerIds.YOUR_TRACKS_LINE, YOUR_TRACKS_SOURCE)
                     .withProperties(
                         PropertyFactory.lineColor(Expression.literal(AssetColors.RECORDED)),
-                        PropertyFactory.lineWidth(Expression.literal(LineWeight.TRACK)),
+                        PropertyFactory.lineWidth(Expression.literal(trackWeight.stylePx)),
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                     )
@@ -1088,15 +1133,75 @@ internal fun MapLibreMap.loadTrailDayStyle(
     }
 }
 
+/**
+ * Changes a style that is already loaded to draw with [look]: **the widths of its lines, and the
+ * pictures its markers are drawn with.**
+ *
+ * A look is not a style reload. The colours take care of themselves, because a line's colour travels in
+ * the feature rather than in the layer and the documents are rebuilt when the look changes - so what is
+ * left here is every number the layers were built with, and the markers, which are pictures and cannot
+ * be recoloured once handed over.
+ *
+ * Every width is asked of [LineWeight] rather than set by hand, so a wider track is a wider casing round
+ * a published line and a wider line being followed, exactly as a freshly loaded style would draw it.
+ * That is the point: this is the other half of [loadTrailDayStyle], and the two must agree.
+ */
+private fun applyLook(style: Style, look: MapLook, density: Float) {
+    val tracks = LineWeight(look.widthOf(LookTarget.TRACKS).stylePx)
+    val bikes = LineWeight(look.widthOf(LookTarget.BIKE_TRACKS).stylePx)
+    val others = LineWeight(look.widthOf(LookTarget.OTHER_TRACKS).stylePx)
+
+    fun width(id: String, value: Float) {
+        style.getLayer(id)?.setProperties(PropertyFactory.lineWidth(Expression.literal(value)))
+    }
+
+    // The trail, which is nobody's kind and follows the tracks' width because it is drawn under them.
+    width(TRAIL_CASING_LAYER, tracks.trailEdge)
+    width(TRAIL_LAYER, tracks.trail)
+    // The other publisher's line and its casing.
+    width(OtherTracksLayerIds.CASING, others.edge)
+    width(OtherTracksLayerIds.LINE, others.stylePx)
+    // DOC's, in both of its pairs.
+    width(DocLayerIds.CASING, tracks.edge)
+    width(DocLayerIds.TRACKS, tracks.stylePx)
+    width(DocLayerIds.BIKE_CASING, bikes.edge)
+    width(DocLayerIds.BIKE_TRACKS, bikes.stylePx)
+    // The walker's own: the line being followed, the planned lines, and the recorded evidence with its
+    // gold edge.
+    width(TARGET_LAYER, tracks.followed)
+    width(YourPlaceLayerIds.RECORDED_TRACK_CASING, tracks.edge)
+    width(YourPlaceLayerIds.RECORDED_BIKE_CASING, bikes.edge)
+    width(AssetLayerIds.TRACKS, tracks.stylePx)
+    width(AssetLayerIds.BIKE_TRACKS, bikes.stylePx)
+    width(YourPlaceLayerIds.YOUR_TRACKS_CASING, tracks.edge)
+    width(YourPlaceLayerIds.YOUR_TRACKS_LINE, tracks.stylePx)
+
+    // A dash array is in multiples of its line's width, so a bike track's dashes are worked out again
+    // from the width it now has: left alone they would be a stipple at one width and a broken line at
+    // another. Only the walker's own bike line is dashed - DOC's rideable tracks are drawn solid.
+    style.getLayer(AssetLayerIds.BIKE_TRACKS)?.let { layer ->
+        AssetLineStyles.forKind(AssetKind.BIKE_TRACK, bikes)?.let { dash ->
+            layer.setProperties(PropertyFactory.lineDasharray(dash))
+        }
+    }
+
+    // The markers: a picture cannot be recoloured or resized once the style has it, so each is taken out
+    // and put back. Guarded by the lookup, because removing an image that is not there throws.
+    markerImages(look, density).forEach { (name, bitmap) ->
+        if (style.getImage(name) != null) style.removeImage(name)
+        style.addImage(name, bitmap)
+    }
+}
+
 /** The gold edge under a recorded planned line of [kind], matching the line's own kind filter. */
-private fun addRecordedCasing(style: Style, id: String, kind: AssetKind) {
+private fun addRecordedCasing(style: Style, id: String, kind: AssetKind, weight: LineWeight) {
     if (style.getLayer(id) != null) return
 
     style.addLayer(
         LineLayer(id, ASSETS_SOURCE)
             .withProperties(
                 PropertyFactory.lineColor(Expression.literal(AssetColors.RECORDED_EDGE)),
-                PropertyFactory.lineWidth(Expression.literal(LineWeight.EDGE)),
+                PropertyFactory.lineWidth(Expression.literal(weight.edge)),
                 PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                 PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
             )
@@ -1184,41 +1289,47 @@ private fun applyLayerVisibility(
  * Hands the style the markers a place is drawn with: one per kind of place, in the kind's own colour.
  *
  * Rendered from the same drawing the place list's glyphs come from - see [MarkerIcons] - rather than
- * painted again here, so a hut is a hut in both places. Each is rendered at the
- * device's own density, which is what draws a place at [PlaceIcons.MARKER_DP] on whatever screen it
- * lands on, and keeps the roof, the tent and the white edge sharp while it does it. There is no size
- * in the style to get wrong and nothing for the map to scale.
+ * painted again here, so a hut is a hut in both places. Each is rendered at the device's own density,
+ * which is what draws a place at its own size on whatever screen it lands on, and keeps the roof, the
+ * tent and the white edge sharp while it does it. There is no size in the style to get wrong and
+ * nothing for the map to scale.
+ *
+ * Added only when missing: an image belongs to the style it was added to, and a style can be loaded
+ * again - the same basemap with a key that has just been entered, say. A look that has changed is a
+ * different case, and [applyLook] replaces them.
  */
-private fun addPlaceMarkerImages(style: Style, density: Float) {
-    val sizePx = (PlaceIcons.MARKER_DP * density).roundToInt()
-    if (sizePx <= 0) return
+private fun addPlaceMarkerImages(style: Style, density: Float, look: MapLook) {
+    val missing = markerImages(look, density).filterKeys { style.getImage(it) == null }
+    if (missing.isNotEmpty()) style.addImages(HashMap(missing))
+}
+
+/**
+ * Every picture the map's markers are drawn with, for [look] on a screen of [density].
+ *
+ * One function for building them and one for handing them over, because a picture is drawn in the
+ * walker's colour and at the walker's size: a look that changes has to draw them all again, and a
+ * second copy of this arithmetic is how the first frame and a changed look come to disagree.
+ */
+private fun markerImages(look: MapLook, density: Float): Map<String, Bitmap> {
     val outlinePx = PlaceIcons.MARKER_OUTLINE_DP * density
-    val missing = HashMap<String, Bitmap>(PlaceIcons.IMAGE_NAMES.size + 1)
+    val images = LinkedHashMap<String, Bitmap>(PlaceIcons.IMAGE_NAMES.size + 1)
     // The bike badge: the bicycle the bike-track kind already draws, smaller than a place marker and
     // with the same white rim, so a point on a line reads as a note about the line.
-    if (style.getImage(BIKE_BADGE_IMAGE) == null) {
-        missing[BIKE_BADGE_IMAGE] = MarkerIcons.bitmap(
-            kind = AssetKind.BIKE_TRACK,
-            colorHex = AssetColors.BIKE_TRACK_KIND,
-            sizePx = (BIKE_BADGE_DP * density).roundToInt().coerceAtLeast(1),
+    images[BIKE_BADGE_IMAGE] = MarkerIcons.bitmap(
+        kind = AssetKind.BIKE_TRACK,
+        colorHex = look.colourOf(LookTarget.BIKE_TRACKS).hex,
+        sizePx = (BIKE_BADGE_DP * density).roundToInt().coerceAtLeast(1),
+        outlinePx = outlinePx
+    )
+    PlaceIcons.KINDS.forEach { kind ->
+        images[PlaceIcons.imageName(kind)] = MarkerIcons.bitmap(
+            kind = kind,
+            colorHex = look.colourOf(kind).hex,
+            sizePx = (look.sizeOf(kind).dp * density).roundToInt().coerceAtLeast(1),
             outlinePx = outlinePx
         )
     }
-    PlaceIcons.KINDS.forEach { kind ->
-        val name = PlaceIcons.imageName(kind)
-        // An image belongs to the style it was added to, and a style can be loaded again -
-        // the same basemap with a key that has just been entered, say. Adding one twice is
-        // not wrong so much as unnecessary work on the main thread.
-        if (style.getImage(name) == null) {
-            missing[name] = MarkerIcons.bitmap(
-                kind = kind,
-                colorHex = PlaceIcons.colorOf(kind),
-                sizePx = sizePx,
-                outlinePx = outlinePx
-            )
-        }
-    }
-    if (missing.isNotEmpty()) style.addImages(missing)
+    return images
 }
 
 /**
@@ -1278,6 +1389,7 @@ private fun addLineLayer(
     style: Style,
     id: String,
     kind: AssetKind,
+    weight: LineWeight,
     source: String = ASSETS_SOURCE,
     bikeFriendly: Boolean? = null
 ) {
@@ -1285,12 +1397,12 @@ private fun addLineLayer(
 
     val properties = mutableListOf<PropertyValue<*>>(
         PropertyFactory.lineColor(Expression.get("stroke")),
-        PropertyFactory.lineWidth(Expression.literal(LineWeight.TRACK)),
+        PropertyFactory.lineWidth(Expression.literal(weight.stylePx)),
         PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
         PropertyFactory.lineOpacity(Expression.literal(0.9f))
     )
-    AssetLineStyles.forKind(kind)?.let { dash -> properties += PropertyFactory.lineDasharray(dash) }
+    AssetLineStyles.forKind(kind, weight)?.let { dash -> properties += PropertyFactory.lineDasharray(dash) }
 
     val filters = mutableListOf(
         Expression.eq(Expression.get("kind"), Expression.literal(kind.name)),
@@ -1364,18 +1476,22 @@ private fun addTrackNameLayer(style: Style) {
  * **No switches are wired to these.** What DOC publishes is the ground the day's work sits on rather
  * than another layer of it, and the layer switches are the walker's answer about their *own* things -
  * see the plan for where the reference layer gets its own control, if it ever does.
+ *
+ * [look] rather than the default: DOC's tracks wear the walker's track colour and the walker's widths,
+ * because "the same track, drawn from a publisher's source" is what the look screen's own sample shows.
  */
-private fun addDocLayers(style: Style) {
+private fun addDocLayers(style: Style, trackWeight: LineWeight, bikeWeight: LineWeight) {
     // The base layer is every DOC track: a dual-use track is walkable too, and losing it because
     // Bike trails is off is exactly the bug this two-layer split now avoids. The bike layer is the
     // rideable subset, used when the base layer is switched off.
-    addReferenceCasing(style, DocLayerIds.CASING)
-    addReferenceCasing(style, DocLayerIds.BIKE_CASING, bikeFriendly = true)
-    addLineLayer(style, DocLayerIds.TRACKS, AssetKind.TRACK, source = DOC_SOURCE)
+    addReferenceCasing(style, DocLayerIds.CASING, trackWeight)
+    addReferenceCasing(style, DocLayerIds.BIKE_CASING, bikeWeight, bikeFriendly = true)
+    addLineLayer(style, DocLayerIds.TRACKS, AssetKind.TRACK, trackWeight, source = DOC_SOURCE)
     addLineLayer(
         style,
         DocLayerIds.BIKE_TRACKS,
         AssetKind.TRACK,
+        bikeWeight,
         source = DOC_SOURCE,
         bikeFriendly = true
     )
@@ -1421,6 +1537,7 @@ private fun addDocBikeBadgeLayer(style: Style) {
 private fun addReferenceCasing(
     style: Style,
     id: String,
+    weight: LineWeight,
     source: String = DOC_SOURCE,
     bikeFriendly: Boolean? = null
 ) {
@@ -1436,9 +1553,7 @@ private fun addReferenceCasing(
         LineLayer(id, source)
             .withProperties(
                 PropertyFactory.lineColor(Expression.literal(REFERENCE_CASING_COLOUR)),
-                PropertyFactory.lineWidth(
-                    Expression.literal(LineWeight.EDGE)
-                ),
+                PropertyFactory.lineWidth(Expression.literal(weight.edge)),
                 PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                 PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
                 PropertyFactory.lineOpacity(Expression.literal(0.75f))

@@ -1,10 +1,8 @@
 package nz.mckenzie.trailday.ui.screens
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -26,8 +24,9 @@ import nz.mckenzie.trailday.map.drawKindGlyph
  * Drawn rather than shipped as an icon font or a set of images: the app has no icon dependency and
  * does not need one for five shapes, and these only mean anything as a set.
  *
- * The colour is the kind's own: colour and glyph together say which kind it is, and neither may be
- * confusable with the recorded line or the dot that says where the phone is.
+ * The colour is the kind's own, read through [kindColour] so the glyph follows a change the walker
+ * makes: colour and glyph together say which kind it is, and neither may be confusable with the
+ * recorded line or the dot that says where the phone is.
  */
 @Composable
 fun AssetKindIcon(
@@ -35,15 +34,14 @@ fun AssetKindIcon(
     modifier: Modifier = Modifier,
     dimension: Dp = 20.dp
 ) {
-    val dark = isSystemInDarkTheme()
-    val colour = remember(kind, dark) { kindHex(kind, dark) }
+    val hex = kindHex(kind)
 
     Canvas(
         modifier = modifier
             .size(dimension)
             .semantics { contentDescription = AssetPhrase.kind(kind) }
     ) {
-        drawKindGlyph(kind, colour, GlyphStyle.LIST)
+        drawKindGlyph(kind, hex, GlyphStyle.LIST)
     }
 }
 

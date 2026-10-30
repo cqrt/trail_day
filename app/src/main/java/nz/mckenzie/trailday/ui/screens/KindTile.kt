@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,8 +18,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.asset.AssetKind
-import nz.mckenzie.trailday.map.AssetColors
+import nz.mckenzie.trailday.domain.look.Look
 import nz.mckenzie.trailday.map.KindTileLook
 import nz.mckenzie.trailday.ui.theme.TileSize
 
@@ -30,7 +32,7 @@ import nz.mckenzie.trailday.ui.theme.TileSize
  * and says which kind it is from further away than a 20-point outline can. The tint is the kind's own colour
  * at a low alpha rather than a second palette, so a kind's tile cannot drift from a kind's line or marker.
  *
- * The colour comes from [AssetColors]: the light set on a light screen, the derived dark set on a dark one,
+ * The colour comes from [Look]: the chosen one on a light screen, its derived dark tone on a dark one,
  * because a deep purple glyph on a dark tile is a glyph nobody sees.
  */
 @Composable
@@ -55,13 +57,24 @@ fun KindTile(
     }
 }
 
-/** The kind's colour for the screen it is on: the light set, or the derived dark one. */
+/**
+ * The kind's colour for the screen it is on: the light set, or the derived dark one.
+ *
+ * **The look is collected rather than read**, so a glyph already on the screen repaints when the
+ * walker changes a colour. Reading it inside a `remember` whose key was only the kind is what left a
+ * row of the look screen showing the previous colour: the cached value had no key that changed.
+ */
 @Composable
 internal fun kindColour(kind: AssetKind, dark: Boolean = isSystemInDarkTheme()): Color {
-    val hex = remember(kind, dark) { kindHex(kind, dark) }
+    val hex = kindHex(kind, dark)
     return remember(hex) { Color(android.graphics.Color.parseColor(hex)) }
 }
 
 /** The same colour as the hex the map's own drawing takes: one choice, two shapes of it. */
-internal fun kindHex(kind: AssetKind, dark: Boolean): String =
-    if (dark) AssetColors.forKindOnDark(kind) else AssetColors.forKind(kind)
+@Composable
+internal fun kindHex(kind: AssetKind, dark: Boolean = isSystemInDarkTheme()): String {
+    val look by Look.current.collectAsStateWithLifecycle()
+    return remember(look, kind, dark) {
+        if (dark) look.colourOnDark(kind) else look.colourOf(kind).hex
+    }
+}
