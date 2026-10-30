@@ -171,6 +171,16 @@ enum class Basemap(
     val usesHostedStyle: Boolean get() = this == LINZ_TOPO_LIDAR_HILLSHADE
 
     /**
+     * Whether these tiles come from LINZ, by way of the app's own proxy.
+     *
+     * The question the map's trouble notice asks about a basemap: only a LINZ basemap can be
+     * refused a key or fail because the Worker holding it is down. The drawn maps are somebody
+     * else's hosts and need no key, so their failures are asked nothing - see
+     * [nz.mckenzie.trailday.offline.MapTrouble].
+     */
+    val usesLinz: Boolean get() = this == LINZ_AERIAL || this == LINZ_TOPO_LIDAR_HILLSHADE
+
+    /**
      * LINZ's own style document for the vector Topographic basemap.
      *
      * The style is fetched by the app and adapted before it is loaded: LINZ's hosted document carries a

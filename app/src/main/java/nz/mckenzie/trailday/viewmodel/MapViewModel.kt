@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import nz.mckenzie.trailday.data.RecordingRepository
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
@@ -60,13 +61,15 @@ import nz.mckenzie.trailday.map.TeAraroaGeoJson
 import nz.mckenzie.trailday.map.OtherTracksGeoJson
 import nz.mckenzie.trailday.map.DocTrackVisibility
 import nz.mckenzie.trailday.map.drawingKind
-import nz.mckenzie.trailday.offline.KeyCheck
+import nz.mckenzie.trailday.offline.DownloadedBasemaps
 import nz.mckenzie.trailday.offline.LinzKeyProbe
+import nz.mckenzie.trailday.offline.MapTrouble
+import nz.mckenzie.trailday.offline.NetworkState
 import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.offline.OfflineOtherTrackStore
-import nz.mckenzie.trailday.offline.ProxyHealth
 import nz.mckenzie.trailday.offline.ProxyHealthCheck
 import nz.mckenzie.trailday.offline.TileTrouble
+import nz.mckenzie.trailday.offline.troubleFrom
 import nz.mckenzie.trailday.map.AssetHitTest
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.MapCamera
@@ -158,7 +161,14 @@ class MapViewModel(
      *
      * Used only when there *is* one: see [askWhatIsWrong], and [LinzAccess] for the two modes.
      */
-    private val keyProbe: LinzKeyProbe = LinzKeyProbe()
+    private val keyProbe: LinzKeyProbe = LinzKeyProbe(),
+    /**
+     * What is downloaded that would draw where the map is looking, for the notice to offer.
+     *
+     * Null in a test that has no database, and in that case the notice offers what is downloaded
+     * rather than a basemap it cannot name - see [MapTrouble.Offline].
+     */
+    private val downloadedBasemaps: DownloadedBasemaps? = null
 ) : ViewModel() {
 
     /** Which map to draw under the work: the walker's choice in Settings. */
@@ -166,18 +176,15 @@ class MapViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, Basemap.DEFAULT)
 
     /**
-     * What to say when the basemap has stopped answering, or null when there is nothing to say.
+     * Why the map has stopped drawing, or null when there is nothing to say.
      *
-     * A run of tiles has to fail first - see [TileTrouble] - and only then is anything asked, so a map
-     * that is working never makes the call. What is shown is the sentence the thing that knows gives back,
-     * rather than a guess made here: this phone cannot tell a dead key from a service that is down, and
-     * whichever of the two is fetching the tiles can.
-     *
-     * **Which of the two depends on the walker's own key** - see [LinzAccess]. With one in force the app
-     * talks to LINZ directly, so the proxy's `/health` would be a sentence about somebody else's key; with
-     * none it is the proxy's business, and the proxy's answer is the one worth repeating.
+     * A run of tiles has to fail first - see [TileTrouble] - and only then is anything asked, so a
+     * map that is working never makes the call. What is shown is a [MapTrouble], gathered here
+     * rather than guessed in the card: **the connection first**, because a phone with none cannot
+     * be told anything useful about the Worker or the key, and then whichever of the two is
+     * fetching the tiles can say what it makes of it - see [LinzAccess].
      */
-    val basemapTrouble: StateFlow<String?> = TileTrouble.showing
+    val basemapTrouble: StateFlow<MapTrouble?> = TileTrouble.showing
         .map { showing ->
             if (!showing) return@map null
             val said = askWhatIsWrong()
@@ -1056,30 +1063,48 @@ class MapViewModel(
     }
 
     /**
-     * Asks whichever service is fetching the tiles what it makes of the key.
+     * Works out which of the [MapTrouble] cases this is.
      *
-     * Best-effort in both modes: a phone with no reception cannot ask, and "could not be reached" is then
-     * the honest answer rather than a claim about a key.
+     * **The connection is asked about before anything is asked over it.** A phone with no reception
+     * cannot reach the Worker or LINZ, and asking took ten seconds to answer a question that did
+     * not need asking: with no connection the sentence is "you're offline", and the useful action
+     * is the map that is already on the phone - possibly a different basemap's, if a download
+     * covers this spot.
+     *
+     * With a connection, a drawn map's silence is nobody's key: OpenStreetMap and OpenTopoMap need
+     * none, so there is nothing to ask about them.
      */
-    private suspend fun askWhatIsWrong(): String {
-        val own = settingsRepository.developerLinzKey.first()
-        if (own.isBlank()) {
-            return when (val answer = proxyHealth.check()) {
-                is ProxyHealth.Answered -> answer.message
-                ProxyHealth.Unreachable -> "The map service could not be reached."
+    private suspend fun askWhatIsWrong(): MapTrouble {
+        val drawn = basemap.value
+
+        if (!NetworkState.isOnline()) {
+            // **The map's own camera arrives a moment after it opens.** Asked for at once - which is
+            // what a cold start with no reception does - the answer would be "nothing covers this
+            // spot" about a spot the app has not been told about yet. A short wait for the first
+            // camera idle is the difference between offering the map on the phone and missing it.
+            val looking = camera.value ?: withTimeoutOrNull(CAMERA_WAIT_MS) {
+                camera.first { it != null }
             }
+            val covering = if (looking == null || downloadedBasemaps == null) {
+                null
+            } else {
+                downloadedBasemaps.covering(looking.lat, looking.lng, looking.zoom, except = drawn)
+            }
+            return MapTrouble.Offline(covering)
         }
 
-        return when (val answer = keyProbe.check(own)) {
-            // The key is fine, so the trouble is something else - and saying so is more use than
-            // repeating a sentence about a key that works.
-            KeyCheck.Works -> "Your LINZ key was accepted, so the trouble is elsewhere."
-            is KeyCheck.Failed -> answer.message
-        }
+        if (!drawn.usesLinz) return MapTrouble.DrawnMapSilent
+
+        val own = settingsRepository.developerLinzKey.first()
+        if (own.isBlank()) return troubleFrom(proxyHealth.check())
+        return troubleFrom(keyProbe.check(own))
     }
 
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L
+
+        /** How long the offline notice waits for the map to say where it is looking. */
+        private const val CAMERA_WAIT_MS = 2_000L
 
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
@@ -1102,7 +1127,10 @@ class MapViewModel(
                         recordedFor = recordings.observeSessions()
                             .map { sessions -> sessions.mapNotNull { it.assetId }.toSet() },
                         recordingRepository = recordings,
-                        trailGeoJson = TeAraroaGeoJson.reader(appContext)
+                        trailGeoJson = TeAraroaGeoJson.reader(appContext),
+                        downloadedBasemaps = DownloadedBasemaps(
+                            TrailDayDatabase.get(appContext).offlineAreaDao()
+                        )
                     )
                 }
             }

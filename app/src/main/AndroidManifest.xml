@@ -3,6 +3,13 @@
     <!-- Basemap tiles (one-off downloads for offline regions) -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!--
+        Whether there is a connection at all. The map's notice asks before it asks anything else:
+        with no reception it says so and offers what is downloaded, rather than reporting a map
+        service it could not reach - see NetworkState.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <!-- GPS track recording -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />

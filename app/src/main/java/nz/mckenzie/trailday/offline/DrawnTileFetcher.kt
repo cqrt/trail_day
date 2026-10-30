@@ -49,7 +49,7 @@ class DrawnTileFetcher(
         withContext(Dispatchers.IO) {
             val url = URL(urlFor(zoom, x, y))
 
-            runCatching {
+            val result = runCatching {
                 val connection = (url.openConnection() as HttpURLConnection).apply {
                     requestMethod = "GET"
                     connectTimeout = connectTimeoutMs
@@ -84,6 +84,18 @@ class DrawnTileFetcher(
             }.getOrElse { error ->
                 TileFetcher.Result.Failed(error.message ?: error::class.java.simpleName)
             }
+
+            // **A drawn map says when it stops answering, the same way a LINZ one does.** Until this
+            // was here, panning off the end of what is cached with no reception gave a blank square and
+            // no explanation at all: only the LINZ fetcher counted its failures, so nothing ever
+            // reached the notice. Their tiles arrive in a screenful at a time, so one arriving puts the
+            // run back to zero - see [TileTrouble].
+            when (result) {
+                is TileFetcher.Result.Tile, TileFetcher.Result.NotFound -> TileTrouble.arrived()
+                is TileFetcher.Result.Failed -> TileTrouble.failed()
+            }
+
+            result
         }
 
     private companion object {

@@ -11,6 +11,7 @@ import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.domain.look.Look
 import nz.mckenzie.trailday.domain.tiles.LinzAccess
 import nz.mckenzie.trailday.map.BasemapPreviewCache
+import nz.mckenzie.trailday.offline.NetworkState
 import nz.mckenzie.trailday.offline.TileServerHolder
 import nz.mckenzie.trailday.tracking.DevicePosition
 import nz.mckenzie.trailday.update.UpdateCheckScheduler
@@ -39,6 +40,11 @@ class TrailDayApplication : Application() {
         // One position stream for the whole app: every map shows where the phone is, and
         // collection starts and stops with whichever map is on screen.
         DevicePosition.start(this)
+
+        // Whether the phone can reach anything, for the map's notice: with no connection the map
+        // says so and offers the map already on the phone, rather than waiting on a service that
+        // cannot be reached to say nothing useful. See [NetworkState].
+        NetworkState.start(this)
 
         // The switches below have to actually stop the job they name, or the setting is a lie.
         val settings = SettingsRepository(this)

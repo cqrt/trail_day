@@ -30,6 +30,8 @@ class DrawnTileFetcherTest {
     @After
     fun tearDown() {
         server?.stop()
+        // The counter is process-wide, so one test's failures must not be the next one's.
+        TileTrouble.reset()
     }
 
     /** Answers every request with one canned response, recording what was asked. */
@@ -127,6 +129,20 @@ class DrawnTileFetcherTest {
         )
 
         assertTrue(offline.fetch(14, 1017, 660) is TileFetcher.Result.Failed)
+    }
+
+    @Test
+    fun `a drawn map that stops answering is counted, so the map can say so`() = runBlocking {
+        // Without this the app had nothing to say when OpenStreetMap ran out of cached tiles: only
+        // LINZ's fetcher counted its failures, so a blank drawn map was silent.
+        startServer(status = 500)
+        repeat(3) { fetcher().fetch(14, 1017, 660) }
+        assertEquals(3, TileTrouble.consecutiveFailures.value)
+
+        // Their 404 is the source answering that it has nothing here, which is not news.
+        startServer(status = 404)
+        fetcher().fetch(14, 1017, 660)
+        assertEquals(0, TileTrouble.consecutiveFailures.value)
     }
 
     @Test

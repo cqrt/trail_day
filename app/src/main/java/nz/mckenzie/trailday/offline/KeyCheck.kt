@@ -24,6 +24,16 @@ sealed interface KeyCheck {
      */
     data class Failed(val message: String) : KeyCheck
 
+    /**
+     * The question was never asked: no network, DNS, TLS, a dropped connection.
+     *
+     * **Not [Failed]**, because it says nothing about the key - and the two lead a walker to
+     * different places. A refused key is replaced in Settings; an answer that never arrived is
+     * the connection's problem, and telling them to change a key that is probably fine would be
+     * the app blaming the one thing it did not test.
+     */
+    data class Unreachable(val message: String) : KeyCheck
+
     companion object {
         /** Turns LINZ's answer into an answer about the key. */
         fun fromStatus(status: Int): KeyCheck = when (status) {
@@ -89,7 +99,7 @@ class LinzKeyProbe(
             }
         }.getOrElse { error ->
             // No network, DNS, TLS: say so rather than blaming the key.
-            KeyCheck.Failed(error.message ?: error::class.java.simpleName)
+            KeyCheck.Unreachable(error.message ?: error::class.java.simpleName)
         }
     }
 }

@@ -259,10 +259,15 @@ class SettingsViewModel(
                 key.isBlank() -> KeyCheckState.Failed("There is no key to check")
                 else -> when (
                     val result = runCatching { checkKey(key) }
-                        .getOrElse { failure -> KeyCheck.Failed(failure.message ?: "the check could not run") }
+                        .getOrElse { failure ->
+                            KeyCheck.Unreachable(failure.message ?: "the check could not run")
+                        }
                 ) {
                     KeyCheck.Works -> KeyCheckState.Worked
                     is KeyCheck.Failed -> KeyCheckState.Failed(result.message)
+                    // The check could not ask LINZ anything, which is worth saying too - it is just
+                    // not a statement about the key.
+                    is KeyCheck.Unreachable -> KeyCheckState.Failed(result.message)
                 }
             }
         }

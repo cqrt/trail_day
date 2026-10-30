@@ -89,6 +89,11 @@ import nz.mckenzie.trailday.viewmodel.PendingFollow
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.domain.tiles.TeAraroa
+import nz.mckenzie.trailday.offline.MapTrouble
+import nz.mckenzie.trailday.offline.MapTroubleAction
+import nz.mckenzie.trailday.offline.MapTroubleWords
+import nz.mckenzie.trailday.offline.actionLabel
+import nz.mckenzie.trailday.offline.troubleWords
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.map.DEFAULT_CAMERA_TARGET
@@ -151,6 +156,17 @@ fun MapScreen(
     var layersOpen by remember { mutableStateOf(false) }
     val mapScope = rememberCoroutineScope()
 
+    // The one thing a trouble notice's button does, whichever notice it is - see [MapTrouble]. The
+    // card and the strip differ in where they sit rather than in what they offer, so the doing is
+    // written once here and both call it with their own action.
+    val actOnTrouble: (MapTroubleAction) -> Unit = { action ->
+        when (action) {
+            is MapTroubleAction.SwitchTo -> viewModel.useBasemap(action.basemap)
+            MapTroubleAction.OpenOfflineTab -> onOpenTab(Tab.OFFLINE)
+            MapTroubleAction.OpenSettings -> onOpenSettings
+        }
+    }
+
     // How far across the ground one pixel of the map covers, as the map reports it on every camera
     // move, and the room the bar is allowed to take. Null until the map has said, which is a moment
     // after it opens: the bar is drawn only from an answer the map itself gave.
@@ -178,8 +194,7 @@ fun MapScreen(
     // Where the app asks for the permission the marker needs, and asked on a tap rather than on
     // the way in: a prompt that arrives with the map is a prompt for nothing, and one that
     // arrived from the record screen already has an answer.
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
+    val permissionLauncher = rememberLauncherForActivityResult(        contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         // A granted "Approximate" arrives here as a refusal, and it is not the same refusal: the fix
         // exists, it is just too rough to draw a dot from, and only the walker can change that.
@@ -307,41 +322,69 @@ fun MapScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
+            // Everything at the top of the map in one column, so nothing has to know how tall
+            // anything else is: the offline strip pushes the round buttons below it rather than
+            // being drawn underneath them.
             Column(
                 modifier = Modifier
-                    .align(Alignment.TopStart)
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                locationNotice?.let { notice ->
-                    LocationNoticeCard(
-                        message = notice,
-                        onDismiss = viewModel::clearLocationNotice
+                // **Offline is a state rather than a fault.** Nothing is broken: this ground is not
+                // on the phone and there is nothing to fetch it from. So it is a strip across the
+                // top of the map - where it says something true about the whole screen rather than
+                // sitting in the middle of the ground the walker is trying to read.
+                (basemapTrouble as? MapTrouble.Offline)?.let { offline ->
+                    val words = troubleWords(offline, basemap)
+                    MapTroubleNotice(
+                        words = words,
+                        onAction = { actOnTrouble(words.action) },
+                        onDismiss = viewModel::answerTrouble,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
-            }
 
-            // Where the app asks for the permission the marker needs, and asked on a tap: a
-            // prompt that arrives with the map is a prompt for nothing, and one that arrived
-            // from the record screen has an answer already.
-            //
-            // The three buttons over the map's top corner, as the mock screens draw them: white circles
-            // with a shadow, settings above what-the-map-draws above where-I-am. The mock screens have the
-            // last two; the settings need a door of their own once the bar is gone, and this is the corner
-            // the walker's thumb is already going to.
-            Column(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(end = 12.dp, top = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                RoundIconButton(glyph = IconGlyph.SETTINGS, description = "Settings", onClick = onOpenSettings)
-                RoundIconButton(
-                    glyph = IconGlyph.LAYERS,
-                    description = "Layers",
-                    onClick = { layersOpen = true }
-                )
-                RoundIconButton(glyph = IconGlyph.LOCATE, description = "Show where I am", onClick = locate)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        locationNotice?.let { notice ->
+                            LocationNoticeCard(
+                                message = notice,
+                                onDismiss = viewModel::clearLocationNotice
+                            )
+                        }
+                    }
+
+                    // The three buttons over the map's top corner, as the mock screens draw them: white
+                    // circles with a shadow, settings above what-the-map-draws above where-I-am. The mock
+                    // screens have the last two; the settings need a door of their own once the bar is
+                    // gone, and this is the corner the walker's thumb is already going to.
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        RoundIconButton(
+                            glyph = IconGlyph.SETTINGS,
+                            description = "Settings",
+                            onClick = onOpenSettings
+                        )
+                        RoundIconButton(
+                            glyph = IconGlyph.LAYERS,
+                            description = "Layers",
+                            onClick = { layersOpen = true }
+                        )
+                        RoundIconButton(
+                            glyph = IconGlyph.LOCATE,
+                            description = "Show where I am",
+                            onClick = locate
+                        )
+                    }
+                }
             }
 
             // The zoom keys and the level, **halfway down the right-hand edge** - where they are on every
@@ -355,19 +398,16 @@ fun MapScreen(
                     .padding(end = KEY_EDGE_PADDING)
             )
 
-            // What to say when the imagery has stopped arriving, with the way out of it. Only ever shown
-            // after a run of tiles has failed, and only for a basemap that has a drawn alternative - see
-            // [TileTrouble] and [nz.mckenzie.trailday.offline.ProxyHealthCheck].
-            basemapTrouble?.let { trouble ->
-                BasemapTroubleCard(
-                    message = trouble,
-                    // Nothing better to offer a walker who is already on a drawn map: this notice is about
-                    // LINZ's tiles, and LINZ's tiles are not what they are drawing.
-                    onUseDrawnMap = if (basemap == Basemap.OPENSTREETMAP) {
-                        null
-                    } else {
-                        { viewModel.useBasemap(Basemap.OPENSTREETMAP) }
-                    },
+            // Why the map has stopped drawing, when the trouble is not the connection: the Worker's
+            // own sentence, the key's, or a drawn map's silence, and the one thing that helps with it
+            // - see [MapTrouble]. Drawn at the middle of the map, because a map that is not
+            // drawing is what the walker is looking at. The offline case is the strip at the top
+            // instead: nothing there is broken, and there is less to say.
+            basemapTrouble?.takeIf { it !is MapTrouble.Offline }?.let { trouble ->
+                val words = troubleWords(trouble, basemap)
+                MapTroubleNotice(
+                    words = words,
+                    onAction = { actOnTrouble(words.action) },
                     onDismiss = viewModel::answerTrouble,
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -843,22 +883,17 @@ private fun GlyphTile(glyph: IconGlyph, background: Color, tint: Color) {
 }
 
 /**
- * What to say when the basemap has stopped answering, and the way out of it.
+ * Why the map has stopped drawing, and the one thing that helps.
  *
- * The app cannot tell a dead key from a Worker that is down - see [TileTrouble] - so the sentence in
- * the middle is the Worker's own, asked for once and repeated as it was given. What the card adds is
- * the thing the walker can actually do about it: the drawn maps need no key, no account and nothing
- * configured, so they work on the day the imagery does not, and one tap puts them under the walker's
- * work rather than sending them into Settings to find a switch.
- *
- * A card rather than a toast, and at the middle of the map rather than in a corner: a map that is not
- * drawing is what the walker is looking at, so this is where their eyes already are.
+ * The words come from `troubleWords` rather than from branches here, because **the sentence is the
+ * whole of the judgement** - which of the five things happened, and what a walker can do about it -
+ * and a branch in a composable cannot be held by a test. This draws whatever it is given: the strip
+ * at the top of the map for being offline, and the card in the middle for everything else.
  */
 @Composable
-private fun BasemapTroubleCard(
-    message: String,
-    /** Null when the map already *is* a drawn map: there is then nothing better to offer. */
-    onUseDrawnMap: (() -> Unit)?,
+private fun MapTroubleNotice(
+    words: MapTroubleWords,
+    onAction: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -867,20 +902,13 @@ private fun BasemapTroubleCard(
         modifier = modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(text = "This map is not drawing", style = MaterialTheme.typography.titleMedium)
-            Text(text = message, style = MaterialTheme.typography.bodySmall)
-            Text(
-                text = "The drawn maps - OpenStreetMap and Topographic - need no key, so they work " +
-                    "whatever this is.",
-                style = MaterialTheme.typography.bodySmall
-            )
+            Text(text = words.title, style = MaterialTheme.typography.titleMedium)
+            Text(text = words.body, style = MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                onUseDrawnMap?.let { use ->
-                    Button(onClick = use) { Text("Use OpenStreetMap") }
-                }
+                Button(onClick = onAction) { Text(actionLabel(words.action)) }
                 TextButton(onClick = onDismiss) { Text("Dismiss") }
             }
         }
