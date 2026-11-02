@@ -22,6 +22,7 @@ import nz.mckenzie.trailday.domain.track.TrackInterchange
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.domain.look.Look
 import nz.mckenzie.trailday.map.drawingKind
+import nz.mckenzie.trailday.ui.ImportWords
 import nz.mckenzie.trailday.ui.docRowDetail
 import nz.mckenzie.trailday.ui.otherTrackRowDetail
 
@@ -147,6 +148,40 @@ object WebEditorJson {
             sideTracks = track.reading.sideTracks,
             segmentsDidNotMeet = track.reading.segmentsDidNotMeet,
             otherTracks = otherTracks
+        )
+    )
+
+    /**
+     * What a file brought in as an activity answers with: the phone's own sentence about what it did.
+     *
+     * The sentence is built on the phone ([nz.mckenzie.trailday.ui.ImportWords]) rather than on the
+     * page, because the same import made on the phone says the same thing - and because the walker
+     * reading "Imported \"Morning Walk\" as an activity on the phone, 3 Nov 2026, 1,240 points" is
+     * reading the date and the count the phone worked out from the file.
+     */
+    fun activitiesWritten(message: String): String = json.encodeToString(
+        WebEditorActivitiesAnswer.serializer(),
+        WebEditorActivitiesAnswer(message = message)
+    )
+
+    /**
+     * What a file of several tracks answers with, when sent to Activities: the question, and nothing
+     * written.
+     *
+     * The words are the phone's, from the same [nz.mckenzie.trailday.ui.ImportWords] the phone's own
+     * dialog uses, so the desk asks exactly what the phone asks and the two buttons say the same two
+     * things. Where the answer goes is given back in the body of the next request - see
+     * [WebEditorActivitiesBody].
+     */
+    fun activitiesAsked(question: ImportWords.Question): String = json.encodeToString(
+        WebEditorActivitiesAnswer.serializer(),
+        WebEditorActivitiesAnswer(
+            question = WebEditorImportQuestion(
+                sentence = question.sentence,
+                tracks = question.tracks,
+                activitiesLabel = question.activitiesLabel,
+                placesLabel = question.placesLabel
+            )
         )
     )
 
@@ -454,6 +489,56 @@ data class WebEditorPosition(val lat: Double, val lng: Double)
 data class WebEditorGpxBody(
     /** See [WebEditorServer.GPX_FIELD] for why the page is told this name rather than writing it in. */
     val gpx: String = ""
+)
+
+/**
+ * The body `POST /api/activities` carries: a file, its own name, and where its tracks should go.
+ *
+ * **The naming and the meaning are the phone's.** The page sends the file's name exactly as the
+ * laptop holds it - `Morning_Walk_2026-11-03.gpx` - and the phone drops the extension by its own rule,
+ * the same one the phone's picker gets a name from, so an activity is called what the same file
+ * imported on the phone would be called.
+ *
+ * [as] is absent on the first send, and that absence is the question being asked rather than skipped: a
+ * file of several tracks is answered with the question and nothing written, and the page sends the file
+ * again with the walker's answer. `"activities"` or `"places"` are the only two values anything acts on;
+ * anything else reads as no answer, so a page from another build asks rather than writing somewhere the
+ * walker never chose.
+ */
+@Serializable
+data class WebEditorActivitiesBody(
+    val gpx: String = "",
+    val name: String = "",
+    val `as`: String? = null
+)
+
+/**
+ * What `POST /api/activities` answers with: either the phone's sentence about what it wrote, or the
+ * question a file of several tracks asks.
+ *
+ * One document with two keys rather than two shapes, because the page has one handler either way and the
+ * difference - was anything written - is the presence of [message], which it has to read regardless.
+ */
+@Serializable
+data class WebEditorActivitiesAnswer(
+    /** The phone's own sentence, when something was written. */
+    val message: String = "",
+    /** The question and its two buttons, when nothing was written because the walker has not answered. */
+    val question: WebEditorImportQuestion? = null
+)
+
+/**
+ * The question, as the page draws it: one sentence and the two answers' own labels.
+ *
+ * The labels carry the count - "4 activities", "4 places" - because the answer is a count, and the
+ * phone says the numbers rather than the page working them out from the file it never read.
+ */
+@Serializable
+data class WebEditorImportQuestion(
+    val sentence: String = "",
+    val tracks: Int = 0,
+    val activitiesLabel: String = "",
+    val placesLabel: String = ""
 )
 
 /**

@@ -8,6 +8,7 @@ import nz.mckenzie.trailday.map.PlaceIcons
 import nz.mckenzie.trailday.offline.HttpRequest
 import nz.mckenzie.trailday.offline.HttpResponse
 import nz.mckenzie.trailday.offline.HttpRoute
+import nz.mckenzie.trailday.ui.ImportWords
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -281,6 +282,25 @@ class WebEditorServerTest {
                     ),
                     otherTracks = 0
                 )
+            }
+        }
+
+        /**
+         * A file brought in as an activity: the sentence the phone wrote, or the question a file of
+         * several tracks asks - so both shapes a route has to pass on are covered.
+         */
+        var lastActivities: String? = null
+
+        override suspend fun activities(body: String?): WebEditorWrite {
+            lastActivities = body
+            return if (body.isNullOrBlank()) {
+                WebEditorWrite.Refused(WebEditorRefusal.INVALID, "that request carried no track file")
+            } else if (body.contains("several")) {
+                WebEditorWrite.AsksWhereItGoes(
+                    ImportWords.Question(fileName = "Taupo rides", tracks = 4)
+                )
+            } else {
+                WebEditorWrite.ActivitiesWritten("Imported \"Morning Walk\" as an activity on the phone.")
             }
         }
 
@@ -809,6 +829,69 @@ class WebEditorServerTest {
         // route, which serves no such file, so it is a 404 rather than a file read with no file.
         assertEquals(404, get(WebEditorServer.GPX_PATH).code)
         assertNull(data.lastGpx)
+    }
+
+    @Test
+    fun `a file brought in as an activity arrives whole and is answered with the phone's sentence`() {
+        start()
+
+        val body = """{"gpx":"PGdweC8+","name":"Morning_Walk.gpx"}"""
+        val response = send(WebEditorServer.ACTIVITIES_PATH, "POST", body)
+
+        assertEquals(200, response.code)
+        assertEquals("the file arrived whole, with its own name", body, data.lastActivities)
+        // The phone's own sentence, passed on as it stands: the page has nothing to add to it, and the
+        // date and the count in it are the phone's.
+        assertEquals(
+            """{"message":"Imported \"Morning Walk\" as an activity on the phone.","question":null}""",
+            response.body
+        )
+    }
+
+    @Test
+    fun `a file of several tracks is answered with the question rather than with a write`() {
+        start()
+
+        val response = send(
+            WebEditorServer.ACTIVITIES_PATH,
+            "POST",
+            """{"gpx":"PGdweC8+","name":"Taupo rides.gpx","as":"several"}"""
+        )
+
+        assertEquals(200, response.code)
+        // The page draws the question from the phone's own words: one sentence and the two answers,
+        // count and all.
+        assertEquals(
+            """{"message":"","question":{"sentence":"Taupo rides holds 4 tracks. """ +
+                """Keep them as 4 activities, or as 4 places?","tracks":4,""" +
+                """"activitiesLabel":"4 activities","placesLabel":"4 places"}}""",
+            response.body
+        )
+    }
+
+    @Test
+    fun `a request with no file in it is refused in the phone's own words at the activities path`() {
+        start()
+
+        val refused = send(WebEditorServer.ACTIVITIES_PATH, "POST", "")
+
+        assertEquals(400, refused.code)
+        assertEquals(
+            """{"reason":"invalid","message":"that request carried no track file"}""",
+            refused.body
+        )
+    }
+
+    @Test
+    fun `bringing a file in as an activity needs the token, and a GET of its path is a 404`() {
+        start()
+
+        assertEquals(
+            403,
+            send(WebEditorServer.ACTIVITIES_PATH, "POST", """{"gpx":"x"}""", withToken = false).code
+        )
+        assertNull("a refused file never reached the data", data.lastActivities)
+        assertEquals(404, get(WebEditorServer.ACTIVITIES_PATH).code)
     }
 
     @Test

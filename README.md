@@ -17,7 +17,7 @@ It's installed straight from GitHub rather than a store, and updates itself from
 | **Map** | Your location, your places, and DOC and other tracks, over the base map you pick |
 | **Places** | Everything you've saved or imported: tracks, bike tracks, huts, campsites and waypoints |
 | **Record** | Record a walk or ride, either as a new route or along a place you already have |
-| **Activities** | The trips you've recorded |
+| **Activities** | The trips you've recorded, and walks you've brought in from a file |
 | **Offline** | What's downloaded to the phone, and where you start new downloads |
 
 Settings, a single place's page, the DOC browser and the other-tracks browser all open from these tabs.
@@ -69,7 +69,7 @@ The kind decides the shape, so you never have to say a hut is a point and a trac
 
 You can get places into the app by:
 
-- importing a GPX, KML, KMZ or GeoJSON file (a file with several tracks becomes several places)
+- importing a GPX, KML, KMZ or GeoJSON file (a file with several tracks becomes several places, and both Import buttons take several files at once)
 - importing something from DOC or the other-tracks browser
 - tapping the map to add a spot
 - walking it with the recorder
@@ -88,6 +88,10 @@ Hit Record and the app logs your position as you move. Each point is saved to th
 
 A recording is saved as a trip with its line, distance, time and points. If you record along a place you already had, the trip is linked to it. If you record a brand new route, it also becomes a new place, and deleting that trip deletes the place it created (but not a place that was yours beforehand).
 
+You can also bring a walk in from a file. Import on the Activities tab takes a GPX, KML, KMZ or GeoJSON file and saves each track in it as a finished trip, dated from the file's own times so it sorts where it belongs. An untimed file takes today, and says nothing about how long it took rather than claiming nothing at all.
+
+A file of several tracks asks where it should go, because four tracks could be a week of walks or four places. Both Import buttons take several files at once, and a file the app can't read is named in the message rather than stopping the rest. A trip from a file says so on its page.
+
 ## DOC tracks, huts and campsites
 
 DOC publishes its data as online map services. Instead of downloading everything, the app searches those services when you ask: by name, or by distance from where you are. The "near me" search works outward in rings, so widening the distance only adds results and never shuffles the existing ones.
@@ -103,6 +107,8 @@ These come from the National Tracks Dataset published by Herenga ā Nuku Aotearo
 ## The desktop page
 
 The phone can serve a web page to a desktop on the same Wi-Fi. Turn it on in Settings, which shows the address to open. The page shows the same map and places as the phone, lets you import track files, and has the DOC and other-tracks browsers. It reads from the phone's own data, so the two always agree.
+
+There are two imports on the page, the same two the phone has: a file brought in as places, which is the one you can also drop on the map, and a file brought in as an activity. The phone does the reading, the dating and the writing either way, and the page says what it answered. A file of several tracks asks where it should go on the page too.
 
 The desktop page doesn't draw or edit lines any more. That was removed, and the phone is the only place you create or change a track. There's a Settings switch to keep the phone awake while it's serving ([details](docs/web-editor.md)).
 

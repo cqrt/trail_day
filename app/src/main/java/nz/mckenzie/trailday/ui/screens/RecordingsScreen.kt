@@ -16,15 +16,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.domain.reference.followedLineWords
+import nz.mckenzie.trailday.domain.track.ImportDestination
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.ui.formatDate
 import nz.mckenzie.trailday.ui.formatDistance
@@ -62,8 +67,36 @@ fun RecordingsScreen(
     val shown by viewModel.shown.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
+    val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val question by viewModel.question.collectAsStateWithLifecycle()
 
     val searching = query.isNotBlank()
+
+    // Several at once: a week of walks exported from a watch is a week of files, and importing them
+    // one at a time is the sort of chore this app is meant to save.
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris -> if (uris.isNotEmpty()) viewModel.importFiles(uris) }
+
+    question?.let { asking ->
+        AlertDialog(
+            onDismissRequest = viewModel::cancelImport,
+            title = { Text("Where should they go?") },
+            text = { Text(asking.sentence) },
+            // Both answers are answers: the walker pressed Import on this screen, so activities is the
+            // likely one and sits where a confirm always sits.
+            confirmButton = {
+                TextButton(onClick = { viewModel.answerImport(ImportDestination.ACTIVITIES) }) {
+                    Text(asking.activitiesLabel)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.answerImport(ImportDestination.PLACES) }) {
+                    Text(asking.placesLabel)
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Activities") }) },
@@ -91,6 +124,19 @@ fun RecordingsScreen(
                     text = summaryOf(shown),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // The way a walk recorded somewhere else comes in, in the same button Places uses, because
+            // it does the same thing. It steps aside while the walker is looking for an activity, so
+            // the answer has the screen.
+            if (!searching) {
+                SecondaryPlaceAction(
+                    label = if (busy) "Importing…" else "Import",
+                    glyph = IconGlyph.OFFLINE,
+                    enabled = !busy,
+                    onClick = { importLauncher.launch(TRACK_MIME_TYPES) },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
 
@@ -214,9 +260,14 @@ internal fun recordingStatus(row: RecordingRow): String? = if (row.isFinished) {
 }
 
 /** When it was, how far it went, and how much of it was kept. */
-internal fun recordingDetail(row: RecordingRow): String =
-    "${formatDate(row.startedAtEpochMs)} \u00b7 ${formatDistance(row.distanceM)} \u00b7 " +
-        "${formatDuration(row.durationMs)} \u00b7 ${row.pointCount} points"
+internal fun recordingDetail(row: RecordingRow): String = listOfNotNull(
+    formatDate(row.startedAtEpochMs),
+    formatDistance(row.distanceM),
+    // A walk from a file with no times in it has no length to claim, so the row says nothing rather
+    // than "0s" beside a distance - see [RecordingRow.durationMs].
+    row.durationMs?.let { formatDuration(it) },
+    "${row.pointCount} points"
+).joinToString(" \u00b7 ")
 
 /** Which place a trip was made for, or that the link to it is gone. */
 internal fun recordingAsset(row: RecordingRow): String {
@@ -224,5 +275,8 @@ internal fun recordingAsset(row: RecordingRow): String {
     // A published line never becomes a place, so a trip that followed one names whose line it was -
     // and which words those are is the reference's and the publisher's to say: see [followedLineWords].
     followedLineWords(row.docRef, row.publisher)?.let { return it }
+    // A walk that came in a file was not recorded against anything, so it says where it came from
+    // rather than calling itself a new track - which is what a walk of the walker's own is.
+    if (row.imported) return "Imported from a file"
     return if (row.assetWasDeleted) "Its place has since been deleted" else "A new track"
 }

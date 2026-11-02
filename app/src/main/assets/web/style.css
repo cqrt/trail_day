@@ -973,6 +973,67 @@ main { flex: 1; display: flex; min-height: 0; position: relative; }
 
 .browse-open:hover { background: var(--state-soft); }
 
+/*
+  The question a file of several tracks asks: a small card in the middle of the page, over the work.
+
+  Small on purpose - a sentence and two buttons - and dimmed behind, because it is a question that has
+  to be answered before anything happens. The two answers are the same weight: neither is a cancel, and
+  the one the walker meant is whichever they press.
+*/
+#ask-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+#ask-overlay[hidden] { display: none; }
+
+#ask {
+  position: relative;
+  width: min(420px, 100%);
+  padding: 16px 18px 18px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 14px 50px rgba(0, 0, 0, 0.3);
+}
+
+#ask h2 { margin: 0 0 8px; font-size: 17px; }
+
+#ask p { margin: 0 0 14px; color: var(--ink); }
+
+#ask-answers { display: flex; flex-wrap: wrap; gap: 8px; }
+
+#ask-answers button {
+  flex: 1 1 auto;
+  padding: 10px 16px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 18%, var(--paper));
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#ask-answers button:hover { background: color-mix(in srgb, var(--accent) 28%, var(--paper)); }
+
+#ask-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  border: 0;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--quiet);
+}
+
 /* The dialog is a card too, and its four services read as the phone's own chips. */
 #doc { border-radius: var(--radius); }
 

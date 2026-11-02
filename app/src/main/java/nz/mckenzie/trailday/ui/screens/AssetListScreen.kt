@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -93,8 +92,8 @@ fun AssetListScreen(
     val docNearby by viewModel.docNearby.collectAsStateWithLifecycle()
 
     val importLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri -> uri?.let(viewModel::importTrackFile) }
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris -> if (uris.isNotEmpty()) viewModel.importTrackFiles(uris) }
 
     val searching = query.isNotBlank()
     // The journeys are the page's own group, and they are tracks: counted with the places they would
@@ -317,18 +316,6 @@ fun AssetListScreen(
 
 }
 
-private val TRACK_MIME_TYPES = arrayOf(
-    "application/gpx+xml",
-    "application/vnd.google-earth.kml+xml",
-    "application/vnd.google-earth.kmz",
-    "application/geo+json",
-    "application/json",
-    "application/xml",
-    "text/xml",
-    "text/plain",
-    "*/*"
-)
-
 /**
  * The filters the page offers. A hut or a campsite is DOC's reference material now, not something
  * the walker makes, so those filters are gone; legacy own huts and campsites still appear on the
@@ -413,47 +400,6 @@ private fun AddSpotAction(onClick: () -> Unit) {
                 glyph = IconGlyph.CHEVRON,
                 dimension = 18.dp,
                 tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
-            )
-        }
-    }
-}
-
-/** One of the two quieter ways into the library: import a file, or read DOC's material. */
-@Composable
-private fun SecondaryPlaceAction(
-    label: String,
-    glyph: IconGlyph,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true
-) {
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        contentColor = MaterialTheme.colorScheme.onSurface.copy(
-            alpha = if (enabled) 1f else 0.45f
-        ),
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 52.dp)
-                .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            AppIcon(glyph = glyph, dimension = 20.dp)
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1
             )
         }
     }

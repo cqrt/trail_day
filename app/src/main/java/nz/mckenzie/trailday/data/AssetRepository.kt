@@ -11,7 +11,9 @@ import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.track.FileTracks
 import nz.mckenzie.trailday.domain.track.GpxWriter
+import nz.mckenzie.trailday.domain.track.NamedTrack
 import nz.mckenzie.trailday.domain.track.TrackInterchange
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.domain.tiles.withMinimumSpan
@@ -305,12 +307,13 @@ class AssetRepository(
     /**
      * Imports a GPX, KML, KMZ or GeoJSON file as one or more new tracks, and says what it held.
      *
-     * A file that names its own tracks becomes one asset per track - a GeoJSON FeatureCollection, a GPX
-     * of several `<trk>` elements, a KML of several `<Placemark>`s - each named from the track where it
-     * has a name and from the file where it does not. The Te Araroa Trust's own export of the trail is
-     * 466 of those, so importing it is 466 named sections rather than one line drawn across the
-     * country. Throws when the file is not a line at all - one point, or no readable track in it - in
-     * the app's own words.
+     * Reading and writing in one call, for the callers that want exactly that - the device tests, and
+     * any place that has a file and wants places. What a file *is* is [FileTracks]'s answer, and what
+     * a track becomes is [createPlacesFrom]'s; this only joins them, so a file read here is read the
+     * same way as one sent to Activities.
+     *
+     * Throws when the file is not a line at all - one point, or no readable track in it - in the app's
+     * own words.
      */
     suspend fun importAssetTracks(
         fileName: String,
@@ -319,27 +322,31 @@ class AssetRepository(
     ): List<ImportedTrack> {
         // The same reading a file dropped on the desk's map gets: the two are one import, and a rule
         // kept in two places is a rule that drifts.
-        val tracks = when (val outcome = TrackInterchange.readFile(file)) {
-            is TrackInterchange.FileOutcome.Invalid -> throw IllegalArgumentException(outcome.message)
-            is TrackInterchange.FileOutcome.Read -> outcome.tracks
-        }
-        if (tracks.isEmpty()) throw IllegalArgumentException(TrackInterchange.TOO_SHORT)
+        val tracks = FileTracks.read(fileName = fileName, bytes = file)
+        return createPlacesFrom(tracks, createdAtEpochMs = createdAtEpochMs)
+    }
 
-        // A file's own name, for a track that has none of its own; numbered only when one file holds
-        // several unnamed tracks, so they can still be told apart.
-        val base = fileName.trim().ifBlank { "Imported track" }
-        return tracks.mapIndexed { index, track ->
-            val name = track.name?.trim()?.takeIf { it.isNotBlank() }
-                ?: if (tracks.size == 1) base else "$base ${index + 1}"
-            createAsset(
-                name = name,
-                // A file whose later paths start on the line's own vertices is a track with side
-                // tracks, and the reading has already decided that; anything else arrives as one line.
-                geometry = AssetGeometry(track.reading.paths),
-                createdAtEpochMs = createdAtEpochMs
-            )
-            ImportedTrack(name = name, reading = track.reading)
-        }
+    /**
+     * Writes already-read tracks as places: one each, with its line and its side tracks.
+     *
+     * This is the writing half of the import, so a file can be read once and written as whichever the
+     * walker chose - places here, or activities through
+     * [RecordingRepository.importActivity]. A file that names its own tracks becomes one place per
+     * track, which is what the Te Araroa Trust's own export of the trail needs: 466 named sections
+     * rather than one line drawn across the country.
+     */
+    suspend fun createPlacesFrom(
+        tracks: List<NamedTrack>,
+        createdAtEpochMs: Long = System.currentTimeMillis()
+    ): List<ImportedTrack> = tracks.map { track ->
+        createAsset(
+            name = track.name,
+            // A file whose later paths start on the line's own vertices is a track with side
+            // tracks, and the reading has already decided that; anything else arrives as one line.
+            geometry = AssetGeometry(track.reading.paths),
+            createdAtEpochMs = createdAtEpochMs
+        )
+        ImportedTrack(name = track.name, reading = track.reading)
     }
 }
 

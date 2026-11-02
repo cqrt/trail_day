@@ -110,6 +110,56 @@ class RecordingRepository(private val db: TrailDayDatabase) {
         )
     }
 
+    /**
+     * Writes a walk that came in a file as a finished recording, its points and all.
+     *
+     * **One transaction for the row and its fixes**, because a walk is the pair: a half-written
+     * activity is a row saying 1,240 points with nothing under it, and it would sit in the list
+     * looking like a walk whose line had gone missing. Nothing here goes through the recorder's own
+     * append-per-fix path either - that is a walk arriving two seconds at a time, and this is one that
+     * has already happened.
+     *
+     * [startedAtEpochMs] and [endedAtEpochMs] are the file's own times, decided by
+     * [nz.mckenzie.trailday.domain.track.ActivityDates]; a null end is a file with no times, which
+     * stores no length rather than a zero. The distance is measured along the points, the same way the
+     * recorder measures its own, so the list's totals add up across both kinds.
+     */
+    suspend fun importActivity(
+        name: String,
+        points: List<GeoPoint>,
+        startedAtEpochMs: Long,
+        endedAtEpochMs: Long?
+    ): Long = db.withTransaction {
+        val sessionId = recordingDao.insertSession(
+            RecordedSessionEntity(
+                name = name,
+                startedAtEpochMs = startedAtEpochMs,
+                endedAtEpochMs = endedAtEpochMs,
+                status = RecordingStatus.FINISHED.name,
+                distanceM = polylineLengthMeters(points),
+                durationMs = endedAtEpochMs?.let { (it - startedAtEpochMs).coerceAtLeast(0L) } ?: 0L,
+                pointCount = points.size,
+                imported = true
+            )
+        )
+        recordingDao.insertPoints(
+            points.mapIndexed { index, point ->
+                RecordedPointEntity(
+                    sessionId = sessionId,
+                    sequence = index,
+                    lat = point.lat,
+                    lng = point.lng,
+                    altitudeM = point.altitudeM,
+                    accuracyM = point.accuracyM,
+                    speedMps = point.speedMps,
+                    bearingDeg = point.bearingDeg,
+                    recordedAtEpochMs = point.timeMs
+                )
+            }
+        )
+        sessionId
+    }
+
     fun observeSessions(): Flow<List<RecordedSessionEntity>> = recordingDao.observeSessions()
 
     /**

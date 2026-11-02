@@ -54,9 +54,20 @@ data class RecordingDetail(
      * Who publishes that line, when it was one from the national dataset and the phone still holds its
      * row: the page names them rather than saying "another publisher".
      */
-    val publisher: String? = null
+    val publisher: String? = null,
+    /** Whether this walk came in a file rather than being recorded with the phone. */
+    val imported: Boolean = false
 ) {
-    val durationMs: Long get() = endedAtEpochMs?.let { (it - startedAtEpochMs).coerceAtLeast(0L) } ?: 0L
+    /**
+     * How long it took, or null when the file gave no times and there is nothing to claim.
+     *
+     * Null is the same distinction [nz.mckenzie.trailday.viewmodel.RecordingRow.durationMs] makes: a
+     * finished walk with no end says nothing rather than "0s", where a walk still being recorded has
+     * been going for 0 so far and says so.
+     */
+    val durationMs: Long?
+        get() = endedAtEpochMs?.let { (it - startedAtEpochMs).coerceAtLeast(0L) }
+            ?: if (isFinished) null else 0L
 
     val isFinished: Boolean get() = status == RecordingStatus.FINISHED
 }
@@ -176,7 +187,8 @@ class RecordingDetailViewModel(
                 assetId = session.assetId,
                 assetName = assetName,
                 docRef = session.docRef,
-                publisher = followedPublisher(session.docRef, otherTracks)
+                publisher = followedPublisher(session.docRef, otherTracks),
+                imported = session.imported
             )
         }
     }

@@ -56,6 +56,10 @@ class WebEditorSaveTest {
         recordings = RecordingRepository(db)
         documents = WebEditorDocuments(
             assets = assets,
+            // Where a file the desk brings in as an activity lands: the same repository the phone's own
+            // import writes through, so the walk arrives whole and the list, page and backup read it like
+            // any other.
+            recordings = recordings,
             token = "7f3a9c7f3a9c7f3a9c7f3a9c7f3a9c7f",
             // The style is the one document nothing here reads, and a lambda that says so beats a
             // value that pretends. The fix, on the other hand, *is* read - by `state`, and not by a
@@ -390,6 +394,7 @@ class WebEditorSaveTest {
         )
         val serving = WebEditorDocuments(
             assets = assets,
+            recordings = recordings,
             token = "7f3a9c7f3a9c7f3a9c7f3a9c7f3a9c7f",
             basemap = { error("nothing here reads the basemap") },
             position = { null },
@@ -425,6 +430,7 @@ class WebEditorSaveTest {
     fun theDocumentsCarryTheTokenWhenThereIsOneAndNothingWhenThereIsNot() = runBlocking {
         fun serving(token: String?) = WebEditorDocuments(
             assets = assets,
+            recordings = recordings,
             token = token,
             basemap = { Basemap.DEFAULT },
             position = { null },

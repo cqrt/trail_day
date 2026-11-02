@@ -216,6 +216,55 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun walksAlreadyKeptAreTheWalkerSOwnAndNotImports() {
+        // Version 11 had walks and no way to tell one that came in a file from one that was walked with
+        // the phone, because a file could only ever become a place. Every row that exists was therefore
+        // recorded here, so the new column has to answer "not imported" for all of them - a build that
+        // guessed the other way would call a season of the walker's own walks somebody else's.
+        helper.createDatabase(TEST_DATABASE_RECORDINGS, 11).apply {
+            execSQL(
+                """
+                INSERT INTO recorded_sessions
+                    (id, name, assetId, docRef, startedAtEpochMs, endedAtEpochMs, status,
+                     distanceM, durationMs, pointCount)
+                VALUES
+                    (1, 'Home block 14 Sep', NULL, NULL, 1790000000000, 1790003600000, 'FINISHED',
+                     2350.0, 3600000, 412)
+                """.trimIndent()
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(
+            TEST_DATABASE_RECORDINGS,
+            12,
+            true,
+            MIGRATION_11_12
+        )
+
+        migrated.query("SELECT name, imported, distanceM FROM recorded_sessions").use { rows ->
+            assertTrue("the walk is still there", rows.moveToFirst())
+            assertEquals("Home block 14 Sep", rows.getString(0))
+            assertEquals("and it was walked with the phone", 0, rows.getInt(1))
+            assertEquals("with everything else it had", 2350.0, rows.getDouble(2), 1e-9)
+        }
+
+        // And a row written by this build can say otherwise, so the column is usable rather than merely
+        // present.
+        migrated.execSQL(
+            """
+            INSERT INTO recorded_sessions
+                (name, startedAtEpochMs, status, distanceM, durationMs, pointCount, imported)
+            VALUES ('Morning_Walk_2026-11-03', 1790000000000, 'FINISHED', 1240.0, 0, 1500, 1)
+            """.trimIndent()
+        )
+        migrated.query("SELECT COUNT(*) FROM recorded_sessions WHERE imported = 1").use { rows ->
+            rows.moveToFirst()
+            assertEquals("an imported activity is kept as one", 1, rows.getInt(0))
+        }
+    }
+
     private companion object {
         /** Names of this test's own: the real database is never opened by a test. */
         const val TEST_DATABASE = "migration-test.db"
@@ -237,5 +286,8 @@ class MigrationTest {
 
         /** And a sixth, for the version 6 to 7 change. */
         const val TEST_DATABASE_AREAS = "migration-test-areas.db"
+
+        /** And a seventh, for the version 11 to 12 change. */
+        const val TEST_DATABASE_RECORDINGS = "migration-test-recordings.db"
     }
 }

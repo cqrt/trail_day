@@ -43,6 +43,16 @@
         <!-- The picker itself: opened by the button above, and never shown. -->
         <input id="import-file" type="file" accept=".gpx,.kml,.kmz,.geojson,.json,application/gpx+xml,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/geo+json,application/json" hidden>
         <!--
+          The same file, brought in as an activity rather than a place: a walk recorded in another app
+          arrives as a finished walk on the phone, dated from the file's own times. The phone does the
+          reading, the dating and the writing; the page says what it answered.
+
+          Under the place import rather than beside it because the two are the same act with a
+          different destination, and a file of several tracks asks which one you meant.
+        -->
+        <button id="import-activity" class="browse-open" type="button">Import a file as an activity</button>
+        <input id="import-activity-file" type="file" accept=".gpx,.kml,.kmz,.geojson,.json,application/gpx+xml,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/geo+json,application/json" hidden>
+        <!--
           The two browsers, read through the phone. A way of *reading* rather than of adding: what these
           two publish is the map's own layer rather than a place of the walker's, so nothing here is
           imported and nothing is written. They share one dialog because they are one screen's worth of
@@ -77,6 +87,28 @@
     -->
     <p id="drop-hint" hidden>Drop the GPX, KML, KMZ or GeoJSON file to keep its line on the phone</p>
   </main>
+
+  <!--
+    The question a file of several tracks asks, over the work: as activities, or as places. Nothing has
+    been written when it appears - the phone asked before writing anything - and the two buttons are its
+    own labels, count and all. Closing it imports nothing, which is the honest outcome of a question
+    left unanswered.
+
+    Places first, because that is the order the phone's own dialog shows them in: there, activities takes
+    the confirm slot on the right, as the likely answer for somebody who pressed Import on Activities. The
+    two surfaces offering the same two answers should not offer them in a different order.
+  -->
+  <div id="ask-overlay" hidden>
+    <section id="ask" role="dialog" aria-labelledby="ask-title">
+      <h2 id="ask-title">Where should they go?</h2>
+      <p id="ask-words"></p>
+      <div id="ask-answers">
+        <button id="ask-places" type="button"></button>
+        <button id="ask-activities" type="button"></button>
+      </div>
+      <button id="ask-close" type="button" aria-label="Close">&times;</button>
+    </section>
+  </div>
 
   <!--
     The two browsers, over the work in one dialog: DOC's material, and the tracks other people publish. A

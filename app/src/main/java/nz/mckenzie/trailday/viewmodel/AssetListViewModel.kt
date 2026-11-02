@@ -2,7 +2,6 @@ package nz.mckenzie.trailday.viewmodel
 
 import android.content.Context
 import android.net.Uri
-import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -18,12 +17,15 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.data.AssetRepository
+import nz.mckenzie.trailday.data.ImportedTrack
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.tracking.DevicePosition
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.offline.OfflineDocStore
+import nz.mckenzie.trailday.domain.track.FileTracks
+import nz.mckenzie.trailday.ui.ImportWords
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetKindFilter
 import nz.mckenzie.trailday.domain.doc.DocBikeLinks
@@ -179,60 +181,80 @@ class AssetListViewModel(
     }
 
     /**
-     * Imports a GPX, KML, KMZ or GeoJSON file chosen through the system file picker.
+     * Imports GPX, KML, KMZ or GeoJSON files chosen through the system file picker.
      *
-     * Failures are surfaced as messages rather than crashes: a malformed or
-     * empty track file is a normal thing for a walker to pick by mistake.
+     * **Several at once**, because a walker with a week of files has a week of files: each is read, each
+     * track in each becomes a place, and the walker is given one sentence about the lot at the end.
+     * A file that will not read is named in that sentence rather than stopping the rest.
+     *
+     * Failures are messages rather than crashes: a malformed or empty track file is a normal thing for
+     * a walker to pick by mistake.
      */
-    fun importTrackFile(uri: Uri) {
+    fun importTrackFiles(uris: List<Uri>) {
+        if (uris.isEmpty()) return
         viewModelScope.launch {
             _busy.value = true
             try {
-                val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
-                    input.readBytes()
-                } ?: throw IllegalStateException("Could not open the selected file")
+                val picked = uris.map { uri -> pickFile(context, uri) }
+                val written = mutableListOf<ImportedTrack>()
+                val failures = mutableListOf<String>()
 
-                val name = displayName(uri)
-                    ?.substringBeforeLast('.')
-                    ?.takeIf { it.isNotBlank() }
-                    ?: "Imported track"
-
-                val imported = assetRepository.importAssetTracks(fileName = name, file = bytes)
-                // The points are the reading's own, so the sentence counts what the file held rather
-                // than asking the database again for a number the import has just been handed.
-                _message.value = if (imported.size == 1) {
-                    val track = imported.single()
-                    val points = track.reading.paths.sumOf { it.size }
-                    when {
-                        track.reading.segmentsDidNotMeet ->
-                            "Imported \"${track.name}\" with $points points as one track: the file's " +
-                                "own track segments do not meet, so they were joined up."
-                        track.reading.sideTracks == 1 ->
-                            "Imported \"${track.name}\" with $points points: the track and 1 side track."
-                        track.reading.sideTracks > 1 ->
-                            "Imported \"${track.name}\" with $points points: the track and " +
-                                "${track.reading.sideTracks} side tracks."
-                        else -> "Imported \"${track.name}\" with $points points"
+                for (one in picked) {
+                    when (one) {
+                        is Picked.Unreadable -> failures += one.fileName
+                        is Picked.Read -> {
+                            // The reading is the same one Activities uses: one file, one meaning,
+                            // whichever button sent it here.
+                            val read = runCatching {
+                                FileTracks.read(fileName = one.file.baseName, bytes = one.file.bytes)
+                            }
+                            if (read.isFailure) {
+                                failures += one.file.fileName
+                                continue
+                            }
+                            written += assetRepository.createPlacesFrom(read.getOrThrow())
+                        }
                     }
-                } else {
-                    // A file of named tracks - a GeoJSON collection - arrives as that many assets, so
-                    // the sentence says how many rather than pretending there was only ever one.
-                    val points = imported.sumOf { track -> track.reading.paths.sumOf { it.size } }
-                    "Imported ${imported.size} tracks, $points points between them"
                 }
-            } catch (failure: Throwable) {
-                _message.value = failure.message ?: "Import failed"
+
+                _message.value = placesMessage(
+                    written = written,
+                    files = picked.size,
+                    failures = failures
+                )
             } finally {
                 _busy.value = false
             }
         }
     }
 
-    private fun displayName(uri: Uri): String? = runCatching {
-        context.contentResolver
-            .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-            ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
-    }.getOrNull()
+    /**
+     * What the walker is told after a Places import.
+     *
+     * One file of one track keeps the sentence Places has always said, points and side tracks and all,
+     * because that is the common case and it carries detail a count cannot. Anything more is counted.
+     */
+    private fun placesMessage(
+        written: List<ImportedTrack>,
+        files: Int,
+        failures: List<String>
+    ): String {
+        val one = written.singleOrNull()
+        if (one != null && files == 1 && failures.isEmpty()) {
+            return ImportWords.onePlace(
+                trackName = one.name,
+                points = one.reading.paths.sumOf { it.size },
+                sideTracks = one.reading.sideTracks,
+                segmentsDidNotMeet = one.reading.segmentsDidNotMeet
+            )
+        }
+        return ImportWords.summary(
+            activities = 0,
+            tracks = written.size,
+            files = files,
+            failures = failures
+        )
+    }
 
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L

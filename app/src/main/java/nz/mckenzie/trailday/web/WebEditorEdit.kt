@@ -10,10 +10,12 @@ import nz.mckenzie.trailday.domain.asset.AssetPathResult
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.track.ImportDestination
 import nz.mckenzie.trailday.domain.track.TrackInterchange
 import nz.mckenzie.trailday.ui.AssetEditFields
 import nz.mckenzie.trailday.ui.AssetEditResult
 import nz.mckenzie.trailday.ui.AssetEdits
+import nz.mckenzie.trailday.ui.ImportWords
 import java.security.MessageDigest
 import java.util.Base64
 
@@ -168,6 +170,20 @@ sealed interface WebEditorCreateResult {
     data class Refused(val refusal: WebEditorRefusal, val message: String) : WebEditorCreateResult
 }
 
+/**
+ * A file the desk sent to be brought in, and where its tracks are to go.
+ *
+ * [fileName] is the file's own name, extension and all, because the phone drops it by its own rule -
+ * see [nz.mckenzie.trailday.domain.track.FileTracks.baseNameOf] - and an activity must be called what the
+ * same file imported on the phone would be called. [destination] is null until the walker has answered
+ * the question a file of several tracks asks.
+ */
+data class WebEditorActivityImport(
+    val fileName: String,
+    val bytes: ByteArray,
+    val destination: ImportDestination?
+)
+
 /** What a route answers a write with. */
 sealed interface WebEditorWrite {
 
@@ -193,6 +209,23 @@ sealed interface WebEditorWrite {
      * the same statuses as a refusal about an edit.
      */
     data class GpxRead(val track: TrackInterchange.Track, val otherTracks: Int) : WebEditorWrite
+
+    /**
+     * A file was brought in as activities or as places, and the phone's own sentence says what happened.
+     *
+     * The sentence rather than a count and a list, because what the walker reads here has to be what they
+     * would have read on the phone, and because it names the activity, dates it from the file and counts
+     * its points - three facts the page has no way of working out.
+     */
+    data class ActivitiesWritten(val message: String) : WebEditorWrite
+
+    /**
+     * A file of several tracks sent to Activities, and the question it raises.
+     *
+     * Nothing is written: four tracks could be a week of walks or four places, and the file does not say
+     * which. The page asks, then sends the file again with the answer.
+     */
+    data class AsksWhereItGoes(val question: ImportWords.Question) : WebEditorWrite
 
     data class Refused(val refusal: WebEditorRefusal, val message: String) : WebEditorWrite
 }
@@ -283,6 +316,33 @@ object WebEditorEdits {
         ?.takeIf { it.isNotBlank() }
         ?.let { runCatching { Base64.getDecoder().decode(it) }.getOrNull() }
         ?.takeIf { it.isNotEmpty() }
+
+    /**
+     * The file, its name and where its tracks are to go, from a `POST /api/activities` body.
+     *
+     * Null when the body carried no file this build can read - which is a refusal with a sentence of
+     * its own, not an empty file. [WebEditorActivityImport.destination] is null when the page has not
+     * answered the question yet, which is what a file of several tracks is asked about; an answer this
+     * build does not know reads the same way, so a page that sent something else is asked rather than
+     * writing where the walker never chose.
+     */
+    fun readActivityImport(body: String?): WebEditorActivityImport? {
+        val parsed = body
+            ?.let { runCatching { json.decodeFromString(WebEditorActivitiesBody.serializer(), it) }.getOrNull() }
+            ?: return null
+        val bytes = runCatching { Base64.getDecoder().decode(parsed.gpx) }.getOrNull()
+            ?.takeIf { it.isNotEmpty() }
+            ?: return null
+        return WebEditorActivityImport(
+            fileName = parsed.name,
+            bytes = bytes,
+            destination = when (parsed.`as`?.trim()?.lowercase()) {
+                "activities" -> ImportDestination.ACTIVITIES
+                "places" -> ImportDestination.PLACES
+                else -> null
+            }
+        )
+    }
 
     /**
      * An edit to an asset the phone already has.

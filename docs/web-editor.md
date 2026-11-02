@@ -23,6 +23,9 @@ phone does not go to sleep with the page half loaded.
 - **A place's card**, with the same facts the phone shows, including a track's length, its height range
   and its profile.
 - **Import** a GPX, KML, KMZ or GeoJSON file, from a button or by dropping it on the map.
+- **Import a file as an activity**: a walk recorded somewhere else arrives as a finished trip on the
+  phone, dated from the file's own times. A file of several tracks asks where it should go, in the
+  phone's own sentence, before anything is written.
 - **Delete** a place - if the phone would allow it, because the rule is the phone's, not the page's.
 - **The two browsers**: DOC's tracks, huts, camps and bike trails, and the tracks other people publish.
 

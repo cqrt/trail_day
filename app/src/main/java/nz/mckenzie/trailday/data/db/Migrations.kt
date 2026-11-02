@@ -282,3 +282,22 @@ internal val MIGRATION_10_11 = object : Migration(10, 11) {
         db.execSQL("ALTER TABLE assets ADD COLUMN journey TEXT")
     }
 }
+
+/**
+ * Where a walk's row says it came from a file.
+ *
+ * **Nothing is carried across, because nothing needs to be.** Every row that exists was walked with
+ * the phone, so every one of them is given `0` - not imported - which is the truth about them. The
+ * column is what lets the list say "Imported from a file" under an activity's name, where a walk of
+ * the walker's own with no place says "A new track"; nothing else about a row changes, because an
+ * imported activity is an ordinary finished recording in every other respect.
+ *
+ * The database holds a default for the column that the entity does not declare, which is the same
+ * arrangement `offline_areas.pack` has: a row inserted by a later build supplies its own value, and
+ * Room does not compare a default it was never told about.
+ */
+internal val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE recorded_sessions ADD COLUMN imported INTEGER NOT NULL DEFAULT 0")
+    }
+}

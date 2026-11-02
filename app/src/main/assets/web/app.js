@@ -950,6 +950,81 @@ async function importGpxFile(file) {
   }
 }
 
+/* ---- A file somebody walked somewhere else ------------------------------------------ */
+
+/**
+ * A file brought in as an activity: the walk itself, written on the phone as a finished recording.
+ *
+ * **Everything about it is the phone's answer** - the reading, the naming, the date and the writing -
+ * so `POST /api/activities` is handed the file's bytes and the file's name, and answers with the
+ * sentence the walker would have read had they imported the same file on the phone. The page adds
+ * nothing to it and takes nothing away from it: a second copy of "Imported ... as an activity" here
+ * would be a second set of words about the same walk.
+ *
+ * A file of several tracks is answered with a question instead, and nothing has been written. The page
+ * asks it, and sends the same file again with the answer - which is why [file] is kept rather than the
+ * bytes: the phone reads the file itself each time, and one reading is one rule.
+ */
+let asking = null;
+
+async function importActivityFile(file, destination) {
+  const problem = importProblem(file, state.gpx.maxBytes);
+  if (problem) {
+    showNotice(problem);
+    return;
+  }
+
+  const button = field('import-activity');
+  button.disabled = true;
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const body = { [state.gpx.field]: base64Of(bytes), name: file.name };
+    if (destination) body.as = destination;
+    const { status, answer } = await sendJson('/api/activities', 'POST', body);
+    if (status !== 200) {
+      // The phone's own words about a file it would not read: the same sentence the phone's own import
+      // shows, because it is the same reading.
+      showNotice(answer.message || 'The phone would not read that file.');
+      return;
+    }
+    if (answer.question) {
+      askWhereItGoes(file, answer.question);
+      return;
+    }
+    // A place arrives on the map, so the map is read again; an activity does not, and reloading costs
+    // a request and nothing else.
+    await reloadFeatures();
+    drawList();
+    showNotice(answer.message || 'The phone has it.');
+  } catch (error) {
+    showNotice(error.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+/** Puts the file's question in front of the walker, with the phone's own sentence and labels. */
+function askWhereItGoes(file, question) {
+  asking = { file };
+  field('ask-words').textContent = question.sentence;
+  field('ask-activities').textContent = question.activitiesLabel;
+  field('ask-places').textContent = question.placesLabel;
+  field('ask-overlay').hidden = false;
+  field('ask-activities').focus();
+}
+
+/**
+ * Closing the question, which imports nothing.
+ *
+ * The answer is the whole of what the phone was waiting for, so a page that closed the dialog has said
+ * "not this" rather than "later": writing the file as activities anyway would be doing the thing the
+ * walker just declined.
+ */
+function closeQuestion() {
+  asking = null;
+  field('ask-overlay').hidden = true;
+}
+
 /**
  * The two browsers this dialog is: DOC's material, and the tracks other people publish.
  *
@@ -1517,6 +1592,42 @@ document.getElementById('import-file').addEventListener('change', (event) => {
 });
 
 /*
+ * The same file, as an activity. Its own button and its own picker rather than a second question after
+ * the place import, because a walker who means "keep this walk" should not have to answer a question
+ * about what a walk is - and because the place import never asks anything.
+ */
+document.getElementById('import-activity')
+  .addEventListener('click', () => field('import-activity-file').click());
+
+document.getElementById('import-activity-file').addEventListener('change', (event) => {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = '';
+  if (file) importActivityFile(file);
+});
+
+/*
+ * The question a file of several tracks asks: two answers and a way out. The overlay's own press closes
+ * it, as the browsers' dialog does - a press rather than a click, so a drag that left the dialog does
+ * not count as a press on the page behind it.
+ */
+document.getElementById('ask-activities').addEventListener('click', () => {
+  const pending = asking;
+  closeQuestion();
+  if (pending) importActivityFile(pending.file, 'activities');
+});
+
+document.getElementById('ask-places').addEventListener('click', () => {
+  const pending = asking;
+  closeQuestion();
+  if (pending) importActivityFile(pending.file, 'places');
+});
+
+document.getElementById('ask-close').addEventListener('click', closeQuestion);
+document.getElementById('ask-overlay').addEventListener('mousedown', (event) => {
+  if (event.target.id === 'ask-overlay') closeQuestion();
+});
+
+/*
  * DOC's tracks: the dialog's own controls, and the two acts it has - a search and an import. The
  * dialog closes on its corner, on Escape (below) or on a press on the dimmed page behind it, and not
  * on a press inside it, which is the walker working. The press, not the click: a click's target is
@@ -1596,6 +1707,12 @@ window.addEventListener('drop', (event) => {
 
 window.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
+  // The question is the topmost thing when it is up: it is what the walker is being asked, and a
+  // question answered by a second Escape is a question closed.
+  if (!field('ask-overlay').hidden) {
+    closeQuestion();
+    return;
+  }
   // The DOC dialog is the topmost thing when it is open, so its Escape goes first - a dialog closes
   // on Escape before anything behind it is thought about.
   if (!field('doc-overlay').hidden) {

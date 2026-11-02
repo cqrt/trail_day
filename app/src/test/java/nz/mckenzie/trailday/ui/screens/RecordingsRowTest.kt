@@ -23,19 +23,22 @@ class RecordingsRowTest {
         assetName: String? = "Home block",
         docRef: String? = null,
         publisher: String? = null,
-        distanceM: Double = 2350.0
+        distanceM: Double = 2350.0,
+        durationMs: Long? = 750_000L,
+        imported: Boolean = false
     ) = RecordingRow(
         id = 1L,
         name = "Home block 14 Sep",
         startedAtEpochMs = 0L,
         distanceM = distanceM,
-        durationMs = 750_000L,
+        durationMs = durationMs,
         pointCount = 412,
         status = status,
         assetId = assetId,
         assetName = assetName,
         docRef = docRef,
-        publisher = publisher
+        publisher = publisher,
+        imported = imported
     )
 
     @Test
@@ -106,6 +109,28 @@ class RecordingsRowTest {
                 )
             )
         )
+    }
+
+    @Test
+    fun `a walk that came in a file says where it came from`() {
+        // An imported activity is an ordinary finished recording, so the one line that tells it apart is
+        // the one that says it was not walked with this phone - where a walk of the walker's own with no
+        // place says "A new track", which would be a lie about a file.
+        assertEquals(
+            "Imported from a file",
+            recordingAsset(row(assetId = null, assetName = null, imported = true))
+        )
+    }
+
+    @Test
+    fun `a walk from a file with no times claims no length`() {
+        // A GPX with no `<time>` in it says when it was brought in and not when it was walked, so the row
+        // leaves the duration out rather than writing "0s" beside a distance.
+        val detail = recordingDetail(row(durationMs = null))
+
+        assertTrue("the distance is still there: $detail", detail.contains("2.35 km"))
+        assertTrue("and the fixes: $detail", detail.contains("412 points"))
+        assertTrue("but no duration at all: $detail", !detail.contains("0s"))
     }
 
     @Test

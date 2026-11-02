@@ -234,10 +234,22 @@ fun RecordingDetailScreen(
 /** "Sun 18 Oct · 1m 00s · For Track 18 Oct", or the same with what happened to the link. */
 private fun subtitleOf(recording: RecordingDetail): String = listOfNotNull(
     formatDate(recording.startedAtEpochMs),
-    if (recording.isFinished) formatDuration(recording.durationMs) else "never finished",
+    if (recording.isFinished) {
+        // A walk from a file with no times in it has no length, so the line leaves the time out
+        // rather than claiming "0s" - the same rule the list's rows follow.
+        recording.durationMs?.let { formatDuration(it) }
+    } else {
+        "never finished"
+    },
     recording.assetName?.let { "For $it" }
         ?: followedLineWords(recording.docRef, recording.publisher)
-        ?: if (recording.assetId != null) "Its place has since been deleted" else "A new track"
+        ?: if (recording.imported) {
+            "Imported from a file"
+        } else if (recording.assetId != null) {
+            "Its place has since been deleted"
+        } else {
+            "A new track"
+        }
 ).joinToString(" \u00b7 ")
 
 /**
@@ -247,33 +259,39 @@ private fun subtitleOf(recording: RecordingDetail): String = listOfNotNull(
  * **Moving time is the total less the pauses**, which is what the pass recorded: a walker who stopped for
  * lunch did not spend it walking. The average is over the moving time for the same reason, and says nothing
  * while there is no moving time to divide by.
+ *
+ * **A walk with no times has no time cells at all.** A file with no `<time>` in it says how far and how high,
+ * and nothing about how long; three cells reading "0s" and "–" would be claiming a measurement. So those rows
+ * are left out, and the distance and the climb stand on their own.
  */
 internal fun figuresOf(recording: RecordingDetail, elevation: ElevationProfile?): List<List<Figure>> {
     val end = recording.endedAtEpochMs ?: recording.startedAtEpochMs
     val pausedMs = recording.breaks.sumOf { brk ->
         ((brk.toEpochMs ?: end) - brk.fromEpochMs).coerceAtLeast(0L)
     }
-    val movingMs = (recording.durationMs - pausedMs).coerceAtLeast(0L)
+    val durationMs = recording.durationMs
+    val movingMs = durationMs?.let { (it - pausedMs).coerceAtLeast(0L) }
     val distanceM = if (recording.geometryDistanceM > 0.0) {
         recording.geometryDistanceM
     } else {
         recording.recordedDistanceM
     }
-    val average = if (movingMs > 0L && distanceM > 0.0) {
+    val average = if (movingMs != null && movingMs > 0L && distanceM > 0.0) {
         String.format(Locale.US, "%.1f km/h", distanceM / 1000.0 / (movingMs / 3_600_000.0))
     } else {
         "\u2013"
     }
 
-    return listOf(
-        listOf(
+    return listOfNotNull(
+        listOfNotNull(
             Figure(label = "Distance", value = formatDistance(distanceM)),
-            Figure(label = "Total time", value = formatDuration(recording.durationMs))
-        ),
-        listOf(
-            Figure(label = "Moving", value = formatDuration(movingMs)),
-            Figure(label = "Average", value = average)
-        ),
+            durationMs?.let { Figure(label = "Total time", value = formatDuration(it)) }
+        ).takeIf { it.isNotEmpty() },
+        listOfNotNull(
+            movingMs?.let { Figure(label = "Moving", value = formatDuration(it)) },
+            // The average is over the moving time, so it is only worth a cell when there is one.
+            if (movingMs != null) Figure(label = "Average", value = average) else null
+        ).takeIf { it.isNotEmpty() },
         listOf(
             Figure(label = "Climb", value = elevation?.let { "${it.climbM.roundToInt()} m" } ?: "\u2013"),
             Figure(label = "Descent", value = elevation?.let { "${it.descentM.roundToInt()} m" } ?: "\u2013")

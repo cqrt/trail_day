@@ -153,6 +153,15 @@ class WebEditorServer(
             handler = { request -> write(data.gpx(request.body)) }
         ),
         HttpRoute(
+            claims = { it.method == POST && it.path == ACTIVITIES_PATH },
+            // A file brought in as an activity, or - when it holds several tracks - a question about
+            // where they should go. The phone reads, dates and writes it; the page shows the sentence
+            // it gets back. A route of its own rather than a flag on `/api/gpx`, because this one does
+            // write: the desk that sent it is told what arrived, and the walker can open the activity on
+            // the phone and find it there.
+            handler = { request -> write(data.activities(request.body)) }
+        ),
+        HttpRoute(
             claims = { it.method == GET && it.path == DOC_PATH },
             // DOC's track network searched by the phone on the walker's behalf. A GET because it
             // changes nothing, and read like the other documents: a name and a place go out, a page of
@@ -279,6 +288,10 @@ class WebEditorServer(
         is WebEditorWrite.Removed -> json(WebEditorJson.removed(result.message))
         // A file read, and nothing written: the page is handed the first track and the count of the rest.
         is WebEditorWrite.GpxRead -> json(WebEditorJson.gpx(result.track, result.otherTracks))
+        // A file brought in as activities or places, in the phone's own sentence; or the question a file
+        // of several tracks asks, with nothing written yet.
+        is WebEditorWrite.ActivitiesWritten -> json(WebEditorJson.activitiesWritten(result.message))
+        is WebEditorWrite.AsksWhereItGoes -> json(WebEditorJson.activitiesAsked(result.question))
         is WebEditorWrite.Refused -> HttpResponse.bytes(
             result.refusal.status,
             JSON,
@@ -385,6 +398,17 @@ class WebEditorServer(
          * made afterwards by the same write every drawn track is made by.
          */
         const val GPX_PATH = "/api/gpx"
+
+        /**
+         * Where a file is brought in as an activity, or as places: `/api/activities`.
+         *
+         * A path of its own rather than a flag on [GPX_PATH], because the two do different things with
+         * the same file. `/api/gpx` reads a file so the desk can draw it and hands nothing on; this one
+         * **writes** - the file becomes finished recordings, or places - and answers with the sentence the
+         * walker would have read on the phone. The page sends the same file twice when it holds several
+         * tracks: once to be asked, once with the answer.
+         */
+        const val ACTIVITIES_PATH = "/api/activities"
 
         /**
          * Where DOC's track network is searched: `/api/doc`.
@@ -558,6 +582,19 @@ interface WebEditorData {
      * nothing else, and there is one way into the database rather than two.
      */
     suspend fun gpx(body: String?): WebEditorWrite
+
+    /**
+     * `POST /api/activities`: a file a laptop sent to be kept as activities, or as places.
+     *
+     * The phone does the reading, the dating and the deciding, and answers with the sentence the walker
+     * would have read had they imported the same file on the phone - "Imported \"Morning Walk\" as an
+     * activity on the phone, 3 Nov 2026, 1,240 points."
+     *
+     * A file of several tracks is asked about before anything is written: the answer is the question,
+     * and the page sends the file again with `as` set to where the walker said it should go. A file the
+     * phone cannot read is refused in the words the phone's own importer refuses it in.
+     */
+    suspend fun activities(body: String?): WebEditorWrite
 
     /**
      * `GET /api/doc`: what DOC publishes, searched by the phone for the desk's own browser.

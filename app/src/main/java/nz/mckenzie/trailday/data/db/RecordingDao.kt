@@ -73,6 +73,16 @@ abstract class RecordingDao {
     @Insert
     abstract suspend fun insertPoint(point: RecordedPointEntity): Long
 
+    /**
+     * Adds a whole walk's fixes at once, for a recording that arrived as a file.
+     *
+     * One insert rather than a call per point: an imported track can be thousands of fixes, and a
+     * transaction per fix is a transaction per fix. Room still writes them in one statement each, but
+     * it does it in one go rather than across a conversation with the database.
+     */
+    @Insert
+    abstract suspend fun insertPoints(points: List<RecordedPointEntity>)
+
     @Query("SELECT MAX(sequence) FROM recorded_points WHERE sessionId = :sessionId")
     abstract suspend fun lastSequence(sessionId: Long): Int?
 

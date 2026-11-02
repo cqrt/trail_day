@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.web
 
 import kotlinx.coroutines.flow.first
 import nz.mckenzie.trailday.data.AssetRepository
+import nz.mckenzie.trailday.data.RecordingRepository
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocReadResult
@@ -28,6 +29,12 @@ import nz.mckenzie.trailday.domain.other.within
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.domain.tiles.boxAround
+import nz.mckenzie.trailday.domain.track.ActivityDate
+import nz.mckenzie.trailday.domain.track.ActivityDates
+import nz.mckenzie.trailday.domain.track.FileTracks
+import nz.mckenzie.trailday.domain.track.ImportDecision
+import nz.mckenzie.trailday.domain.track.ImportDestination
+import nz.mckenzie.trailday.domain.track.NamedTrack
 import nz.mckenzie.trailday.domain.track.TrackInterchange
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.map.AssetGeoJson
@@ -38,6 +45,7 @@ import nz.mckenzie.trailday.offline.HttpResponse
 import nz.mckenzie.trailday.other.ArcGisOtherTracks
 import nz.mckenzie.trailday.other.OtherTracksReadResult
 import nz.mckenzie.trailday.other.OtherTracksReader
+import nz.mckenzie.trailday.ui.ImportWords
 
 /**
  * The documents the editor serves, built from the same repository calls the app's own screens use.
@@ -60,6 +68,15 @@ import nz.mckenzie.trailday.other.OtherTracksReader
  */
 class WebEditorDocuments(
     private val assets: AssetRepository,
+    /**
+     * The walk records, which is where an imported activity is written.
+     *
+     * The desk writes no activity itself: it hands the file over and this repository writes the finished
+     * recording, points and all, exactly as the phone's own Activities import does. One writer, so an
+     * activity made on a laptop is the same kind of thing as one made on the phone - and the phone's
+     * list, page, map and backup read both without knowing which was which beyond the one column.
+     */
+    private val recordings: RecordingRepository,
     /**
      * The token, because the documents contain URLs and those have to carry it too - or null when
      * this run asks for none, in which case the URLs it hands out carry nothing.
@@ -283,6 +300,108 @@ class WebEditorDocuments(
                 WebEditorWrite.GpxRead(first, otherTracks = outcome.tracks.size - 1)
             }
         }
+    }
+
+    /**
+     * `POST /api/activities`: a file the desk sent, kept on the phone as activities or as places.
+     *
+     * **The same reading, the same naming, the same sentence as the phone.** The file goes through
+     * [FileTracks], so a file the desk accepts and a file the phone accepts are the same files; the date
+     * comes from [ActivityDates], so an exported walk lands on the day it was walked; and the words are
+     * [ImportWords]', so the desk says what the phone would have said. Nothing about the reading is
+     * repeated here.
+     *
+     * A file of several tracks sent with no answer yet is a question and nothing else - see
+     * [ImportDecision] - because four tracks could be a week of walks or four places, and the page asks
+     * before anything is written. Any other file is written at once, as activities: that is what the
+     * button which sent it offers.
+     */
+    override suspend fun activities(body: String?): WebEditorWrite {
+        val request = WebEditorEdits.readActivityImport(body) ?: return refused(
+            WebEditorRefusal.INVALID,
+            "That request did not carry a track file, so nothing was read."
+        )
+
+        // The extension is dropped by the phone's own rule, so an activity is called what the same file
+        // imported on the phone would be called - or what its own track is called, where the file names
+        // one.
+        val fileName = FileTracks.baseNameOf(request.fileName)
+        val tracks = runCatching { FileTracks.read(fileName, request.bytes) }
+            .getOrElse { failure ->
+                return refused(
+                    WebEditorRefusal.INVALID,
+                    failure.message ?: TrackInterchange.TOO_SHORT
+                )
+            }
+
+        val chosen = request.destination
+        if (ImportDecision.asks(tracks.size, ImportDestination.ACTIVITIES, chosen)) {
+            return WebEditorWrite.AsksWhereItGoes(
+                ImportWords.Question(fileName = fileName, tracks = tracks.size)
+            )
+        }
+
+        val destination = chosen ?: ImportDestination.ACTIVITIES
+        val sideTracks = tracks.sumOf { it.reading.sideTracks }
+
+        if (destination == ImportDestination.PLACES) {
+            val written = runCatching { assets.createPlacesFrom(tracks) }
+                .getOrElse { return refused(WebEditorRefusal.INVALID, it.message ?: "Nothing was imported.") }
+            return WebEditorWrite.ActivitiesWritten(
+                ImportWords.summary(
+                    activities = 0,
+                    tracks = written.size,
+                    files = 1,
+                    onPhone = true
+                )
+            )
+        }
+
+        // One clock reading for the file, so every track in it that carries no time of its own is dated
+        // the same day rather than a day apart across a midnight.
+        val today = now()
+        var written = 0
+        var first: Pair<NamedTrack, ActivityDate>? = null
+        for (track in tracks) {
+            val date = ActivityDates.of(track.line, today)
+            val made = runCatching {
+                recordings.importActivity(
+                    name = track.name,
+                    points = track.line,
+                    startedAtEpochMs = date.startEpochMs,
+                    endedAtEpochMs = date.endEpochMs
+                )
+            }
+            if (made.isFailure) {
+                return refused(
+                    WebEditorRefusal.INVALID,
+                    made.exceptionOrNull()?.message ?: "Nothing was imported."
+                )
+            }
+            written++
+            if (tracks.size == 1) first = track to date
+        }
+
+        val one = first
+        return WebEditorWrite.ActivitiesWritten(
+            if (one != null) {
+                ImportWords.oneActivity(
+                    name = one.first.name,
+                    dateEpochMs = one.second.startEpochMs,
+                    points = one.first.line.size,
+                    sideTracks = sideTracks,
+                    onPhone = true
+                )
+            } else {
+                ImportWords.summary(
+                    activities = written,
+                    tracks = 0,
+                    files = 1,
+                    sideTracks = sideTracks,
+                    onPhone = true
+                )
+            }
+        )
     }
 
     /**

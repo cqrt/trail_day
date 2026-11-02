@@ -35,7 +35,16 @@ data class RecordedSessionEntity(
     val status: String,
     val distanceM: Double = 0.0,
     val durationMs: Long = 0L,
-    val pointCount: Int = 0
+    val pointCount: Int = 0,
+    /**
+     * Whether this walk came from a file rather than from the recorder.
+     *
+     * An imported activity is written as a finished recording, so that the list, the page, the map and
+     * the export read it exactly like one that was walked with the phone - and one column is what
+     * lets the list say where it came from instead of calling it a walk of nothing. It is not a
+     * second kind of recording: nothing else about the row changes.
+     */
+    val imported: Boolean = false
 )
 
 /**

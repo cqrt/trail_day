@@ -32,6 +32,7 @@ import nz.mckenzie.trailday.map.PlaceIcons
 import nz.mckenzie.trailday.MainActivity
 import nz.mckenzie.trailday.R
 import nz.mckenzie.trailday.data.AssetRepository
+import nz.mckenzie.trailday.data.RecordingRepository
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.doc.DocDownloader
@@ -193,6 +194,9 @@ class WebEditorService : Service() {
 
         val documents = WebEditorDocuments(
             assets = AssetRepository(database),
+            // Where an activity a laptop brings in is written: the phone's own recorder repository, so
+            // the walk arrives whole and the list, page, map and backup read it like any other.
+            recordings = RecordingRepository(database),
             token = token,
             basemap = { settings.basemap.first() },
             position = { position.value },

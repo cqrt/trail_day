@@ -121,6 +121,48 @@ class RecordingDataTest {
     }
 
     @Test
+    fun anImportedActivityIsWrittenWholeAsAFinishedWalk() = runBlocking {
+        // A walk from a file arrives all at once rather than a fix at a time, so this holds the whole of
+        // it in one place: the row, its fixes in order, its distance along them, and the column that says
+        // it came from a file rather than from this phone.
+        val sessionId = recordings.importActivity(
+            name = "Morning_Walk_2026-11-03",
+            points = fixes,
+            startedAtEpochMs = 1_000L,
+            endedAtEpochMs = 5_000L
+        )
+
+        val session = recordings.getSession(sessionId)!!
+        assertEquals(RecordingStatus.FINISHED.name, session.status)
+        assertEquals("the file's own name", "Morning_Walk_2026-11-03", session.name)
+        assertEquals(3, session.pointCount)
+        assertEquals(4_000L, session.durationMs)
+        assertEquals("two 0.001 degree hops along the equator", 222.39, session.distanceM, 1.0)
+        assertTrue("it says it came from a file", session.imported)
+
+        val stored = recordings.getPoints(sessionId)
+        assertEquals(3, stored.size)
+        assertEquals("its fixes in the file's own order", 0.002, stored[2].lng, 1e-9)
+        assertEquals("with the times the file gave them", 5_000L, stored[2].timeMs)
+    }
+
+    @Test
+    fun anImportedActivityWithNoTimesKeepsNoEndAndSoClaimsNoLength() = runBlocking {
+        // A GPX with no `<time>` in it says when it was brought in and not when it was walked, so the row
+        // has no end - and the list and the page leave the duration out rather than saying "0s".
+        val sessionId = recordings.importActivity(
+            name = "Untimed",
+            points = fixes.map { it.copy(timeMs = 0L) },
+            startedAtEpochMs = 1_790_000_000_000L,
+            endedAtEpochMs = null
+        )
+
+        val session = recordings.getSession(sessionId)!!
+        assertNull("no end, so nothing to subtract", session.endedAtEpochMs)
+        assertEquals("and no length claimed", 0L, session.durationMs)
+    }
+
+    @Test
     fun pausingKeepsTheSessionOpen() = runBlocking {
         val sessionId = recordings.startRecording(name = "Walk")
 

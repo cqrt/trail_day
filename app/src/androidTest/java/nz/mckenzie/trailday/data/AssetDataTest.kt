@@ -9,6 +9,7 @@ import kotlinx.coroutines.runBlocking
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.track.FileTracks
 import nz.mckenzie.trailday.domain.track.GpxParser
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -222,5 +223,39 @@ class AssetDataTest {
 
         assertTrue(failure.exceptionOrNull() is IllegalArgumentException)
     }
+
+    @Test
+    fun aFileOfSeveralTracksWrittenAsPlacesMakesOneOfEachWithoutAQuestion() = runBlocking {
+        // The reading and the writing are two things now, so a file can be read once and written as
+        // places - which is what Places' button does with every track a file holds, question or none.
+        // A file of a named trail's sections is the case: each section is its own place.
+        val gpx = """
+            <?xml version="1.0"?>
+            <gpx version="1.1">
+              <trk><name>Section one</name><trkseg>
+                <trkpt lat="-41.0" lon="174.0"/><trkpt lat="-41.1" lon="174.1"/>
+              </trkseg></trk>
+              <trk><name>Section two</name><trkseg>
+                <trkpt lat="-42.0" lon="175.0"/><trkpt lat="-42.1" lon="175.1"/>
+              </trkseg></trk>
+            </gpx>
+        """.trimIndent()
+
+        val tracks = FileTracks.read(fileName = "Sections", bytes = gpx.toByteArray())
+        val written = assetRepository.createPlacesFrom(tracks)
+
+        assertEquals("one place per track", 2, written.size)
+        assertEquals(listOf("Section one", "Section two"), written.map { it.name })
+        assertEquals(
+            "and both are in the list",
+            listOf("Section one", "Section two"),
+            assetRepository.observeActiveAssets().first().map { it.name }.sorted()
+        )
+        assertEquals("nothing was written as an activity", 0, recordingsForPlaces())
+    }
+
+    /** How many activities the phone holds: a place import writes none, and this is what says so. */
+    private suspend fun recordingsForPlaces(): Int =
+        nz.mckenzie.trailday.data.RecordingRepository(db).observeSessions().first().size
 }
 
