@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
+import nz.mckenzie.trailday.domain.reference.followedLineWords
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.ui.formatDate
 import nz.mckenzie.trailday.ui.formatDistance
@@ -218,10 +219,10 @@ internal fun recordingDetail(row: RecordingRow): String =
         "${formatDuration(row.durationMs)} \u00b7 ${row.pointCount} points"
 
 /** Which place a trip was made for, or that the link to it is gone. */
-internal fun recordingAsset(row: RecordingRow): String = when {
-    row.assetName != null -> "For ${row.assetName}"
-    // A line of DOC's never becomes a place, so a trip that followed one says whose line it was.
-    row.docRef != null -> "Following a DOC track"
-    row.assetWasDeleted -> "Its place has since been deleted"
-    else -> "A new track"
+internal fun recordingAsset(row: RecordingRow): String {
+    row.assetName?.let { return "For $it" }
+    // A published line never becomes a place, so a trip that followed one says whose line it was -
+    // and which words those are is the reference's to say: see [followedLineWords].
+    followedLineWords(row.docRef)?.let { return it }
+    return if (row.assetWasDeleted) "Its place has since been deleted" else "A new track"
 }

@@ -21,10 +21,12 @@ data class RecordedSessionEntity(
     val name: String,
     val assetId: Long? = null,
     /**
-     * DOC's own record this pass followed, when the line was DOC's rather than the walker's -
-     * `doc-tracks:35237557`, the same reference the walker's places carry for DOC's material.
+     * The published line this pass followed, when it followed one rather than the walker's own: DOC's
+     * `doc-tracks:35237557`, or a track from the national dataset as `other:…` - the same references the
+     * walker's own places carry for those publishers.
      *
-     * A DOC line never becomes a place, so this is how the trip itself remembers what was followed.
+     * A published line never becomes a place, so this is how the trip itself remembers what was followed.
+     * Which publisher it was is read back off the prefix, in `followedLineWords`.
      */
     val docRef: String? = null,
     val startedAtEpochMs: Long,

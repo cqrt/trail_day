@@ -48,7 +48,7 @@ class RecordingRepository(private val db: TrailDayDatabase) {
     suspend fun startRecording(
         name: String,
         assetId: Long? = null,
-        /** DOC's own record this pass followed, when it followed one: see [RecordedSessionEntity.docRef]. */
+        /** The published line this pass followed, if any: see [RecordedSessionEntity.docRef]. */
         docRef: String? = null,
         startedAtEpochMs: Long = System.currentTimeMillis()
     ): Long = recordingDao.insertSession(
@@ -86,7 +86,7 @@ class RecordingRepository(private val db: TrailDayDatabase) {
     suspend fun setSessionAsset(sessionId: Long, assetId: Long) =
         recordingDao.setSessionAsset(sessionId, assetId)
 
-    /** Remembers that a pass followed one of DOC's lines - or, with null, that it followed none. */
+    /** Remembers which published line a pass followed - or, with null, that it followed none. */
     suspend fun setSessionDocRef(sessionId: Long, docRef: String?) =
         recordingDao.setSessionDocRef(sessionId, docRef)
 

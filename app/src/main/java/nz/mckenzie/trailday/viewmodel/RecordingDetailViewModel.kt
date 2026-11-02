@@ -44,7 +44,7 @@ data class RecordingDetail(
     val breaks: List<RecordingBreak> = emptyList(),
     val assetId: Long?,
     val assetName: String?,
-    /** DOC's own reference for the line this pass followed, or null when it followed none of DOC's. */
+    /** The reference of the published line this pass followed, or null when it followed none. */
     val docRef: String? = null
 ) {
     val durationMs: Long get() = endedAtEpochMs?.let { (it - startedAtEpochMs).coerceAtLeast(0L) } ?: 0L

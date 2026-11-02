@@ -32,6 +32,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.geo.ElevationPhrase
 import nz.mckenzie.trailday.domain.geo.ElevationProfile
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.reference.followedLineWords
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.map.BasemapView
 import nz.mckenzie.trailday.ui.formatDate
@@ -234,13 +235,9 @@ fun RecordingDetailScreen(
 private fun subtitleOf(recording: RecordingDetail): String = listOfNotNull(
     formatDate(recording.startedAtEpochMs),
     if (recording.isFinished) formatDuration(recording.durationMs) else "never finished",
-    when {
-        recording.assetName != null -> "For ${recording.assetName}"
-        // A line of DOC's never becomes a place, so a trip that followed one says whose line it was.
-        recording.docRef != null -> "Following a DOC track"
-        recording.assetId != null -> "Its place has since been deleted"
-        else -> "A new track"
-    }
+    recording.assetName?.let { "For $it" }
+        ?: followedLineWords(recording.docRef)
+        ?: if (recording.assetId != null) "Its place has since been deleted" else "A new track"
 ).joinToString(" \u00b7 ")
 
 /**

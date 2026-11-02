@@ -74,10 +74,20 @@ class RecordingsRowTest {
 
     @Test
     fun `a trip that followed one of DOC's lines says so`() {
-        // DOC's material never becomes a place, so the row cannot say "For ..." - it says whose line it was.
+        // Published material never becomes a place, so the row cannot say "For ..." - it says whose line it was.
         assertEquals(
             "Following a DOC track",
             recordingAsset(row(assetId = null, assetName = null, docRef = "doc-tracks:35237557"))
+        )
+    }
+
+    @Test
+    fun `a trip that followed somebody else's track does not call it DOC's`() {
+        // Kew Bush Walkway is from the national tracks dataset and is nobody's in this app, so a walk of it
+        // read "Following a DOC track" - the reference, not its presence, is what says whose line it was.
+        assertEquals(
+            "Following another publisher's track",
+            recordingAsset(row(assetId = null, assetName = null, docRef = "other:kew-bush-walkway"))
         )
     }
 
