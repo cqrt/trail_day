@@ -40,6 +40,13 @@ abstract class OfflineOtherTrackDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insertAll(items: List<OfflineOtherTrackEntity>)
 
+    /**
+     * One row by the service's own key, for a saved trip that followed it: see
+     * [nz.mckenzie.trailday.domain.other.OtherTracksCache.find].
+     */
+    @Query("SELECT * FROM offline_other_tracks WHERE globalId = :globalId")
+    abstract suspend fun get(globalId: String): OfflineOtherTrackEntity?
+
     @Query("DELETE FROM offline_other_tracks")
     abstract suspend fun deleteAll()
 

@@ -61,6 +61,16 @@ class OfflineOtherTrackStore(
      */
     override suspend fun cached(): List<OtherTrack> = dao.getAll().mapNotNull { it.toTrack() }.joinedByName()
 
+    /**
+     * One row, read by its key rather than searched for in everything held.
+     *
+     * The map's own `cached()` above joins walkways, which is work to do for one row and for a question the
+     * join cannot change the answer to: who publishes a track is on the row, whichever pieces of a walkway
+     * it belongs to. A saved trip that followed a joined walkway recorded the lowest piece's key, which is
+     * the key the join itself keeps.
+     */
+    override suspend fun find(globalId: String): OtherTrack? = dao.get(globalId)?.toTrack()
+
     override suspend fun count(): Int = dao.count()
 
     /** A live count, for the offline screen to say what is stored, and for the map to redraw on. */

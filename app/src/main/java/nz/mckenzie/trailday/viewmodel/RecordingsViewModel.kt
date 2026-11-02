@@ -10,13 +10,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.data.RecordingRepository
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.RecordedSessionEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
+import nz.mckenzie.trailday.domain.other.EmptyOtherTracksCache
+import nz.mckenzie.trailday.domain.other.OtherTracksCache
+import nz.mckenzie.trailday.domain.reference.followedPublisher
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
+import nz.mckenzie.trailday.offline.OfflineOtherTrackStore
 
 /**
  * One recording, as the browser lists it.
@@ -37,7 +42,12 @@ data class RecordingRow(
     val assetId: Long?,
     val assetName: String?,
     /** The reference of the published line this trip followed, or null when it followed none. */
-    val docRef: String? = null
+    val docRef: String? = null,
+    /**
+     * Who publishes that line, when the trip followed one from the national dataset and its row is still
+     * downloaded: the activity names them rather than saying "another publisher".
+     */
+    val publisher: String? = null
 ) {
     val isFinished: Boolean get() = status == RecordingStatus.FINISHED
 
@@ -50,13 +60,22 @@ data class RecordingRow(
  */
 class RecordingsViewModel(
     private val recordings: RecordingRepository,
-    assetRepository: AssetRepository
+    assetRepository: AssetRepository,
+    /**
+     * Where the publisher of a followed track is written down.
+     *
+     * A trip keeps the reference of the line it followed and nothing else, so the name of whoever
+     * published it comes from the dataset's own row, read once per trip that followed one.
+     */
+    private val otherTracks: OtherTracksCache = EmptyOtherTracksCache
 ) : ViewModel() {
 
     val sessions: StateFlow<List<RecordingRow>> =
         combine(recordings.observeSessions(), assetRepository.observeActiveAssets()) { sessions, assetList ->
             val names = assetList.associate { asset -> asset.id to asset.name }
             sessions.map { session -> session.toRow(names) }
+        }.map { rows ->
+            rows.map { row -> row.copy(publisher = followedPublisher(row.docRef, otherTracks)) }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     /**
@@ -95,7 +114,8 @@ class RecordingsViewModel(
                     val database = TrailDayDatabase.get(appContext)
                     RecordingsViewModel(
                         recordings = RecordingRepository(database),
-                        assetRepository = AssetRepository(database)
+                        assetRepository = AssetRepository(database),
+                        otherTracks = OfflineOtherTrackStore(dao = database.offlineOtherTrackDao())
                     )
                 }
             }

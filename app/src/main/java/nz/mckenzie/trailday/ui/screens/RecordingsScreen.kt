@@ -221,8 +221,8 @@ internal fun recordingDetail(row: RecordingRow): String =
 /** Which place a trip was made for, or that the link to it is gone. */
 internal fun recordingAsset(row: RecordingRow): String {
     row.assetName?.let { return "For $it" }
-    // A published line never becomes a place, so a trip that followed one says whose line it was -
-    // and which words those are is the reference's to say: see [followedLineWords].
-    followedLineWords(row.docRef)?.let { return it }
+    // A published line never becomes a place, so a trip that followed one names whose line it was -
+    // and which words those are is the reference's and the publisher's to say: see [followedLineWords].
+    followedLineWords(row.docRef, row.publisher)?.let { return it }
     return if (row.assetWasDeleted) "Its place has since been deleted" else "A new track"
 }

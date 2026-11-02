@@ -236,7 +236,7 @@ private fun subtitleOf(recording: RecordingDetail): String = listOfNotNull(
     formatDate(recording.startedAtEpochMs),
     if (recording.isFinished) formatDuration(recording.durationMs) else "never finished",
     recording.assetName?.let { "For $it" }
-        ?: followedLineWords(recording.docRef)
+        ?: followedLineWords(recording.docRef, recording.publisher)
         ?: if (recording.assetId != null) "Its place has since been deleted" else "A new track"
 ).joinToString(" \u00b7 ")
 

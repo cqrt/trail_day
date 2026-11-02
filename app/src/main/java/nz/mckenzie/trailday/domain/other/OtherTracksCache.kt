@@ -23,6 +23,15 @@ interface OtherTracksCache {
     suspend fun count(): Int
 
     /**
+     * One row, by the service's own key, or null when it is not held.
+     *
+     * For a saved trip that followed a track: the trip keeps the reference and nothing else, so the
+     * publisher named on its activity page is this row's, read when the page is. Answered from what is
+     * downloaded rather than over the network, so it works with no reception.
+     */
+    suspend fun find(globalId: String): OtherTrack? = cached().firstOrNull { it.globalId == globalId }
+
+    /**
      * The same number, as it changes.
      *
      * For the offline screen's count, and for a map that has to draw tracks downloaded while it is open:

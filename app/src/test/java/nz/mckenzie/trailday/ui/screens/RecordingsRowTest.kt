@@ -22,6 +22,7 @@ class RecordingsRowTest {
         assetId: Long? = 7L,
         assetName: String? = "Home block",
         docRef: String? = null,
+        publisher: String? = null,
         distanceM: Double = 2350.0
     ) = RecordingRow(
         id = 1L,
@@ -33,7 +34,8 @@ class RecordingsRowTest {
         status = status,
         assetId = assetId,
         assetName = assetName,
-        docRef = docRef
+        docRef = docRef,
+        publisher = publisher
     )
 
     @Test
@@ -88,6 +90,21 @@ class RecordingsRowTest {
         assertEquals(
             "Following another publisher's track",
             recordingAsset(row(assetId = null, assetName = null, docRef = "other:kew-bush-walkway"))
+        )
+    }
+
+    @Test
+    fun `a trip that followed somebody else's track names the publisher when the row is held`() {
+        assertEquals(
+            "Following a track from Environment Southland Regional Council",
+            recordingAsset(
+                row(
+                    assetId = null,
+                    assetName = null,
+                    docRef = "other:kew-bush-walkway",
+                    publisher = "Environment Southland Regional Council"
+                )
+            )
         )
     }
 

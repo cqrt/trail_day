@@ -20,6 +20,9 @@ import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.RecordingBreak
 import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
 import nz.mckenzie.trailday.domain.geo.splitAtBreaks
+import nz.mckenzie.trailday.domain.other.EmptyOtherTracksCache
+import nz.mckenzie.trailday.domain.other.OtherTracksCache
+import nz.mckenzie.trailday.domain.reference.followedPublisher
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.domain.recording.placeMadeByWalk
 import nz.mckenzie.trailday.domain.tiles.Basemap
@@ -27,6 +30,7 @@ import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.AssetStretch
+import nz.mckenzie.trailday.offline.OfflineOtherTrackStore
 
 /** One recording, in full: what was walked or ridden, and for which place. */
 data class RecordingDetail(
@@ -45,7 +49,12 @@ data class RecordingDetail(
     val assetId: Long?,
     val assetName: String?,
     /** The reference of the published line this pass followed, or null when it followed none. */
-    val docRef: String? = null
+    val docRef: String? = null,
+    /**
+     * Who publishes that line, when it was one from the national dataset and the phone still holds its
+     * row: the page names them rather than saying "another publisher".
+     */
+    val publisher: String? = null
 ) {
     val durationMs: Long get() = endedAtEpochMs?.let { (it - startedAtEpochMs).coerceAtLeast(0L) } ?: 0L
 
@@ -59,7 +68,12 @@ class RecordingDetailViewModel(
     private val sessionId: Long,
     private val recordings: RecordingRepository,
     private val assetRepository: AssetRepository,
-    settingsRepository: SettingsRepository
+    settingsRepository: SettingsRepository,
+    /**
+     * Where the publisher of a followed track is written down: a trip keeps the line's reference, so this
+     * is what turns it back into a name for the page.
+     */
+    private val otherTracks: OtherTracksCache = EmptyOtherTracksCache
 ) : ViewModel() {
 
     /** Which map to draw the pass on: the walker's choice in Settings. */
@@ -161,7 +175,8 @@ class RecordingDetailViewModel(
                 breaks = breaks,
                 assetId = session.assetId,
                 assetName = assetName,
-                docRef = session.docRef
+                docRef = session.docRef,
+                publisher = followedPublisher(session.docRef, otherTracks)
             )
         }
     }
@@ -215,7 +230,8 @@ class RecordingDetailViewModel(
                         sessionId = sessionId,
                         recordings = RecordingRepository(database),
                         assetRepository = AssetRepository(database),
-                        settingsRepository = SettingsRepository(appContext)
+                        settingsRepository = SettingsRepository(appContext),
+                        otherTracks = OfflineOtherTrackStore(dao = database.offlineOtherTrackDao())
                     )
                 }
             }
