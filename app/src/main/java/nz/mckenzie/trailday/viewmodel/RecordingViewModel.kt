@@ -50,7 +50,6 @@ import nz.mckenzie.trailday.domain.reference.Followable
 import nz.mckenzie.trailday.domain.reference.chooserChoices
 import nz.mckenzie.trailday.domain.geo.RecordingBreak
 import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
-import nz.mckenzie.trailday.domain.journey.JourneyTrack
 import nz.mckenzie.trailday.domain.journey.SectionHandOver
 import nz.mckenzie.trailday.domain.geo.splitAtBreaks
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
@@ -74,13 +73,18 @@ import nz.mckenzie.trailday.tracking.frameOnDevice
 import nz.mckenzie.trailday.ui.formatShortDate
 
 /**
- * A line of DOC's being followed: what it is called, DOC's own reference for it, and its line.
+ * A published line being followed: the track as it was published, and the piece of it underfoot.
  *
+ * The piece is held apart from the track's own paths because a walk cut into pieces is walked one piece
+ * at a time: the readout is about the ground in front of the walker, while the map draws the whole track.
  * The points are held here rather than fetched on every fix, for the reason a place's line is: the ground
  * does not move while the walker does. The reference is what lets the trip remember what it followed,
- * without DOC's material ever becoming one of the walker's places.
+ * without somebody else's material ever becoming one of the walker's places.
  */
-data class DocTarget(val ref: String, val name: String, val points: List<GeoPoint>)
+data class DocTarget(val track: Followable, val points: List<GeoPoint>) {
+    val ref: String get() = track.sourceRef
+    val name: String get() = track.name
+}
 
 /**
  * Drives the recorder screen.
@@ -552,8 +556,13 @@ class RecordingViewModel(
             .filter { it.size >= 2 }
             .maxByOrNull { path -> polylineLengthMeters(path) }
             .orEmpty()
+        followDoc(item, line)
+    }
+
+    /** Follows one named piece of a published track: the piece a hand-over has just moved onto. */
+    private fun followDoc(item: Followable, line: List<GeoPoint>) {
         if (line.size < 2) return
-        _selectedDoc.value = DocTarget(ref = item.sourceRef, name = item.name, points = line)
+        _selectedDoc.value = DocTarget(track = item, points = line)
         _selectedAssetId.value = null
         driftWord.reset()
         _drift.value = null
@@ -589,9 +598,9 @@ class RecordingViewModel(
     /**
      * Reads both published lists for the sheet: DOC's sections, and the tracks councils and trusts publish.
      *
-     * Called when the sheet opens rather than at every visit to the screen. [refreshDocTracks] is what the
-     * init needs on its own - the hand-over between DOC's sections is DOC's business - and the other
-     * publisher's tracks are read here because nothing else on this screen asks for them.
+     * Called when the sheet opens, and once when the screen does, because the hand-over between sections
+     * can carry on onto a line from either list - a junction does not care who published the row on the
+     * far side of it.
      */
     fun refreshTracksToFollow() {
         refreshDocTracks()
@@ -921,6 +930,10 @@ class RecordingViewModel(
      * lives: the same four numbers that say how much is left are what say the section's end has been
      * reached. It sits at the foot of the class on purpose - every state flow it reads has to be built
      * before this runs, and property initialisers run in the order they are written.
+     *
+     * **Either publisher's line will do, and so will the next piece of the same track.** A junction does
+     * not care who published the row on the far side of it, and a walkway the dataset cut into nine rows
+     * is one walkway to the walker standing at the end of the first.
      */
     private fun watchForHandOver() {
         viewModelScope.launch {
@@ -936,7 +949,7 @@ class RecordingViewModel(
                 furthestFromEndM = maxOf(furthestFromEndM, progress.totalM - progress.alongM)
                 if (TrackingState.current.status != RecordingStatus.RECORDING) return@collect
 
-                val doc = _selectedDoc.value ?: return@collect
+                val target = _selectedDoc.value ?: return@collect
                 val position = here.value ?: return@collect
                 val next = SectionHandOver.next(
                     line = line,
@@ -944,26 +957,40 @@ class RecordingViewModel(
                     travelledM = progress.alongM,
                     furthestFromStartM = furthestFromStartM,
                     furthestFromEndM = furthestFromEndM,
-                    candidates = _docTracks.value.map { item -> JourneyTrack(item.name, item.paths) },
-                    notThis = doc.name
+                    candidates = linesToCarryOnOnto(target),
+                    walked = line
                 ) ?: return@collect
 
-                val item = _docTracks.value.firstOrNull { kept -> kept.name == next.name } ?: return@collect
-                selectDoc(item)
+                followDoc(next.track, next.line)
                 furthestFromStartM = 0.0
                 furthestFromEndM = 0.0
                 handOverLine = emptyList()
-                _message.value = "Now following ${item.name}"
+                // The next piece of the same walk is not news: the readout still says the same name.
+                if (next.track.sourceRef != target.ref) _message.value = "Now following ${next.track.name}"
             }
         }
     }
 
+    /**
+     * What the walker may carry on onto: the walk being followed with every piece it was published in,
+     * then both lists the chooser offers.
+     *
+     * The piece underfoot comes from the target itself rather than from the lists, because a track chosen
+     * on the map or on its own page need not be in either: what is being walked is always available to
+     * carry on with.
+     */
+    private fun linesToCarryOnOnto(target: DocTarget): List<Followable> = buildList {
+        add(target.track)
+        for (item in _docTracks.value) if (item.sourceRef != target.ref) add(item)
+        for (item in _otherTracks.value) if (item.sourceRef != target.ref) add(item)
+    }
+
     init {
-        // **The sections DOC publishes for this area, ready before they are needed.** The chooser reads them
-        // when it opens; the hand-over has to have them while the walker is walking. Called from here rather
-        // than from the init above because it writes a state flow that is declared below that one - and a
-        // property is not there yet when an init block above it runs.
-        refreshDocTracks()
+        // **The lines the walker may follow, ready before they are needed.** The sheet reads them when it
+        // opens; the hand-over has to have them while the walker is walking, and it can carry on onto
+        // either publisher's. Called from here rather than from the init above because it writes state
+        // flows declared below that one - and a property is not there yet when an init block above it runs.
+        refreshTracksToFollow()
         watchForHandOver()
     }
 

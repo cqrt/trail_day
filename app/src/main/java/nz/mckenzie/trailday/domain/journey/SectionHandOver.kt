@@ -2,17 +2,24 @@ package nz.mckenzie.trailday.domain.journey
 
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.haversineMeters
+import nz.mckenzie.trailday.domain.reference.Followable
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 
 /**
- * Carrying on to the next of DOC's sections, without the walker touching the phone.
+ * Carrying on to the next section, without the walker touching the phone.
  *
  * A walk published in pieces is followed one piece at a time: at the end of a section the recorder knows
  * nothing about the section that begins there, so the walker has to open the app and choose it. This is
  * the rule that hands over instead - **the next section that starts where this one ends, and carries on
  * the way the walker was walking**.
+ *
+ * **Pieces of the same walk count, and they are the common case.** DOC publishes the Kepler in nine rows
+ * and the national tracks dataset publishes a walkway in as many pieces as it likes, so a line is often
+ * one piece of one track rather than a track of its own. The rule does not care which: it is handed every
+ * piece it may move onto, and the track they came from, so the caller can say whose line the walker is
+ * now on.
  *
  * It cannot say how long the whole walk is: the chain is discovered as it is walked, not known before the
  * start. That is what the journey builder is for.
@@ -41,8 +48,9 @@ object SectionHandOver {
      * [furthestFromEndM] are the furthest they have been from each end since this section became the
      * target - which is what says they walked *along* it rather than arriving at the junction.
      *
-     * [notThis] is the section they are on, by name: a junction has two ends, and handing back to the one
-     * just walked would be a walk that goes nowhere.
+     * [walked] is the piece being walked. A junction has two ends, and handing back onto the line just
+     * walked would be a walk that goes nowhere - but the name it is published under cannot say which line
+     * to leave out, because a walk cut into pieces has one name for all of them.
      */
     fun next(
         line: List<GeoPoint>,
@@ -50,8 +58,8 @@ object SectionHandOver {
         travelledM: Double,
         furthestFromStartM: Double,
         furthestFromEndM: Double,
-        candidates: List<JourneyTrack>,
-        notThis: String?
+        candidates: List<Followable>,
+        walked: List<GeoPoint>? = null
     ): HandOver? {
         if (line.size < 2) return null
         val total = lengthOf(line)
@@ -77,10 +85,10 @@ object SectionHandOver {
 
         var best: HandOver? = null
         var bestTurn = Double.MAX_VALUE
-        for (track in candidates) {
-            if (notThis != null && track.name == notThis) continue
-            for (path in track.paths) {
+        for (candidate in candidates) {
+            for (path in candidate.paths) {
                 if (path.size < 2) continue
+                if (walked != null && isTheLineWalked(path, walked)) continue
                 for (endsAtLast in listOf(true, false)) {
                     val end = if (endsAtLast) path.last() else path.first()
                     val away = haversineMeters(junction.lat, junction.lng, end.lat, end.lng)
@@ -94,7 +102,7 @@ object SectionHandOver {
                     // sections leaving a junction at the same angle are one line with a join in it.
                     if (turn < bestTurn - 1e-9 || (abs(turn - bestTurn) <= 1e-9 && (best == null || oriented.size > best!!.line.size))) {
                         bestTurn = turn
-                        best = HandOver(name = track.name, line = oriented, turnDegrees = turn)
+                        best = HandOver(track = candidate, line = oriented, turnDegrees = turn)
                     }
                 }
             }
@@ -102,8 +110,28 @@ object SectionHandOver {
         return best
     }
 
-    /** What the recorder moves onto: the section's name, and its line starting at the junction. */
-    data class HandOver(val name: String, val line: List<GeoPoint>, val turnDegrees: Double)
+    /** What the recorder moves onto: whose track it is, and its line starting at the junction. */
+    data class HandOver(
+        val track: Followable,
+        val line: List<GeoPoint>,
+        val turnDegrees: Double
+    )
+
+    /**
+     * Whether two pieces are the same line, read either way round.
+     *
+     * Compared by its two ends rather than point by point: a hand-over turns a piece to start at the
+     * junction, and the same ground is the same ground whichever end the walker set off from.
+     */
+    private fun isTheLineWalked(piece: List<GeoPoint>, walked: List<GeoPoint>): Boolean {
+        if (piece.size != walked.size) return false
+        return (samePlace(piece.first(), walked.first()) && samePlace(piece.last(), walked.last())) ||
+            (samePlace(piece.first(), walked.last()) && samePlace(piece.last(), walked.first()))
+    }
+
+    /** The same vertex to within a metre - the precision a published line is worth. */
+    private fun samePlace(a: GeoPoint, b: GeoPoint): Boolean =
+        haversineMeters(a.lat, a.lng, b.lat, b.lng) < 1.0
 
     /**
      * A point [DIRECTION_SAMPLE_M] inside a path from the end asked about.

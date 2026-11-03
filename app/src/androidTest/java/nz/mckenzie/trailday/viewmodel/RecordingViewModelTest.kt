@@ -1,8 +1,10 @@
 package nz.mckenzie.trailday.viewmodel
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
+import nz.mckenzie.trailday.tracking.DevicePosition
 import nz.mckenzie.trailday.tracking.LocationSource
 
 import android.content.Context
@@ -72,6 +74,8 @@ class RecordingViewModelTest {
     @After
     fun tearDown() {
         TrackingState.clear()
+        // The fixes a test put in place of the device's are not the next test's.
+        DevicePosition.useForTest(null)
         // Deliberately no db.close(): this view model observes the session's points for
         // as long as it lives, so closing the database underneath it throws on a
         // background thread and takes the whole instrumentation process down - with
@@ -534,7 +538,7 @@ class RecordingViewModelTest {
             name = "Southern Walkway",
             paths = listOf(line)
         )
-        val viewModel = viewModel(otherStore = OneTrackHeld(southern))
+        val viewModel = viewModel(otherStore = TracksHeld(listOf(southern)))
         viewModel.refreshTracksToFollow()
         viewModel.setTrackQuery("southern")
 
@@ -552,11 +556,105 @@ class RecordingViewModelTest {
         )
     }
 
-    /** A phone holding one track somebody else publishes, for the chooser's third list. */
-    private class OneTrackHeld(private val track: OtherTrack) : OtherTracksCache {
-        override suspend fun cached(): List<OtherTrack> = listOf(track)
-        override suspend fun count(): Int = 1
-        override fun observeCount(): Flow<Int> = flowOf(1)
+    /**
+     * A walkway the dataset cut into two pieces is walked as one: at the end of the first piece the
+     * recorder takes up the second by itself.
+     *
+     * This is the piece-to-piece half of the hand-over. A walkway is joined by name before it is offered -
+     * nine rows in Invercargill are one row in the chooser - but following a track takes its longest piece,
+     * so without this the readout stops where a row ended and the walker is left to choose the next one by
+     * hand. Nothing is said about it either: the name in the readout has not changed.
+     */
+    @Test
+    fun theRecorderCarriesOnToTheNextPieceOfTheSameWalkway() = runBlocking {
+        val first = (0..20).map { step -> GeoPoint(-41.5000, 173.9500 + 0.0001 * step) }
+        // The second piece starts where the first one ends: 173.9520.
+        val second = (0..5).map { step -> GeoPoint(-41.5000, 173.9520 + 0.0001 * step) }
+        val walkway = OtherTrack(
+            globalId = "6f1c2b8e-0000-4000-8000-000000000002",
+            name = "Kingswell Creek Walkway",
+            paths = listOf(first, second)
+        )
+        // Standing at the end of the first piece, having walked it: the end of a piece is where a walker
+        // stops to look at the phone.
+        DevicePosition.useForTest(FakeLocation(listOf(first.last().copy(accuracyM = 5f))))
+        val viewModel = viewModel(otherStore = TracksHeld(listOf(walkway)))
+        val sessionId = recordings.startRecording(name = "Recording")
+        TrackingState.begin(sessionId, System.currentTimeMillis())
+        TrackingState.setStatus(RecordingStatus.RECORDING)
+
+        viewModel.refreshTracksToFollow()
+        viewModel.selectDoc(walkway)
+
+        val carriedOn = withTimeout(5_000) {
+            viewModel.follow.first { it != null && it.totalM < polylineLengthMeters(first) }
+        }
+
+        assertEquals(
+            "the readout is about the second piece now",
+            polylineLengthMeters(second),
+            carriedOn!!.totalM,
+            1.0
+        )
+        assertEquals(
+            "and the walk is still the same walkway",
+            "Kingswell Creek Walkway",
+            withTimeout(5_000) { viewModel.selectedTrackName.first { it != null } }
+        )
+    }
+
+    /**
+     * A junction does not care who published the row on the far side of it.
+     *
+     * DOC's sections hand over to DOC's sections, and they did so while every other publisher's line was
+     * invisible to the rule. Two councils' rows that meet are the same walker standing at the same corner,
+     * so the name in the readout changes and the walk carries on.
+     */
+    @Test
+    fun theRecorderCarriesOnToAnotherPublishersRowAtTheEnd() = runBlocking {
+        val first = (0..20).map { step -> GeoPoint(-41.5000, 173.9500 + 0.0001 * step) }
+        val onwards = (0..5).map { step -> GeoPoint(-41.5000, 173.9520 + 0.0001 * step) }
+        val here = OtherTrack(
+            globalId = "6f1c2b8e-0000-4000-8000-000000000003",
+            name = "Major Hornbrook Track",
+            paths = listOf(first)
+        )
+        val next = OtherTrack(
+            globalId = "6f1c2b8e-0000-4000-8000-000000000004",
+            name = "Mount Pleasant Track",
+            paths = listOf(onwards)
+        )
+        DevicePosition.useForTest(FakeLocation(listOf(first.last().copy(accuracyM = 5f))))
+        val viewModel = viewModel(otherStore = TracksHeld(listOf(here, next)))
+        val sessionId = recordings.startRecording(name = "Recording")
+        TrackingState.begin(sessionId, System.currentTimeMillis())
+        TrackingState.setStatus(RecordingStatus.RECORDING)
+
+        viewModel.refreshTracksToFollow()
+        viewModel.selectDoc(here)
+
+        val told = withTimeout(5_000) { viewModel.message.first { it == "Now following Mount Pleasant Track" } }
+
+        assertEquals("the card says whose line the walker is on", "Now following Mount Pleasant Track", told)
+        assertEquals(
+            "and the readout follows it rather than staying on the old one",
+            "Mount Pleasant Track",
+            withTimeout(5_000) { viewModel.selectedTrackName.first { it == "Mount Pleasant Track" } }
+        )
+    }
+
+    /** A phone offering one fix, for the hand-over tests: the rule needs to know where the walker is. */
+    private class FakeLocation(private val fixes: List<GeoPoint>) : LocationSource {
+        override fun updates(): Flow<GeoPoint> = fixes.asFlow()
+
+        override suspend fun currentLocation(): GeoPoint? = fixes.lastOrNull()
+    }
+
+    /** A phone holding some tracks somebody else publishes, for the chooser's third list. */
+    private class TracksHeld(private val tracks: List<OtherTrack>) : OtherTracksCache {
+        override suspend fun cached(): List<OtherTrack> = tracks
+        override suspend fun count(): Int = tracks.size
+        override fun observeCount(): Flow<Int> = flowOf(tracks.size)
     }
 
     /**
