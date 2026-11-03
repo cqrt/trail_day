@@ -4,15 +4,15 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- The same tramper for Android 13's themed icons. One colour throughout: the gold of the pack
-         and the pole is the only thing the system cannot tint, so here it becomes part of the shape
-         and the pack reads through its silhouette instead. -->
+    <!-- The same tramper for Android 13's themed icons, at the same 0.76 as the plain foreground.
+         One colour throughout: the gold of the pack and the pole cannot be tinted, so here it becomes
+         part of the shape and the pack reads through its silhouette instead. -->
     <group
         android:pivotX="54"
         android:pivotY="54"
-        android:scaleX="1.06"
-        android:scaleY="1.06"
-        android:translateY="-2">
+        android:scaleX="0.76"
+        android:scaleY="0.76"
+        android:translateY="-1.5">
 
         <group
             android:pivotX="40"
@@ -33,34 +33,34 @@
 
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M54.4,32 A8.6,8.6 0 1 0 71.6,32 A8.6,8.6 0 1 0 54.4,32 Z" />
+            android:pathData="M55,32 A8,8 0 1 0 71,32 A8,8 0 1 0 55,32 Z" />
         <path
             android:pathData="M59,44 L53,63"
             android:strokeColor="#FFFFFF"
-            android:strokeWidth="17"
+            android:strokeWidth="16"
             android:strokeLineCap="round" />
         <path
             android:pathData="M53,63 L61,73 L59,82"
             android:strokeColor="#FFFFFF"
-            android:strokeWidth="13.5"
+            android:strokeWidth="12.5"
             android:strokeLineCap="round"
             android:strokeLineJoin="round" />
         <path
             android:pathData="M53,63 L45,73 L37,81"
             android:strokeColor="#FFFFFF"
-            android:strokeWidth="13.5"
+            android:strokeWidth="12.5"
             android:strokeLineCap="round"
             android:strokeLineJoin="round" />
         <path
             android:pathData="M61,47 L72,53 L74,60"
             android:strokeColor="#FFFFFF"
-            android:strokeWidth="11.5"
+            android:strokeWidth="11"
             android:strokeLineCap="round"
             android:strokeLineJoin="round" />
         <path
             android:pathData="M78,38 L71,84"
             android:strokeColor="#FFFFFF"
-            android:strokeWidth="3.8"
+            android:strokeWidth="3.6"
             android:strokeLineCap="round" />
         <path
             android:pathData="M76,38 H80"
