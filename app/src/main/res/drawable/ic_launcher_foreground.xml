@@ -4,16 +4,73 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- A mountain, and a hut at its foot: somewhere to walk to and somewhere to sleep. -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M40,80 L63,43 L86,80 Z" />
+    <!-- A tramper mid-stride: pack on the back, one pole planted ahead. The figure is drawn at 1.06
+         and lifted two units, which fills the tile without reaching the edge of a circular mask. -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="1.06"
+        android:scaleY="1.06"
+        android:translateY="-2">
 
-    <!-- The hut: a roof over a wall, kept clear of the mountain so both read. -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M20,70 L33,57 L46,70 Z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M24,70 L42,70 L42,80 L24,80 Z" />
+        <!-- The pack, in the map's gold, sitting high on the shoulders and tipped back a little. -->
+        <group
+            android:pivotX="40"
+            android:pivotY="34"
+            android:rotation="-10">
+            <path
+                android:fillColor="#F2E3A8"
+                android:pathData="M37,28 H44 A6,6 0 0 1 50,34 V35 A6,6 0 0 1 44,41 H37 A6,6 0 0 1 31,35 V34 A6,6 0 0 1 37,28 Z" />
+        </group>
+        <group
+            android:pivotX="36"
+            android:pivotY="50"
+            android:rotation="-10">
+            <path
+                android:fillColor="#F2E3A8"
+                android:pathData="M34,40 H38 A9,9 0 0 1 47,49 V51 A9,9 0 0 1 38,60 H34 A9,9 0 0 1 25,51 V49 A9,9 0 0 1 34,40 Z" />
+        </group>
+
+        <!-- Head, torso and both legs in one colour, in heavy round-capped strokes: that heaviness is
+             what survives being drawn at 48 pixels on a home screen. -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M54.4,32 A8.6,8.6 0 1 0 71.6,32 A8.6,8.6 0 1 0 54.4,32 Z" />
+        <path
+            android:pathData="M59,44 L53,63"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="17"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M53,63 L61,73 L59,82"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="13.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M53,63 L45,73 L37,81"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="13.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+
+        <!-- The arm reaching forward to the pole, then the pole itself, gold and thin so it reads as
+             something held rather than part of the body. -->
+        <path
+            android:pathData="M61,47 L72,53 L74,60"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="11.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M78,38 L71,84"
+            android:strokeColor="#F2E3A8"
+            android:strokeWidth="3.8"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M76,38 H80"
+            android:strokeColor="#F2E3A8"
+            android:strokeWidth="6"
+            android:strokeLineCap="round" />
+    </group>
 </vector>
