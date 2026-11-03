@@ -84,6 +84,8 @@ On the Record tab, Follow a track opens a list of what you can follow: your own 
 
 When you're following a track, the app shows how far off the line you are, how far along you've got, how much is left, and roughly how long that will take. The time estimate uses Naismith's rule (5 km/h plus an hour for every 600 m climbed when walking, and 12 km/h plus an hour per 450 m climbed when riding). It only counts climbing, not descent, and always rounds up, so treat it as a rough guide rather than a promise.
 
+While you're recording, the app carries on to the next piece of the walk by itself. A section ends where the next one begins, and that piece can be another part of the same walkway or another publisher's track. A piece that turns back, or one that starts down the road rather than at the junction, is yours to choose. You have to have walked 100 m of the section first, so standing at a junction doesn't swap the track under you. The next piece of the same walkway isn't announced, because the name doesn't change; another publisher's row is, with its name and the words "Now following".
+
 ## Recording
 
 Hit Record and the app logs your position as you move. Each point is saved to the database as it arrives, so a crash or a flat battery loses at most the last point. Pausing is stored as a pause, so it doesn't look like a gap in the GPS signal. The recorder ignores fixes that are obviously bad, such as ones with poor accuracy or ones that would mean you'd moved impossibly fast.
