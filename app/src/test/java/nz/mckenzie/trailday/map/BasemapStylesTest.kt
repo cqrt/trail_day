@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.map
 
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
+import nz.mckenzie.trailday.domain.tiles.Roads
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -133,6 +134,71 @@ class BasemapStylesTest {
             nowhereToGetThem.contains(PlaceLabels.ID)
         )
     }
+
+    @Test
+    fun `the roads are drawn over the imagery, from the names' own source, and only when asked for`() {
+        val tiles = "http://127.0.0.1:41234/tiles/linz-aerial/{z}/{x}/{y}.webp"
+        val letters = GlyphFonts.urlTemplateFrom(tiles)
+        val vectors = PlaceLabels.urlTemplateFrom(tiles)
+
+        val asked = BasemapStyles.rasterStyleJson(
+            Basemap.LINZ_AERIAL,
+            tiles,
+            letters,
+            roadsUrl = vectors
+        )
+
+        assertTrue(
+            "one source serves both the names and the roads: $asked",
+            Regex("\"type\": \"vector\"").findAll(asked).count() == 1
+        )
+        Roads.LINES.forEach { line ->
+            assertTrue("${line.id} is drawn", asked.contains("\"id\": \"${line.id}\""))
+            assertTrue("${line.id} asks for LINZ's streets", asked.contains("\"source-layer\": \"${Roads.SOURCE_LAYER}\""))
+        }
+        assertTrue("a road's own colour", asked.contains(Roads.COLOUR))
+        assertTrue("a road's name is drawn too", asked.contains("\"id\": \"roads-name\""))
+        assertTrue(
+            "over the imagery rather than under it",
+            asked.indexOf("\"id\": \"${Roads.HIGHWAY.id}\"") >
+                asked.indexOf("\"id\": \"${Basemap.LINZ_AERIAL.id}\"")
+        )
+
+        val notAsked = BasemapStyles.rasterStyleJson(Basemap.LINZ_AERIAL, tiles, letters)
+        assertFalse("nothing is fetched for a switch nobody has thrown", notAsked.contains(PlaceLabels.ID))
+
+        val nowhereToGetThem = BasemapStyles.rasterStyleJson(Basemap.LINZ_AERIAL, tiles, null, roadsUrl = vectors)
+        assertFalse(
+            "and a road with no letters to name it by draws no road at all, rather than a road with no source",
+            nowhereToGetThem.contains(PlaceLabels.ID)
+        )
+    }
+
+    @Test
+    fun `the roads are drawn under the place names, so a town name is not written along a road`() {
+        val tiles = "http://127.0.0.1:41234/tiles/linz-aerial/{z}/{x}/{y}.webp"
+        val letters = GlyphFonts.urlTemplateFrom(tiles)
+        val both = BasemapStyles.rasterStyleJson(
+            Basemap.LINZ_AERIAL,
+            tiles,
+            letters,
+            PlaceLabels.urlTemplateFrom(tiles),
+            roadsUrl = PlaceLabels.urlTemplateFrom(tiles)
+        )
+
+        assertTrue("a road is drawn", both.contains(Roads.HIGHWAY.id))
+        assertTrue("a town is drawn", both.contains(PlaceLabels.TOWNS.id))
+        assertTrue(
+            "the road first",
+            both.indexOf(Roads.HIGHWAY.id) < both.indexOf(PlaceLabels.TOWNS.id)
+        )
+        assertEquals(
+            "and one source between them, so a tile is fetched once",
+            emptyList<String>(),
+            StyleExpressions.problems(both)
+        )
+    }
+
 
     @Test
     fun `every basemap builds a style with its own zoom and credit`() {

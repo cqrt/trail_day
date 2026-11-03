@@ -47,6 +47,7 @@ enum class IconGlyph {
     MINUS,
     ALERT,
     TRAIL,
+    ROAD,
     LINES
 }
 
@@ -146,6 +147,17 @@ internal fun AppIcon(
                 line(0.46f, 0.28f, 0.78f, 0.40f)
                 line(0.22f, 0.68f, 0.46f, 0.60f)
                 line(0.46f, 0.60f, 0.78f, 0.72f)
+            }
+
+            // A road: two edges running up the grid with a centre line broken into dashes, which is
+            // the mark every road sign in the country uses. Drawn as the thing itself rather than as
+            // a line with dots, so it is not mistaken for a track or for "other tracks" above.
+            IconGlyph.ROAD -> {
+                line(0.20f, 0.82f, 0.42f, 0.18f)
+                line(0.80f, 0.82f, 0.58f, 0.18f)
+                line(0.50f, 0.76f, 0.50f, 0.64f)
+                line(0.50f, 0.54f, 0.50f, 0.42f)
+                line(0.50f, 0.32f, 0.50f, 0.22f)
             }
 
             // The long pathway: a route that bends its way up the grid, with a mark at either end. The

@@ -44,6 +44,9 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     /** The old "Your Tracks" switch: read once to seed [hiddenYourPlaces], never written again. */
     private val legacyYourTracksHiddenPref = booleanPreferencesKey("your_tracks_hidden")
     private val placeNamesPref = booleanPreferencesKey("place_names")
+
+    /** Whether LINZ's roads are drawn over the imagery: see [roads]. */
+    private val roadsPref = booleanPreferencesKey("roads")
     private val teAraroaPref = booleanPreferencesKey("te_araroa")
     private val otherTracksPref = booleanPreferencesKey("other_tracks")
     private val webEditorTokenRequiredPref = booleanPreferencesKey("web_editor_token_required")
@@ -294,6 +297,22 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
 
     suspend fun setPlaceNames(shown: Boolean) {
         context.settingsDataStore.edit { prefs -> prefs[placeNamesPref] = shown }
+    }
+
+    /**
+     * Whether LINZ's roads are drawn over the imagery - the map's own "Roads" switch.
+     *
+     * **Off when unset**, like the names beside it and for the same reason: a line drawn over the
+     * walker's photograph is asked for rather than arrived. Asking for both costs one fetch of a
+     * tile rather than two, because the roads and the names are in the same tiles - see
+     * [nz.mckenzie.trailday.domain.tiles.Roads].
+     */
+    val roads: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[roadsPref] ?: false
+    }
+
+    suspend fun setRoads(shown: Boolean) {
+        context.settingsDataStore.edit { prefs -> prefs[roadsPref] = shown }
     }
 
     /**

@@ -299,6 +299,14 @@ fun BasemapView(
      */
     placeNames: Boolean = false,
     /**
+     * Whether LINZ's roads, and their names, are drawn over the imagery - see
+     * [nz.mckenzie.trailday.domain.tiles.Roads].
+     *
+     * The same tiles as the place names, so asking for both is one fetch per tile rather than two;
+     * and like the names this changes what the style *is*, so switching it reloads the style.
+     */
+    roads: Boolean = false,
+    /**
      * Whether the Te Araroa trail is drawn under everything else - the map's own "Te Araroa trail"
      * switch. See [TeAraroa].
      *
@@ -597,6 +605,7 @@ fun BasemapView(
                         hiddenLayers = hiddenLayers,
                         hiddenYourPlaces = hiddenYourPlaces,
                         placeNames = placeNames,
+                roads = roads,
                         teAraroaGeoJson = teAraroaGeoJson,
                         showTeAraroa = showTeAraroa,
                         showOtherTracks = showOtherTracks,
@@ -621,7 +630,7 @@ fun BasemapView(
     // because they are a source the style either has or has not got - a style with no vector source
     // in it has nothing to show. It is a preference the walker sets once, not a switch they flip
     // while reading the map, and the tiles come from the app's own server either way.
-    LaunchedEffect(basemap, tileUrlTemplate, placeNames, hostedStyleJson) {
+    LaunchedEffect(basemap, tileUrlTemplate, placeNames, roads, hostedStyleJson) {
         val map = mapState.value
         if (map != null) {
             map.loadTrailDayStyle(
@@ -639,6 +648,7 @@ fun BasemapView(
                 hiddenLayers = hiddenLayers,
                 hiddenYourPlaces = hiddenYourPlaces,
                 placeNames = placeNames,
+                roads = roads,
                 teAraroaGeoJson = teAraroaGeoJson,
                 showTeAraroa = showTeAraroa,
                 showOtherTracks = showOtherTracks,
@@ -856,6 +866,7 @@ internal fun MapLibreMap.loadTrailDayStyle(
     hiddenLayers: Set<AssetLayer>,
     hiddenYourPlaces: Set<YourPlaceLayer> = emptySet(),
     placeNames: Boolean,
+    roads: Boolean = false,
     /** The trail's own GeoJSON, and whether it is drawn: see [BasemapView.showTeAraroa]. */
     teAraroaGeoJson: String = AssetGeoJson.build(emptyList()),
     showTeAraroa: Boolean = false,
@@ -889,7 +900,8 @@ internal fun MapLibreMap.loadTrailDayStyle(
             basemap,
             tileUrlTemplate,
             glyphsUrl = GlyphFonts.urlTemplateFrom(tileUrlTemplate),
-            placeNamesUrl = if (placeNames) PlaceLabels.urlTemplateFrom(tileUrlTemplate) else null
+            placeNamesUrl = if (placeNames) PlaceLabels.urlTemplateFrom(tileUrlTemplate) else null,
+            roadsUrl = if (roads) PlaceLabels.urlTemplateFrom(tileUrlTemplate) else null
         )
 
         // No server (tests, previews): the basemap's own address, which is the app's proxy for LINZ's
@@ -1626,3 +1638,4 @@ private fun cameraFor(
         CameraPosition.Builder(fitted).zoom(if (maxZoom == null) fitted.zoom else minOf(fitted.zoom, maxZoom)).build()
     )
 }
+

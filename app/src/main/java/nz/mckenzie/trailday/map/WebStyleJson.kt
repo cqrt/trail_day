@@ -16,6 +16,7 @@ import nz.mckenzie.trailday.domain.look.Look
 import nz.mckenzie.trailday.domain.look.MarkerSizeChoice
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
+import nz.mckenzie.trailday.domain.tiles.Roads
 
 /**
  * The style the editor's page loads, built from the same tables the app's own map is built from.
@@ -77,12 +78,17 @@ object WebStyleJson {
      * [nz.mckenzie.trailday.domain.tiles.PlaceLabels]. The desk draws them where the phone does,
      * from the phone, for the reason everything else on the desk goes through the phone: one store,
      * one place the key lives, and names that are already there when the ground has been looked at.
+     *
+     * [roadsUrl] is the same address again for the roads, which are in the same tiles - see
+     * [nz.mckenzie.trailday.domain.tiles.Roads] - or null when the road switch is off. Either one
+     * brings the one source with it.
      */
     fun build(
         basemap: Basemap,
         tileUrlTemplate: String,
         assetsUrl: String,
         placeNamesUrl: String? = null,
+        roadsUrl: String? = null,
         /** The terrain-rgb elevation, when the chosen basemap draws a LiDAR hillshade. */
         elevationUrlTemplate: String? = null,
         /**
@@ -126,8 +132,8 @@ object WebStyleJson {
         // a name on the desk is written from the letters that travel inside the app rather than from a
         // font the laptop happens to have.
         put("glyphs", GlyphFonts.urlTemplateFrom(tileUrlTemplate))
-        put("sources", sources(basemap, tileUrlTemplate, assetsUrl, placeNamesUrl, elevationUrlTemplate))
-        put("layers", layers(basemap, placeNamesUrl != null, elevationUrlTemplate != null))
+        put("sources", sources(basemap, tileUrlTemplate, assetsUrl, placeNamesUrl, roadsUrl, elevationUrlTemplate))
+        put("layers", layers(basemap, placeNamesUrl != null, roadsUrl != null, elevationUrlTemplate != null))
         }.toString()
     }
 
@@ -144,12 +150,14 @@ object WebStyleJson {
             tileUrlTemplate = "",
             assetsUrl = assetsUrl,
             placeNamesUrl = null,
+            roadsUrl = null,
             elevationUrlTemplate = null,
             includeBasemap = false
         ).jsonObject
         val appLayers = layers(
             basemap = Basemap.LINZ_TOPO_LIDAR_HILLSHADE,
             placeNames = false,
+            roads = false,
             hillshade = false,
             includeBase = false
         ).jsonArray
@@ -172,6 +180,7 @@ object WebStyleJson {
         tileUrlTemplate: String,
         assetsUrl: String,
         placeNamesUrl: String?,
+        roadsUrl: String?,
         elevationUrlTemplate: String?,
         includeBasemap: Boolean = true
     ) = buildJsonObject {
@@ -212,15 +221,20 @@ object WebStyleJson {
                 put("data", assetsUrl)
             }
         )
-        // The place names, when they have been asked for: the phone's own server hands them out, the
-        // same as the tiles, so the page never talks to LINZ and a looked-at area keeps its names
-        // with no network at all.
-        if (placeNamesUrl != null) {
+        // The place names and the roads, when they have been asked for: the phone's own server hands
+        // them out, the same as the tiles, so the page never talks to LINZ and a looked-at area keeps
+        // its names with no network at all.
+        //
+        // **One source for both**, because they are one tileset - see
+        // [nz.mckenzie.trailday.domain.tiles.Roads] and [PlaceLabels]. Asking for both must not fetch
+        // a tile twice, so either one brings the source and neither owns it.
+        val vectors = placeNamesUrl ?: roadsUrl
+        if (vectors != null) {
             put(
                 PlaceLabels.ID,
                 buildJsonObject {
                     put("type", "vector")
-                    put("tiles", buildJsonArray { add(placeNamesUrl) })
+                    put("tiles", buildJsonArray { add(vectors) })
                     put("minzoom", 0)
                     put("maxzoom", PlaceLabels.MAX_ZOOM)
                     put("attribution", PlaceLabels.ATTRIBUTION)
@@ -232,6 +246,7 @@ object WebStyleJson {
     private fun layers(
         basemap: Basemap,
         placeNames: Boolean,
+        roads: Boolean,
         hillshade: Boolean,
         includeBase: Boolean = true
     ) = buildJsonArray {
@@ -276,6 +291,9 @@ object WebStyleJson {
                 )
             }
         }
+        // The roads, over the photograph and **under the names**: a gold line is what says a grey
+        // ribbon in a paddock is a road, and a town name laid over a road is the wrong way round.
+        if (roads) roadLayers().forEach { add(it) }
         // The names, straight over the imagery and **under the work**: this is the phone's own
         // arrangement, and the reason is the same on both - the work is what the map is for, and a
         // town name is the furniture around it.
@@ -356,6 +374,117 @@ object WebStyleJson {
                 put("text-color", PlaceLabels.COLOUR)
                 put("text-halo-color", PlaceLabels.HALO_COLOUR)
                 put("text-halo-width", PlaceLabels.HALO_WIDTH)
+            }
+        )
+    }
+
+    /**
+     * The roads, as the page's own layers - see [nz.mckenzie.trailday.domain.tiles.Roads].
+     *
+     * **Every casing first, then every line**, which is what makes one road pass under another
+     * cleanly: a highway's edge is drawn, then a street's edge, and only then the gold of both. Drawn
+     * one road at a time, a street would cut a hole in the highway it meets. The phone's map does the
+     * same, from the same numbers.
+     */
+    private fun roadLayers(): List<JsonObject> {
+        val casings = Roads.LINES.filter { it.casing }.map { roadLineLayer(it, casing = true) }
+        val filled = Roads.LINES.map { roadLineLayer(it, casing = false) }
+        return casings + filled + listOf(roadNameLayer())
+    }
+
+    /**
+     * One line of roads: the casing under it, or the line itself.
+     *
+     * A dashed line's casing is not dashed - the dash is the road's condition, sealed or not, and an
+     * edge that broke with it would read as two roads rather than one road in two states.
+     */
+    private fun roadLineLayer(line: Roads.Line, casing: Boolean): JsonObject = buildJsonObject {
+        val width = if (casing) line.width.map { (zoom, px) -> zoom to px + Roads.CASING_WIDTH }
+        else line.width
+        put("id", line.id + if (casing) "-casing" else "")
+        put("type", "line")
+        put("source", PlaceLabels.ID)
+        put("source-layer", Roads.SOURCE_LAYER)
+        put("minzoom", line.minZoom)
+        // The filter travels as JSON text rather than as Kotlin, because that is what both builders
+        // can read: the phone writes its style as a string, and this one builds objects.
+        put("filter", Json.parseToJsonElement(line.filter))
+        put(
+            "layout",
+            buildJsonObject {
+                put("line-cap", "round")
+                put("line-join", "round")
+            }
+        )
+        put(
+            "paint",
+            buildJsonObject {
+                put("line-color", if (casing) Roads.CASING_COLOUR else line.colour)
+                put("line-opacity", if (casing) Roads.CASING_OPACITY else line.opacity)
+                put(
+                    "line-width",
+                    buildJsonArray {
+                        add("interpolate")
+                        add(buildJsonArray { add("linear") })
+                        add(buildJsonArray { add("zoom") })
+                        width.forEach { (zoom, px) ->
+                            add(zoom)
+                            add(px)
+                        }
+                    }
+                )
+                // Multiples of the line's own width, which is what a dasharray is - the same numbers
+                // the app hands its own map, so a dash reads at the same spacing on both.
+                if (!casing && line.dash != null) {
+                    put("line-dasharray", buildJsonArray { line.dash.forEach { add(it) } })
+                }
+            }
+        )
+    }
+
+    /**
+     * A road's name, written along it - see [Roads.NAME_PROPERTY].
+     *
+     * Along the line rather than at a point, because a road is a line and its name belongs on it:
+     * where a section is too short or too crooked, the map does not write it, which is what the
+     * engine's placement does for free.
+     */
+    private fun roadNameLayer(): JsonObject = buildJsonObject {
+        put("id", "roads-name")
+        put("type", "symbol")
+        put("source", PlaceLabels.ID)
+        put("source-layer", Roads.SOURCE_LAYER)
+        put("minzoom", Roads.NAME_MIN_ZOOM)
+        put("filter", Json.parseToJsonElement(Roads.NAME_FILTER))
+        put(
+            "layout",
+            buildJsonObject {
+                put("text-field", dataProperty(Roads.NAME_PROPERTY))
+                put("text-font", buildJsonArray { add(GlyphFonts.STACK) })
+                put(
+                    "text-size",
+                    buildJsonArray {
+                        add("interpolate")
+                        add(buildJsonArray { add("linear") })
+                        add(buildJsonArray { add("zoom") })
+                        add(Roads.NAME_MIN_ZOOM)
+                        add(Roads.NAME_SIZE_AT_MIN_ZOOM)
+                        add(Roads.MAX_ZOOM)
+                        add(Roads.NAME_SIZE_AT_MAX_ZOOM)
+                    }
+                )
+                put("symbol-placement", "line")
+                put("text-max-angle", Roads.NAME_MAX_ANGLE)
+                put("text-allow-overlap", false)
+                put("text-padding", PLACE_NAME_PADDING)
+            }
+        )
+        put(
+            "paint",
+            buildJsonObject {
+                put("text-color", Roads.NAME_COLOUR)
+                put("text-halo-color", Roads.NAME_HALO_COLOUR)
+                put("text-halo-width", Roads.NAME_HALO_WIDTH)
             }
         )
     }

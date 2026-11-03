@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.map
 
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
+import nz.mckenzie.trailday.domain.tiles.Roads
 
 /**
  * The MapLibre style document for a basemap.
@@ -33,16 +34,23 @@ object BasemapStyles {
      * walker has not asked for them. **Both** are needed: names are drawn where there is a server to
      * fetch the tiles from and letters to write them with, so a style pointed straight at a provider
      * draws no names at all rather than drawing boxes.
+     *
+     * [roadsUrl] is the same tile address again, or null when the walker has not asked for roads. It
+     * is the same tileset as the names - see [Roads] - so the two share **one** source: a walker with
+     * both on fetches each tile once, not twice, and either one alone brings the source with it.
      */
     fun rasterStyleJson(
         basemap: Basemap,
         tileUrlTemplate: String,
         glyphsUrl: String? = null,
         placeNamesUrl: String? = null,
+        roadsUrl: String? = null,
         /** The terrain-rgb elevation, when the basemap draws a LiDAR hillshade. */
         elevationUrlTemplate: String? = null
     ): String {
         val names = if (placeNamesUrl != null && glyphsUrl != null) placeNamesUrl else null
+        val road = if (roadsUrl != null && glyphsUrl != null) roadsUrl else null
+        val vectors = names ?: road
 
         return """
             {
@@ -57,7 +65,7 @@ object BasemapStyles {
                   "minzoom": 0,
                   "maxzoom": ${basemap.maxZoom},
                   "attribution": "${basemap.attributionHtml()}"
-                }${names?.let { ",\n" + placeLabelsSource(it) }.orEmpty()}${
+                }${vectors?.let { ",\n" + placeLabelsSource(it) }.orEmpty()}${
             elevationUrlTemplate?.let { ",\n" + elevationSource(it, basemap) }.orEmpty()
         }
               },
@@ -75,7 +83,7 @@ object BasemapStyles {
                   "maxzoom": ${basemap.maxZoom}
                 }${
             elevationUrlTemplate?.let { ",\n" + hillshadeLayer(basemap) }.orEmpty()
-        }${names?.let { ",\n" + labelsLayers() }.orEmpty()}
+        }${road?.let { ",\n" + roadsLayers() }.orEmpty()}${names?.let { ",\n" + labelsLayers() }.orEmpty()}
               ]
             }
         """.trimIndent()
@@ -178,6 +186,90 @@ object BasemapStyles {
             "text-color": "${PlaceLabels.COLOUR}",
             "text-halo-color": "${PlaceLabels.HALO_COLOUR}",
             "text-halo-width": ${PlaceLabels.HALO_WIDTH}
+          }
+        }
+    """.trimIndent()
+
+    /**
+     * The roads, as style layers - see [Roads].
+     *
+     * **Every casing first, then every line**, which is what makes one road pass under another
+     * cleanly: a highway's edge is drawn, then a street's edge, and only then the gold of both. Drawn
+     * one road at a time, a street would cut a hole in the highway it meets.
+     */
+    private fun roadsLayers(): String {
+        val casings = Roads.LINES.filter { it.casing }
+        val filled = Roads.LINES
+        return (casings.map { roadLineLayer(it, casing = true) } +
+            filled.map { roadLineLayer(it, casing = false) } +
+            roadNameLayer()).joinToString(",\n")
+    }
+
+    /**
+     * One line of roads, as a style layer: the casing under it, or the line itself.
+     *
+     * A dashed line's casing is not dashed. The dash is the road's condition - sealed or not - and an
+     * edge that broke with it would read as two roads rather than one road in two states.
+     */
+    private fun roadLineLayer(line: Roads.Line, casing: Boolean): String {
+        val width = if (casing) line.width.map { (zoom, px) -> "$zoom, ${px + Roads.CASING_WIDTH}" }
+        else line.width.map { (zoom, px) -> "$zoom, $px" }
+        val dash = if (!casing && line.dash != null) """
+            "line-dasharray": [${line.dash.joinToString(", ")}],""" else ""
+        return """
+        {
+          "id": "${line.id}${if (casing) "-casing" else ""}",
+          "type": "line",
+          "source": "${PlaceLabels.ID}",
+          "source-layer": "${Roads.SOURCE_LAYER}",
+          "minzoom": ${if (casing) line.minZoom else line.minZoom},
+          "filter": ${line.filter},
+          "layout": {
+            "line-cap": "round",
+            "line-join": "round"
+          },
+          "paint": {
+            "line-color": "${if (casing) Roads.CASING_COLOUR else line.colour}",
+            "line-opacity": ${if (casing) Roads.CASING_OPACITY else line.opacity},
+            "line-width": ["interpolate", ["linear"], ["zoom"], ${
+            width.joinToString(", ")
+        }],$dash
+            "line-blur": 0
+          }
+        }
+        """.trimIndent()
+    }
+
+    /**
+     * A road's name, written along it - see [Roads.NAME_PROPERTY].
+     *
+     * Along the line rather than at a point, because a road is a line and its name belongs on it;
+     * where a section is too short or too crooked for the name, the map simply does not write it,
+     * which is what the engine's placement does for free and what a name laid flat could not.
+     */
+    private fun roadNameLayer(): String = """
+        {
+          "id": "roads-name",
+          "type": "symbol",
+          "source": "${PlaceLabels.ID}",
+          "source-layer": "${Roads.SOURCE_LAYER}",
+          "minzoom": ${Roads.NAME_MIN_ZOOM},
+          "filter": ${Roads.NAME_FILTER},
+          "layout": {
+            "text-field": ["get", "${Roads.NAME_PROPERTY}"],
+            "text-font": ["${GlyphFonts.STACK}"],
+            "text-size": ["interpolate", ["linear"], ["zoom"], ${Roads.NAME_MIN_ZOOM}, ${
+        Roads.NAME_SIZE_AT_MIN_ZOOM
+    }, ${Roads.MAX_ZOOM}, ${Roads.NAME_SIZE_AT_MAX_ZOOM}],
+            "symbol-placement": "line",
+            "text-max-angle": ${Roads.NAME_MAX_ANGLE},
+            "text-allow-overlap": false,
+            "text-padding": 4
+          },
+          "paint": {
+            "text-color": "${Roads.NAME_COLOUR}",
+            "text-halo-color": "${Roads.NAME_HALO_COLOUR}",
+            "text-halo-width": ${Roads.NAME_HALO_WIDTH}
           }
         }
     """.trimIndent()

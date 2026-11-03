@@ -148,6 +148,7 @@ fun MapScreen(
     val yourPlaceCounts by viewModel.yourPlaceCounts.collectAsStateWithLifecycle()
     val yourTracksGeoJson by viewModel.yourTracksGeoJson.collectAsStateWithLifecycle()
     val placeNames by viewModel.placeNames.collectAsStateWithLifecycle()
+    val roads by viewModel.roads.collectAsStateWithLifecycle()
     val docPick by viewModel.docPick.collectAsStateWithLifecycle()
     val docAlerts by viewModel.pickedDocAlerts.collectAsStateWithLifecycle()
     val places by viewModel.assets.collectAsStateWithLifecycle()
@@ -245,6 +246,9 @@ fun MapScreen(
                 // they read the map on, and "which town is that" is asked here rather than on a
                 // screen that is about one place.
                 placeNames = placeNames,
+                // The roads, asked for in the same sheet: the gold line is what says a grey ribbon
+                // in a paddock is a road, and which road it is.
+                roads = roads,
                 // The trail, under everything including DOC's material: a national route is the ground
                 // the rest of the map is read against, and it is the app's own feature rather than
                 // anything the walker has to find and import.
@@ -475,6 +479,8 @@ fun MapScreen(
             yourPlaceCounts = yourPlaceCounts,
             placeNames = placeNames,
             onPlaceNames = viewModel::setPlaceNames,
+            roads = roads,
+            onRoads = viewModel::setRoads,
             teAraroa = teAraroa,
             onTeAraroa = viewModel::setTeAraroa,
             otherTracks = otherTracks,
@@ -520,6 +526,8 @@ private fun LayersSheet(
     yourPlaceCounts: YourPlaceCounts,
     placeNames: Boolean,
     onPlaceNames: (show: Boolean) -> Unit,
+    roads: Boolean,
+    onRoads: (show: Boolean) -> Unit,
     teAraroa: Boolean,
     onTeAraroa: (show: Boolean) -> Unit,
     otherTracks: Boolean,
@@ -613,6 +621,19 @@ private fun LayersSheet(
                     title = "Place names",
                     checked = placeNames,
                     onToggle = onPlaceNames
+                )
+                LayerDivider()
+                LayerSwitchRow(
+                    icon = {
+                        GlyphTile(
+                            glyph = IconGlyph.ROAD,
+                            background = MaterialTheme.colorScheme.tertiaryContainer,
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    },
+                    title = "Roads",
+                    checked = roads,
+                    onToggle = onRoads
                 )
                 LayerDivider()
                 LayerSwitchRow(

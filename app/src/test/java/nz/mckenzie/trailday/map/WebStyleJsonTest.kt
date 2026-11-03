@@ -11,6 +11,7 @@ import nz.mckenzie.trailday.domain.look.MapLook
 import nz.mckenzie.trailday.domain.look.MarkerSizeChoice
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
+import nz.mckenzie.trailday.domain.tiles.Roads
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -38,6 +39,16 @@ class WebStyleJsonTest {
         Json.parseToJsonElement(WebStyleJson.build(Basemap.LINZ_AERIAL, tiles, assets, namesUrl))
             .jsonObject
 
+    private val styleWithRoads: JsonObject =
+        Json.parseToJsonElement(
+            WebStyleJson.build(Basemap.LINZ_AERIAL, tiles, assets, roadsUrl = namesUrl)
+        ).jsonObject
+
+    private val styleWithBoth: JsonObject =
+        Json.parseToJsonElement(
+            WebStyleJson.build(Basemap.LINZ_AERIAL, tiles, assets, namesUrl, namesUrl)
+        ).jsonObject
+
     private fun layerIds(): List<String> =
         style["layers"]!!.jsonArray.map { it.jsonObject["id"]!!.jsonPrimitive.content }
 
@@ -48,6 +59,12 @@ class WebStyleJsonTest {
         style["layers"]!!.jsonArray.first { it.jsonObject["id"]!!.jsonPrimitive.content == id }.jsonObject
 
     private fun paint(id: String): JsonObject = layer(id)["paint"]!!.jsonObject
+
+    private fun layerIn(style: JsonObject, id: String): JsonObject =
+        style["layers"]!!.jsonArray.first { it.jsonObject["id"]!!.jsonPrimitive.content == id }.jsonObject
+
+    private fun paintIn(style: JsonObject, id: String): JsonObject =
+        layerIn(style, id)["paint"]!!.jsonObject
 
     @Test
     fun `the work is drawn in the app's own layers, in the app's own order`() {
@@ -507,5 +524,83 @@ class WebStyleJsonTest {
             emptyList<String>(),
             StyleExpressions.problems(styleWithNames.toString())
         )
+        assertEquals(
+            "and the style with the roads on it",
+            emptyList<String>(),
+            StyleExpressions.problems(styleWithRoads.toString())
+        )
+    }
+
+    @Test
+    fun `the desk draws the roads when the phone's switch is on, and not before`() {
+        assertTrue(
+            "nothing is drawn for a switch nobody has thrown",
+            style.toString().indexOf(Roads.HIGHWAY.id) < 0
+        )
+        Roads.LINES.forEach { line ->
+            assertTrue("${line.id} is drawn", layerIdsOf(styleWithRoads).contains(line.id))
+            assertTrue(
+                "${line.id} asks LINZ's streets for them",
+                layerIn(styleWithRoads, line.id)["source-layer"]!!.jsonPrimitive.content == Roads.SOURCE_LAYER
+            )
+        }
+        assertTrue(
+            "a road's name is drawn too",
+            layerIdsOf(styleWithRoads).contains("roads-name")
+        )
+        assertEquals("a road is LINZ's own colour", Roads.COLOUR, paintIn(styleWithRoads, Roads.HIGHWAY.id)["line-color"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `the roads and the names are one source on the desk, so a tile is fetched once`() {
+        // Both come out of the same vector tiles - see Roads - so a page that draws both must not
+        // declare the source twice, or ask for every tile twice.
+        val vectors = styleWithRoads["sources"]!!.jsonObject.keys.filter { it == PlaceLabels.ID }
+        assertEquals(listOf(PlaceLabels.ID), vectors)
+        assertEquals(
+            "and one address, not two",
+            1,
+            Regex("\"type\":\"vector\"").findAll(styleWithBoth.toString()).count()
+        )
+    }
+
+    @Test
+    fun `a road is drawn under the place names, and over the photograph`() {
+        val ids = layerIdsOf(styleWithBoth)
+        assertTrue(
+            "over the imagery: $ids",
+            ids.indexOf(Roads.HIGHWAY.id) > ids.indexOf(Basemap.LINZ_AERIAL.id)
+        )
+        assertTrue(
+            "and under a town name: $ids",
+            ids.indexOf(Roads.HIGHWAY.id) < ids.indexOf(PlaceLabels.TOWNS.id)
+        )
+    }
+
+    @Test
+    fun `a road's edge is drawn under it, and only the lines with an edge have one`() {
+        val casing = layerIn(styleWithRoads, "${Roads.HIGHWAY.id}-casing")
+        val line = layerIn(styleWithRoads, Roads.HIGHWAY.id)
+        assertEquals(
+            "the edge is the dark grey",
+            Roads.CASING_COLOUR,
+            casing["paint"]!!.jsonObject["line-color"]!!.jsonPrimitive.content
+        )
+        assertEquals(
+            "the road is the gold",
+            Roads.COLOUR,
+            line["paint"]!!.jsonObject["line-color"]!!.jsonPrimitive.content
+        )
+        assertTrue(
+            "and every edge is drawn before any line, so one road passes under another cleanly",
+            layerIdsOf(styleWithRoads).indexOf("${Roads.TRACK.id}") >
+                layerIdsOf(styleWithRoads).indexOf("${Roads.UNMETALLED.id}-casing")
+        )
+        assertNull(
+            "a track has no edge: it is not a road",
+            styleWithRoads["layers"]!!.jsonArray.map { it.jsonObject["id"]!!.jsonPrimitive.content }
+                .firstOrNull { it == "${Roads.TRACK.id}-casing" }
+        )
     }
 }
+

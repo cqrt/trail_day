@@ -970,6 +970,20 @@ class MapViewModel(
     }
 
     /**
+     * Whether LINZ's roads are drawn over the imagery - see
+     * [nz.mckenzie.trailday.domain.tiles.Roads].
+     *
+     * Eagerly and for the same reason as the names: the map's first draw is built from this, and a
+     * style that grows its roads a moment later would flash the photograph twice.
+     */
+    val roads: StateFlow<Boolean> = settingsRepository.roads
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setRoads(shown: Boolean) {
+        viewModelScope.launch { settingsRepository.setRoads(shown) }
+    }
+
+    /**
      * Whether the Te Araroa trail is drawn - the map's own "Te Araroa trail" switch.
      *
      * Eagerly, like the basemap: a switch read after the first draw would show a map with no trail on it

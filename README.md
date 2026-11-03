@@ -33,7 +33,7 @@ You can switch between four:
 
 None of them need an API key. The LINZ maps go through a small Cloudflare Worker (`worker-linz/`) that holds the LINZ key, so the key never ends up in the app. LINZ keys expire every 90 days, and this way renewing one is a quick change on the Worker rather than a new app release. If you do have your own LINZ key, tap the version number in Settings seven times to unlock Developer options and enter it there ([details](docs/developer-options.md)).
 
-You can also switch on LINZ place names (towns, peaks, lakes, rivers) over the aerial imagery from the layers sheet on the map. They're off by default ([details](docs/place-names.md)).
+Over the aerial imagery you can also switch on **Roads** (LINZ's road network, in their own gold, with road names written along them) and **Place names** (towns, peaks, lakes, rivers). Both are off by default, and both come from the same LINZ tiles ([details](docs/roads.md), [place names](docs/place-names.md)).
 
 If the LINZ imagery fails to load, the app tells you why (for example, the key was rejected or the service can't be reached) and offers a one-tap switch to OpenStreetMap, rather than just showing a blank map.
 
@@ -47,7 +47,7 @@ There's no Save. The sample and the map change as you tap, and **Back to how it 
 
 The Offline tab is where you download things. There are four separate downloads:
 
-1. **Aerial imagery**: tap two opposite corners on the map to draw a box, drag the corners to adjust, choose how far in and out to zoom, and give it a name. You're shown the tile count before you start.
+1. **Aerial imagery**: tap two opposite corners on the map to draw a box, drag the corners to adjust, choose how far in and out to zoom, and give it a name. You're shown the tile count before you start, and the download brings the roads and their names with the photographs.
 2. **Topographic map**: the same, for the LINZ topo map.
 3. **DOC data**: pick a region and the app downloads all of DOC's tracks, huts, campsites and bike trails in it, with their photos.
 4. **Other tracks**: pick a region and it downloads the council, trust and club tracks inside it.

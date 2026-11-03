@@ -90,6 +90,11 @@ class WebEditorDocuments(
      * is asked for on every page load and the walker may have changed their mind in between.
      */
     private val placeNames: suspend () -> Boolean = { false },
+    /**
+     * Whether the desk should draw LINZ's roads - the phone's own "Roads" switch, read at the same
+     * moment and for the same reason: the walker may have changed their mind since the run began.
+     */
+    private val roads: suspend () -> Boolean = { false },
     /** One file of the page, from the APK's own assets, or null when it ships no such file. */
     private val readPageFile: (String) -> ByteArray?,
     /**
@@ -641,6 +646,10 @@ class WebEditorDocuments(
             // The names, when the phone has them switched on - from this phone, so the page never
             // reaches LINZ and an area already looked at keeps its names on the desk with no network.
             placeNamesUrl = if (placeNames()) {
+                "http://$authority/tiles/${PlaceLabels.ID}/{z}/{x}/{y}" +
+                    "${PlaceLabels.TILE_SUFFIX}$tokenQuery"
+            } else null,
+            roadsUrl = if (roads()) {
                 "http://$authority/tiles/${PlaceLabels.ID}/{z}/{x}/{y}" +
                     "${PlaceLabels.TILE_SUFFIX}$tokenQuery"
             } else null,

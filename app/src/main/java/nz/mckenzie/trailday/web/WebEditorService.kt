@@ -203,6 +203,9 @@ class WebEditorService : Service() {
             // The map's own switch, read when the desk asks for its style: a walker who turns the
             // names on and reloads the page gets them, without the run being rebuilt.
             placeNames = { settings.placeNames.first() },
+            // The roads, the same way and for the same reason: the walker's own switch, read when
+            // the style is asked for rather than fixed when the run was built.
+            roads = { settings.roads.first() },
             readPageFile = ::readPageFile,
             // The tracks downloaded for offline use, so the desk's browser falls back to them when
             // DOC cannot be reached - the same cache the offline screen fills.
