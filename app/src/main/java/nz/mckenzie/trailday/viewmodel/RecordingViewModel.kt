@@ -41,7 +41,13 @@ import nz.mckenzie.trailday.domain.geo.DriftWord
 import nz.mckenzie.trailday.domain.geo.FollowPoint
 import nz.mckenzie.trailday.domain.geo.FollowProgress
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.other.EmptyOtherTracksCache
+import nz.mckenzie.trailday.domain.other.OtherTrack
+import nz.mckenzie.trailday.domain.other.OtherTracksCache
+import nz.mckenzie.trailday.domain.other.distanceM
+import nz.mckenzie.trailday.domain.reference.ChooserChoice
 import nz.mckenzie.trailday.domain.reference.Followable
+import nz.mckenzie.trailday.domain.reference.chooserChoices
 import nz.mckenzie.trailday.domain.geo.RecordingBreak
 import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
 import nz.mckenzie.trailday.domain.journey.JourneyTrack
@@ -57,6 +63,7 @@ import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.AssetStretch
 import nz.mckenzie.trailday.offline.OfflineDocStore
+import nz.mckenzie.trailday.offline.OfflineOtherTrackStore
 import nz.mckenzie.trailday.tracking.DevicePosition
 import nz.mckenzie.trailday.tracking.FusedLocationSource
 import nz.mckenzie.trailday.tracking.LocationPermission
@@ -101,6 +108,11 @@ class RecordingViewModel(
      * can follow a line of DOC's as readily as one of their own - and with no reception.
      */
     private val docStore: DocCache = EmptyDocCache,
+    /**
+     * The tracks councils and trusts publish, kept on the phone: the chooser's other list, read the same
+     * way and for the same reason as [docStore] - a line is followed where the reception happened to end.
+     */
+    private val otherStore: OtherTracksCache = EmptyOtherTracksCache,
     /**
      * The place the page that opened the recorder is about, if any: a track's own page offers "Record this",
      * and arriving at the recorder with the target already chosen is the whole point of that button.
@@ -570,11 +582,32 @@ class RecordingViewModel(
             val bikes = runCatching { docStore.cached(DocSource.BIKES) }.getOrDefault(emptyList())
             _docTracks.value = kept
             _docBikeLinks.value = DocBikeLinks.of(kept, bikes)
-            // The last fix the phone knows about, if no new one has arrived: a chooser that offered nothing
-            // because the phone happens to be standing still would look like a phone that had kept nothing.
-            if (_lastKnown.value == null) {
-                _lastKnown.value = runCatching { locationSource.currentLocation() }.getOrNull()
-            }
+            rememberFix()
+        }
+    }
+
+    /**
+     * Reads both published lists for the sheet: DOC's sections, and the tracks councils and trusts publish.
+     *
+     * Called when the sheet opens rather than at every visit to the screen. [refreshDocTracks] is what the
+     * init needs on its own - the hand-over between DOC's sections is DOC's business - and the other
+     * publisher's tracks are read here because nothing else on this screen asks for them.
+     */
+    fun refreshTracksToFollow() {
+        refreshDocTracks()
+        viewModelScope.launch {
+            _otherTracks.value = runCatching { otherStore.cached() }.getOrDefault(emptyList())
+            rememberFix()
+        }
+    }
+
+    /**
+     * The last fix the phone knows about, asked for when no new one has arrived: a chooser that offered
+     * nothing because the phone happens to be standing still would look like a phone that had kept nothing.
+     */
+    private suspend fun rememberFix() {
+        if (_lastKnown.value == null) {
+            _lastKnown.value = runCatching { locationSource.currentLocation() }.getOrNull()
         }
     }
 
@@ -590,11 +623,13 @@ class RecordingViewModel(
     /** The bike points DOC published on those tracks, paired for the chooser's badge. */
     private val _docBikeLinks = MutableStateFlow(DocBikeLinks.EMPTY)
 
-    private val _docQuery = MutableStateFlow("")
+    private val _otherTracks = MutableStateFlow<List<OtherTrack>>(emptyList())
+
+    private val _trackQuery = MutableStateFlow("")
 
     /** What the walker is typing into the chooser's search, or blank for what is nearby. */
-    fun setDocQuery(value: String) {
-        _docQuery.value = value
+    fun setTrackQuery(value: String) {
+        _trackQuery.value = value
     }
 
     /**
@@ -603,21 +638,25 @@ class RecordingViewModel(
      * know where it is rather than said as zero.
      */
     val docChoices: StateFlow<List<DocChoice>> =
-        combine(_docTracks, _docBikeLinks, _docQuery, fix) { tracks, links, query, position ->
-            val words = query.trim()
+        combine(_docTracks, _docBikeLinks, _trackQuery, fix) { tracks, links, query, position ->
             tracks
-                .mapNotNull { item ->
-                    val distance = position?.let { DocHitTest.distanceTo(item, it) }
-                    val named = words.isEmpty() || item.name.contains(words, ignoreCase = true)
-                    val near = distance != null && distance <= DOC_NEARBY_M
-                    if (named && (words.isNotEmpty() || near)) {
-                        DocChoice(item, distance, links.bikeFor(item))
-                    } else {
-                        null
-                    }
-                }
-                .sortedBy { it.distanceM ?: Double.MAX_VALUE }
-                .take(DOC_CHOICES)
+                .chooserChoices(query, { item -> position?.let { DocHitTest.distanceTo(item, it) } }, DocItem::name)
+                .map { choice -> DocChoice(choice.item, choice.distanceM, links.bikeFor(choice.item)) }
+        }
+            .flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
+    /**
+     * What the chooser offers of the tracks councils and trusts publish: the nearby few, and name matches.
+     *
+     * **The rows the map draws and no others**, because they are what the sheet has: a downloaded area is
+     * what the phone holds, and offering a line it cannot draw would be offering a track it cannot show.
+     * It also makes the two ways of choosing agree - a track tapped on the map can be found here by name,
+     * and a track found here is one the map can already draw.
+     */
+    val otherChoices: StateFlow<List<ChooserChoice<OtherTrack>>> =
+        combine(_otherTracks, _trackQuery, fix) { tracks, query, position ->
+            tracks.chooserChoices(query, { track -> position?.let { track.distanceM(it) } }, OtherTrack::name)
         }
             .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
@@ -627,6 +666,11 @@ class RecordingViewModel(
 
     /** Whether any of DOC's tracks are kept at all, so the chooser can say which kind of nothing it is. */
     val docTracksHeld: StateFlow<Boolean> = _docTracks
+        .map { it.isNotEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
+
+    /** The same answer about the other publisher's tracks, for the same sentence. */
+    val otherTracksHeld: StateFlow<Boolean> = _otherTracks
         .map { it.isNotEmpty() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
 
@@ -926,11 +970,6 @@ class RecordingViewModel(
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L
 
-        /** How far around the phone the chooser looks for DOC's tracks: ten kilometres, five of them. */
-        private const val DOC_NEARBY_M = 10_000.0
-
-        /** How many of DOC's lines the chooser offers at once. */
-        private const val DOC_CHOICES = 5
         private const val RECORDING_ID = -2L
 
         fun factory(context: Context, initialTargetId: Long? = null): ViewModelProvider.Factory {
@@ -949,6 +988,8 @@ class RecordingViewModel(
                             dao = database.offlineDocItemDao(),
                             downloader = DocDownloader.online()
                         ),
+                        // And the other publisher's, from what the map draws.
+                        otherStore = OfflineOtherTrackStore(dao = database.offlineOtherTrackDao()),
                         initialTargetId = initialTargetId
                     )
                 }

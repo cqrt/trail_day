@@ -75,6 +75,7 @@ import nz.mckenzie.trailday.ui.docBikeLine
 import nz.mckenzie.trailday.ui.docRowDetail
 import nz.mckenzie.trailday.ui.formatEstimate
 import nz.mckenzie.trailday.ui.formatLengthOf
+import nz.mckenzie.trailday.ui.otherTrackRowDetail
 import nz.mckenzie.trailday.viewmodel.PendingFollow
 import nz.mckenzie.trailday.viewmodel.RecordingViewModel
 
@@ -126,13 +127,15 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
     // The kind of recording being set up: following a line, or a new line of the walker's own. Not held
     // while a pass is being driven - by then it is a fact, not a choice.
     var followingMode by rememberSaveable { mutableStateOf(false) }
-    var docQuery by rememberSaveable { mutableStateOf("") }
+    var trackQuery by rememberSaveable { mutableStateOf("") }
     val docChoices by viewModel.docChoices.collectAsStateWithLifecycle()
     val docTracksHeld by viewModel.docTracksHeld.collectAsStateWithLifecycle()
+    val otherChoices by viewModel.otherChoices.collectAsStateWithLifecycle()
+    val otherTracksHeld by viewModel.otherTracksHeld.collectAsStateWithLifecycle()
 
-    // DOC's lines are read when the chooser opens, not on every visit to the screen.
+    // The lines are read when the chooser opens, not on every visit to the screen.
     LaunchedEffect(pickingTrack) {
-        if (pickingTrack) viewModel.refreshDocTracks()
+        if (pickingTrack) viewModel.refreshTracksToFollow()
     }
 
     // A line asked for somewhere else - the map's card, the places list: the recorder takes it as the line to
@@ -311,10 +314,10 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                 }
 
                 SearchField(
-                    value = docQuery,
+                    value = trackQuery,
                     onValueChange = {
-                        docQuery = it
-                        viewModel.setDocQuery(it)
+                        trackQuery = it
+                        viewModel.setTrackQuery(it)
                     },
                     placeholder = "Find a track",
                     modifier = Modifier.padding(horizontal = 24.dp)
@@ -322,18 +325,12 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
 
                 // The rows scroll inside a window of their own rather than running off the bottom of the
                 // sheet: a season is dozens of places, and the sheet's content does not scroll by itself.
-                // Your places first, then DOC's, because the walker's own work comes first.
+                // Your places first, then the published lines - DOC's, then the tracks councils and trusts
+                // publish - because the walker's own work comes first.
                 LazyColumn(modifier = Modifier.heightIn(max = PICKER_LIST_MAX_HEIGHT)) {
                     item { GroupLabel("Your tracks and places") }
                     if (recordingTargets.isEmpty()) {
-                        item {
-                            Text(
-                                text = "No track or place to follow yet",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
-                            )
-                        }
+                        item { EmptyChooserRow("No track or place to follow yet") }
                     }
                     itemsIndexed(recordingTargets, key = { _, item -> item.id }) { _, item ->
                         ListItem(
@@ -358,11 +355,14 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                     item { GroupLabel("DOC's tracks near you") }
                     if (docChoices.isEmpty()) {
                         item {
-                            Text(
-                                text = if (docTracksHeld) "Nothing nearby" else "Nothing from DOC kept yet",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                            EmptyChooserRow(
+                                // Which kind of nothing it is: nothing kept, nothing that answers the search,
+                                // or nothing close enough to walk to.
+                                text = when {
+                                    !docTracksHeld -> "Nothing from DOC kept yet"
+                                    trackQuery.isNotBlank() -> "Nothing matches"
+                                    else -> "Nothing nearby"
+                                }
                             )
                         }
                     }
@@ -388,6 +388,39 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                             // Whose line it is, in one word: nothing here is renamed or deleted.
                             trailingContent = {
                                 Text("DOC", style = MaterialTheme.typography.labelSmall)
+                            }
+                        )
+                    }
+
+                    item { GroupLabel("Other tracks near you") }
+                    if (otherChoices.isEmpty()) {
+                        item {
+                            EmptyChooserRow(
+                                text = when {
+                                    !otherTracksHeld -> "No other tracks downloaded yet"
+                                    trackQuery.isNotBlank() -> "Nothing matches"
+                                    else -> "Nothing nearby"
+                                }
+                            )
+                        }
+                    }
+                    items(otherChoices, key = { it.item.globalId }) { choice ->
+                        ListItem(
+                            modifier = Modifier.clickable {
+                                viewModel.selectDoc(choice.item)
+                                followingMode = true
+                                pickingTrack = false
+                            },
+                            headlineContent = { Text(choice.item.name) },
+                            // The publisher is in this line rather than a word at the end, as it is on
+                            // every other row of these tracks: a council's name is too long to trail.
+                            supportingContent = {
+                                Text(
+                                    listOfNotNull(
+                                        otherTrackRowDetail(choice.item).takeIf { it.isNotEmpty() },
+                                        choice.distanceM?.let { "${formatDistance(it)} away" }
+                                    ).joinToString(" \u00b7 ")
+                                )
                             }
                         )
                     }
@@ -486,7 +519,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
     }
 }
 
-/** A heading over a group of rows in the chooser: your places, DOC's tracks. */
+/** A heading over a group of rows in the chooser: your places, DOC's tracks, other tracks. */
 @Composable
 private fun GroupLabel(text: String) {
     Text(
@@ -495,6 +528,17 @@ private fun GroupLabel(text: String) {
         letterSpacing = 1.1.sp,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 2.dp)
+    )
+}
+
+/** The line under a group that has no rows, in the same quiet voice as the rows it stands in for. */
+@Composable
+private fun EmptyChooserRow(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
     )
 }
 

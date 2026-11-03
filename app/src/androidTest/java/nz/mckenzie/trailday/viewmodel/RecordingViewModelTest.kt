@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.viewmodel
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
 import nz.mckenzie.trailday.tracking.LocationSource
 
 import android.content.Context
@@ -21,6 +22,9 @@ import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.METRES_PER_DEG_LNG_AT_EQUATOR
 import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
+import nz.mckenzie.trailday.domain.other.EmptyOtherTracksCache
+import nz.mckenzie.trailday.domain.other.OtherTrack
+import nz.mckenzie.trailday.domain.other.OtherTracksCache
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.tracking.TrackingState
@@ -74,12 +78,13 @@ class RecordingViewModelTest {
         // whichever test happens to be running blamed for it.
     }
 
-    private fun viewModel() = RecordingViewModel(
+    private fun viewModel(otherStore: OtherTracksCache = EmptyOtherTracksCache) = RecordingViewModel(
         recordings = recordings,
         assetRepository = assetRepository,
         settingsRepository = SettingsRepository(context),
         context = context,
-        locationSource = NoFixLocation
+        locationSource = NoFixLocation,
+        otherStore = otherStore
     )
 
     /** A phone that offers no fix: this suite is about recording, not about framing. */
@@ -513,6 +518,45 @@ class RecordingViewModelTest {
         assertNull("and nothing has been saved", viewModel.finished.value)
         assertEquals("with the card still saying what it was saying", told, viewModel.message.value)
         assertNull("and the session still open in the database", recordings.getSession(sessionId)!!.endedAtEpochMs)
+    }
+
+    /**
+     * The tracks councils and trusts publish are choosable from the recorder, not only from the map.
+     *
+     * The sheet used to offer the walker's own places and DOC's lines and nothing else, so one of the
+     * tracks the map draws could be followed by tapping it there and was absent from the chooser beside
+     * it. Found by name, because the phone this suite runs on offers no fix to measure "nearby" from.
+     */
+    @Test
+    fun theChooserOffersAnotherPublishersTrackByName() = runBlocking {
+        val southern = OtherTrack(
+            globalId = "6f1c2b8e-0000-4000-8000-000000000001",
+            name = "Southern Walkway",
+            paths = listOf(line)
+        )
+        val viewModel = viewModel(otherStore = OneTrackHeld(southern))
+        viewModel.refreshTracksToFollow()
+        viewModel.setTrackQuery("southern")
+
+        val offered = withTimeout(5_000) { viewModel.otherChoices.first { it.isNotEmpty() } }
+
+        assertEquals("Southern Walkway", offered.single().item.name)
+        assertEquals("with no distance, rather than a zero", null, offered.single().distanceM)
+
+        viewModel.selectDoc(offered.single().item)
+
+        assertEquals(
+            "and following it makes it the line the pass is measured against",
+            "Southern Walkway",
+            withTimeout(5_000) { viewModel.selectedTrackName.first { it != null } }
+        )
+    }
+
+    /** A phone holding one track somebody else publishes, for the chooser's third list. */
+    private class OneTrackHeld(private val track: OtherTrack) : OtherTracksCache {
+        override suspend fun cached(): List<OtherTrack> = listOf(track)
+        override suspend fun count(): Int = 1
+        override fun observeCount(): Flow<Int> = flowOf(1)
     }
 
     /**
