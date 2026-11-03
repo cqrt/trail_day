@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.offline
 
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
+import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.domain.tiles.TileMath
 import kotlin.math.max
 import kotlin.math.min
@@ -43,10 +44,27 @@ data class OfflineAreaDraft(
     val tileCount: Long
         get() = bounds?.let { TileMath.tileCount(it, minZoom, maxZoom) } ?: 0L
 
+    /**
+     * The vector tiles the imagery pack lays over its photograph: the roads and the place names.
+     *
+     * Counted here rather than left to the download so the walker is told the size of the whole box
+     * rather than the size of the pictures in it. Capped where LINZ stops publishing these tiles,
+     * which is the same cap the download uses - see [OfflineAreaManager.PackPass.zoomCap] - because a
+     * box of zoom 18 imagery needs no more vectors than a box of 15.
+     */
+    val vectorTileCount: Long
+        get() = bounds?.let {
+            TileMath.tileCount(it, minOf(minZoom, VECTOR_MAX_ZOOM), minOf(maxZoom, VECTOR_MAX_ZOOM))
+        } ?: 0L
+
     val estimatedBytes: Long
         get() = bounds?.let { TileMath.estimateBytes(it, minZoom, maxZoom) } ?: 0L
 
     val estimatedSizeLabel: String get() = formatBytes(estimatedBytes)
+
+    /** The vectors over the photograph, at the same rough size per tile the imagery is counted at. */
+    val estimatedVectorLabel: String
+        get() = formatBytes(vectorTileCount * TileMath.DEFAULT_TILE_BYTES)
 
     /** Past this the manager refuses the plan, so say so while the sliders move. */
     val isTooBig: Boolean get() = tileCount > OfflineAreaManager.MAX_TILES_PER_AREA
@@ -100,5 +118,9 @@ data class OfflineAreaDraft(
 
         const val DEFAULT_MIN_ZOOM = OfflineAreaPlan.DEFAULT_MIN_ZOOM
         const val DEFAULT_MAX_ZOOM = OfflineAreaPlan.DEFAULT_MAX_ZOOM
+
+        /** Where LINZ stops publishing the vector tiles, and so where an area's vectors stop. */
+        private val VECTOR_MAX_ZOOM = PlaceLabels.MAX_ZOOM
     }
 }
+

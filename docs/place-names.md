@@ -66,9 +66,9 @@ The names go through the phone's own tile server, the same as the imagery: fetch
 past, kept, and served from there afterwards. So anywhere you have looked at keeps its names with no
 reception, and anywhere you have not has none.
 
-They are kept in the cache directory, not in the app's files: they are what the map picked up on its way
-past, so they are not in a backup and Android may reclaim them. Folding them into the imagery download,
-so a downloaded area keeps its names too, is an obvious next step and is not done yet.
+They're kept in the app's own files, not in the cache. They began in the cache, when nothing but the
+map's own browsing filled them; a downloaded imagery box now fetches them on purpose, so they have to
+survive a phone reclaiming its cache ([details](roads.md#offline)).
 
 ## The credit
 
@@ -83,6 +83,6 @@ publisher was a third more strip for something you had already read.
 | `domain/tiles/PlaceLabels.kt` | The tileset, the layer, the six bands and their numbers |
 | `map/BasemapStyles.kt` | The phone's style: one symbol layer per band |
 | `map/WebStyleJson.kt` | The desktop page's style, built from the same numbers |
-| `offline/TileServerHolder.kt` | The source in the tile server, cached rather than downloaded |
+| `offline/TileServerHolder.kt` | The source in the tile server, kept in the app's own files |
 | `data/SettingsRepository.kt` | `place_names`, off when unset |
 | `ui/screens/MapScreen.kt` | The row in **What the map draws** |

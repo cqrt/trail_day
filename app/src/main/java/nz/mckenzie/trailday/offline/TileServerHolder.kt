@@ -35,6 +35,14 @@ object TileServerHolder {
     const val CACHE_DIR_PREFIX = "tiles-cache-"
 
     /**
+     * Where LINZ's vector tiles go: the roads and the place names, which are one tileset.
+     *
+     * A directory of its own rather than inside `tiles/`, so the imagery and the drawing of what is
+     * on it can be cleared apart. In the app's own files for the reason [TOPOGRAPHY_DIR] gives.
+     */
+    const val VECTORS_DIR = "vectors"
+
+    /**
      * The hidden source behind the LiDAR hillshade.
      *
      * It is not a basemap a walker picks; it is the elevation the desk shades when the chosen
@@ -204,16 +212,19 @@ object TileServerHolder {
     )
 
     /**
-     * Where the place names are kept: a cache of what has been looked at.
+     * Where the place names and the roads are kept: the app's own files, because a download keeps them.
      *
-     * The cache directory rather than the app's own files, and the difference is the one
-     * [store] draws for the drawn map: nothing here is downloaded on purpose yet, so it is not a
-     * thing to carry in a backup or to keep under storage pressure - it is what the map picked up on
-     * its way past. Anywhere the walker has looked at, the names are there for good; anywhere they
-     * have not, they arrive as they look at it.
+     * It began in the cache directory, when nothing but the map's own browsing filled it and the
+     * honest description was "what the map picked up on its way past". That is no longer true: a
+     * downloaded imagery box now fetches these tiles on purpose, so they have to survive a phone
+     * reclaiming its cache - otherwise a box kept for a week in the hills comes back with its
+     * photograph and no roads on it.
+     *
+     * The same reasoning as the elevation beside a downloaded Topographic area. The tiles are small -
+     * about 21 KB at zoom 14 and 130 KB at 15, and nothing is published deeper than 15.
      */
     fun labelsStore(context: Context): OfflineTileStore = OfflineTileStore(
-        File(context.applicationContext.cacheDir, "$CACHE_DIR_PREFIX${PlaceLabels.ID}"),
+        File(context.applicationContext.filesDir, VECTORS_DIR),
         PlaceLabels.TILE_SUFFIX
     )
 

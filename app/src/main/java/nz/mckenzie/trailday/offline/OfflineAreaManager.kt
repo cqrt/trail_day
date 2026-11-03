@@ -7,6 +7,8 @@ import nz.mckenzie.trailday.data.db.OfflineAreaDao
 import nz.mckenzie.trailday.data.db.OfflineAreaEntity
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
+import nz.mckenzie.trailday.domain.tiles.PlaceLabels
+import nz.mckenzie.trailday.domain.tiles.TileMath
 
 /**
  * A downloaded offline area, as the screen shows it: **one named box a walker chose, with a size and a
@@ -70,9 +72,36 @@ data class PackPass(
     val store: OfflineTileStore,
     /** What this pass is, in the walker's words, when a pack has more than one. */
     val phase: String? = null,
+    /**
+     * The deepest zoom this pass is worth fetching, or null for the whole of the area's range.
+     *
+     * The vector tiles stop at [PlaceLabels.MAX_ZOOM] - LINZ publishes them no deeper - while the
+     * imagery goes on to 22. Past the cap the map overzooms the deepest tile it has, so fetching the
+     * same parents over and over under new numbers would be a box of duplicates.
+     */
+    val zoomCap: Int? = null,
     /** Built per download rather than held, so a download always starts from a fresh client. */
     val fetcherFor: () -> TileFetcher
-)
+) {
+
+    /**
+     * The zoom range this pass actually fetches for an area, out of the area's own range.
+     *
+     * A cap above the area's deepest zoom changes nothing, and an area that starts deeper than the cap
+     * - a box of z17 imagery, say - still needs the deepest tiles that exist, because that is what the
+     * map overzooms. So both ends are brought down to the cap rather than the pass being skipped.
+     */
+    fun zoomsFor(minZoom: Int, maxZoom: Int): Pair<Int, Int> {
+        val cap = zoomCap ?: return minZoom to maxZoom
+        return minOf(minZoom, cap) to minOf(maxZoom, cap)
+    }
+
+    /** This pass's tiles for one area: the zoom range above, over that area's box. */
+    fun tilesFor(bounds: LatLngBounds, minZoom: Int, maxZoom: Int): List<TileRef> {
+        val (from, to) = zoomsFor(minZoom, maxZoom)
+        return plannedTiles(bounds, from, to)
+    }
+}
 
 /**
  * Downloads and records offline areas **for one pack.**
@@ -126,7 +155,13 @@ class OfflineAreaManager(
      * it had finished.
      */
     suspend fun createArea(plan: OfflineAreaPlan): OfflineArea {
-        val planned = plan.tileCount * passes.size
+        // Every pass's tiles, each pass under its own zoom cap: a pass that stops at 15 covers far
+        // fewer tiles than the imagery beside it, and counting it as if it covered the same range
+        // would make a big area look too large to save.
+        val planned = passes.sumOf { pass ->
+            val (from, to) = pass.zoomsFor(plan.minZoom, plan.maxZoom)
+            TileMath.tileCount(plan.bounds, from, to)
+        }
         require(planned <= MAX_TILES_PER_AREA) {
             "That area needs $planned tiles, more than the $MAX_TILES_PER_AREA limit. " +
                 "Narrow the zoom range or the area."
@@ -166,7 +201,8 @@ class OfflineAreaManager(
         try {
             passes.forEach { pass ->
                 val downloader = TileDownloader(store = pass.store, fetcher = pass.fetcherFor())
-                val progress = downloader.download(bounds, row.minZoom, row.maxZoom) { current ->
+                val (from, to) = pass.zoomsFor(row.minZoom, row.maxZoom)
+                val progress = downloader.download(bounds, from, to) { current ->
                     // What a walker watching this reads: one sentence, the same one the offline screen and
                     // the notification show, and per pass - a single bar across two passes would appear to
                     // go backwards when the second one started.
@@ -228,13 +264,16 @@ class OfflineAreaManager(
      */
     suspend fun deleteArea(areaId: Long): Int {
         val row = dao.getById(areaId) ?: return 0
-        val mine = plannedTiles(row.bounds(), row.minZoom, row.maxZoom)
-        val others = dao.byPack(pack.id)
-            .filter { it.id != areaId }
-            .flatMap { plannedTiles(it.bounds(), it.minZoom, it.maxZoom) }
+        val mine = row.bounds()
+        val others = dao.byPack(pack.id).filter { it.id != areaId }
 
-        val removed = tilesToFree(mine, others).sumOf { tile ->
-            passes.count { pass -> pass.store.delete(tile.zoom, tile.x, tile.y) }
+        // Per pass, because the passes do not cover the same tiles: the vectors stop where LINZ's
+        // publishing does while the imagery goes deeper, so subtracting one shared plan would leave
+        // vector tiles behind for ever, or take an imagery tile another area still describes.
+        val removed = passes.sumOf { pass ->
+            val keep = others.flatMap { pass.tilesFor(it.bounds(), it.minZoom, it.maxZoom) }
+            tilesToFree(pass.tilesFor(mine, row.minZoom, row.maxZoom), keep)
+                .count { pass.store.delete(it.zoom, it.x, it.y) }
         }
         dao.delete(areaId)
         return removed
@@ -268,7 +307,26 @@ class OfflineAreaManager(
         const val HEIGHTS_PHASE = "the heights"
 
         /**
-         * The imagery pack: LINZ's aerial tiles, into the store an offline area is downloaded into.
+         * The imagery pack's second pass, as the live sentence names it.
+         *
+         * Not "the names": this pass brings the roads too, and the sentence is what a walker reads
+         * while waiting.
+         */
+        const val VECTORS_PHASE = "the roads and names"
+
+        /**
+         * The imagery pack: LINZ's aerial tiles, then the vector tiles that draw over them.
+         *
+         * **Two passes, and the second one is a choice worth stating.** A photograph of a road says
+         * nothing, so a downloaded box of imagery used to be a box with no idea where the roads went,
+         * even though the walker could have written that down. The same vector tiles carry the roads
+         * and the place names both - see [nz.mckenzie.trailday.domain.tiles.Roads] and
+         * [PlaceLabels] - so one pass brings both, at the zooms LINZ publishes them to, into the store
+         * the app's own tile server serves them from.
+         *
+         * It is fetched whether or not the walker has the two switches on: a box whose roads depended
+         * on a switch flipped on the day it was downloaded would be a box that quietly holds less than
+         * its neighbour, and there is no way to tell the two apart afterwards.
          */
         fun imagery(context: Context, dao: OfflineAreaDao): OfflineAreaManager = OfflineAreaManager(
             pack = OfflinePack.IMAGERY,
@@ -276,6 +334,19 @@ class OfflineAreaManager(
                 PackPass(
                     store = TileServerHolder.imageryStore(context),
                     fetcherFor = { LinzTileFetcher() }
+                ),
+                PackPass(
+                    store = TileServerHolder.labelsStore(context),
+                    phase = VECTORS_PHASE,
+                    zoomCap = PlaceLabels.MAX_ZOOM,
+                    fetcherFor = {
+                        // A vector tile, asked for as one: the endpoint answers protobuf, and a
+                        // request that says image/webp gets bytes the renderer cannot read.
+                        LinzTileFetcher(
+                            urlFor = { zoom, x, y -> PlaceLabels.tileUrl(zoom, x, y) },
+                            accept = "application/x-protobuf"
+                        )
+                    }
                 )
             ),
             dao = dao

@@ -283,9 +283,19 @@ fun OfflineAreaPickerScreen(
 
                         Text(
                             text = if (draft.isComplete) {
-                                "${draft.tileCount} ${if (topography) "map" else "aerial"} tiles, " +
-                                    "roughly ${draft.estimatedSizeLabel} " +
-                                    "· zoom ${draft.minZoom} to ${draft.maxZoom}"
+                                // The imagery pack fetches the roads and names over its photograph as
+                                // well, so its box is counted as both - a walker told "roughly 18 MB"
+                                // and handed 24 is a walker who stops trusting the number.
+                                if (topography) {
+                                    "${draft.tileCount} map tiles, roughly ${draft.estimatedSizeLabel} " +
+                                        "· zoom ${draft.minZoom} to ${draft.maxZoom}"
+                                } else {
+                                    "${draft.tileCount} aerial tiles and " +
+                                        "${draft.vectorTileCount} of roads and names, " +
+                                        "roughly ${draft.estimatedSizeLabel} plus " +
+                                        "${draft.estimatedVectorLabel} " +
+                                        "· zoom ${draft.minZoom} to ${draft.maxZoom}"
+                                }
                             } else {
                                 "Tap two corners to see how many tiles that is."
                             },
