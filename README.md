@@ -80,6 +80,8 @@ If a track came from a file with elevation data, its page shows the height range
 
 ## Following a track
 
+On the Record tab, Follow a track opens a list of what you can follow: your own tracks and places, DOC's tracks near you, and the council, trust and club tracks near you. The search box looks through all of them by name, however far away the line is. The two published lists come from what you've downloaded, so the list and the search work with no reception.
+
 When you're following a track, the app shows how far off the line you are, how far along you've got, how much is left, and roughly how long that will take. The time estimate uses Naismith's rule (5 km/h plus an hour for every 600 m climbed when walking, and 12 km/h plus an hour per 450 m climbed when riding). It only counts climbing, not descent, and always rounds up, so treat it as a rough guide rather than a promise.
 
 ## Recording
