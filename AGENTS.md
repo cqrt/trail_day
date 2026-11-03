@@ -19,7 +19,7 @@ from a blank page here — it starts from the last paragraph.
   "It shipped as 0.3.NN." One release, one paragraph, however many commits it took.
 - `README.md` is what the app does and how it is built and released.
 - `docs/*.md` is one file per feature that needed more than a paragraph: `doc-tracks.md`,
-  `place-names.md`, `elevation.md`, `side-tracks.md`, `te-araroa.md`, `developer-options.md`,
+  `place-names.md`, `roads.md`, `elevation.md`, `side-tracks.md`, `te-araroa.md`, `developer-options.md`,
   `web-editor.md`. They describe the app as it is now, in the same plain voice as `README.md`: short
   sentences, "you", and no history - the history is `trail-day-plan.md`.
 - **A paragraph that says "It shipped as 0.3.NN" is a claim that a tag exists.** Check.
@@ -154,6 +154,9 @@ than assuming it is a bug:
   phone serves its own.
 - The drawn Topographic map's size estimate uses the imagery's arithmetic (about 45 KB a tile) and
   reads high for vector tiles.
+- **Tracks are drawn over the imagery but not named.** LINZ's `streets` layer carries their names, and
+  they are not drawn: a track is a faint dashed line, and its name is the name that pushes a road's out
+  of the way. If track names are wanted, that is a decision, not a task.
 - The recording notification refreshes every five accepted fixes, so it sits at "0 m · 0 points" while
   the walker is standing still.
 - DOC's API publishes no description, access or facilities text, and scraping its pages was rejected.
