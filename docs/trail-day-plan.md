@@ -1218,4 +1218,8 @@ Measured on the emulator with the four rows of Kew Bush Walkway held in the cach
 
 **Measured on the emulator at 48 pixels**, in the app drawer and on Settings' App info screen, the figure reads as a person walking with a pack, and the pole stays visible as a separate line rather than merging into the arm.
 
-151 device tests ran with none failing, and the 1,047 unit tests, the desk's 92 JavaScript tests and lint are green. It shipped as 0.4.32.
+151 device tests ran with none failing, and the 1,047 unit tests, the desk's 92 JavaScript tests and lint are green. It shipped as 0.4.32.**The 1.06 filled the icon, and the mockup that chose it was the wrong shape.** A launcher shows only the middle 72 of the 108-unit layer, so the 18-to-90 band that Android calls the safe area is the edge of the icon, not a margin inside it. At 1.06 the walker stood from 20 to 89, which is 95 per cent of the circle: measured on the drawer, a circle 159 pixels across held a figure 151 pixels tall. Nothing was cut off, which is why it passed the mask check - there was simply no slate left around it. A mockup drawn in the full 108 square flatters a mark by about a third of the room the phone actually gives it.
+
+**The figure is drawn at 0.76 about the middle now, lifted a unit and a half**, and the strokes are back to the widths the mark was drawn with. It stands from 30 to 79, with about twelve units of slate all round, and measures 107 pixels in that same 159 pixel circle - 67 per cent of the height instead of 95. Every icon mockup from here on crops to the middle 72 and masks to a circle, because the whole square is a picture the walker never sees.
+
+151 device tests ran with none failing, and the 1,047 unit tests, the desk's 92 JavaScript tests and lint are green. It shipped as 0.4.33.
