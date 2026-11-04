@@ -2,6 +2,7 @@ package nz.mckenzie.trailday.domain.reference
 
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import nz.mckenzie.trailday.domain.look.LookTarget
 import nz.mckenzie.trailday.domain.other.OtherTrack
 import nz.mckenzie.trailday.domain.other.OtherTracksCache
 import org.junit.Assert.assertEquals
@@ -38,6 +39,20 @@ class FollowedLineTest {
     fun `a trip that followed no published line has nothing to say here`() {
         assertNull(followedLineWords(null))
         assertNull(followedLineWords(null, "Environment Southland Regional Council"))
+    }
+
+    @Test
+    fun `the row a followed line is painted by is read from the same prefix`() {
+        assertEquals(
+            "DOC's tracks are drawn among the walker's own",
+            LookTarget.TRACKS,
+            followedLookTarget("doc-tracks:35237557")
+        )
+        assertEquals(
+            "and somebody else's wears the row kept for them",
+            LookTarget.OTHER_TRACKS,
+            followedLookTarget("other:6c6bfda6-d011-4afa-b453-405029c47bfb")
+        )
     }
 
     @Test

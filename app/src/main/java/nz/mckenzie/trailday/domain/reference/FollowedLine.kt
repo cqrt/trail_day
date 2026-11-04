@@ -1,5 +1,6 @@
 package nz.mckenzie.trailday.domain.reference
 
+import nz.mckenzie.trailday.domain.look.LookTarget
 import nz.mckenzie.trailday.domain.other.OTHER_TRACK_REF_PREFIX
 import nz.mckenzie.trailday.domain.other.OtherTracksCache
 
@@ -23,6 +24,17 @@ fun followedLineWords(ref: String?, publisher: String? = null): String? = when {
     publisher != null -> "Following a track from $publisher"
     else -> "Following another publisher's track"
 }
+
+/**
+ * Which row of the look screen paints a line being followed, read from its reference for the same reason
+ * [followedLineWords] reads who published it that way: the prefix is the whole of the difference.
+ *
+ * DOC's tracks are drawn among the walker's own - that is what every map does with DOC's material - and a
+ * track from the national dataset wears the Other tracks colour, which is the row the walker sets to keep
+ * somebody else's line apart from DOC's.
+ */
+fun followedLookTarget(ref: String): LookTarget =
+    if (ref.startsWith(OTHER_TRACK_REF_PREFIX)) LookTarget.OTHER_TRACKS else LookTarget.TRACKS
 
 /**
  * The service's own key for the dataset's row a reference points at, or null when it points at somebody

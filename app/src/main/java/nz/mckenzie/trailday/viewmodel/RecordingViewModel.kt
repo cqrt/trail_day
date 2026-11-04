@@ -48,6 +48,7 @@ import nz.mckenzie.trailday.domain.other.distanceM
 import nz.mckenzie.trailday.domain.reference.ChooserChoice
 import nz.mckenzie.trailday.domain.reference.Followable
 import nz.mckenzie.trailday.domain.reference.chooserChoices
+import nz.mckenzie.trailday.domain.reference.followedLookTarget
 import nz.mckenzie.trailday.domain.geo.RecordingBreak
 import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
 import nz.mckenzie.trailday.domain.journey.SectionHandOver
@@ -55,12 +56,14 @@ import nz.mckenzie.trailday.domain.geo.splitAtBreaks
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.domain.recording.recordingSourceRef
 import nz.mckenzie.trailday.domain.look.Look
+import nz.mckenzie.trailday.domain.look.LookTarget
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.AssetStretch
+import nz.mckenzie.trailday.map.TargetGeoJson
 import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.offline.OfflineOtherTrackStore
 import nz.mckenzie.trailday.tracking.DevicePosition
@@ -304,36 +307,42 @@ class RecordingViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), PassSummary.EMPTY)
 
     /**
-     * The line being followed, drawn wide over the work while a pass is running against a chosen place.
+     * The line being followed, drawn wide over the work while a pass is running against a chosen target.
      *
-     * Its own kind's colour, as it has on every other map - what makes it bold is the width, because a
-     * followed bike track should still look like a bike track - and nothing at all when no place is
-     * chosen, which is most recordings.
+     * **Both kinds of target now, and that is the point of the change**: the walker's own place, and a
+     * line somebody published - one of DOC's tracks or a council's. It was only ever the first, so
+     * following a published track drew nothing, and the recorded line had no reference to be read
+     * against. Its own row's colour, as it has on every other map - what makes it bold is the width,
+     * because a followed bike track should still look like a bike track - and nothing at all when no
+     * target is chosen, which is most recordings. See [TargetGeoJson].
      */
-    val targetGeoJson: StateFlow<String> = combine(targetLine, assets, Look.current) { line, places, look ->
-        val place = places.firstOrNull { it.id == _selectedAssetId.value }
-        val isLine = place != null && AssetShape.fromStorage(place.shape) == AssetShape.LINE
-        if (!isLine || line.size < 2) {
-            AssetGeoJson.build(emptyList())
-        } else {
-            AssetGeoJson.build(
-                listOf(
-                    AssetLine(
-                        assetId = 0L,
-                        name = place.name,
-                        colorHex = look.colourOf(AssetKind.fromStorage(place.kind)).hex,
-                        points = line,
-                        kind = AssetKind.fromStorage(place.kind),
-                        shape = AssetShape.LINE
-                    )
+    val targetGeoJson: StateFlow<String> =
+        combine(targetLine, assets, _selectedDoc, Look.current) { line, places, doc, look ->
+            val place = places.firstOrNull { it.id == _selectedAssetId.value }
+            val isLine = place != null && AssetShape.fromStorage(place.shape) == AssetShape.LINE
+            when {
+                isLine -> TargetGeoJson.build(
+                    name = place.name,
+                    target = LookTarget.of(AssetKind.fromStorage(place.kind)),
+                    paths = listOf(line),
+                    kind = AssetKind.fromStorage(place.kind),
+                    look = look
                 )
-            )
-        }
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-        AssetGeoJson.build(emptyList())
-    )
+                // A published line, drawn as it was published rather than as the piece underfoot: the
+                // piece is what the readout measures, the whole track is what the walker is walking.
+                doc != null -> TargetGeoJson.build(
+                    name = doc.name,
+                    target = followedLookTarget(doc.ref),
+                    paths = doc.track.paths,
+                    look = look
+                )
+                else -> TargetGeoJson.empty()
+            }
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+            TargetGeoJson.empty()
+        )
 
     /** One pass as the card reads it, whether it is still being driven or has just been saved. */
     data class PassSummary(

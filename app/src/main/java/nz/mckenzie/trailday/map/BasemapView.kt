@@ -185,10 +185,10 @@ fun BasemapView(
     /** The bike points that belong to a track, drawn as a badge over the line. */
     docBikeBadgesGeoJson: String = AssetGeoJson.build(emptyList()),
     /**
-     * The line being followed, drawn wide over everything else - see [TARGET_SOURCE].
+     * The line being followed, drawn wide and under the recorded line - see [TARGET_SOURCE].
      *
-     * Empty when nothing is being followed, which is every map except the recorder's while a pass is
-     * running against a chosen place.
+     * Empty when nothing is being followed, which is every map except the recorder's once a track or a
+     * place has been chosen to follow.
      */
     targetGeoJson: String = AssetGeoJson.build(emptyList()),
     modifier: Modifier = Modifier,
@@ -1038,9 +1038,12 @@ internal fun MapLibreMap.loadTrailDayStyle(
         if (style.getSource(ASSETS_SOURCE) == null) {
             style.addSource(GeoJsonSource(ASSETS_SOURCE, assetGeoJson))
         }
-        // The line being followed, drawn **over** the walker's own work and wider than any of it: while a
-        // walk is being followed, that line is the thing the screen is about, and a track the same weight as
-        // every other track is not. Under the position marker, which is where the walker is against it.
+        // The line being followed, wider than any other line on the map and **under** the recorded one:
+        // while a walk is being followed, that line is the thing the screen is about, and a track the same
+        // weight as every other track is not. It goes under because the line actually walked is the
+        // evidence, and a wide line over it would bury the thing being judged - what the walker reads is
+        // the track ahead in its own colour, and their own line lying on it or drifting off it. Under the
+        // position marker too, which is where the walker is against it.
         if (style.getSource(TARGET_SOURCE) == null) {
             style.addSource(GeoJsonSource(TARGET_SOURCE, targetGeoJson))
         }
