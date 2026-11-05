@@ -123,15 +123,8 @@ object SectionHandOver {
      * Compared by its two ends rather than point by point: a hand-over turns a piece to start at the
      * junction, and the same ground is the same ground whichever end the walker set off from.
      */
-    private fun isTheLineWalked(piece: List<GeoPoint>, walked: List<GeoPoint>): Boolean {
-        if (piece.size != walked.size) return false
-        return (samePlace(piece.first(), walked.first()) && samePlace(piece.last(), walked.last())) ||
-            (samePlace(piece.first(), walked.last()) && samePlace(piece.last(), walked.first()))
-    }
-
-    /** The same vertex to within a metre - the precision a published line is worth. */
-    private fun samePlace(a: GeoPoint, b: GeoPoint): Boolean =
-        haversineMeters(a.lat, a.lng, b.lat, b.lng) < 1.0
+    private fun isTheLineWalked(piece: List<GeoPoint>, walked: List<GeoPoint>): Boolean =
+        isTheSamePiece(piece, walked)
 
     /**
      * A point [DIRECTION_SAMPLE_M] inside a path from the end asked about.
@@ -175,3 +168,27 @@ object SectionHandOver {
 
     private const val METRES_PER_DEGREE = 111_320.0
 }
+
+/**
+ * Whether two pieces are the same line of the ground, read either way round.
+ *
+ * **By its two ends rather than point by point.** A hand-over turns a piece to start at the junction, so
+ * the same published line is stored one way round in one rule and the other way round in the next; and a
+ * piece being walked is cut where the walker joined it, so its ends are not the published piece's ends at
+ * all - which is why a rule that has just switched into the middle of a line must not be handed back to
+ * the line it left by the same name.
+ *
+ * Shared by both hand-over rules: the one at the end of a section and the one in the middle of it. Two
+ * copies of "is this the same line" is how one of them comes to hand the walker back to the track they
+ * just left.
+ */
+internal fun isTheSamePiece(a: List<GeoPoint>, b: List<GeoPoint>): Boolean {
+    if (a.size != b.size) return false
+    if (a.isEmpty() || b.isEmpty()) return false
+    return (samePlace(a.first(), b.first()) && samePlace(a.last(), b.last())) ||
+        (samePlace(a.first(), b.last()) && samePlace(a.last(), b.first()))
+}
+
+/** The same vertex to within a metre - the precision a published line is worth. */
+private fun samePlace(a: GeoPoint, b: GeoPoint): Boolean =
+    haversineMeters(a.lat, a.lng, b.lat, b.lng) < 1.0
