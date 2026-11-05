@@ -38,38 +38,20 @@ data class FollowProgress(
         /**
          * Where [position] is against [line], or null when there is no line to be against.
          *
-         * The nearest point is taken over each segment and the distance measured to it, so a walker beside
-         * the middle of a long straight stretch is measured against that stretch rather than against
-         * whichever vertex happens to be nearest - which is what makes "how far off" honest on a track that
-         * is mostly long legs.
+         * **The distance along the line is [nearestOnPath]'s**, which is the same walk the recorder makes
+         * over every nearby line when it is looking for one the walker has wandered onto. The climbing is
+         * the only thing added here, because it is the only thing that costs a pass over every point and it
+         * is only ever asked of the line being followed.
          *
-         * **A walker past the end of the line is at the end of it**, 0 m to go and as far off as they are:
-         * the arithmetic clamps there rather than running off the end into a negative remainder.
+         * A walker past the end of the line is at the end of it: 0 m to go and as far off as they are.
          */
         fun of(line: List<GeoPoint>, position: GeoPoint): FollowProgress? {
-            if (line.size < 2) return null
-
-            var travelled = 0.0
-            var nearestOffM = Double.MAX_VALUE
-            var nearestAlongM = 0.0
-
-            for (index in 1 until line.size) {
-                val start = line[index - 1]
-                val end = line[index]
-                val nearest = nearestPointOnSegment(position, start, end)
-                val offM = haversineMeters(position.lat, position.lng, nearest.lat, nearest.lng)
-                if (offM < nearestOffM) {
-                    nearestOffM = offM
-                    nearestAlongM = travelled + haversineMeters(start.lat, start.lng, nearest.lat, nearest.lng)
-                }
-                travelled += haversineMeters(start.lat, start.lng, end.lat, end.lng)
-            }
-
+            val on = nearestOnPath(line, position) ?: return null
             return FollowProgress(
-                offM = nearestOffM,
-                alongM = nearestAlongM,
-                remainingM = (travelled - nearestAlongM).coerceAtLeast(0.0),
-                remainingClimbM = climbAfter(line, nearestAlongM)
+                offM = on.offM,
+                alongM = on.alongM,
+                remainingM = on.remainingM,
+                remainingClimbM = climbAfter(line, on.alongM)
             )
         }
 
