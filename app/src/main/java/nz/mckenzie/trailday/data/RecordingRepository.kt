@@ -10,6 +10,7 @@ import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.RecordingBreak
 import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
+import nz.mckenzie.trailday.domain.recording.DOC_REFS_SEPARATOR
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 
 /**
@@ -56,6 +57,7 @@ class RecordingRepository(private val db: TrailDayDatabase) {
             name = name,
             assetId = assetId,
             docRef = docRef,
+            docRefs = docRef,
             startedAtEpochMs = startedAtEpochMs,
             status = RecordingStatus.RECORDING.name
         )
@@ -86,9 +88,20 @@ class RecordingRepository(private val db: TrailDayDatabase) {
     suspend fun setSessionAsset(sessionId: Long, assetId: Long) =
         recordingDao.setSessionAsset(sessionId, assetId)
 
-    /** Remembers which published line a pass followed - or, with null, that it followed none. */
-    suspend fun setSessionDocRef(sessionId: Long, docRef: String?) =
-        recordingDao.setSessionDocRef(sessionId, docRef)
+    /**
+     * Remembers which published line a pass followed, or, with an empty list, that it followed none.
+     *
+     * The list is the whole of what a walk followed, in the order it followed it, and `docRef` is written
+     * as its last entry so everything that already reads one reference still reads the right one. Stored as
+     * a newline-separated string rather than a second table: the list is a handful of references at most,
+     * and it belongs to the session as much as its name does.
+     */
+    suspend fun setSessionDocRefs(sessionId: Long, refs: List<String>) =
+        recordingDao.setSessionDocRefs(
+            sessionId = sessionId,
+            docRef = refs.lastOrNull(),
+            docRefs = refs.takeIf { it.isNotEmpty() }?.joinToString(DOC_REFS_SEPARATOR)
+        )
 
     /** Renames a session, so the recordings list matches the track it became. */
     suspend fun renameSession(sessionId: Long, name: String) =

@@ -67,6 +67,20 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     private val webEditorEnabledPref = booleanPreferencesKey("web_editor_enabled")
     private val webEditorKeepAwakePref = booleanPreferencesKey("web_editor_keep_awake")
     private val updateChecksPref = booleanPreferencesKey("update_checks_enabled")
+
+    /**
+     * Whether the recorder hands over to the next track by itself - the **Hand-over** switch.
+     *
+     * **On when unset**, because the two rules behind it are what following a track in pieces already
+     * needs: a walkway the dataset cut into nine rows, and a DOC route published as separate sections,
+     * are both walked by the recorder taking up the next piece. A walker who updates has been doing that
+     * since 0.4.30 without asking for it, so this switch is there to stop it rather than to start it.
+     *
+     * Only an off is written, the way a hidden layer is: a phone that has never touched the card reads on
+     * from the same file with nothing in it. What is deliberately not here is the *record* of a hand-over
+     * having happened - that is on the session, not on the phone.
+     */
+    private val handOverPref = booleanPreferencesKey("hand_over")
     private val docPlacesDroppedPref = booleanPreferencesKey("doc_places_dropped")
     private val lastNotifiedUpdatePref = stringPreferencesKey("last_notified_update")
     private val backupDestinationPref = stringPreferencesKey("backup_destination")
@@ -437,8 +451,7 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
         context.settingsDataStore.edit { prefs -> prefs[docPlacesDroppedPref] = dropped }
     }
 
-    /**
-     * Whether the app should look for a newer version of itself.
+    /** Whether the app should look for a newer version of itself.
      *
      * On by default. This app is not installed from a store, so nothing else will ever
      * mention a new version - without this, the only way to find out would be to go and
@@ -450,6 +463,23 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
 
     suspend fun setUpdateChecksEnabled(enabled: Boolean) {
         context.settingsDataStore.edit { prefs -> prefs[updateChecksPref] = enabled }
+    }
+
+    /**
+     * Whether the recorder hands over to the next track by itself.
+     *
+     * Read by the recorder on every fix and by the Settings card that sets it, and by nothing else: a
+     * screen that reported anything other than this could disagree with what the recorder does.
+     */
+    val handOver: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[handOverPref] ?: true
+    }
+
+    /** Turns the hand-over off, or puts it back. An on is written as no value at all. */
+    suspend fun setHandOver(enabled: Boolean) {
+        context.settingsDataStore.edit { prefs ->
+            if (enabled) prefs.remove(handOverPref) else prefs[handOverPref] = false
+        }
     }
 
     /**

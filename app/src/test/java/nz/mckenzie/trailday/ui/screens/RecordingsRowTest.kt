@@ -1,5 +1,6 @@
 package nz.mckenzie.trailday.ui.screens
 
+import nz.mckenzie.trailday.domain.reference.FollowedRef
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.viewmodel.RecordingRow
 import org.junit.Assert.assertEquals
@@ -38,6 +39,7 @@ class RecordingsRowTest {
         assetName = assetName,
         docRef = docRef,
         publisher = publisher,
+        followed = docRef?.let { listOf(FollowedRef(it, publisher)) }.orEmpty(),
         imported = imported
     )
 

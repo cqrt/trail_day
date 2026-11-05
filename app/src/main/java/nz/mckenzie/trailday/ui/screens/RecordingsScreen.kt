@@ -274,7 +274,7 @@ internal fun recordingAsset(row: RecordingRow): String {
     row.assetName?.let { return "For $it" }
     // A published line never becomes a place, so a trip that followed one names whose line it was -
     // and which words those are is the reference's and the publisher's to say: see [followedLineWords].
-    followedLineWords(row.docRef, row.publisher)?.let { return it }
+    followedLineWords(row.followed)?.let { return it }
     // A walk that came in a file was not recorded against anything, so it says where it came from
     // rather than calling itself a new track - which is what a walk of the walker's own is.
     if (row.imported) return "Imported from a file"

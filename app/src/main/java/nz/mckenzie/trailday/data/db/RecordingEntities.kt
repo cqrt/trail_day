@@ -27,8 +27,21 @@ data class RecordedSessionEntity(
      *
      * A published line never becomes a place, so this is how the trip itself remembers what was followed.
      * Which publisher it was is read back off the prefix, in `followedLineWords`.
+     *
+     * The **last** line it followed, for a walk that followed more than one. [docRefs] is the list.
      */
     val docRef: String? = null,
+    /**
+     * Every published line this pass followed, in the order it followed them, newline separated.
+     *
+     * A walk that wanders onto a second track is still one activity, and its name is made of both - see
+     * `joinedWalkName`. Keeping only the last reference would leave the walk's own page claiming it followed
+     * one line, which for a walk that changed over halfway is a fact about the last half hour.
+     *
+     * Null on every row written before the column existed; the migration fills it from [docRef], so a walk
+     * already saved reads as a walk of one line.
+     */
+    val docRefs: String? = null,
     val startedAtEpochMs: Long,
     val endedAtEpochMs: Long? = null,
     /** [nz.mckenzie.trailday.domain.recording.RecordingStatus] name. */

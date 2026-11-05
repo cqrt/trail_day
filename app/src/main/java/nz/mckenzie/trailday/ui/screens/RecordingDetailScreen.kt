@@ -242,7 +242,7 @@ private fun subtitleOf(recording: RecordingDetail): String = listOfNotNull(
         "never finished"
     },
     recording.assetName?.let { "For $it" }
-        ?: followedLineWords(recording.docRef, recording.publisher)
+        ?: followedLineWords(recording.followed)
         ?: if (recording.imported) {
             "Imported from a file"
         } else if (recording.assetId != null) {

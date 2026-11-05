@@ -20,8 +20,10 @@ import nz.mckenzie.trailday.data.db.RecordedSessionEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.other.EmptyOtherTracksCache
 import nz.mckenzie.trailday.domain.other.OtherTracksCache
-import nz.mckenzie.trailday.domain.reference.followedPublisher
+import nz.mckenzie.trailday.domain.reference.FollowedRef
+import nz.mckenzie.trailday.domain.reference.followedPublishers
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
+import nz.mckenzie.trailday.domain.recording.followedRefs
 import nz.mckenzie.trailday.domain.track.ActivityDate
 import nz.mckenzie.trailday.domain.track.ActivityDates
 import nz.mckenzie.trailday.domain.track.FileTracks
@@ -63,6 +65,14 @@ data class RecordingRow(
      * downloaded: the activity names them rather than saying "another publisher".
      */
     val publisher: String? = null,
+    /**
+     * Every published line this walk followed, in the order it followed them, with whoever publishes each.
+     *
+     * A walk in pieces, or a walk that wandered onto a second track, followed more than one line, and the
+     * words under its name name all of them - see [nz.mckenzie.trailday.domain.reference.followedLineWords].
+     * [docRef] is the last of these, kept for the readers that predate the list.
+     */
+    val followed: List<FollowedRef> = emptyList(),
     /** Whether this activity was brought in from a file rather than walked with the phone. */
     val imported: Boolean = false
 ) {
@@ -100,7 +110,14 @@ class RecordingsViewModel(
             val names = assetList.associate { asset -> asset.id to asset.name }
             sessions.map { session -> session.toRow(names) }
         }.map { rows ->
-            rows.map { row -> row.copy(publisher = followedPublisher(row.docRef, otherTracks)) }
+            val refs = rows.flatMap { row -> row.followed }.map { it.ref }.distinct()
+            val publishers = refs.zip(followedPublishers(refs, otherTracks)).toMap()
+            rows.map { row ->
+                row.copy(
+                    followed = row.followed.map { FollowedRef(it.ref, publishers[it.ref]) },
+                    publisher = publishers[row.docRef]
+                )
+            }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     /**
@@ -367,5 +384,6 @@ internal fun RecordedSessionEntity.toRow(assetNames: Map<Long, String>) = Record
     assetId = assetId,
     assetName = assetId?.let { assetNames[it] },
     docRef = docRef,
+    followed = followedRefs(docRef, docRefs).map { FollowedRef(it) },
     imported = imported
 )

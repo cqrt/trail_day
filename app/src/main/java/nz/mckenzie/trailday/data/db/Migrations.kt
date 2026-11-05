@@ -301,3 +301,22 @@ internal val MIGRATION_11_12 = object : Migration(11, 12) {
         db.execSQL("ALTER TABLE recorded_sessions ADD COLUMN imported INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+/**
+ * Every published line a walk followed, rather than only the last one.
+ *
+ * **A walk is measured against one line at a time and remembered against however many it walked**, so the
+ * session keeps a list beside the one reference it kept before. `docRef` stays and stays meaningful - the
+ * last line it followed - because everything that already reads it reads a walk that followed one line,
+ * and a list of one is no different from the single value it replaces.
+ *
+ * The copies are what make this migration worth writing down: every walk already saved followed exactly one
+ * line, if any, so `docRef` is filled in as the list. A row that followed nothing stays null, which is the
+ * truth about it rather than a list of no lines.
+ */
+internal val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE recorded_sessions ADD COLUMN docRefs TEXT")
+        db.execSQL("UPDATE recorded_sessions SET docRefs = docRef WHERE docRef IS NOT NULL")
+    }
+}

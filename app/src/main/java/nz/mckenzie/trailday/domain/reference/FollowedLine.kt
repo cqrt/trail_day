@@ -5,24 +5,59 @@ import nz.mckenzie.trailday.domain.other.OTHER_TRACK_REF_PREFIX
 import nz.mckenzie.trailday.domain.other.OtherTracksCache
 
 /**
- * What a saved trip's reference says about the line it followed, in the words a walker reads.
+ * One published line a trip followed, and who published it when that is known.
  *
- * **A reference and nothing else is what a trip keeps of the line**, so the reference is the beginning of
- * what the wording can be decided from. Deciding it from "is there a reference at all?" was wrong: every
- * published line is remembered that way, so a walk of Kew Bush Walkway - a track from the national
- * dataset, nobody's in this app - read "Following a DOC track".
+ * A walk is measured against one line at a time, but it is remembered against however many it walked. The
+ * publisher is nullable for the reason [followedPublishers] says: it lives in the downloaded row, and a
+ * cache cleared on a monthly rebuild can take it away without taking away the walk.
+ */
+data class FollowedRef(val ref: String, val publisher: String? = null) {
+
+    /** Whether this is one of DOC's lines, which is what the reference's prefix says. */
+    val isDoc: Boolean get() = !ref.startsWith(OTHER_TRACK_REF_PREFIX)
+}
+
+/**
+ * What a saved trip's references say about the line, or the lines, it followed.
+ *
+ * **A reference and nothing else is what a trip keeps**, so the reference is the beginning of what the
+ * wording can be decided from. A walk that followed one track reads as it always has. A walk that followed
+ * two - one line at the end of a section, another when the ground forked - names **both publishers**:
+ * reading only the last one would be a line under the name of a walk that is quietly wrong about its first
+ * half.
  *
  * The reading is by prefix, because the prefix is what the publishers already use to keep their lines
  * apart. DOC is named by its own word; a track from the dataset is **named by whoever publishes it** when
- * [publisher] is known, and falls back to the plain sentence when it is not - which is honest, because the
- * cache holding that name can be cleared without costing anything but the download. Null is a trip that
- * followed no published line, which has its own words for what it was made for.
+ * the publisher is known, and falls back to "another publisher" when it is not - which is honest, because
+ * the cache holding that name can be cleared without costing anything but the download.
  */
-fun followedLineWords(ref: String?, publisher: String? = null): String? = when {
-    ref == null -> null
-    !ref.startsWith(OTHER_TRACK_REF_PREFIX) -> "Following a DOC track"
-    publisher != null -> "Following a track from $publisher"
-    else -> "Following another publisher's track"
+fun followedLineWords(followed: List<FollowedRef>): String? {
+    if (followed.isEmpty()) return null
+
+    if (followed.all { it.isDoc }) {
+        return if (followed.size == 1) "Following a DOC track" else "Following DOC tracks"
+    }
+
+    // Named once each, in the order they were walked: a walk that went DOC, council, DOC read its two
+    // publishers and not its three lines.
+    val publishers = LinkedHashSet<String>()
+    for (item in followed) {
+        publishers += if (item.isDoc) DOC_WORD else item.publisher ?: UNKNOWN_PUBLISHER
+    }
+
+    if (publishers.size == 1 && UNKNOWN_PUBLISHER in publishers) {
+        return if (followed.size == 1) {
+            "Following another publisher's track"
+        } else {
+            "Following other publishers' tracks"
+        }
+    }
+
+    return if (followed.size == 1) {
+        "Following a track from ${publishers.first()}"
+    } else {
+        "Following tracks from ${namedInWords(publishers.toList())}"
+    }
 }
 
 /**
@@ -44,14 +79,39 @@ fun otherTrackGlobalId(ref: String?): String? =
     ref?.takeIf { it.startsWith(OTHER_TRACK_REF_PREFIX) }?.removePrefix(OTHER_TRACK_REF_PREFIX)
 
 /**
- * Who publishes the track a trip followed, or null when the phone no longer holds that row.
+ * Who published each of the lines a trip followed, in the same order, or null where the phone no longer
+ * holds that row.
  *
  * The dataset's row is the only place the publisher is written down: a trip keeps its line's reference,
  * never a copy of somebody's facts. Read from the cache the walker downloaded rather than fetched, so this
  * answers with no reception, and answers null for a row a monthly rebuild has taken away - the words then
- * say "another publisher's track" rather than a name nobody checked.
+ * say "another publisher" rather than a name nobody checked.
+ *
+ * **The cache is read once for the whole list.** One call per reference is one parse of a thousand rows
+ * per reference, which a walk that changed track three times would pay three times over for the same
+ * answer.
  */
-suspend fun followedPublisher(ref: String?, cache: OtherTracksCache): String? {
-    val id = otherTrackGlobalId(ref) ?: return null
-    return runCatching { cache.find(id) }.getOrNull()?.suppliers?.firstOrNull()
+suspend fun followedPublishers(refs: List<String>, cache: OtherTracksCache): List<String?> {
+    if (refs.none { otherTrackGlobalId(it) != null }) return refs.map { null }
+    val held = runCatching { cache.cached() }.getOrNull().orEmpty().associateBy { it.globalId }
+    return refs.map { ref ->
+        otherTrackGlobalId(ref)?.let { id -> held[id]?.suppliers?.firstOrNull() }
+    }
+}
+
+/** The word a publisher of DOC's material is named by, when it is named beside others. */
+private const val DOC_WORD = "DOC"
+
+/** What is said of a line whose publisher the phone no longer holds. */
+private const val UNKNOWN_PUBLISHER = "another publisher"
+
+/**
+ * "A", "A and B", "A, B and C": the app's own English, without the comma before "and" that a list of three
+ * gets in American writing and does not here.
+ */
+private fun namedInWords(names: List<String>): String = when (names.size) {
+    0 -> UNKNOWN_PUBLISHER
+    1 -> names.first()
+    2 -> "${names[0]} and ${names[1]}"
+    else -> names.dropLast(1).joinToString(", ") + " and " + names.last()
 }

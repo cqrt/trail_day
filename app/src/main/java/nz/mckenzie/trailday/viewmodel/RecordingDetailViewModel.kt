@@ -22,8 +22,10 @@ import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
 import nz.mckenzie.trailday.domain.geo.splitAtBreaks
 import nz.mckenzie.trailday.domain.other.EmptyOtherTracksCache
 import nz.mckenzie.trailday.domain.other.OtherTracksCache
-import nz.mckenzie.trailday.domain.reference.followedPublisher
+import nz.mckenzie.trailday.domain.reference.FollowedRef
+import nz.mckenzie.trailday.domain.reference.followedPublishers
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
+import nz.mckenzie.trailday.domain.recording.followedRefs
 import nz.mckenzie.trailday.domain.recording.placeMadeByWalk
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.map.AssetColors
@@ -55,6 +57,8 @@ data class RecordingDetail(
      * row: the page names them rather than saying "another publisher".
      */
     val publisher: String? = null,
+    /** Every published line this walk followed, in the order it followed them: see [RecordingRow.followed]. */
+    val followed: List<FollowedRef> = emptyList(),
     /** Whether this walk came in a file rather than being recorded with the phone. */
     val imported: Boolean = false
 ) {
@@ -173,6 +177,11 @@ class RecordingDetailViewModel(
                 .getOrNull()
             _placeGoesToo.value = placeMadeByThisWalk != null
 
+            // Who published the lines this walk followed: one read of the cache for all of them, because a
+            // walk that changed track three times would otherwise parse the whole cache three times.
+            val refs = followedRefs(session.docRef, session.docRefs)
+            val publishers = followedPublishers(refs, otherTracks)
+
             _detail.value = RecordingDetail(
                 id = session.id,
                 name = session.name,
@@ -187,7 +196,8 @@ class RecordingDetailViewModel(
                 assetId = session.assetId,
                 assetName = assetName,
                 docRef = session.docRef,
-                publisher = followedPublisher(session.docRef, otherTracks),
+                publisher = publishers.lastOrNull(),
+                followed = refs.zip(publishers).map { (ref, publisher) -> FollowedRef(ref, publisher) },
                 imported = session.imported
             )
         }

@@ -6,6 +6,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import nz.mckenzie.trailday.domain.cache.FactsJson
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -265,6 +266,61 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun walksAlreadyKeptFollowedOneLineAndSaySo() {
+        // Version 12 kept one reference per walk, because the recorder could only ever be measured against
+        // one published line at a time. The list arrives with this build, and every walk already saved
+        // followed exactly one line - or none - so its one reference becomes a list of one. A walk that
+        // followed nothing keeps nothing, which is the truth about it rather than a list of no lines.
+        helper.createDatabase(TEST_DATABASE_FOLLOWED, 12).apply {
+            execSQL(
+                """
+                INSERT INTO recorded_sessions
+                    (id, name, assetId, docRef, startedAtEpochMs, endedAtEpochMs, status,
+                     distanceM, durationMs, pointCount, imported)
+                VALUES
+                    (1, 'Major Hornbrook Track', NULL, 'doc-tracks:35237557', 1790000000000,
+                     1790003600000, 'FINISHED', 2350.0, 3600000, 412, 0),
+                    (2, 'Home block 14 Sep', NULL, NULL, 1790000000000, 1790003600000, 'FINISHED',
+                     2350.0, 3600000, 412, 0)
+                """.trimIndent()
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(
+            TEST_DATABASE_FOLLOWED,
+            13,
+            true,
+            MIGRATION_12_13
+        )
+
+        migrated.query("SELECT name, docRef, docRefs FROM recorded_sessions ORDER BY id").use { rows ->
+            assertTrue(rows.moveToFirst())
+            assertEquals("the walk is still there", "Major Hornbrook Track", rows.getString(0))
+            assertEquals("its reference is untouched", "doc-tracks:35237557", rows.getString(1))
+            assertEquals("and it is now a walk of one line", "doc-tracks:35237557", rows.getString(2))
+
+            assertTrue(rows.moveToNext())
+            assertNull("a walk that followed nothing gained nothing", rows.getString(2))
+        }
+
+        // And a row written by this build can hold more than one, so the column is usable rather than
+        // merely present.
+        migrated.execSQL(
+            """
+            INSERT INTO recorded_sessions
+                (name, docRef, docRefs, startedAtEpochMs, status, distanceM, durationMs, pointCount, imported)
+            VALUES ('Two tracks', 'doc-tracks:2', 'doc-tracks:1' || char(10) || 'doc-tracks:2',
+                    1790000000000, 'FINISHED', 1240.0, 0, 1500, 0)
+            """.trimIndent()
+        )
+        migrated.query("SELECT COUNT(*) FROM recorded_sessions WHERE docRefs LIKE '%' || char(10) || '%'").use { rows ->
+            rows.moveToFirst()
+            assertEquals("a walk of two lines is kept as one", 1, rows.getInt(0))
+        }
+    }
+
     private companion object {
         /** Names of this test's own: the real database is never opened by a test. */
         const val TEST_DATABASE = "migration-test.db"
@@ -289,5 +345,8 @@ class MigrationTest {
 
         /** And a seventh, for the version 11 to 12 change. */
         const val TEST_DATABASE_RECORDINGS = "migration-test-recordings.db"
+
+        /** And an eighth, for the version 12 to 13 change. */
+        const val TEST_DATABASE_FOLLOWED = "migration-test-followed.db"
     }
 }
