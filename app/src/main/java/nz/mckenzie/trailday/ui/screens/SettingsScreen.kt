@@ -96,6 +96,7 @@ fun SettingsScreen(
     val webEditorUrl by viewModel.webEditorUrl.collectAsStateWithLifecycle()
     val webEditorTokenRequired by viewModel.webEditorTokenRequired.collectAsStateWithLifecycle()
     val webEditorKeepAwake by viewModel.webEditorKeepAwake.collectAsStateWithLifecycle()
+    val handOver by viewModel.handOver.collectAsStateWithLifecycle()
     val storedTiles by viewModel.storedTiles.collectAsStateWithLifecycle()
     val dataMessage by viewModel.dataMessage.collectAsStateWithLifecycle()
     val dataBusy by viewModel.dataBusy.collectAsStateWithLifecycle()
@@ -287,6 +288,39 @@ fun SettingsScreen(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                }
+            }
+
+            // The recorder taking up the next track by itself. **Two rules behind one switch**: at the end
+            // of a section it is walking, and in the middle of one when the ground the walker is on leaves
+            // the line. They are one idea to the walker and only the app knows they are two, so the card
+            // asks the question once - and off means neither runs, leaving the chooser to do what it did
+            // before the first of them existed.
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Hand-over", style = MaterialTheme.typography.titleMedium)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Follow the next track",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(checked = handOver, onCheckedChange = viewModel::setHandOver)
+                    }
+
+                    Text(
+                        "At the end of a track, or when you walk onto another.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 

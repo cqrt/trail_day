@@ -51,9 +51,16 @@ import nz.mckenzie.trailday.domain.reference.chooserChoices
 import nz.mckenzie.trailday.domain.reference.followedLookTarget
 import nz.mckenzie.trailday.domain.geo.RecordingBreak
 import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
+import nz.mckenzie.trailday.domain.journey.BoxedLine
+import nz.mckenzie.trailday.domain.journey.JoiningTrack
+import nz.mckenzie.trailday.domain.journey.LINES_NEARBY_M
 import nz.mckenzie.trailday.domain.journey.SectionHandOver
+import nz.mckenzie.trailday.domain.journey.boxed
+import nz.mckenzie.trailday.domain.journey.joinedWalkName
+import nz.mckenzie.trailday.domain.journey.near
 import nz.mckenzie.trailday.domain.geo.splitAtBreaks
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
+import nz.mckenzie.trailday.domain.recording.followedRefs
 import nz.mckenzie.trailday.domain.recording.recordingSourceRef
 import nz.mckenzie.trailday.domain.look.Look
 import nz.mckenzie.trailday.domain.look.LookTarget
@@ -103,7 +110,7 @@ data class DocTarget(val track: Followable, val points: List<GeoPoint>) {
 class RecordingViewModel(
     private val recordings: RecordingRepository,
     private val assetRepository: AssetRepository,
-    settingsRepository: SettingsRepository,
+    private val settingsRepository: SettingsRepository,
     private val context: Context,
     /**
      * Where the phone is, for the first frame. Recording is driving a thing you are
@@ -130,6 +137,16 @@ class RecordingViewModel(
     /** Which map to draw the pass on: the walker's choice in Settings. */
     val basemap: StateFlow<Basemap> = settingsRepository.basemap
         .stateIn(viewModelScope, SharingStarted.Eagerly, Basemap.DEFAULT)
+
+    /**
+     * Whether the recorder takes up the next track by itself - the **Hand-over** switch in Settings.
+     *
+     * Read eagerly rather than while it is watched: the rule below asks it on every fix, and a preference
+     * that was only collected while a screen showed it would answer `true` for ever on a screen that never
+     * asked, which is the switch quietly not working.
+     */
+    val handOver: StateFlow<Boolean> = settingsRepository.handOver
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     val tracking: StateFlow<TrackingState.State> = TrackingState.state
 
@@ -165,6 +182,47 @@ class RecordingViewModel(
 
     /** The line those two distances are about, so a new target starts them again. */
     private var handOverLine: List<GeoPoint> = emptyList()
+
+    /**
+     * The rule that carries on to a line the walker has wandered onto, in the middle of a section.
+     *
+     * Held rather than made per fix because it remembers which line is being considered and how far along
+     * it the walker has come - which is the whole of how a line walked is told from a line crossed.
+     */
+    private val joining = JoiningTrack()
+
+    /**
+     * Every published line the phone holds, boxed, so a fix does not measure a thousand of them.
+     *
+     * Rebuilt when the lists are read and when the target changes - see [rememberLinesNearby].
+     */
+    private var linesNearby: List<BoxedLine> = emptyList()
+
+    /**
+     * The published lines this pass has followed, in the order it followed them, each once.
+     *
+     * The name a walk is saved under is made of these, and the words under its row say who published them.
+     * The database has its own copy: this one is what the recorder writes as it walks.
+     */
+    private val walkRefs = mutableListOf<String>()
+
+    /**
+     * What the hand-over just did, and the way back to the line it left - or null when it has done nothing.
+     *
+     * A switch the walker did not ask for should be something they can undo without finding the chooser,
+     * so this is a state rather than a message: the card draws it, with one tap that puts the line back.
+     */
+    private val _switched = MutableStateFlow<SwitchedBack?>(null)
+    val switched: StateFlow<SwitchedBack?> = _switched
+
+    /** One hand-over: what the walker is following now, and the piece they left. */
+    data class SwitchedBack(
+        val toName: String,
+        val from: Followable,
+        val fromLine: List<GeoPoint>,
+        /** How far the pass had walked when it happened, so the offer knows when it has gone stale. */
+        val walkedAtSwitchM: Double
+    )
 
     init {
         viewModelScope.launch {
@@ -499,6 +557,13 @@ class RecordingViewModel(
             val status = runCatching { RecordingStatus.valueOf(unfinished.status) }
                 .getOrDefault(RecordingStatus.RECORDING)
             TrackingState.setStatus(status)
+
+            // What the walk had followed before the app was killed. The line itself does not come back -
+            // that is a separate gap, and was true before this - but the list does, so the walk is still
+            // named after every track it walked and its row still says who published them.
+            walkRefs.clear()
+            walkRefs += followedRefs(unfinished.docRef, unfinished.docRefs)
+
             unfinished.assetId?.let { selectTrack(it) }
 
             // A foreground service does not survive a process kill, so a session
@@ -536,6 +601,11 @@ class RecordingViewModel(
         // one is not about this one.
         driftWord.reset()
         _drift.value = null
+        // A line chosen by hand is a decision of the walker's own, so an offer to go back to the line the
+        // recorder left is no longer the last thing that happened.
+        _switched.value = null
+        joining.reset()
+        rememberLinesNearby()
         // Choosing a place is the start of a new job, so the pass that was on the screen gives
         // way to the one being set up. Cancelling the choice - assetId null - is not: that is
         // the walker backing out of the picker, with the finished pass still the last thing
@@ -559,6 +629,9 @@ class RecordingViewModel(
      * the line changing hands.
      */
     fun selectDoc(item: Followable) {
+        // Chosen by hand, so an offer to go back to the line the recorder left is not the last word on
+        // what the walker is following.
+        _switched.value = null
         // The line to follow is the longest of the published paths, not whichever came first: a route with
         // a short spur in front of its own line would otherwise be followed along the spur.
         val line = item.paths
@@ -576,16 +649,48 @@ class RecordingViewModel(
         driftWord.reset()
         _drift.value = null
         _finished.value = null
+        // A new line to be measured against is a new set of distances for the join rule too.
+        joining.reset()
+        rememberLinesNearby()
+        // What the pass has been measured against, remembered in the order it happened: the walk is named
+        // after them, and the row under the name says whose lines they were.
+        rememberFollowed(item.sourceRef)
+    }
+
+    /**
+     * Remembers a published line this pass has followed, once.
+     *
+     * Once is the rule and not an optimisation: a walk that comes back to a track it has already followed
+     * has not started following a new one, and a name reading "A / B / A" is a name that says the app lost
+     * track of where the walker was.
+     */
+    private fun rememberFollowed(ref: String?) {
+        if (ref == null || walkRefs.contains(ref)) return
+        walkRefs += ref
+        persistWalkRefs()
+    }
+
+    /**
+     * Writes the list to the session, when there is one.
+     *
+     * Before a pass starts there is no row to write to, and [start] writes the whole list instead. Every
+     * write is the whole list rather than an append, so the row after a kill is the row the walker walked.
+     */
+    private fun persistWalkRefs() {
+        val sessionId = TrackingState.current.sessionId ?: return
+        val refs = walkRefs.toList()
+        if (refs.isEmpty()) return
         viewModelScope.launch {
-            TrackingState.current.sessionId?.let { sessionId ->
-                runCatching { recordings.setSessionDocRef(sessionId, item.sourceRef) }
-            }
+            runCatching { recordings.setSessionDocRefs(sessionId, refs) }
         }
     }
 
     /** Lets go of DOC's line: the walk is a new line of the walker's own again. */
     fun clearDoc() {
         _selectedDoc.value = null
+        _switched.value = null
+        joining.reset()
+        rememberLinesNearby()
     }
 
     /**
@@ -600,6 +705,7 @@ class RecordingViewModel(
             val bikes = runCatching { docStore.cached(DocSource.BIKES) }.getOrDefault(emptyList())
             _docTracks.value = kept
             _docBikeLinks.value = DocBikeLinks.of(kept, bikes)
+            rememberLinesNearby()
             rememberFix()
         }
     }
@@ -615,8 +721,25 @@ class RecordingViewModel(
         refreshDocTracks()
         viewModelScope.launch {
             _otherTracks.value = runCatching { otherStore.cached() }.getOrDefault(emptyList())
+            rememberLinesNearby()
             rememberFix()
         }
+    }
+
+    /**
+     * Boxes every line the recorder may switch onto, so a fix measures a handful instead of a thousand.
+     *
+     * Built here rather than per fix because it is the same country every time: the target's own track,
+     * DOC's list and the other publisher's, which is what both hand-over rules are allowed to move onto.
+     * Rebuilt when a list is read and when the target changes.
+     */
+    private fun rememberLinesNearby() {
+        val target = _selectedDoc.value?.track
+        linesNearby = buildList {
+            if (target != null) add(target)
+            addAll(_docTracks.value)
+            addAll(_otherTracks.value)
+        }.boxed()
     }
 
     /**
@@ -702,6 +825,13 @@ class RecordingViewModel(
         _finished.value = null
         driftWord.reset()
         _drift.value = null
+        _switched.value = null
+        // The walk begins measured against whatever line was chosen for it, and against nothing the last
+        // walk followed: a name made of last week's tracks would be a name about the wrong walk.
+        walkRefs.clear()
+        _selectedDoc.value?.let { walkRefs += it.ref }
+        joining.reset()
+
         viewModelScope.launch {
             _message.value = null
             val sessionId = recordings.startRecording(
@@ -710,6 +840,9 @@ class RecordingViewModel(
                 docRef = _selectedDoc.value?.ref
             )
             TrackingState.begin(sessionId, System.currentTimeMillis())
+            if (walkRefs.isNotEmpty()) {
+                runCatching { recordings.setSessionDocRefs(sessionId, walkRefs.toList()) }
+            }
             TrackingService.start(context, sessionId)
         }
     }
@@ -814,6 +947,9 @@ class RecordingViewModel(
             _finished.value = null
             _selectedAssetId.value = null
             _selectedDoc.value = null
+            _switched.value = null
+            walkRefs.clear()
+            joining.reset()
             _message.value = failure?.let { it.message ?: "Could not discard the recording" }
                 ?: "Recording discarded"
         }
@@ -883,11 +1019,14 @@ class RecordingViewModel(
             // walker typed, and a trip made for an existing place takes that
             // place's name and the date. Neither asks a question - a dialog on the
             // common path is friction for an answer the app already has.
+            //
+            // A walk that followed published tracks is named after **all of them**, in the order it walked
+            // them, because the last one alone would be a title about the last half hour. One line reads
+            // exactly as it always has.
             val sessionName = when {
                 newTrackName != null -> newTrackName
-                // A line of DOC's already has a name; the trip takes it and the day, and makes no place.
-                _selectedDoc.value != null ->
-                    "${_selectedDoc.value!!.name} \u2013 ${formatShortDate(sessionStart)}"
+                walkRefs.isNotEmpty() ->
+                    joinedWalkName(walkRefs.mapNotNull { nameOfFollowed(it) }, formatShortDate(sessionStart))
                 recordingName != null -> "$recordingName · ${formatShortDate(sessionStart)}"
                 else -> null
             }
@@ -916,8 +1055,23 @@ class RecordingViewModel(
             )
             _selectedAssetId.value = null
             _selectedDoc.value = null
+            _switched.value = null
+            walkRefs.clear()
+            joining.reset()
         }
     }
+
+    /**
+     * What a followed line is called, read from the lists the recorder already holds.
+     *
+     * Resolved when the walk is saved rather than copied when it was followed: a trip keeps its line's
+     * reference, never a copy of somebody's facts. The target is asked first, because a line chosen on the
+     * map or on its own page need not be in either list.
+     */
+    private fun nameOfFollowed(ref: String): String? =
+        _selectedDoc.value?.takeIf { it.ref == ref }?.name
+            ?: _docTracks.value.firstOrNull { it.sourceRef == ref }?.name
+            ?: _otherTracks.value.firstOrNull { it.sourceRef == ref }?.name
 
     private fun sessionIdOrNull(): Long? = TrackingState.current.sessionId
 
@@ -933,12 +1087,17 @@ class RecordingViewModel(
     }
 
     /**
-     * **Carrying on to the next section without the walker touching the phone.**
+     * **Carrying on to the next track without the walker touching the phone.**
      *
      * Watched here rather than in the tracking service because this is where the follow readout already
      * lives: the same four numbers that say how much is left are what say the section's end has been
      * reached. It sits at the foot of the class on purpose - every state flow it reads has to be built
      * before this runs, and property initialisers run in the order they are written.
+     *
+     * **Two ways to carry on, and one switch over both.** At the end of the section being walked - which
+     * is [SectionHandOver], and has been since 0.4.30 - and in the middle of it, when the ground the walker
+     * is on leaves the line they are following, which is [JoiningTrack]. They cannot both answer: being at
+     * a section's end is being nothing off it, which is not what arms the second rule.
      *
      * **Either publisher's line will do, and so will the next piece of the same track.** A junction does
      * not care who published the row on the far side of it, and a walkway the dataset cut into nine rows
@@ -953,6 +1112,18 @@ class RecordingViewModel(
                     furthestFromStartM = 0.0
                     furthestFromEndM = 0.0
                 }
+
+                // The switch is read on every fix rather than when the screen opens: turned off mid-walk,
+                // it takes effect on the next one, and an offer to go back to a line the recorder left is
+                // no longer something the recorder is entitled to be holding.
+                if (!handOver.value) {
+                    joining.reset()
+                    _switched.value = null
+                    return@collect
+                }
+
+                offerHasLapsed()
+
                 if (progress == null || line.size < 2) return@collect
                 furthestFromStartM = maxOf(furthestFromStartM, progress.alongM)
                 furthestFromEndM = maxOf(furthestFromEndM, progress.totalM - progress.alongM)
@@ -960,6 +1131,7 @@ class RecordingViewModel(
 
                 val target = _selectedDoc.value ?: return@collect
                 val position = here.value ?: return@collect
+
                 val next = SectionHandOver.next(
                     line = line,
                     at = position,
@@ -968,16 +1140,65 @@ class RecordingViewModel(
                     furthestFromEndM = furthestFromEndM,
                     candidates = linesToCarryOnOnto(target),
                     walked = line
+                )
+                if (next != null) {
+                    switchTo(next.track, next.line, from = target, fromLine = line)
+                    return@collect
+                }
+
+                // The middle of the section: the walker has left this line and is walking another one.
+                val join = joining.consider(
+                    followed = line,
+                    at = position,
+                    offFollowed = progress.offM,
+                    candidates = linesNearby.near(position, LINES_NEARBY_M)
                 ) ?: return@collect
 
-                followDoc(next.track, next.line)
-                furthestFromStartM = 0.0
-                furthestFromEndM = 0.0
-                handOverLine = emptyList()
-                // The next piece of the same walk is not news: the readout still says the same name.
-                if (next.track.sourceRef != target.ref) _message.value = "Now following ${next.track.name}"
+                switchTo(join.track, join.line, from = target, fromLine = line)
             }
         }
+    }
+
+    /**
+     * Moves the recorder onto another line, and says so - with the way back.
+     *
+     * **The next piece of the same walk is not news**: the readout still says the same name, so nothing is
+     * put on the card about it. A different track is news, and the row it puts there stands for as long as
+     * the walker is still near enough to the junction for going back to mean anything.
+     */
+    private fun switchTo(track: Followable, line: List<GeoPoint>, from: DocTarget, fromLine: List<GeoPoint>) {
+        followDoc(track, line)
+        furthestFromStartM = 0.0
+        furthestFromEndM = 0.0
+        handOverLine = emptyList()
+        if (track.sourceRef == from.ref) return
+        _switched.value = SwitchedBack(
+            toName = track.name,
+            from = from.track,
+            fromLine = fromLine,
+            walkedAtSwitchM = TrackingState.current.distanceM
+        )
+    }
+
+    /** Puts the line the recorder left back under the walker, after a switch they did not want. */
+    fun backFromSwitch() {
+        val offer = _switched.value ?: return
+        _switched.value = null
+        followDoc(offer.from, offer.fromLine)
+        furthestFromStartM = 0.0
+        furthestFromEndM = 0.0
+    }
+
+    /**
+     * Takes the offer away once going back has stopped meaning going back.
+     *
+     * A hundred metres on from the switch, the junction is behind the walker and the line they left is not
+     * where they are; choosing a track is what the chooser is for. It is the same hundred metres the
+     * end-of-track hand-over asks of a section before it will move on.
+     */
+    private fun offerHasLapsed() {
+        val offer = _switched.value ?: return
+        if (TrackingState.current.distanceM - offer.walkedAtSwitchM >= BACK_OFFER_M) _switched.value = null
     }
 
     /**
@@ -1007,6 +1228,14 @@ class RecordingViewModel(
         private const val STOP_TIMEOUT_MS = 5_000L
 
         private const val RECORDING_ID = -2L
+
+        /**
+         * How far the walk has to walk on before an offer to go back to the line it left is taken away.
+         *
+         * The same hundred metres the end-of-track hand-over asks of a section, for the same reason: past
+         * it, the junction is behind the walker and the chooser is the honest way back.
+         */
+        private const val BACK_OFFER_M = 100.0
 
         fun factory(context: Context, initialTargetId: Long? = null): ViewModelProvider.Factory {
             val appContext = context.applicationContext

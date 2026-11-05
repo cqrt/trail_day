@@ -1,6 +1,7 @@
 package nz.mckenzie.trailday.viewmodel
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
@@ -62,6 +63,9 @@ class RecordingViewModelTest {
         GeoPoint(-41.5010, 173.9545)
     )
 
+    /** How long a stepped fix is given to reach the recorder. Enough for the readout, and no more. */
+    private val STEP_MS = 60L
+
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
@@ -76,6 +80,9 @@ class RecordingViewModelTest {
         TrackingState.clear()
         // The fixes a test put in place of the device's are not the next test's.
         DevicePosition.useForTest(null)
+        // And neither is the Hand-over switch a test turned off: it is one preference for the whole
+        // app, so a test that leaves it off would break every hand-over test after it.
+        runBlocking { SettingsRepository(context).setHandOver(true) }
         // Deliberately no db.close(): this view model observes the session's points for
         // as long as it lives, so closing the database underneath it throws on a
         // background thread and takes the whole instrumentation process down - with
@@ -633,14 +640,213 @@ class RecordingViewModelTest {
         viewModel.refreshTracksToFollow()
         viewModel.selectDoc(here)
 
-        val told = withTimeout(5_000) { viewModel.message.first { it == "Now following Mount Pleasant Track" } }
+        val told = withTimeout(5_000) { viewModel.switched.first { it != null } }
 
-        assertEquals("the card says whose line the walker is on", "Now following Mount Pleasant Track", told)
+        assertEquals(
+            "the card says whose line the walker is on",
+            "Now following Mount Pleasant Track",
+            "Now following ${told!!.toName}"
+        )
         assertEquals(
             "and the readout follows it rather than staying on the old one",
             "Mount Pleasant Track",
             withTimeout(5_000) { viewModel.selectedTrackName.first { it == "Mount Pleasant Track" } }
         )
+    }
+
+    /**
+     * A walk that leaves the line it was following and takes up a neighbouring one halfway along.
+     *
+     * The end-of-track hand-over only answers at the end of a section, so a walker who cuts a corner or
+     * takes the footpath where the published line carries on was measured against ground they had left
+     * until they found the chooser. Thirty-four metres off one line and eight metres onto the next is a
+     * deliberate step off a track, which is what arms the rule.
+     */
+    @Test
+    fun theRecorderSwitchesWhenTheWalkWandersOntoAnotherLine() = runBlocking {
+        val followed = OtherTrack(
+            globalId = "6f1c2b8e-0000-4000-8000-000000000011",
+            name = "Major Hornbrook Track",
+            paths = listOf(lineFrom(-41.5000, 173.9500, 400.0))
+        )
+        val other = OtherTrack(
+            globalId = "6f1c2b8e-0000-4000-8000-000000000012",
+            name = "Mount Pleasant Track",
+            paths = listOf(lineFrom(-41.4996, 173.9500, 400.0))
+        )
+        val phone = SteppedLocation()
+        DevicePosition.useForTest(phone)
+        val viewModel = viewModel(otherStore = TracksHeld(listOf(followed, other)))
+        val sessionId = recordings.startRecording(name = "Recording")
+        TrackingState.begin(sessionId, System.currentTimeMillis())
+        TrackingState.setStatus(RecordingStatus.RECORDING)
+
+        viewModel.refreshTracksToFollow()
+        withTimeout(5_000) { viewModel.otherTracksHeld.first { it } }
+        viewModel.selectDoc(followed)
+
+        // Forty metres off the line being followed, and along the one beside it.
+        walk(phone, lineFrom(-41.4996, 173.9500, 64.0, steps = 8))
+
+        val switched = withTimeout(5_000) { viewModel.switched.first { it != null } }
+        assertEquals("the line the walker is on now", "Mount Pleasant Track", switched!!.toName)
+        assertEquals(
+            "and the readout measures it",
+            "Mount Pleasant Track",
+            withTimeout(5_000) { viewModel.selectedTrackName.first { it == "Mount Pleasant Track" } }
+        )
+
+        viewModel.finish()
+        withTimeout(5_000) { viewModel.finished.first { it != null } }
+
+        val saved = recordings.getSession(sessionId)!!.name
+        assertTrue(
+            "the walk is named after both tracks: $saved",
+            saved.contains("Major Hornbrook Track / Mount Pleasant Track")
+        )
+    }
+
+    @Test
+    fun theRecorderDoesNotSwitchForALineItOnlyCrosses() = runBlocking {
+        val followed = OtherTrack(
+            globalId = "6f1c2b8e-0000-4000-8000-000000000013",
+            name = "Major Hornbrook Track",
+            paths = listOf(lineFrom(-41.5000, 173.9500, 400.0))
+        )
+        // A line running north and south, straight through the ground the walker is crossing.
+        val crossing = OtherTrack(
+            globalId = "6f1c2b8e-0000-4000-8000-000000000014",
+            name = "Crossing Track",
+            paths = listOf(
+                (0..20).map { step -> GeoPoint(-41.5004 + 0.00008 * step, 173.9520) }
+            )
+        )
+        val phone = SteppedLocation()
+        DevicePosition.useForTest(phone)
+        val viewModel = viewModel(otherStore = TracksHeld(listOf(followed, crossing)))
+        val sessionId = recordings.startRecording(name = "Recording")
+        TrackingState.begin(sessionId, System.currentTimeMillis())
+        TrackingState.setStatus(RecordingStatus.RECORDING)
+
+        viewModel.refreshTracksToFollow()
+        withTimeout(5_000) { viewModel.otherTracksHeld.first { it } }
+        viewModel.selectDoc(followed)
+
+        // Along the line beside the one being followed, through the crossing, 10 m a fix: 40 m of walking
+        // within 20 m of it, and not one metre of it along it.
+        walk(phone, lineFrom(-41.4996, 173.9500, 140.0, steps = 14))
+        delay(400)
+
+        assertNull("a crossing is not a hand-over", viewModel.switched.value)
+        assertEquals(
+            "and the walk is still measured against the line it set out on",
+            "Major Hornbrook Track",
+            withTimeout(5_000) { viewModel.selectedTrackName.first { it != null } }
+        )
+    }
+
+    @Test
+    fun goingBackReturnsToTheLineItLeft() = runBlocking {
+        val followed = OtherTrack(
+            globalId = "6f1c2b8e-0000-4000-8000-000000000015",
+            name = "Major Hornbrook Track",
+            paths = listOf(lineFrom(-41.5000, 173.9500, 400.0))
+        )
+        val other = OtherTrack(
+            globalId = "6f1c2b8e-0000-4000-8000-000000000016",
+            name = "Mount Pleasant Track",
+            paths = listOf(lineFrom(-41.4996, 173.9500, 400.0))
+        )
+        val phone = SteppedLocation()
+        DevicePosition.useForTest(phone)
+        val viewModel = viewModel(otherStore = TracksHeld(listOf(followed, other)))
+        val sessionId = recordings.startRecording(name = "Recording")
+        TrackingState.begin(sessionId, System.currentTimeMillis())
+        TrackingState.setStatus(RecordingStatus.RECORDING)
+
+        viewModel.refreshTracksToFollow()
+        withTimeout(5_000) { viewModel.otherTracksHeld.first { it } }
+        viewModel.selectDoc(followed)
+        walk(phone, lineFrom(-41.4996, 173.9500, 64.0, steps = 8))
+        withTimeout(5_000) { viewModel.switched.first { it != null } }
+
+        viewModel.backFromSwitch()
+
+        assertNull("the offer goes with the tap", viewModel.switched.value)
+        assertEquals(
+            "and the walk is measured against the line it left",
+            "Major Hornbrook Track",
+            withTimeout(5_000) { viewModel.selectedTrackName.first { it == "Major Hornbrook Track" } }
+        )
+    }
+
+    @Test
+    fun handOverOffLeavesTheTrackWhereItWasChosen() = runBlocking {
+        SettingsRepository(context).setHandOver(false)
+        val followed = OtherTrack(
+            globalId = "6f1c2b8e-0000-4000-8000-000000000017",
+            name = "Major Hornbrook Track",
+            paths = listOf(lineFrom(-41.5000, 173.9500, 400.0))
+        )
+        val other = OtherTrack(
+            globalId = "6f1c2b8e-0000-4000-8000-000000000018",
+            name = "Mount Pleasant Track",
+            paths = listOf(lineFrom(-41.4996, 173.9500, 400.0))
+        )
+        val phone = SteppedLocation()
+        DevicePosition.useForTest(phone)
+        val viewModel = viewModel(otherStore = TracksHeld(listOf(followed, other)))
+        val sessionId = recordings.startRecording(name = "Recording")
+        TrackingState.begin(sessionId, System.currentTimeMillis())
+        TrackingState.setStatus(RecordingStatus.RECORDING)
+
+        viewModel.refreshTracksToFollow()
+        withTimeout(5_000) { viewModel.otherTracksHeld.first { it } }
+        viewModel.selectDoc(followed)
+        walk(phone, lineFrom(-41.4996, 173.9500, 64.0, steps = 8))
+        delay(400)
+
+        assertNull("turned off, nothing switches", viewModel.switched.value)
+        assertEquals(
+            "and the line chosen is the line measured",
+            "Major Hornbrook Track",
+            withTimeout(5_000) { viewModel.selectedTrackName.first { it != null } }
+        )
+    }
+
+    /** A line running east from [lng] at [lat], [lengthM] long, in [steps] legs. */
+    private fun lineFrom(lat: Double, lng: Double, lengthM: Double, steps: Int = 20): List<GeoPoint> {
+        val perDegree = METRES_PER_DEG_LNG_AT_EQUATOR * kotlin.math.cos(Math.toRadians(lat))
+        return (0..steps).map { step -> GeoPoint(lat, lng + lengthM * step / steps / perDegree) }
+    }
+
+    /**
+     * Feeds the fixes one at a time, so the recorder sees each one rather than only the last.
+     *
+     * A flow that hands over every fix at once is read as a state, and a state keeps its newest value -
+     * which is exactly wrong for a rule that asks how far the walker has come since the fix before.
+     */
+    private suspend fun walk(phone: SteppedLocation, fixes: List<GeoPoint>) {
+        for (fix in fixes) {
+            phone.send(fix)
+            delay(STEP_MS)
+        }
+    }
+
+    private class SteppedLocation : LocationSource {
+        private val fixes = MutableSharedFlow<GeoPoint>(replay = 1, extraBufferCapacity = 64)
+
+        @Volatile
+        private var last: GeoPoint? = null
+
+        fun send(point: GeoPoint) {
+            last = point
+            fixes.tryEmit(point)
+        }
+
+        override fun updates(): Flow<GeoPoint> = fixes
+
+        override suspend fun currentLocation(): GeoPoint? = last
     }
 
     /** A phone offering one fix, for the hand-over tests: the rule needs to know where the walker is. */

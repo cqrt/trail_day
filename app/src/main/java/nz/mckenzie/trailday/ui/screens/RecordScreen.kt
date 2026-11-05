@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -106,6 +107,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
     val following by viewModel.following.collectAsStateWithLifecycle()
     val followPhone by viewModel.followPhone.collectAsStateWithLifecycle()
     val follow by viewModel.follow.collectAsStateWithLifecycle()
+    val switched by viewModel.switched.collectAsStateWithLifecycle()
     val heading by viewModel.heading.collectAsStateWithLifecycle()
     val drift by viewModel.drift.collectAsStateWithLifecycle()
     val assetName by viewModel.selectedTrackName.collectAsStateWithLifecycle()
@@ -251,6 +253,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                 follow = follow,
                 drift = drift,
                 heading = heading,
+                switched = switched,
                 passElevation = passElevation,
                 followMode = followingMode,
                 targetName = assetName,
@@ -264,6 +267,7 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
                     if (!following) viewModel.selectTrack(null) else if (assetName == null) pickingTrack = true
                 },
                 onChooseTarget = { pickingTrack = true },
+                onBackFromSwitch = viewModel::backFromSwitch,
                 onAllowLocation = {
                     permissionLauncher.launch(
                         arrayOf(
@@ -570,6 +574,7 @@ private fun RecordDock(
     follow: FollowProgress?,
     drift: Double?,
     heading: FollowPoint?,
+    switched: RecordingViewModel.SwitchedBack?,
     passElevation: ElevationProfile?,
     followMode: Boolean,
     targetName: String?,
@@ -578,6 +583,7 @@ private fun RecordDock(
     message: String?,
     onFollowMode: (Boolean) -> Unit,
     onChooseTarget: () -> Unit,
+    onBackFromSwitch: () -> Unit,
     onAllowLocation: () -> Unit,
     onStart: () -> Unit,
     onPause: () -> Unit,
@@ -682,6 +688,29 @@ private fun RecordDock(
                 } ?: Spacer(modifier = Modifier.weight(1f))
 
                 DockCredit(basemap = basemap)
+            }
+
+            // The line the recorder has just taken up by itself, with the one tap that gives the walker's
+            // own line back. A switch nobody asked for should be undoable from the card rather than by
+            // finding the chooser again; it goes away once the walker is a hundred metres on.
+            switched?.let { offer ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Now following ${offer.toName}",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(
+                        onClick = onBackFromSwitch,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                    ) {
+                        Text(text = "Back", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
             }
 
             // The line being followed, in the phone's own words: the quiet word when the walker has properly

@@ -366,6 +366,20 @@ class SettingsViewModel(
         }
     }
 
+    /**
+     * Whether the recorder hands over to the next track by itself.
+     *
+     * Seeded with `true`, like the switches above: the card shows an untouched install's answer rather
+     * than a switch that sits blank for a frame and then moves.
+     */
+    val handOver: StateFlow<Boolean> = settings.handOver
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), true)
+
+    /** The Hand-over switch. The recorder reads the same preference, so it takes effect on the next fix. */
+    fun setHandOver(enabled: Boolean) {
+        viewModelScope.launch { settings.setHandOver(enabled) }
+    }
+
     private val _storedTiles = MutableStateFlow(TileStoreSummary(0, 0))
     val storedTiles: StateFlow<TileStoreSummary> = _storedTiles
 
