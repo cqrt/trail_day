@@ -317,7 +317,7 @@ fun SettingsScreen(
                     }
 
                     Text(
-                        "At the end of a track, or when you walk onto another.",
+                        "When following a track, and you move to a different track, Trail Day will move with you.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
