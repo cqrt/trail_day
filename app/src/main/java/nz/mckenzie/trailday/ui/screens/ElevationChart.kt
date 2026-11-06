@@ -3,6 +3,7 @@ package nz.mckenzie.trailday.ui.screens
 import androidx.compose.foundation.Canvas
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
@@ -10,14 +11,17 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import nz.mckenzie.trailday.domain.geo.ElevationProfile
 import nz.mckenzie.trailday.domain.geo.ElevationSample
+import nz.mckenzie.trailday.domain.geo.ElevationShape
 
 /**
  * A line's height along its own length: the shape of the ground it was walked or driven on.
  *
  * The arithmetic is [ElevationProfile]'s, done once in the domain; this only puts it on the screen,
  * scaling the distance along the line to the width and the height between the lowest and highest
- * points to the height. A line that is flat - the highest point as low as the lowest - is drawn down
- * the middle rather than divided by nothing.
+ * points to the height. The line drawn is [ElevationShape]'s, so a fix-to-fix sawtooth reads as the
+ * ground under it; the box it is drawn in is still the measured lowest and highest, so the words
+ * beside the chart describe the chart. A line that is flat - the highest point as low as the lowest -
+ * is drawn down the middle rather than divided by nothing.
  *
  * It is a shape to read, not a survey: the height came off a device, so the chart is one colour and
  * no numbers live on it. The range is said in words beside it.
@@ -26,7 +30,7 @@ import nz.mckenzie.trailday.domain.geo.ElevationSample
 fun ElevationChart(profile: ElevationProfile, modifier: Modifier = Modifier) {
     val lineColor = MaterialTheme.colorScheme.primary
     val fillColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-    val samples = profile.samples
+    val samples = remember(profile) { ElevationShape.of(profile.samples) }
 
     Canvas(modifier = modifier) {
         val first = samples.first()
