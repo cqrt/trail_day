@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import nz.mckenzie.trailday.domain.geo.ElevationBox
 import nz.mckenzie.trailday.domain.geo.ElevationProfile
 import nz.mckenzie.trailday.domain.geo.ElevationSample
 import nz.mckenzie.trailday.domain.geo.ElevationShape
@@ -22,11 +23,12 @@ import nz.mckenzie.trailday.domain.geo.ElevationShape
  * A line's height along its own length: the shape of the ground it was walked or driven on.
  *
  * The arithmetic is [ElevationProfile]'s, done once in the domain; this only puts it on the screen,
- * scaling the distance along the line to the width and the height between the lowest and highest
+ * scaling the distance along the line to the width and the height between the box's lowest and highest
  * points to the height. The line drawn is [ElevationShape]'s, so a fix-to-fix sawtooth reads as the
- * ground under it; the box it is drawn in is still the measured lowest and highest, so the words
- * beside the chart describe the chart. A line that is flat - the highest point as low as the lowest -
- * is drawn down the middle rather than divided by nothing.
+ * ground under it. **The box is [ElevationBox]'s**, which is the measured range widened to a hundred
+ * metres when the line has less than that in it: a ripple is drawn as a ripple rather than filling the
+ * height like a mountain, and a line flatter than the box sits across its middle with air above and
+ * below.
  *
  * It is a shape to read, not a survey: the height came off a device, so the chart is one colour and
  * no numbers live on it. The range is said in words beside it.
@@ -59,6 +61,7 @@ fun ElevationChart(
     val hairlineColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
     val cardColor = MaterialTheme.colorScheme.surface
     val samples = remember(profile) { ElevationShape.of(profile.samples) }
+    val box = remember(profile) { ElevationBox.of(profile) }
     val padPx = with(LocalDensity.current) { PAD.toPx() }
     val currentOnFinger by rememberUpdatedState(onFinger)
 
@@ -92,16 +95,14 @@ fun ElevationChart(
         val first = samples.first()
         val last = samples.last()
         val alongSpan = (last.alongM - first.alongM).takeIf { it > 0.0 } ?: 1.0
-        val heightSpan = profile.rangeM.takeIf { it > 0.0 }
         val pad = 4.dp.toPx()
         val usableWidth = (size.width - pad * 2).coerceAtLeast(1f)
         val usableHeight = (size.height - pad * 2).coerceAtLeast(1f)
 
-        fun yFor(heightM: Double): Float = if (heightSpan == null) {
-            size.height / 2f
-        } else {
-            pad + (1f - ((heightM - profile.lowestM) / heightSpan).toFloat()) * usableHeight
-        }
+        // The box is never flat - a hundred metres at least - so this is one division and not a special
+        // case for a line that climbs nothing.
+        fun yFor(heightM: Double): Float =
+            pad + (1f - ((heightM - box.lowestM) / box.spanM).toFloat()) * usableHeight
 
         fun point(sample: ElevationSample): Offset {
             val x = pad + ((sample.alongM - first.alongM) / alongSpan).toFloat() * usableWidth

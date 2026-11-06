@@ -212,6 +212,25 @@ class WebEditorJsonTest {
     }
 
     @Test
+    fun `the height the card draws across goes with the shape`() {
+        // Ten metres of ground: the card's chart draws it in a hundred, centred, so the ripple is not
+        // stretched to the top of the card like a mountain. The page draws what the phone decides.
+        val rippled = listOf(500.0, 510.0, 500.0).mapIndexed { index, height ->
+            GeoPoint(-45.35 - index * 0.00005, 168.12, altitudeM = height)
+        }
+
+        val elevation = WebEditorJson.record(
+            asset = everyField,
+            paths = listOf(rippled),
+            recordingCount = 0
+        ).elevation!!
+
+        assertEquals(455.0, elevation.box!!.lowestM, 1e-9)
+        assertEquals(555.0, elevation.box!!.highestM, 1e-9)
+        assertEquals("and the figures are still the measured ones", 500.0, elevation.lowestM, 1e-9)
+    }
+
+    @Test
     fun `the box the work is in and the phone's fix are both offered`() {
         val document = WebEditorDocument(
             bounds = WebEditorBounds.of(

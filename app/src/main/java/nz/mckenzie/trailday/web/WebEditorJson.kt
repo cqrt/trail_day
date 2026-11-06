@@ -14,6 +14,7 @@ import nz.mckenzie.trailday.domain.backup.AssetRecord
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.distanceM
+import nz.mckenzie.trailday.domain.geo.ElevationBox
 import nz.mckenzie.trailday.domain.geo.ElevationProfile
 import nz.mckenzie.trailday.domain.geo.ElevationShape
 import nz.mckenzie.trailday.domain.geo.GeoPoint
@@ -399,24 +400,41 @@ data class WebEditorElevation(
     val highestM: Double,
     val climbM: Double,
     val descentM: Double,
-    val shape: List<WebEditorSample> = emptyList()
+    val shape: List<WebEditorSample> = emptyList(),
+    /**
+     * The heights the card's chart draws across, which is [lowestM] and [highestM] widened to a
+     * hundred metres when the line has less than that in it - see
+     * [nz.mckenzie.trailday.domain.geo.ElevationBox].
+     *
+     * Here rather than worked out on the page, so the card and the phone's own chart are drawn in the
+     * same box: a drawing decision made twice is a drawing decision that comes apart.
+     */
+    val box: WebEditorBox? = null
 ) {
     companion object {
-        fun of(profile: ElevationProfile) = WebEditorElevation(
-            lowestM = profile.lowestM,
-            highestM = profile.highestM,
-            climbM = profile.climbM,
-            descentM = profile.descentM,
-            // A tenth of a metre: the card is 100 units wide, so this is finer than the drawing can
-            // show, and it halves what a long ride's shape adds to the document.
-            shape = ElevationShape.of(profile.samples).map {
-                WebEditorSample(alongM = it.alongM.tenths(), heightM = it.heightM.tenths())
-            }
-        )
+        fun of(profile: ElevationProfile): WebEditorElevation {
+            val box = ElevationBox.of(profile)
+            return WebEditorElevation(
+                lowestM = profile.lowestM,
+                highestM = profile.highestM,
+                climbM = profile.climbM,
+                descentM = profile.descentM,
+                // A tenth of a metre: the card is 100 units wide, so this is finer than the drawing can
+                // show, and it halves what a long ride's shape adds to the document.
+                shape = ElevationShape.of(profile.samples).map {
+                    WebEditorSample(alongM = it.alongM.tenths(), heightM = it.heightM.tenths())
+                },
+                box = WebEditorBox(lowestM = box.lowestM, highestM = box.highestM)
+            )
+        }
 
         private fun Double.tenths(): Double = round(this * 10.0) / 10.0
     }
 }
+
+/** The height a chart draws across: see [nz.mckenzie.trailday.domain.geo.ElevationBox]. */
+@Serializable
+data class WebEditorBox(val lowestM: Double, val highestM: Double)
 
 /**
  * One sample of [WebEditorElevation.shape]: how far along the line it is, and how high the ground is

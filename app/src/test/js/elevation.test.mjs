@@ -55,6 +55,17 @@ test('a flat line is drawn down the middle rather than divided by nothing', () =
   assert.deepEqual(chart, { line: 'M2 15 L98 15', area: 'M2 30 L2 15 L98 15 L98 30 Z' });
 });
 
+test('the phone’s box decides the height, so a ripple is not drawn as a mountain', () => {
+  // 100 to 120 m of ground in a 60 to 160 m box: a fifth of the height, in the middle, rather than
+  // filling it the way the samples' own range would.
+  const chart = elevationChart([at(0, 100), at(100, 120)], 100, 30, 2, {
+    lowestM: 60,
+    highestM: 160
+  });
+
+  assert.deepEqual(chart, { line: 'M2 17.6 L98 12.4', area: 'M2 30 L2 17.6 L98 12.4 L98 30 Z' });
+});
+
 test('fewer than two samples is nothing to draw', () => {
   assert.equal(elevationChart([at(0, 100)], 100, 30), null);
   assert.equal(elevationChart([], 100, 30), null);

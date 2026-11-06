@@ -39,14 +39,19 @@ function whole(metres) {
  * only places them. Null when fewer than two samples, because a chart of nothing is not a chart. The
  * x axis is measured along the line rather than by sample number, so unevenly sampled ground draws as
  * itself.
+ *
+ * [drawn] is the height the chart draws across, when the record carries one: the phone works it out
+ * ([ElevationBox] there) so the card's chart and the phone's own are the same picture, and a ripple is
+ * not stretched to the top of the box like a mountain. Without it the samples' own lowest and highest
+ * are used, which is what a record from an older build has.
  */
-export function elevationChart(samples, width, height, pad = 2) {
+export function elevationChart(samples, width, height, pad = 2, drawn = null) {
   if (!samples || samples.length < 2) return null;
 
   const first = samples[0];
   const last = samples[samples.length - 1];
-  const lowest = Math.min(...samples.map((sample) => sample.heightM));
-  const highest = Math.max(...samples.map((sample) => sample.heightM));
+  const lowest = drawn?.lowestM ?? Math.min(...samples.map((sample) => sample.heightM));
+  const highest = drawn?.highestM ?? Math.max(...samples.map((sample) => sample.heightM));
   const spanAlong = last.alongM - first.alongM || 1;
   const spanHeight = highest - lowest;
 

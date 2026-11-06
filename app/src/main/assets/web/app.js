@@ -840,7 +840,7 @@ function showCard(item) {
   // own card uses, and the phone's own smoothed shape under the facts. A track drawn on a map has no
   // heights, so it says nothing and draws nothing.
   fact('Elevation', elevationWords(item.elevation));
-  drawCardElevation(item.elevation?.shape ?? []);
+  drawCardElevation(item.elevation?.shape ?? [], item.elevation?.box ?? null);
 
   document.getElementById('card').hidden = false;
 
@@ -867,9 +867,9 @@ function showCard(item) {
  * would draw a second answer to the same question. A line with no heights carries no shape, so the
  * box is hidden rather than drawn empty.
  */
-function drawCardElevation(shape) {
+function drawCardElevation(shape, drawn) {
   const box = field('card-elevation');
-  const chart = elevationChart(shape, CARD_ELEVATION_WIDTH, CARD_ELEVATION_HEIGHT);
+  const chart = elevationChart(shape, CARD_ELEVATION_WIDTH, CARD_ELEVATION_HEIGHT, 2, drawn);
   box.textContent = '';
   if (!chart) {
     box.hidden = true;

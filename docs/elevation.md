@@ -36,6 +36,12 @@ The shape is a way of drawing the samples, not a second reading of them. On a no
 reads high, so the line can look calmer than the figure beside it; the climb is what feeds the time
 estimate, so it is left as measured.
 
+**The chart shows at least 100 m of ground, however tall the line is.** A box that always fills makes a
+ripple look like a mountain: 20 m of rise across a beach drew as tall as a 600 m climb. The box is now
+the measured range, widened to 100 m and centred on the middle of it, so a smaller rise is drawn small,
+in the middle, with air above and below it. A line with 100 m or more of ground in it is drawn exactly
+as it was. The words beside the chart still say the measured lowest, highest and climb.
+
 **A feature shorter than the window is flattened.** A 55 m knoll or a short cutting is mostly gone at
 200 m. The line is the ground over a couple of hundred metres, not a survey of every rise.
 
@@ -67,6 +73,10 @@ same figure two ways.
 `ElevationShape.kt` smooths the samples for drawing, and thins a line longer than 480 samples to about
 that many. Only the chart calls it. The figures and the recorder's time estimate use the measured
 heights, not the shape.
+
+`ElevationBox.kt` is the height the chart draws across: the measured range, widened to 100 m and
+centred when a line has less ground than that in it. The phone's chart and the desk's card are both
+given it from there, so the two draw the same picture.
 
 The finger's dot is the same arithmetic the other way round. `ElevationProfile.alongAt` says how far
 along the line a fraction of the chart is, and `PathWalk.pointAlong` turns metres along a line into a
