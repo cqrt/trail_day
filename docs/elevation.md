@@ -27,7 +27,7 @@ highest point of the line, and the total climb.
 **Under that line, a profile**: the height of the line along its own length, so a climb is visible
 without reading numbers. It draws the ground rather than every fix: a phone's height jitters by a few
 metres from one fix to the next, so the raw heights make a sawtooth. Each sample is the mean of the
-heights within 40 m of it, either side. A climb reads as a climb.
+heights in the 200 m around it, 100 m either side. A climb reads as a climb.
 
 The first and last samples keep their measured heights, so the line starts and ends where you did.
 
@@ -35,6 +35,9 @@ The four figures above do not change. Lowest, highest, climb and descent are sti
 The shape is a way of drawing the samples, not a second reading of them. On a noisy walk the climb
 reads high, so the line can look calmer than the figure beside it; the climb is what feeds the time
 estimate, so it is left as measured.
+
+**A feature shorter than the window is flattened.** A 55 m knoll or a short cutting is mostly gone at
+200 m. The line is the ground over a couple of hundred metres, not a survey of every rise.
 
 **After a recording is saved**, the same chart over the points that were just walked or ridden.
 
