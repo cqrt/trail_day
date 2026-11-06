@@ -13,9 +13,10 @@ package nz.mckenzie.trailday.domain.geo
  * measured ones, [ElevationPhrase] says them, and the time estimate is worked out from them - this is a
  * way of drawing, like [ElevationShape], and nothing reads it back.
  *
- * **Fifty metres is the number.** Below it the ground is undulation rather than a climb, and a ripple
- * should not take the height of a mountain; above it a hill has earned the whole chart, and a line with
- * fifty metres or more in it is drawn exactly as it was before the floor existed.
+ * **A hundred and eighty metres is the number.** Below it the ground is undulation rather than a
+ * climb, and a ripple should not take the height of a mountain; at or above it a hill has earned the
+ * whole chart. The Kiwi Burn track, 143 m between its lowest and highest, is drawn at four fifths of
+ * the card, which is how the walker read it on the chart in the chat.
  */
 data class ElevationBox(val lowestM: Double, val highestM: Double) {
 
@@ -25,7 +26,7 @@ data class ElevationBox(val lowestM: Double, val highestM: Double) {
     companion object {
 
         /** The least ground a chart shows, in metres of height. */
-        const val MIN_SPAN_M = 50.0
+        const val MIN_SPAN_M = 180.0
 
         fun of(profile: ElevationProfile): ElevationBox {
             if (profile.rangeM >= MIN_SPAN_M) {

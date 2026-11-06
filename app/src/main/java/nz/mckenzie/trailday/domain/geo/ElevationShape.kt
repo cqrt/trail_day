@@ -25,11 +25,15 @@ object ElevationShape {
     /**
      * The width of the ground each sample is averaged over: half of it either side.
      *
-     * Chosen on a 12 km walk: 40 m left small turns in the line, and 200 m took them out while
-     * moving the line at most 3.4 m from the fixes. The cost is a feature shorter than the window -
-     * a small knoll is flattened - and that is the trade the line is drawn on.
+     * Thirty metres, chosen by eye on a real walk rather than from a noise model. The Kiwi Burn
+     * track, 3,456 fixes over 12 km: at 200 m its small turns were gone and the line read as a smooth
+     * ridge that the ground is not, and at 0 the fix-to-fix jitter was the line. Thirty keeps the
+     * turns and takes the jitter - four or five fixes either side at a fix every few metres.
+     *
+     * The cost is anything much shorter than the window: a ten-metre knoll is muted, where 200 m
+     * flattened a fifty-metre one. That is the trade the line is drawn on.
      */
-    const val WINDOW_M = 200.0
+    const val WINDOW_M = 30.0
 
     /**
      * The most samples a chart is handed.

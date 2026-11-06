@@ -25,9 +25,10 @@ import nz.mckenzie.trailday.domain.geo.ElevationShape
  * The arithmetic is [ElevationProfile]'s, done once in the domain; this only puts it on the screen,
  * scaling the distance along the line to the width and the height between the box's lowest and highest
  * points to the height. The line drawn is [ElevationShape]'s, so a fix-to-fix sawtooth reads as the
- * ground under it. **The box is [ElevationBox]'s**, which is the measured range widened to fifty metres
- * when the line has less than that in it: a ripple is drawn as a ripple rather than filling the height
- * like a mountain, and a line flatter than the box sits across its middle with air above and below.
+ * ground under it. **The box is [ElevationBox]'s**, which is the measured range widened to a hundred
+ * and eighty metres when the line has less than that in it: a ripple is drawn as a ripple rather than
+ * filling the height like a mountain, and a line flatter than the box sits across its middle with air
+ * above and below.
  *
  * It is a shape to read, not a survey: the height came off a device, so the chart is one colour and
  * no numbers live on it. The range is said in words beside it.
@@ -98,8 +99,8 @@ fun ElevationChart(
         val usableWidth = (size.width - pad * 2).coerceAtLeast(1f)
         val usableHeight = (size.height - pad * 2).coerceAtLeast(1f)
 
-        // The box is never flat - fifty metres at least - so this is one division and not a special
-        // case for a line that climbs nothing.
+        // The box is never flat - a hundred and eighty metres at least - so this is one division and
+        // not a special case for a line that climbs nothing.
         fun yFor(heightM: Double): Float =
             pad + (1f - ((heightM - box.lowestM) / box.spanM).toFloat()) * usableHeight
 
