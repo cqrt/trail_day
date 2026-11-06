@@ -24,6 +24,10 @@ the height and leaves the rest where it is.
 **On a place's page**, one line under the facts: *≈520–664 m, up 140 m*. That reads the lowest and the
 highest point of the line, and the total climb.
 
+The climb is every rise added up, not the highest less the lowest, so a rolling walk climbs more than
+its range: up 50 m, down 40, up 50 again is 100 m of climb over 60 m of range. It counts the rises
+between consecutive fixes, so a height recorded to a decimetre adds a little of its own noise to it.
+
 **Under that line, a profile**: the height of the line along its own length, so a climb is visible
 without reading numbers. It draws the ground rather than every fix: a phone's height jitters by a few
 metres from one fix to the next, so the raw heights make a sawtooth. Each sample is the mean of the
