@@ -61,6 +61,7 @@ import nz.mckenzie.trailday.viewmodel.RecordingsViewModel
 fun RecordingsScreen(
     viewModel: RecordingsViewModel,
     onOpenTab: (Tab) -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     onOpenRecording: (Long) -> Unit
 ) {
     val sessions by viewModel.sessions.collectAsStateWithLifecycle()
@@ -99,7 +100,12 @@ fun RecordingsScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Activities") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Activities") },
+                actions = { SettingsAction(onOpenSettings) }
+            )
+        },
         bottomBar = { TrailDayNavBar(current = Tab.RECORDINGS, onSelect = onOpenTab) }
     ) { innerPadding ->
         Column(

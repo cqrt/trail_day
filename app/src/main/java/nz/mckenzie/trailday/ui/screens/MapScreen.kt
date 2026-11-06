@@ -374,7 +374,7 @@ fun MapScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         RoundIconButton(
                             glyph = IconGlyph.SETTINGS,
-                            description = "Settings",
+                            description = SETTINGS_WORD,
                             onClick = onOpenSettings
                         )
                         RoundIconButton(

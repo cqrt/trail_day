@@ -90,7 +90,11 @@ import nz.mckenzie.trailday.viewmodel.RecordingViewModel
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
+fun RecordScreen(
+    viewModel: RecordingViewModel,
+    onOpenTab: (Tab) -> Unit = {},
+    onOpenSettings: () -> Unit = {}
+) {
     val state by viewModel.tracking.collectAsStateWithLifecycle()
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
     val geoJson by viewModel.recordedGeoJson.collectAsStateWithLifecycle()
@@ -205,7 +209,18 @@ fun RecordScreen(viewModel: RecordingViewModel, onOpenTab: (Tab) -> Unit = {}) {
         // **No title bar while a pass is being driven, or has just been.** The map is the top of the screen
         // then - which is the whole point of the panel at the foot - and the tab bar already says where the
         // walker is. Kept while nothing is being recorded, as every other tab keeps its own.
-        topBar = { if (summary.status == null) TopAppBar(title = { Text("Record") }) },
+        //
+        // The settings door lives with that bar and goes with it: a walk in progress has the map and the
+        // panel, and nothing else. It is the one tab where the answer to "where is Settings" changes by
+        // itself, which is the price of the map having the whole screen.
+        topBar = {
+            if (summary.status == null) {
+                TopAppBar(
+                    title = { Text("Record") },
+                    actions = { SettingsAction(onOpenSettings) }
+                )
+            }
+        },
         // No back arrow: recording is a tab, and the bar below is how you leave it.
         bottomBar = { TrailDayNavBar(current = Tab.RECORD, onSelect = onOpenTab) }
     ) { innerPadding ->

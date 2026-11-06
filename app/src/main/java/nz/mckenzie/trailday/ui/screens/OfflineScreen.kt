@@ -71,6 +71,7 @@ import nz.mckenzie.trailday.viewmodel.OfflineViewModel
 fun OfflineScreen(
     viewModel: OfflineViewModel,
     onOpenTab: (Tab) -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     onChooseArea: () -> Unit,
     onChooseDocArea: () -> Unit,
     onChooseOtherTracksArea: () -> Unit,
@@ -120,7 +121,12 @@ fun OfflineScreen(
     val active = stored.firstOrNull { !it.isComplete }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Offline") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Offline") },
+                actions = { SettingsAction(onOpenSettings) }
+            )
+        },
         bottomBar = { TrailDayNavBar(current = Tab.OFFLINE, onSelect = onOpenTab) }
     ) { innerPadding ->
         Column(

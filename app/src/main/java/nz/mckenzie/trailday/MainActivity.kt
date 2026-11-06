@@ -112,6 +112,11 @@ class MainActivity : ComponentActivity() {
                 // them. Its page is reached from two places and Back has to return to the one that asked.
                 var otherTrackDetailOrigin by remember { mutableStateOf(Destination.MAP) }
 
+                // Where Settings was opened from. Every tab has a door to it now, and a walker who went
+                // there from Offline should come back to Offline rather than to the map. Saved, because a
+                // rotation while the walker is in Settings would otherwise forget which tab asked.
+                var settingsOrigin by rememberSaveable { mutableStateOf(Destination.MAP) }
+
                 /**
                  * Somebody else's track, on its way to its own page.
                  *
@@ -137,6 +142,19 @@ class MainActivity : ComponentActivity() {
                 // second area found the first one's answers already filled in.
                 var offlinePickerVisit by rememberSaveable { mutableStateOf(0) }
 
+                /**
+                 * The one door to Settings, for all five tabs.
+                 *
+                 * It reads the tab it was called from at the moment it is called rather than being built
+                 * per screen, so a screen cannot forget to say where it was and quietly send the walker
+                 * to the map. Settings' own back arrow and system back both use [settingsOrigin], which
+                 * this is the only thing that writes.
+                 */
+                val openSettings: () -> Unit = {
+                    settingsOrigin = destination
+                    destination = Destination.SETTINGS
+                }
+
                 // System back returns the way the walker came, and never leaves the app.
                 BackHandler(enabled = destination != Destination.MAP) {
                     destination = when (destination) {
@@ -146,6 +164,9 @@ class MainActivity : ComponentActivity() {
                         // fiddling with a colour and pressing back lands on the screen they left
                         // rather than on the map.
                         Destination.TRACKS_AND_PLACES -> Destination.SETTINGS
+                        // Settings is reached from every tab, so it goes back to the tab that asked -
+                        // the same rule as its own back arrow, so the two cannot disagree.
+                        Destination.SETTINGS -> settingsOrigin
                         else -> Destination.MAP
                     }
                 }
@@ -180,7 +201,7 @@ class MainActivity : ComponentActivity() {
                         MapScreen(
                             viewModel = mapViewModel,
                             onOpenTab = { destination = destinationOf(it) },
-                            onOpenSettings = { destination = Destination.SETTINGS },
+                            onOpenSettings = openSettings,
                             onOpenAsset = { assetId ->
                                 selectedAssetId = assetId
                                 destination = Destination.ASSET_DETAIL
@@ -227,7 +248,7 @@ class MainActivity : ComponentActivity() {
                             },
                             onOpenDoc = { destination = Destination.DOC },
                             onOpenOtherTracks = { destination = Destination.OTHER_TRACKS_BROWSER },
-                            onOpenSettings = { destination = Destination.SETTINGS }
+                            onOpenSettings = openSettings
                         )
                     }
 
@@ -363,7 +384,8 @@ class MainActivity : ComponentActivity() {
                         )
                         RecordScreen(
                             viewModel = recordingViewModel,
-                            onOpenTab = { destination = destinationOf(it) }
+                            onOpenTab = { destination = destinationOf(it) },
+                            onOpenSettings = openSettings
                         )
                     }
 
@@ -403,6 +425,7 @@ class MainActivity : ComponentActivity() {
                         RecordingsScreen(
                             viewModel = recordingsViewModel,
                             onOpenTab = { destination = destinationOf(it) },
+                            onOpenSettings = openSettings,
                             onOpenRecording = { sessionId ->
                                 selectedSessionId = sessionId
                                 destination = Destination.RECORDING_DETAIL
@@ -437,7 +460,7 @@ class MainActivity : ComponentActivity() {
                             viewModel = settingsViewModel,
                             updateViewModel = updateViewModel,
                             onOpenTracksAndPlaces = { destination = Destination.TRACKS_AND_PLACES },
-                            onBack = { destination = Destination.MAP }
+                            onBack = { destination = settingsOrigin }
                         )
                     }
 
@@ -458,6 +481,7 @@ class MainActivity : ComponentActivity() {
                         OfflineScreen(
                             viewModel = offlineViewModel,
                             onOpenTab = { destination = destinationOf(it) },
+                            onOpenSettings = openSettings,
                             onChooseArea = {
                                 offlinePickerVisit++
                                 destination = Destination.OFFLINE_PICKER
