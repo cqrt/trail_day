@@ -1,15 +1,14 @@
 /*
  * A line's height, from the desk's side of it.
  *
- * The phone works the range out and hands it over in the record; this is what the page does with it -
- * say the range in the words the phone's own card uses, and turn the heights it already holds into
- * the shape a chart draws. Pure, so node runs the very file the browser does.
+ * The phone works the range out and hands it over in the record, with the shape to draw; this is what
+ * the page does with it - say the range in the words the phone's own card uses, and turn the shape
+ * into the two strings a chart draws. Pure, so node runs the very file the browser does.
  *
- * It keeps its own flat-earth step rather than importing `geometry.mjs`: the page fetches that module
- * with the token on its URL, and a second import without it is a request the phone refuses.
+ * The smoothing is the phone's, not this file's: a page that averaged the line's points again would
+ * draw a second answer to a question the phone has already answered, and the one that fell behind
+ * would be the page nobody looked at.
  */
-
-const METRES_PER_DEGREE = 111132;
 
 /**
  * The range in the words the phone's card uses, or null when the record carries no height.
@@ -33,36 +32,29 @@ function whole(metres) {
 }
 
 /**
- * A path's heights as the two strings a chart draws, in a box `width` by `height` with `pad` inside
- * it: `line` is the outline and `area` the same filled down to the bottom.
+ * A line's shape as the two strings a chart draws, in a box `width` by `height` with `pad` inside it:
+ * `line` is the outline and `area` the same filled down to the bottom.
  *
- * Null when fewer than two points carry a height, because a chart of nothing is not a chart. The x
- * axis is measured along the line rather than by point number, so a file sampled unevenly draws as
- * the ground it is; a height missing in the middle is stepped over but its metres still count.
+ * [samples] are the phone's own heights along the line, already smoothed and already thinned, so this
+ * only places them. Null when fewer than two samples, because a chart of nothing is not a chart. The
+ * x axis is measured along the line rather than by sample number, so unevenly sampled ground draws as
+ * itself.
  */
-export function elevationChart(points, width, height, pad = 2) {
-  const samples = [];
-  let along = 0;
-  let previous = null;
-  for (const point of points ?? []) {
-    if (previous) along += metresBetween(previous, point);
-    previous = point;
-    if (typeof point.altitudeM === 'number') samples.push({ x: along, y: point.altitudeM });
-  }
-  if (samples.length < 2) return null;
+export function elevationChart(samples, width, height, pad = 2) {
+  if (!samples || samples.length < 2) return null;
 
   const first = samples[0];
   const last = samples[samples.length - 1];
-  const lowest = Math.min(...samples.map((sample) => sample.y));
-  const highest = Math.max(...samples.map((sample) => sample.y));
-  const spanAlong = last.x - first.x || 1;
+  const lowest = Math.min(...samples.map((sample) => sample.heightM));
+  const highest = Math.max(...samples.map((sample) => sample.heightM));
+  const spanAlong = last.alongM - first.alongM || 1;
   const spanHeight = highest - lowest;
 
   const at = (sample) => {
-    const x = pad + ((sample.x - first.x) / spanAlong) * (width - pad * 2);
+    const x = pad + ((sample.alongM - first.alongM) / spanAlong) * (width - pad * 2);
     const y = spanHeight === 0
       ? height / 2
-      : pad + (1 - (sample.y - lowest) / spanHeight) * (height - pad * 2);
+      : pad + (1 - (sample.heightM - lowest) / spanHeight) * (height - pad * 2);
     return [round(x), round(y)];
   };
 
@@ -72,13 +64,6 @@ export function elevationChart(points, width, height, pad = 2) {
     placed.map(([x, y]) => `L${x} ${y}`).join(' ') +
     ` L${placed[placed.length - 1][0]} ${height} Z`;
   return { line, area };
-}
-
-function metresBetween(a, b) {
-  const midLat = (((a.lat + b.lat) / 2) * Math.PI) / 180;
-  const dx = (b.lng - a.lng) * METRES_PER_DEGREE * Math.cos(midLat);
-  const dy = (b.lat - a.lat) * METRES_PER_DEGREE;
-  return Math.hypot(dx, dy);
 }
 
 function round(value) {

@@ -3,8 +3,8 @@
  *
  * `elevation.mjs` is pure, so node runs the very file the browser does: the range is pinned to the
  * same words the phone's own card uses, and the chart's arithmetic - the x axis measured along the
- * line, a flat line down the middle, a height missing in the middle - is held here rather than read
- * by eye off a screen.
+ * line, a flat line down the middle - is held here rather than read by eye off a screen. The samples
+ * are the phone's own smoothed shape, so this file places them and does not average anything.
  */
 
 import assert from 'node:assert/strict';
@@ -12,8 +12,8 @@ import test from 'node:test';
 
 import { elevationChart, elevationWords } from '../../main/assets/web/elevation.mjs';
 
-/** A point on a line running north at a known step, with the height or none. */
-const at = (step, altitudeM) => ({ lat: 0.001 * step, lng: 0, altitudeM });
+/** One sample of the phone's shape: metres along the line, and the height there. */
+const at = (alongM, heightM) => ({ alongM, heightM });
 
 test('the range is said the way the phone says it', () => {
   assert.equal(
@@ -33,7 +33,7 @@ test('the range is said the way the phone says it', () => {
 });
 
 test('a chart is the heights drawn, the lowest near the bottom and the highest near the top', () => {
-  const chart = elevationChart([at(0, 100), at(1, 200), at(2, 150)], 100, 30, 2);
+  const chart = elevationChart([at(0, 100), at(50, 200), at(100, 150)], 100, 30, 2);
 
   assert.deepEqual(chart, {
     line: 'M2 28 L50 2 L98 15',
@@ -41,23 +41,22 @@ test('a chart is the heights drawn, the lowest near the bottom and the highest n
   });
 });
 
+test('the x axis follows the metres along the line rather than the sample number', () => {
+  // A file sampled unevenly draws as the ground it is: the middle sample is a quarter of the way
+  // along, so it is drawn a quarter of the way across.
+  const chart = elevationChart([at(0, 100), at(25, 200), at(100, 150)], 100, 30, 2);
+
+  assert.equal(chart.line, 'M2 28 L26 2 L98 15');
+});
+
 test('a flat line is drawn down the middle rather than divided by nothing', () => {
-  const chart = elevationChart([at(0, 100), at(1, 100)], 100, 30, 2);
+  const chart = elevationChart([at(0, 100), at(100, 100)], 100, 30, 2);
 
   assert.deepEqual(chart, { line: 'M2 15 L98 15', area: 'M2 30 L2 15 L98 15 L98 30 Z' });
 });
 
-test('a height missing in the middle is stepped over, and its metres still count', () => {
-  const chart = elevationChart([at(0, 100), at(1, null), at(2, 150)], 100, 30, 2);
-
-  // Two heights, so two points on the chart - and the second is at the end of the line, where the
-  // point it came from is, not at the missing point's place.
-  assert.equal(chart.line, 'M2 28 L98 2');
-});
-
-test('fewer than two heights is nothing to draw', () => {
+test('fewer than two samples is nothing to draw', () => {
   assert.equal(elevationChart([at(0, 100)], 100, 30), null);
-  assert.equal(elevationChart([at(0, null), at(1, null)], 100, 30), null);
   assert.equal(elevationChart([], 100, 30), null);
-  assert.equal(elevationChart(undefined, 100, 30), null);
+  assert.equal(elevationChart(undefined, 100, 30), null, 'a track with no heights has no shape');
 });

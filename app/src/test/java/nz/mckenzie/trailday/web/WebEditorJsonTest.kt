@@ -191,6 +191,27 @@ class WebEditorJsonTest {
     }
 
     @Test
+    fun `the desk is handed the smoothed shape, with the line's own heights at its ends`() {
+        // A sawtooth of fixes either side of 505 m: the line's own points never sit on the ground,
+        // so the middle of the drawn shape is the window's mean rather than any one of them.
+        val noisy = listOf(500.0, 510.0, 500.0, 510.0, 505.0).mapIndexed { index, height ->
+            GeoPoint(-45.35 - index * 0.00005, 168.12, altitudeM = height)
+        }
+
+        val elevation = WebEditorJson.record(
+            asset = everyField,
+            paths = listOf(noisy),
+            recordingCount = 0
+        ).elevation!!
+
+        assertEquals(5, elevation.shape.size)
+        assertEquals(505.0, elevation.shape[2].heightM, 1e-9)
+        // The line starts and ends where the walk did, so a reader can place it against the ground.
+        assertEquals(noisy.first().altitudeM!!, elevation.shape.first().heightM, 1e-9)
+        assertEquals(noisy.last().altitudeM!!, elevation.shape.last().heightM, 1e-9)
+    }
+
+    @Test
     fun `the box the work is in and the phone's fix are both offered`() {
         val document = WebEditorDocument(
             bounds = WebEditorBounds.of(

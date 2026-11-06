@@ -3,6 +3,7 @@ package nz.mckenzie.trailday.web
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlin.math.round
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetPhrase
@@ -14,6 +15,7 @@ import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.distanceM
 import nz.mckenzie.trailday.domain.geo.ElevationProfile
+import nz.mckenzie.trailday.domain.geo.ElevationShape
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.other.OTHER_TRACK_FILTERS
 import nz.mckenzie.trailday.domain.other.OtherTrack
@@ -356,10 +358,11 @@ data class WebEditorAssetRecord(
     /**
      * The line's height, when it has one: the phone's own figures for the card.
      *
-     * The page draws the profile from the heights in [paths], but it does not work the range out for
-     * itself: lowest, highest and the climb are the phone's, so the desk and the phone say the same
-     * thing about the same track. Absent for a track with no height, and left out of the document
-     * rather than sent as a null. See docs/elevation.md.
+     * The page draws the profile from [WebEditorElevation.shape] rather than working it out from the
+     * heights in [paths]: the phone smooths the fixes into the ground and the desk draws that, so the
+     * two charts are the same shape. The range is the phone's too - lowest, highest and the climb - so
+     * the desk and the phone say the same thing about the same track. Absent for a track with no
+     * height, and left out of the document rather than sent as a null. See docs/elevation.md.
      */
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val elevation: WebEditorElevation? = null,
@@ -378,30 +381,49 @@ data class WebEditorAssetRecord(
 )
 
 /**
- * A line's height, as the desk's card reads it: how low and how high it goes, and how much it climbs
- * and descends.
+ * A line's height, as the desk's card reads it: how low and how high it goes, how much it climbs and
+ * descends, and the shape to draw.
  *
  * The same four figures [nz.mckenzie.trailday.domain.geo.ElevationPhrase] words on the phone; the
- * page words them so the two cards say the same sentence, and it draws its profile from the heights
- * in the record's own `paths`. The descent travels beside the climb so a line that mostly falls is
- * said to fall, as the phone says it.
+ * page words them so the two cards say the same sentence. [shape] is
+ * [nz.mckenzie.trailday.domain.geo.ElevationShape]'s, worked out here so the desk draws the ground
+ * the phone's own chart draws rather than smoothing differently or not at all. The descent travels
+ * beside the climb so a line that mostly falls is said to fall, as the phone says it.
+ *
+ * **The shape is for drawing only.** A write back carries `paths`, so the heights written back are
+ * the measured ones; the smoothed shape is never a source for an edit.
  */
 @Serializable
 data class WebEditorElevation(
     val lowestM: Double,
     val highestM: Double,
     val climbM: Double,
-    val descentM: Double
+    val descentM: Double,
+    val shape: List<WebEditorSample> = emptyList()
 ) {
     companion object {
         fun of(profile: ElevationProfile) = WebEditorElevation(
             lowestM = profile.lowestM,
             highestM = profile.highestM,
             climbM = profile.climbM,
-            descentM = profile.descentM
+            descentM = profile.descentM,
+            // A tenth of a metre: the card is 100 units wide, so this is finer than the drawing can
+            // show, and it halves what a long ride's shape adds to the document.
+            shape = ElevationShape.of(profile.samples).map {
+                WebEditorSample(alongM = it.alongM.tenths(), heightM = it.heightM.tenths())
+            }
         )
+
+        private fun Double.tenths(): Double = round(this * 10.0) / 10.0
     }
 }
+
+/**
+ * One sample of [WebEditorElevation.shape]: how far along the line it is, and how high the ground is
+ * there. Both the phone's metres, so the page draws rather than measures.
+ */
+@Serializable
+data class WebEditorSample(val alongM: Double, val heightM: Double)
 
 /**
  * What deleting an asset from the desk would take with it.

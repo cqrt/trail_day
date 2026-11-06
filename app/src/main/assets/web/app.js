@@ -837,10 +837,10 @@ function showCard(item) {
   fact('Notes', item.asset.notes);
 
   // The height, when the file the track came from said one: the phone's range, in the same words its
-  // own card uses, and the desk's own drawing of the profile under the facts. A track drawn on a map
-  // has no heights, so it says nothing and draws nothing.
+  // own card uses, and the phone's own smoothed shape under the facts. A track drawn on a map has no
+  // heights, so it says nothing and draws nothing.
   fact('Elevation', elevationWords(item.elevation));
-  drawCardElevation(item.paths);
+  drawCardElevation(item.elevation?.shape ?? []);
 
   document.getElementById('card').hidden = false;
 
@@ -859,16 +859,17 @@ function showCard(item) {
 }
 
 /**
- * The card's little profile: the line's height along its own length, from the heights the record
- * carries.
+ * The card's little profile: the line's height along its own length, as the phone worked it out.
  *
  * The box is a fixed grid the stylesheet stretches to the card's width, so nothing here knows how
- * wide the card is. A line with no heights is hidden rather than drawn empty, which is what the
- * record's absent `elevation` already said in the facts above.
+ * wide the card is. The shape arrives in the record rather than being worked out from the line's
+ * points: the phone has already averaged the fixes into the ground, and averaging them again here
+ * would draw a second answer to the same question. A line with no heights carries no shape, so the
+ * box is hidden rather than drawn empty.
  */
-function drawCardElevation(paths) {
+function drawCardElevation(shape) {
   const box = field('card-elevation');
-  const chart = elevationChart(paths?.[0] ?? [], CARD_ELEVATION_WIDTH, CARD_ELEVATION_HEIGHT);
+  const chart = elevationChart(shape, CARD_ELEVATION_WIDTH, CARD_ELEVATION_HEIGHT);
   box.textContent = '';
   if (!chart) {
     box.hidden = true;
