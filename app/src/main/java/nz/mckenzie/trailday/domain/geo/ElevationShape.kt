@@ -9,8 +9,8 @@ import kotlin.math.min
  *
  * A recorded walk is a fix every few metres and a phone's height is noisy, so the measured heights
  * drawn straight are a sawtooth with the ground buried in it. This is the ground: each sample is
- * replaced by the mean of the heights within [WINDOW_M] of it, so fix-to-fix jitter averages out and a
- * climb reads as a climb.
+ * replaced by the mean of the heights around it - a window [WINDOW_M] wide, half of it either side -
+ * so fix-to-fix jitter averages out and a climb reads as a climb.
  *
  * **It is a way of drawing the samples, not a second reading of them.** Nothing here changes what the
  * profile says was the lowest, the highest, the climb or the descent, and nothing here reaches the
@@ -22,8 +22,14 @@ import kotlin.math.min
  */
 object ElevationShape {
 
-    /** The width of the ground each sample is averaged over: half of it either side. */
-    const val WINDOW_M = 40.0
+    /**
+     * The width of the ground each sample is averaged over: half of it either side.
+     *
+     * Chosen on a 12 km walk: 40 m left small turns in the line, and 200 m took them out while
+     * moving the line at most 3.4 m from the fixes. The cost is a feature shorter than the window -
+     * a small knoll is flattened - and that is the trade the line is drawn on.
+     */
+    const val WINDOW_M = 200.0
 
     /**
      * The most samples a chart is handed.

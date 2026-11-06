@@ -33,9 +33,9 @@ class ElevationShapeTest {
 
     @Test
     fun `a real climb survives the window`() {
-        // A 100 m climb over 1.2 km, which is a walking gradient. Every sample beyond the first
-        // window is the measured line within 3 m: the mean of a straight climb is the line itself.
-        val climbing = line(401, 3.0) { index -> 100.0 + index * 3.0 / 12.0 }
+        // A 100 m climb over 12 km, sampled every 30 m: a walking gradient. At 200 m the window
+        // shifts the one-sided mean at the start by a quarter of a metre, and the interior is exact.
+        val climbing = line(401, 30.0) { index -> 100.0 + index * 0.25 }
 
         val shape = ElevationShape.of(climbing)
 
@@ -121,8 +121,8 @@ class ElevationShapeTest {
 
     @Test
     fun `a spike survives the thinning that leaves its flat metres behind`() {
-        // One 800 m spike in a 6 km flat line. The mean it is drawn as is lower than the spike, but
-        // the sample in that bucket that departs furthest from the flat is the one kept.
+        // One 800 m spike in a 6 km flat line. A 200 m window draws it as a hump of about 112 m; the
+        // point is that the thinning kept that hump rather than the flat 100 m around it.
         val spiked = line(2_000, 3.0) { index -> if (index == 1_000) 900.0 else 100.0 }
 
         val shape = ElevationShape.of(spiked)
@@ -130,7 +130,7 @@ class ElevationShapeTest {
         assertTrue("thinned to ${shape.size} samples", shape.size <= ElevationShape.MAX_SAMPLES)
         assertTrue(
             "the spike is still the highest thing drawn: ${shape.maxOf { it.heightM }}",
-            shape.maxOf { it.heightM } > 150.0
+            shape.maxOf { it.heightM } > 110.0
         )
     }
 }
