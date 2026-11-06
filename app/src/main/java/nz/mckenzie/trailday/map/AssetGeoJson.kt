@@ -127,6 +127,16 @@ object AssetColors {
      * being taken for a track.
      */
     const val POSITION = "#1A73E8"
+
+    /**
+     * The dot under a finger run along a height chart.
+     *
+     * The chart's own green, which is the app's primary: the line on the graph and the dot on the map are
+     * one gesture, so they are one colour, and the ring round the dot is heavy enough to keep the green
+     * apart from a recorded line it may be sitting on. It is not on the shelf and cannot be chosen - it
+     * says where you are pointing, not what something is.
+     */
+    const val FINGER = "#2E7D32"
 }
 
 /**

@@ -136,6 +136,16 @@ internal const val POSITION_ACCURACY_LAYER = "trailday-position-accuracy"
 internal const val POSITION_DOT_LAYER = "trailday-position-dot"
 
 /**
+ * The dot under a finger run along a height chart: its own source and layer, drawn over everything.
+ *
+ * Nothing of the walker's: the map is being *pointed at* while a chart is touched, and a mark that slid
+ * under the lines and places would be the one thing on the map that could not be seen. Empty whenever no
+ * finger is down, which is every moment the walker is not reading a graph.
+ */
+internal const val FINGER_SOURCE = "trailday-finger"
+internal const val FINGER_LAYER = "trailday-finger-dot"
+
+/**
  * The uncertainty around the dot, faint enough to read the imagery through and to sit under
  * the work rather than over it.
  *
@@ -191,6 +201,14 @@ fun BasemapView(
      * place has been chosen to follow.
      */
     targetGeoJson: String = AssetGeoJson.build(emptyList()),
+    /**
+     * A mark another part of the screen puts on this map: the height chart's finger, and nothing else.
+     *
+     * Running a finger along the chart names a place on the line, and the map draws it so the graph and the
+     * ground are one gesture rather than two readings. Empty the moment the finger lifts. See
+     * [FingerGeoJson].
+     */
+    fingerGeoJson: String = FingerGeoJson.EMPTY,
     modifier: Modifier = Modifier,
     /**
      * Whether the camera should keep the phone in the middle of the screen.
@@ -600,6 +618,7 @@ fun BasemapView(
                         docGeoJson = docGeoJson,
                         docBikeBadgesGeoJson = docBikeBadgesGeoJson,
                         targetGeoJson = targetGeoJson,
+                        fingerGeoJson = fingerGeoJson,
                         positionGeoJson = positionGeoJson,
                         density = density,
                         hiddenLayers = hiddenLayers,
@@ -643,6 +662,7 @@ fun BasemapView(
                 docGeoJson = docGeoJson,
                 docBikeBadgesGeoJson = docBikeBadgesGeoJson,
                 targetGeoJson = targetGeoJson,
+                fingerGeoJson = fingerGeoJson,
                 positionGeoJson = positionGeoJson,
                 density = density,
                 hiddenLayers = hiddenLayers,
@@ -728,6 +748,12 @@ fun BasemapView(
     // document, not a reload of the style, so the camera and the tiles stay where the walker left them.
     LaunchedEffect(targetGeoJson, styleState.value) {
         styleState.value?.getSourceAs<GeoJsonSource>(TARGET_SOURCE)?.setGeoJson(targetGeoJson)
+    }
+
+    // The chart's finger, handed over the same way: one feature replaced per movement, so running a
+    // finger along a graph restyles one dot rather than the map under it.
+    LaunchedEffect(fingerGeoJson, styleState.value) {
+        styleState.value?.getSourceAs<GeoJsonSource>(FINGER_SOURCE)?.setGeoJson(fingerGeoJson)
     }
 
     // A layer the walker has switched off, applied to the style that is already loaded. This is a
@@ -861,6 +887,8 @@ internal fun MapLibreMap.loadTrailDayStyle(
     /** The bike points that belong to a track, drawn as a badge over the line. */
     docBikeBadgesGeoJson: String = AssetGeoJson.build(emptyList()),
     targetGeoJson: String = AssetGeoJson.build(emptyList()),
+    /** The chart's finger: see [BasemapView.fingerGeoJson]. */
+    fingerGeoJson: String = FingerGeoJson.EMPTY,
     positionGeoJson: String,
     density: Float,
     hiddenLayers: Set<AssetLayer>,
@@ -1141,6 +1169,23 @@ internal fun MapLibreMap.loadTrailDayStyle(
                         PropertyFactory.circleStrokeWidth(Expression.literal(2.5f))
                     )
                     .withFilter(partIs(PositionGeoJson.PART_DOT))
+            )
+        }
+        // The height chart's finger, last of all so it is over even the phone's dot: while a finger is on a
+        // graph, the place it names is the one thing being pointed at. It wears a heavier white ring than
+        // the phone's dot for that reason - it is a point being read, not the walker's own whereabouts.
+        if (style.getSource(FINGER_SOURCE) == null) {
+            style.addSource(GeoJsonSource(FINGER_SOURCE, fingerGeoJson))
+        }
+        if (style.getLayer(FINGER_LAYER) == null) {
+            style.addLayer(
+                CircleLayer(FINGER_LAYER, FINGER_SOURCE)
+                    .withProperties(
+                        PropertyFactory.circleColor(Expression.literal(AssetColors.FINGER)),
+                        PropertyFactory.circleRadius(Expression.literal(9f)),
+                        PropertyFactory.circleStrokeColor(Expression.literal("#FFFFFF")),
+                        PropertyFactory.circleStrokeWidth(Expression.literal(4f))
+                    )
             )
         }
         // The switches, applied to the style that has just been built, so that the first frame is

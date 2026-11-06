@@ -39,6 +39,17 @@ estimate, so it is left as measured.
 **A feature shorter than the window is flattened.** A 55 m knoll or a short cutting is mostly gone at
 200 m. The line is the ground over a couple of hundred metres, not a survey of every rise.
 
+**Run a finger along the profile and a dot follows on the map above.** The hairline under your finger
+says where on the graph you are, and the dot says where that is on the ground, so a climb you can see
+is a place you can look at. The dot is the chart's own green, with a white ring so it reads on imagery
+of any colour.
+
+Lift your finger and the dot goes with it. Slide sideways to read the ground; a drag up or down is the
+page scrolling, which still works over the chart.
+
+The dot is on a track's own page and on a trip's page, which are the two screens with a map above the
+profile. It is not the phone's dot: that one is blue, and it stays where it is.
+
 **After a recording is saved**, the same chart over the points that were just walked or ridden.
 
 A line that was drawn has no heights, so its page says nothing at all about them. An absence is not a
@@ -56,6 +67,11 @@ same figure two ways.
 `ElevationShape.kt` smooths the samples for drawing, and thins a line longer than 480 samples to about
 that many. Only the chart calls it. The figures and the recorder's time estimate use the measured
 heights, not the shape.
+
+The finger's dot is the same arithmetic the other way round. `ElevationProfile.alongAt` says how far
+along the line a fraction of the chart is, and `PathWalk.pointAlong` turns metres along a line into a
+place on it - the walk of the segments that the recorder already uses to say how far along a track you
+are. The chart says the metres and the line says where they are; neither keeps a second copy.
 
 The desktop page is handed the figures and the smoothed shape by the phone, and draws them. The
 smoothing is not done again on the laptop.

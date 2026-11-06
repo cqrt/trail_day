@@ -36,6 +36,23 @@ data class ElevationProfile(
     /** How much of the line's height there is: the highest point less the lowest. */
     val rangeM: Double get() = highestM - lowestM
 
+    /**
+     * How far along the line a finger at [fraction] of the chart is pointing.
+     *
+     * The chart is drawn against [ElevationSample.alongM] from its first sample to its last, so 0 is the
+     * start of the drawn ground and 1 is the end of it - which is the line's own start and end whenever the
+     * first and last points carried a height. A fraction outside that is held at the end it went past:
+     * the chart is a box, and a finger cannot point beyond it.
+     *
+     * [pointAlong] turns the answer back into a place on the ground; the two live apart because a profile
+     * is a shape and a line is a line.
+     */
+    fun alongAt(fraction: Float): Double {
+        val start = samples.first().alongM
+        val end = samples.last().alongM
+        return start + fraction.coerceIn(0f, 1f) * (end - start)
+    }
+
     companion object {
 
         /**

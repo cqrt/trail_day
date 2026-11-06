@@ -16,7 +16,10 @@ class PathWalkTest {
 
     /** A line running east at [lat], [lengthM] metres long, in [steps] equal legs. */
     private fun eastward(lat: Double, lengthM: Double, steps: Int = 10): List<GeoPoint> {
-        val degLng = lengthM / (METRES_PER_DEG_LNG_AT_EQUATOR * kotlin.math.cos(Math.toRadians(lat)))
+        // Degrees of longitude per metre on that parallel, on the same mean sphere haversine measures
+        // with: a line built any other way is a line whose legs are not the length they claim, and every
+        // promise below is about a metre along it.
+        val degLng = Math.toDegrees(lengthM / EARTH_RADIUS_M) / kotlin.math.cos(Math.toRadians(lat))
         return (0..steps).map { step -> GeoPoint(lat = lat, lng = degLng * step / steps) }
     }
 
@@ -98,5 +101,77 @@ class PathWalkTest {
         assertEquals(on.alongM, progress.alongM, 1e-6)
         assertEquals(on.offM, progress.offM, 1e-6)
         assertEquals(on.remainingM, progress.remainingM, 1e-6)
+    }
+
+    @Test
+    fun `a place along the line is a real place on it, not the nearest vertex`() {
+        val line = eastward(-41.0, 1_000.0, steps = 10)
+
+        val half = pointAlong(line, 500.0)!!
+        val quarter = pointAlong(line, 250.0)!!
+
+        // The promise is the distance, not a longitude: the line is measured with haversine, and the
+        // helper above places its points with a flatter projection, so a metre along is what is held.
+        assertEquals(
+            "half a kilometre along the line",
+            500.0,
+            polylineLengthMeters(listOf(line.first(), half)),
+            0.5
+        )
+        assertEquals(
+            "and a quarter of it",
+            250.0,
+            polylineLengthMeters(listOf(line.first(), quarter)),
+            0.5
+        )
+        assertEquals("on the line's own latitude", -41.0, half.lat, 1e-9)
+    }
+
+    @Test
+    fun `a place past the end of the line is the end of it`() {
+        val line = eastward(-41.0, 500.0)
+
+        assertEquals(line.first().lng, pointAlong(line, 0.0)!!.lng, 1e-9)
+        assertEquals(line.first().lng, pointAlong(line, -40.0)!!.lng, 1e-9)
+        assertEquals(line.last().lng, pointAlong(line, 900.0)!!.lng, 1e-9)
+    }
+
+    @Test
+    fun `the metres run along the whole line, round a corner`() {
+        // 500 m east, then 500 m north: 200 m past the corner the place is 200 m up the second leg.
+        val cornerLng = 500.0 / (METRES_PER_DEG_LNG_AT_EQUATOR * kotlin.math.cos(Math.toRadians(-41.0)))
+        val corner = GeoPoint(lat = -41.0, lng = cornerLng)
+        val north = GeoPoint(lat = -41.0 + 500.0 / METRES_PER_DEG_LAT, lng = cornerLng)
+        val firstLegM = haversineMeters(-41.0, 0.0, corner.lat, corner.lng)
+
+        val at = pointAlong(listOf(GeoPoint(-41.0, 0.0), corner, north), firstLegM + 200.0)!!
+
+        assertEquals("on the corner's longitude", cornerLng, at.lng, 1e-9)
+        assertEquals(
+            "and 200 m up the second leg",
+            200.0,
+            haversineMeters(corner.lat, corner.lng, at.lat, at.lng),
+            0.5
+        )
+    }
+
+    @Test
+    fun `there is no place along a line of one point`() {
+        assertNull(pointAlong(emptyList(), 10.0))
+        assertNull(pointAlong(listOf(GeoPoint(-41.0, 173.0)), 10.0))
+    }
+
+    @Test
+    fun `the chart's finger lands where the height sample says it should`() {
+        // The one arithmetic this feature exists on: a fraction of the graph, metres along the line,
+        // and the place those metres are. The two live in different files, so they are held together here.
+        val line = eastward(-41.0, 1_000.0, steps = 10).mapIndexed { index, point ->
+            point.copy(altitudeM = 100.0 + index * 10.0)
+        }
+        val profile = ElevationProfile.of(line)!!
+
+        val atHalf = pointAlong(line, profile.alongAt(0.5f))!!
+
+        assertEquals("half the width of the chart", 500.0, polylineLengthMeters(listOf(line.first(), atHalf)), 2.0)
     }
 }

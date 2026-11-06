@@ -32,9 +32,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.geo.ElevationPhrase
 import nz.mckenzie.trailday.domain.geo.ElevationProfile
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.geo.pointAlong
 import nz.mckenzie.trailday.domain.reference.followedLineWords
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.map.BasemapView
+import nz.mckenzie.trailday.map.FingerGeoJson
 import nz.mckenzie.trailday.ui.formatDate
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.formatDuration
@@ -70,6 +72,15 @@ fun RecordingDetailScreen(
 
     var confirmingDelete by remember { mutableStateOf(false) }
 
+    // Where the finger is on the height chart, in metres along the line, and the place on the ground
+    // that is. The chart says the metres; the trip's own points say where they are; the map draws the dot.
+    var fingerAtM by remember { mutableStateOf<Double?>(null) }
+    val fingerPoint = remember(fingerAtM, detail) {
+        val line = detail?.points.orEmpty()
+        fingerAtM?.let { pointAlong(line, it) }
+    }
+    val fingerGeoJson = remember(fingerPoint) { FingerGeoJson.build(fingerPoint) }
+
     LaunchedEffect(deleted) {
         if (deleted) {
             // Consume before navigating, so re-entering this screen does not immediately bounce back out.
@@ -97,6 +108,7 @@ fun RecordingDetailScreen(
                 BasemapView(
                     basemap = basemap,
                     assetGeoJson = geoJson,
+                    fingerGeoJson = fingerGeoJson,
                     fitBounds = remember(detail) { boundsOf(detail) },
                     // A picture of one trip, not a place to explore: every gesture off, and the zoom given
                     // to the buttons on the right instead.
@@ -173,6 +185,8 @@ fun RecordingDetailScreen(
                                 }
                                 ElevationChart(
                                     profile = profile,
+                                    fingerAtM = fingerAtM,
+                                    onFinger = { fingerAtM = it },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(96.dp)

@@ -112,6 +112,38 @@ fun pathFrom(path: List<GeoPoint>, alongM: Double, forward: Boolean): List<GeoPo
 }
 
 /**
+ * The place [alongM] along [path], or null when there is no line to walk.
+ *
+ * **The inverse of the height chart's distance scale.** The chart is drawn against [ElevationSample.alongM],
+ * which steps along every point of the line, so the same metres asked of the line itself give the ground
+ * under a finger run along the graph. Past either end it is the end: a chart's own box is the line's own
+ * length, and a fraction outside it is arithmetic rather than a place.
+ *
+ * Measured with [haversineMeters] like everything else that walks a line, so a join rule, a following
+ * readout and this cannot disagree about how far along a particular piece of ground is.
+ */
+fun pointAlong(path: List<GeoPoint>, alongM: Double): GeoPoint? {
+    if (path.size < 2) return null
+
+    val target = alongM.coerceAtLeast(0.0)
+    var travelled = 0.0
+    for (index in 1 until path.size) {
+        val start = path[index - 1]
+        val end = path[index]
+        val length = haversineMeters(start.lat, start.lng, end.lat, end.lng)
+
+        if (travelled + length >= target) {
+            val fraction = if (length <= 0.0) 0.0 else (target - travelled) / length
+            return interpolate(start, end, fraction.coerceIn(0.0, 1.0))
+        }
+        travelled += length
+    }
+
+    // Past the end: the last place on the line, which is where a walk of the chart's whole width ends.
+    return path.last()
+}
+
+/**
  * A point [fraction] of the way from [start] to [end].
  *
  * The height comes with it when both ends have one, because a joined line's profile should not gain a step

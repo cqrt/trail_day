@@ -52,11 +52,13 @@ import nz.mckenzie.trailday.domain.geo.ElevationProfile
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.TravelMode
 import nz.mckenzie.trailday.domain.geo.TravelTime
+import nz.mckenzie.trailday.domain.geo.pointAlong
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.look.Look
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.BasemapView
+import nz.mckenzie.trailday.map.FingerGeoJson
 import nz.mckenzie.trailday.photo.WaypointPhotos
 import nz.mckenzie.trailday.ui.formatCoordinates
 import nz.mckenzie.trailday.ui.formatDate
@@ -130,6 +132,14 @@ fun AssetDetailScreen(
     var confirmingDelete by remember { mutableStateOf(false) }
     var actionsOpen by remember { mutableStateOf(false) }
 
+    // Where the finger is on the height chart, in metres along the line, and the place on the ground
+    // that is. The chart says the metres; the line says where they are; the map draws the dot.
+    var fingerAtM by remember { mutableStateOf<Double?>(null) }
+    val fingerPoint = remember(fingerAtM, geometry) {
+        fingerAtM?.let { pointAlong(geometry.line, it) }
+    }
+    val fingerGeoJson = remember(fingerPoint) { FingerGeoJson.build(fingerPoint) }
+
     // The map at the top is a **preview** of one place: every gesture off, so a drag cannot slide the
     // place off the page, and the two buttons on the right for the looking closer.
     val zoom = rememberMapZoomState()
@@ -150,6 +160,7 @@ fun AssetDetailScreen(
                 BasemapView(
                     basemap = basemap,
                     assetGeoJson = geoJson,
+                    fingerGeoJson = fingerGeoJson,
                     fitBounds = bounds,
                     // How close this map is allowed to sit. Asked for in as many words: the page was
                     // landing at the deepest zoom the map has, where the imagery runs out, and 15 is the
@@ -240,6 +251,8 @@ fun AssetDetailScreen(
                             elevation?.let { profile ->
                                 ElevationChart(
                                     profile = profile,
+                                    fingerAtM = fingerAtM,
+                                    onFinger = { fingerAtM = it },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(96.dp)

@@ -77,4 +77,34 @@ class ElevationProfileTest {
 
         assertEquals("≈500–600 m, down 100 m", ElevationPhrase.range(profile))
     }
+
+    @Test
+    fun `the chart's two ends are the first and last height's own metres`() {
+        val line = listOf(at(0, 100.0), at(1, 200.0), at(2, 150.0))
+        val profile = ElevationProfile.of(line)!!
+        val end = haversineMeters(0.0, 0.0, 0.002, 0.0)
+
+        assertEquals("the start of the chart", 0.0, profile.alongAt(0f), 1e-9)
+        assertEquals("the middle of it", end / 2.0, profile.alongAt(0.5f), 1e-6)
+        assertEquals("and its end", end, profile.alongAt(1f), 1e-6)
+    }
+
+    @Test
+    fun `a finger past either end of the chart is held at that end`() {
+        // A box on a screen cannot be pointed outside, whatever arithmetic arrives from a touch.
+        val profile = ElevationProfile.of(listOf(at(0, 100.0), at(1, 200.0)))!!
+
+        assertEquals(profile.samples.first().alongM, profile.alongAt(-0.4f), 1e-9)
+        assertEquals(profile.samples.last().alongM, profile.alongAt(3.2f), 1e-9)
+    }
+
+    @Test
+    fun `a line whose first point has no height draws from the first height onwards`() {
+        // The chart starts where the heights start, so the finger's 0 is there rather than at the
+        // beginning of a line with nothing to draw.
+        val profile = ElevationProfile.of(listOf(at(0, null), at(1, 100.0), at(2, 200.0)))!!
+
+        assertEquals(haversineMeters(0.0, 0.0, 0.001, 0.0), profile.alongAt(0f), 1e-6)
+        assertEquals(haversineMeters(0.0, 0.0, 0.002, 0.0), profile.alongAt(1f), 1e-6)
+    }
 }
