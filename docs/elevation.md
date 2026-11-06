@@ -25,7 +25,16 @@ the height and leaves the rest where it is.
 highest point of the line, and the total climb.
 
 **Under that line, a profile**: the height of the line along its own length, so a climb is visible
-without reading numbers.
+without reading numbers. It draws the ground rather than every fix: a phone's height jitters by a few
+metres from one fix to the next, so the raw heights make a sawtooth. Each sample is the mean of the
+heights within 40 m of it, either side. A climb reads as a climb.
+
+The first and last samples keep their measured heights, so the line starts and ends where you did.
+
+The four figures above do not change. Lowest, highest, climb and descent are still the measured ones.
+The shape is a way of drawing the samples, not a second reading of them. On a noisy walk the climb
+reads high, so the line can look calmer than the figure beside it; the climb is what feeds the time
+estimate, so it is left as measured.
 
 **After a recording is saved**, the same chart over the points that were just walked or ridden.
 
@@ -41,8 +50,12 @@ no Android in it, so it is held by unit tests.
 The words are in `ElevationPhrase.kt` beside it, so the phone's card and the desktop page cannot say the
 same figure two ways.
 
-The desktop page is handed the three figures by the phone and draws the shape from the heights it
-already has. The arithmetic stays on the phone, which is the same rule the area figures follow.
+`ElevationShape.kt` smooths the samples for drawing, and thins a line longer than 480 samples to about
+that many. Only the chart calls it. The figures and the recorder's time estimate use the measured
+heights, not the shape.
+
+The desktop page is handed the figures and the smoothed shape by the phone, and draws them. The
+smoothing is not done again on the laptop.
 
 ## Where a height is used
 
@@ -62,4 +75,6 @@ Nothing else is worked out from a height. Distances are measured on the flat.
   and it goes across to the desktop page, so a track that came in with heights still has them tomorrow.
 - **A GPX written back out keeps its heights.** Export a track you imported and the `<ele>` lines are
   still in the file.
+- **The shape is drawn, not stored.** The points keep the heights the phone took. The chart averages
+  them when it draws.
 - **A backup made before heights existed restores unchanged**, and one made after keeps them.
