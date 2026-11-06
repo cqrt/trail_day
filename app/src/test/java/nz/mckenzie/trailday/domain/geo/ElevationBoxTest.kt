@@ -31,28 +31,29 @@ class ElevationBoxTest {
     }
 
     @Test
-    fun `a hundred metres of ground is already a hill`() {
-        val box = ElevationBox.of(line(500.0, 600.0))
+    fun `fifty metres of ground is already a hill`() {
+        val box = ElevationBox.of(line(500.0, 550.0))
 
         assertEquals("the box it always had", 500.0, box.lowestM, 1e-9)
-        assertEquals(600.0, box.highestM, 1e-9)
+        assertEquals(550.0, box.highestM, 1e-9)
     }
 
     @Test
-    fun `a ripple is drawn small, in the middle of a hundred metres`() {
+    fun `a ripple is drawn small, in the middle of fifty metres`() {
         val box = ElevationBox.of(line(500.0, 520.0))
 
-        assertEquals("the middle of the measured range, less fifty", 460.0, box.lowestM, 1e-9)
-        assertEquals("and fifty above it", 560.0, box.highestM, 1e-9)
+        assertEquals("the middle of the measured range, less twenty-five", 485.0, box.lowestM, 1e-9)
+        assertEquals("and twenty-five above it", 535.0, box.highestM, 1e-9)
         assertEquals(ElevationBox.MIN_SPAN_M, box.spanM, 1e-9)
+        assertEquals("which is half the range it would otherwise take", 50.0, box.spanM, 1e-9)
     }
 
     @Test
     fun `a flat walk has air above and below rather than no height at all`() {
         val box = ElevationBox.of(line(50.0, 50.0))
 
-        assertEquals(0.0, box.lowestM, 1e-9)
-        assertEquals(100.0, box.highestM, 1e-9)
+        assertEquals(25.0, box.lowestM, 1e-9)
+        assertEquals(75.0, box.highestM, 1e-9)
         assertEquals("and the line is drawn down the middle", 50.0, (box.lowestM + box.highestM) / 2, 1e-9)
     }
 
