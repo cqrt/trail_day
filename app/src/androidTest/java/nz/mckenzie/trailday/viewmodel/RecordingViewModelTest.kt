@@ -296,6 +296,17 @@ class RecordingViewModelTest {
         String.format(java.util.Locale.US, "%.7f", point.lng)
 
     @Test
+    fun theLevelTheMapWasLeftAtIsTheLevelTheNextRecorderOpensAt() {
+        // A walker zoomed in on a creek. Following a place from its page builds a recorder with a key of
+        // its own, so a level kept inside this view model would be forgotten at the one moment the walker
+        // has just said where they are walking. It lives in RecordZoomMemory, and this is the rule that
+        // says so - the part a later change could undo without anything else noticing.
+        viewModel().rememberMapLevel(17.0)
+
+        assertEquals(17.0, viewModel().mapLevel.value!!, 0.0001)
+    }
+
+    @Test
     fun aScreenThatComesBackToARecordingKeepsItsProgress() = runBlocking {
         // The service's session, paused with fixes in the database and nothing in memory,
         // which is exactly what a re-created screen finds.

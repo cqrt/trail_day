@@ -90,6 +90,8 @@ While you're recording, the app carries on to the next track by itself. A sectio
 
 Hit Record and the app logs your position as you move. Each point is saved to the database as it arrives, so a crash or a flat battery loses at most the last point. Pausing is stored as a pause, so it doesn't look like a gap in the GPS signal. The recorder ignores fixes that are obviously bad, such as ones with poor accuracy or ones that would mean you'd moved impossibly fast.
 
+The map keeps the zoom you left it at. Go to another tab and come back and it's still at that scale, though it centres on you again rather than staying where you'd panned.
+
 A recording is saved as a trip with its line, distance, time and points. If you record along a place you already had, the trip is linked to it. If you record a brand new route, it also becomes a new place, and deleting that trip deletes the place it created (but not a place that was yours beforehand).
 
 You can also bring a walk in from a file. Import on the Activities tab takes a GPX, KML, KMZ or GeoJSON file and saves each track in it as a finished trip, dated from the file's own times so it sorts where it belongs. An untimed file takes today, and says nothing about how long it took rather than claiming nothing at all.

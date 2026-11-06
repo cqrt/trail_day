@@ -70,6 +70,7 @@ import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.AssetStretch
+import nz.mckenzie.trailday.map.RecordZoomMemory
 import nz.mckenzie.trailday.map.TargetGeoJson
 import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.offline.OfflineOtherTrackStore
@@ -170,6 +171,21 @@ class RecordingViewModel(
 
     /** The frame for the camera when the map opens: around the phone, if it knows. */
     val initialFrame: StateFlow<LatLngBounds?> = _initialFrame
+
+    /**
+     * How close the map was last left, so coming back to the tab opens at the walker's own scale.
+     *
+     * Kept in [RecordZoomMemory] rather than here, and that is the point: following a place from its
+     * page builds a **new** recorder, so a level kept in this view model would be forgotten at exactly
+     * the moment the walker has just chosen where to walk. The frame above is where; this is how close,
+     * and only the second is the walker's to choose.
+     */
+    val mapLevel: StateFlow<Double?> = RecordZoomMemory.level
+
+    /** The map has settled; keep how close it was. */
+    fun rememberMapLevel(level: Double) {
+        RecordZoomMemory.remember(level)
+    }
 
     /**
      * How far the walker has been from each end of the section being followed, since it became the target.

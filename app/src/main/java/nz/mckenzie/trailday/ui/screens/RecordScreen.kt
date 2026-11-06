@@ -70,6 +70,7 @@ import nz.mckenzie.trailday.domain.geo.FollowPoint
 import nz.mckenzie.trailday.domain.geo.FollowProgress
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.map.BasemapView
+import nz.mckenzie.trailday.map.DEFAULT_CAMERA_ZOOM
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.formatDuration
 import nz.mckenzie.trailday.ui.docBikeLine
@@ -100,6 +101,9 @@ fun RecordScreen(
     val geoJson by viewModel.recordedGeoJson.collectAsStateWithLifecycle()
     val targetGeoJson by viewModel.targetGeoJson.collectAsStateWithLifecycle()
     val initialFrame by viewModel.initialFrame.collectAsStateWithLifecycle()
+    // How close the walker was reading. Where the map opens is the phone, or the work; the scale is
+    // the one thing on this camera that is theirs to choose.
+    val mapLevel by viewModel.mapLevel.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val summary by viewModel.summary.collectAsStateWithLifecycle()
     val finished by viewModel.finished.collectAsStateWithLifecycle()
@@ -237,6 +241,12 @@ fun RecordScreen(
                 targetGeoJson = targetGeoJson,
                 // Recording starts where the walker is, not on a view of the country.
                 fitBounds = initialFrame,
+                // ...and at the scale they were last reading. A box around one person says nothing
+                // about how close to be, so without this every return to the tab landed on whatever
+                // level the framing chose, and a zoomed-in creek came back as the whole valley.
+                initialZoom = mapLevel ?: DEFAULT_CAMERA_ZOOM,
+                keepZoomWhenFitting = mapLevel,
+                onCameraIdle = { _, _, level -> viewModel.rememberMapLevel(level) },
                 // While a pass is being driven the map keeps the phone in the middle, so the
                 // walker can see the line they are on without touching the screen. A drag
                 // takes the map off them - see the follow control - and nothing else moves it.

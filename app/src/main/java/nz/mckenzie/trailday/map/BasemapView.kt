@@ -257,6 +257,17 @@ fun BasemapView(
      */
     fitBoundsPaddingBottomPx: Int = 0,
     /**
+     * The level to land on when framing [fitBounds], rather than the one the box implies.
+     *
+     * For the recorder, and nothing else. Its map is made again every time the walker comes back to the
+     * tab, and the frame it is made with is the phone - so without this the box decides the scale, and a
+     * walker who had zoomed in on a creek came back to the whole valley. Where is the box's business;
+     * how close is the walker's. See [nz.mckenzie.trailday.map.RecordZoomMemory].
+     *
+     * Null by default, so every other map is framed exactly as it always was.
+     */
+    keepZoomWhenFitting: Double? = null,
+    /**
      * Whether the walker may move this map.
      *
      * True on every map the work is read on, and on every map the walker is working *with* - the map tab,
@@ -810,14 +821,29 @@ fun BasemapView(
 
     // Frame the track network the first time we know where it is, so opening the
     // app shows "my tracks", not an arbitrary patch of countryside. The asset's own page
-    // also says how close it is allowed to end up - see [fitBoundsMaxZoom].
-    LaunchedEffect(fitBounds, fitBoundsMaxZoom, fitBoundsPaddingPx, fitBoundsPaddingBottomPx, mapState.value) {
+    // also says how close it is allowed to end up - see [fitBoundsMaxZoom] - and the recorder
+    // says how close it already was, so coming back to its tab does not undo the walker's zoom.
+    LaunchedEffect(
+        fitBounds,
+        fitBoundsMaxZoom,
+        keepZoomWhenFitting,
+        fitBoundsPaddingPx,
+        fitBoundsPaddingBottomPx,
+        mapState.value
+    ) {
         val map = mapState.value ?: return@LaunchedEffect
         val bounds = fitBounds ?: return@LaunchedEffect
         if (boundsApplied) return@LaunchedEffect
 
         map.animateCamera(
-            cameraFor(map, bounds, fitBoundsMaxZoom, fitBoundsPaddingPx, fitBoundsPaddingBottomPx)
+            cameraFor(
+                map,
+                bounds,
+                fitBoundsMaxZoom,
+                fitBoundsPaddingPx,
+                fitBoundsPaddingBottomPx,
+                keepZoomWhenFitting
+            )
         )
         boundsApplied = true
     }
@@ -1658,6 +1684,9 @@ private fun partIs(part: String): Expression =
  * its own zoom until the map applies it. That needs a map that has been laid out - which it
  * has, by the time bounds arrive - and it is what lets the asset's own page end up at 15
  * rather than at the deepest zoom the map has.
+ *
+ * [keptZoom] is the recorder's, and the choice between the three is [fitZoom] rather than a
+ * condition here, because it is a rule about levels and worth a test of its own.
  */
 private fun cameraFor(
     map: MapLibreMap,
@@ -1665,7 +1694,9 @@ private fun cameraFor(
     maxZoom: Double? = null,
     paddingPx: Int = BOUNDS_PADDING_PX,
     /** Extra room at the foot: a card drawn over the map would otherwise cover what was just framed. */
-    bottomPaddingPx: Int = 0
+    bottomPaddingPx: Int = 0,
+    /** How close the walker was reading, when they are the one who decides. */
+    keptZoom: Double? = null
 ): CameraUpdate {
     val maplibreBounds = org.maplibre.android.geometry.LatLngBounds.Builder()
         .include(LatLng(bounds.minLat, bounds.minLng))
@@ -1683,7 +1714,7 @@ private fun cameraFor(
         ?: return CameraUpdateFactory.newLatLngBounds(maplibreBounds, paddingPx)
 
     return CameraUpdateFactory.newCameraPosition(
-        CameraPosition.Builder(fitted).zoom(if (maxZoom == null) fitted.zoom else minOf(fitted.zoom, maxZoom)).build()
+        CameraPosition.Builder(fitted).zoom(fitZoom(fitted.zoom, maxZoom, keptZoom)).build()
     )
 }
 
