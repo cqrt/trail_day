@@ -65,6 +65,7 @@ import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.ElevationPhrase
 import nz.mckenzie.trailday.domain.geo.ElevationProfile
 import nz.mckenzie.trailday.domain.geo.TravelMode
+import nz.mckenzie.trailday.domain.recording.ActivityMode
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.domain.geo.FollowPoint
 import nz.mckenzie.trailday.domain.geo.FollowProgress
@@ -119,20 +120,15 @@ fun RecordScreen(
     val heading by viewModel.heading.collectAsStateWithLifecycle()
     val drift by viewModel.drift.collectAsStateWithLifecycle()
     val assetName by viewModel.selectedTrackName.collectAsStateWithLifecycle()
+    val targetMode by viewModel.targetMode.collectAsStateWithLifecycle()
     val recordingTargets by viewModel.recordingTargets.collectAsStateWithLifecycle()
-    val pendingTrackName by viewModel.pendingTrackName.collectAsStateWithLifecycle()
+    val pendingFinish by viewModel.pendingFinish.collectAsStateWithLifecycle()
 
     var permissionGranted by remember { mutableStateOf(viewModel.hasLocationPermission()) }
     var pickingTrack by remember { mutableStateOf(false) }
     var confirmingDiscard by remember { mutableStateOf(false) }
     var assetNameDraft by remember { mutableStateOf("") }
-    var assetKindDraft by remember { mutableStateOf(AssetKind.TRACK) }
 
-    // A new dialog starts on the common case: a walk. The last saved track's type must not leak into
-    // the next one, which is a different place.
-    LaunchedEffect(pendingTrackName) {
-        if (pendingTrackName != null) assetKindDraft = AssetKind.TRACK
-    }
 
     // The kind of recording being set up: following a line, or a new line of the walker's own. Not held
     // while a pass is being driven - by then it is a fact, not a choice.
@@ -166,8 +162,8 @@ fun RecordScreen(
     val pickerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // Finish asks what to call the line; the suggested name arrives with the prompt.
-    LaunchedEffect(pendingTrackName) {
-        pendingTrackName?.let { assetNameDraft = it }
+    LaunchedEffect(pendingFinish) {
+        pendingFinish?.let { assetNameDraft = it.name }
     }
 
     // The pass that has just been saved is on the card while the walker is here to see it -
@@ -282,6 +278,7 @@ fun RecordScreen(
                 passElevation = passElevation,
                 followMode = followingMode,
                 targetName = assetName,
+                targetMode = targetMode,
                 permissionGranted = permissionGranted,
                 notificationsAllowed = notifications.allowed,
                 message = message,
@@ -476,15 +473,22 @@ fun RecordScreen(
         }
     }
 
-    // Finishing a line that is not already a track makes one, so it needs a name.
-    if (pendingTrackName != null) {
+    // Finishing a line that is not already a track makes one, so it needs a name. **The mode is not a
+    // question**: the pass has an average, and the average says what it was - so the dialog states it
+    // and the trip is saved as it. The trip's own page is where it is changed.
+    pendingFinish?.let { asking ->
         AlertDialog(
             onDismissRequest = { viewModel.cancelFinish() },
-            title = { Text("Name this track") },
+            title = { Text(if (asking.mode == ActivityMode.RIDE) "Name this ride" else "Name this track") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Saved as a place. Cancelling keeps recording.",
+                        text = modeSentence(asking) +
+                            " " + if (asking.mode == ActivityMode.RIDE) {
+                                "Saved as a bike track. Cancelling keeps recording."
+                            } else {
+                                "Saved as a track. Cancelling keeps recording."
+                            },
                         style = MaterialTheme.typography.bodySmall
                     )
                     OutlinedTextField(
@@ -493,18 +497,11 @@ fun RecordScreen(
                         label = { Text("Name") },
                         singleLine = true
                     )
-                    ChoiceRow(
-                        label = "What kind of track",
-                        choices = listOf(AssetKind.TRACK, AssetKind.BIKE_TRACK),
-                        selected = assetKindDraft,
-                        onChoose = { assetKindDraft = it },
-                        text = AssetPhrase::kind
-                    )
                 }
             },
             confirmButton = {
                 TextButton(
-                    onClick = { viewModel.confirmFinish(assetNameDraft, assetKindDraft) }
+                    onClick = { viewModel.confirmFinish(assetNameDraft) }
                 ) { Text("Save") }
             },
             dismissButton = {
@@ -603,6 +600,8 @@ private fun RecordDock(
     passElevation: ElevationProfile?,
     followMode: Boolean,
     targetName: String?,
+    /** What the line being followed is, or null when nothing is followed: a bike's figure is a speed. */
+    targetMode: ActivityMode?,
     permissionGranted: Boolean,
     notificationsAllowed: Boolean,
     message: String?,
@@ -684,7 +683,14 @@ private fun RecordDock(
                         color = MaterialTheme.colorScheme.outlineVariant,
                         modifier = Modifier.height(32.dp)
                     )
-                    DockFigure(label = "Pace", value = paceOf(summary.distanceM, elapsedMs))
+                    // A ride's figure is a speed, because that is the number a rider reads: minutes a
+                    // kilometre is a walker's arithmetic, and 5.0 min/km tells a rider less than 12 km/h.
+                    // A new line has no kind yet, so it stays on the walker's figure until it is saved.
+                    if (targetMode == ActivityMode.RIDE) {
+                        DockFigure(label = "Speed", value = speedOf(summary.distanceM, elapsedMs))
+                    } else {
+                        DockFigure(label = "Pace", value = paceOf(summary.distanceM, elapsedMs))
+                    }
                 }
             }
 
@@ -758,7 +764,11 @@ private fun RecordDock(
                             text = offPart + buildString {
                                 append("${formatDistance(progress.alongM)} of ")
                                 append(formatDistance(progress.totalM))
-                                val toGo = progress.toGoSeconds(TravelMode.WALKING)
+                                // The ground ahead takes a walker's hour or a rider's, and the line
+                                // being followed says which: a bike track's 400 m is two minutes.
+                                val toGo = progress.toGoSeconds(
+                                    targetMode?.travelMode ?: TravelMode.WALKING
+                                )
                                 if (toGo >= ONE_MINUTE_S) append(" \u00b7 about ${formatEstimate(toGo)} to go")
                             },
                             style = MaterialTheme.typography.bodySmall
@@ -935,6 +945,34 @@ private fun paceOf(distanceM: Double, elapsedMs: Long): String {
     val minutesPerKm = (elapsedMs / 60_000.0) / (distanceM / 1000.0)
     return String.format(java.util.Locale.US, "%.1f min/km", minutesPerKm)
 }
+
+/**
+ * How fast the pass is going, in kilometres an hour, or nothing while there is nothing to divide by.
+ *
+ * The same fifty metres of movement the pace needs before it says anything: a fix or two of a phone
+ * standing at a trailhead is a very fast rider by arithmetic and a very misleading one to read.
+ */
+private fun speedOf(distanceM: Double, elapsedMs: Long): String {
+    if (distanceM < 50.0 || elapsedMs <= 0L) return "\u2013"
+    val kmh = distanceM / 1_000.0 / (elapsedMs / 3_600_000.0)
+    return String.format(java.util.Locale.US, "%.1f km/h", kmh)
+}
+
+/**
+ * What the pass came to, in the naming dialog's quiet first clause.
+ *
+ * The average is the one the trip's page will print, so the sentence and the page agree; a pass with no
+ * average says what it is without claiming a number nobody measured.
+ */
+private fun modeSentence(asking: RecordingViewModel.PendingFinish): String =
+    asking.kmh?.let { kmh ->
+        String.format(
+            java.util.Locale.US,
+            "Averaged %.1f km/h, so this is a %s.",
+            kmh,
+            asking.mode.one
+        )
+    } ?: "This is a ${asking.mode.one}."
 
 /** "Following" or "Follow me", the map's own camera control, as the mock screens draw it: a white pill. */
 @Composable

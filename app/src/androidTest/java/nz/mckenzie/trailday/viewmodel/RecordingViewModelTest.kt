@@ -28,6 +28,7 @@ import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
 import nz.mckenzie.trailday.domain.other.EmptyOtherTracksCache
 import nz.mckenzie.trailday.domain.other.OtherTrack
 import nz.mckenzie.trailday.domain.other.OtherTracksCache
+import nz.mckenzie.trailday.domain.recording.ActivityMode
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.tracking.TrackingState
@@ -156,8 +157,11 @@ class RecordingViewModelTest {
 
         viewModel.finish()
 
-        val suggested = withTimeout(5_000) { viewModel.pendingTrackName.first { it != null } }
-        assertTrue("a suggested name should be offered, got $suggested", !suggested.isNullOrBlank())
+        val suggested = withTimeout(5_000) { viewModel.pendingFinish.first { it != null } }
+        assertTrue(
+            "a suggested name should be offered, got ${suggested?.name}",
+            !suggested!!.name.isNullOrBlank()
+        )
         assertNull(
             "nothing should be finished until the name is confirmed",
             recordings.getSession(sessionId)!!.endedAtEpochMs
@@ -184,6 +188,75 @@ class RecordingViewModelTest {
         assertTrue("its length should have been computed", stored.lengthM > 0.0)
     }
 
+    /**
+     * A session that has been recording long enough for [line] to average [kmh].
+     *
+     * A recording's mode is decided from its average over the wall clock - the start the service stored
+     * to the moment Save is pressed - so a pass's speed is set here by putting its start back rather
+     * than by giving its fixes times.
+     */
+    private suspend fun sessionAveraging(kmh: Double): Long {
+        val sessionId = recordings.startRecording(name = "Recording")
+        line.forEach { recordings.appendPoint(sessionId, it) }
+        val distanceM = polylineLengthMeters(line)
+        val movingMs = (distanceM / (kmh * 1_000.0 / 3_600.0)).toLong()
+        TrackingState.begin(sessionId, System.currentTimeMillis() - movingMs)
+        TrackingState.onAcceptedFix(pointCount = line.size, distanceM = distanceM, accuracyM = 5f)
+        return sessionId
+    }
+
+    @Test
+    fun aPassOverSixKilometresAnHourIsSavedAsARideThatMadeABikeTrack() = runBlocking {
+        val viewModel = viewModel()
+        val sessionId = sessionAveraging(12.0)
+
+        viewModel.finish()
+
+        val asking = withTimeout(5_000) { viewModel.pendingFinish.first { it != null } }!!
+        assertEquals("twelve an hour is a ride", ActivityMode.RIDE, asking.mode)
+        assertEquals(
+            "and the sentence's average is the one the page will print",
+            12.0,
+            asking.kmh!!,
+            0.5
+        )
+
+        viewModel.confirmFinish("Paddock lane")
+
+        withTimeout(5_000) { viewModel.message.first { it?.contains("Paddock lane") == true } }
+
+        val session = recordings.getSession(sessionId)!!
+        assertEquals("the trip says what it was", ActivityMode.RIDE.name, session.mode)
+        assertEquals("and the saved line is a ride", ActivityMode.RIDE, viewModel.finished.value?.mode)
+        assertEquals(
+            "the place a ride makes is a bike track",
+            "BIKE_TRACK",
+            assetsNamed("Paddock lane").single().kind
+        )
+    }
+
+    @Test
+    fun aPassUnderSixKilometresAnHourIsSavedAsAWalkThatMadeATrack() = runBlocking {
+        val viewModel = viewModel()
+        val sessionId = sessionAveraging(4.0)
+
+        viewModel.finish()
+
+        val asking = withTimeout(5_000) { viewModel.pendingFinish.first { it != null } }!!
+        assertEquals("four an hour is a walk", ActivityMode.WALK, asking.mode)
+
+        viewModel.confirmFinish("Paddock lane")
+
+        withTimeout(5_000) { viewModel.message.first { it?.contains("Paddock lane") == true } }
+
+        assertEquals(ActivityMode.WALK.name, recordings.getSession(sessionId)!!.mode)
+        assertEquals(
+            "the place a walk makes is a track",
+            "TRACK",
+            assetsNamed("Paddock lane").single().kind
+        )
+    }
+
     @Test
     fun finishingAgainstAnExistingTrackDoesNotAskForAName() = runBlocking {
         val assetId = assetRepository.createAsset("Block A", line)
@@ -195,7 +268,7 @@ class RecordingViewModelTest {
 
         viewModel.finish()
 
-        assertNull("an existing track already has a name", viewModel.pendingTrackName.value)
+        assertNull("an existing track already has a name", viewModel.pendingFinish.value)
         val message = withTimeout(5_000) {
             viewModel.message.first { it?.startsWith("Saved") == true }
         }
@@ -223,11 +296,11 @@ class RecordingViewModelTest {
         val sessionId = recordingSession()
 
         viewModel.finish()
-        withTimeout(5_000) { viewModel.pendingTrackName.first { it != null } }
+        withTimeout(5_000) { viewModel.pendingFinish.first { it != null } }
 
         viewModel.cancelFinish()
 
-        assertNull(viewModel.pendingTrackName.value)
+        assertNull(viewModel.pendingFinish.value)
         val session = recordings.getSession(sessionId)!!
         assertNull("the session must still be open", session.endedAtEpochMs)
         assertEquals(RecordingStatus.RECORDING.name, session.status)
@@ -239,7 +312,7 @@ class RecordingViewModelTest {
         val sessionId = recordingSession()
 
         viewModel.finish()
-        withTimeout(5_000) { viewModel.pendingTrackName.first { it != null } }
+        withTimeout(5_000) { viewModel.pendingFinish.first { it != null } }
 
         viewModel.discard()
 
@@ -270,7 +343,7 @@ class RecordingViewModelTest {
         TrackingState.onAcceptedFix(pointCount = 1, distanceM = 0.0, accuracyM = 5f)
 
         viewModel.finish()
-        withTimeout(5_000) { viewModel.pendingTrackName.first { it != null } }
+        withTimeout(5_000) { viewModel.pendingFinish.first { it != null } }
         viewModel.confirmFinish("One point")
 
         val message = withTimeout(5_000) {

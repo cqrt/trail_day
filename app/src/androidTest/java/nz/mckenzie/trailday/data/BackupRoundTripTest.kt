@@ -212,6 +212,69 @@ class BackupRoundTripTest {
     }
 
     @Test
+    fun aRideSurvivesTheRoundTrip() = runBlocking {
+        populate()
+        val sessionId = db.recordingDao().insertSession(
+            RecordedSessionEntity(
+                name = "Taupo ride",
+                startedAtEpochMs = 1_788_000_000_000L,
+                endedAtEpochMs = 1_788_000_600_000L,
+                status = "FINISHED",
+                distanceM = 18_200.0,
+                durationMs = 5_460_000L,
+                pointCount = 2,
+                mode = "RIDE"
+            )
+        )
+
+        val exported = repository().export()
+        repository().restore(BackupDocument(exportedAtEpochMs = clock, appVersion = "test-build"))
+        repository().restore(exported)
+
+        assertEquals(
+            "what was ridden is still a ride",
+            "RIDE",
+            db.recordingDao().getSession(sessionId)!!.mode
+        )
+        assertEquals("and the rest of the season is untouched", exported, repository().export())
+    }
+
+    @Test
+    fun aFileWrittenBeforeTheModeExistedRestoresItsTripsAsWalks() = runBlocking {
+        // A backup written by 0.4.45 has no `mode` key at all, and the format does not move for a key
+        // an older build can live without: the default is what every trip of that age was.
+        val old = """
+            {
+              "format": "trail-day-backup",
+              "version": 2,
+              "exportedAtEpochMs": 1789344000000,
+              "appVersion": "0.4.45",
+              "recordings": [
+                {
+                  "id": 3,
+                  "name": "Home block 14 Sep",
+                  "startedAtEpochMs": 1788000000000,
+                  "endedAtEpochMs": 1788000600000,
+                  "status": "FINISHED",
+                  "distanceM": 2350.0,
+                  "durationMs": 600000,
+                  "pointCount": 0
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val document = nz.mckenzie.trailday.domain.backup.BackupFormat.decode(old)
+        repository().restore(document)
+
+        assertEquals(
+            "an old trip reads as a walk, which is what it was saved as",
+            "WALK",
+            db.recordingDao().getSession(3L)!!.mode
+        )
+    }
+
+    @Test
     fun theFileNameSaysWhatItIsAndWhen() {
         val controller = BackupController(repository(), context)
 

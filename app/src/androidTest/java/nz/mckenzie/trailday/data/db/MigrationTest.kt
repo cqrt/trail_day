@@ -321,6 +321,59 @@ class MigrationTest {
         }
     }
 
+    @Test
+    fun tripsAlreadyKeptAreWalksUntilSomebodySaysOtherwise() {
+        // Version 13 drew every recorded line in the same green and saved every one as a TRACK, so there is
+        // no fact in the database to carry across: the honest answer for a trip of that age is a walk, and
+        // a ride already on the phone is one tap away on its own page.
+        helper.createDatabase(TEST_DATABASE_MODES, 13).apply {
+            execSQL(
+                """
+                INSERT INTO recorded_sessions
+                    (id, name, assetId, docRef, docRefs, startedAtEpochMs, endedAtEpochMs, status,
+                     distanceM, durationMs, pointCount, imported)
+                VALUES
+                    (1, 'Home block 14 Sep', NULL, NULL, NULL, 1790000000000, 1790003600000, 'FINISHED',
+                     2350.0, 3600000, 412, 0),
+                    (2, 'Morning_Walk_2026-11-03', NULL, NULL, NULL, 1790000000000, 1790003600000,
+                     'FINISHED', 1240.0, 0, 1500, 1)
+                """.trimIndent()
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(
+            TEST_DATABASE_MODES,
+            14,
+            true,
+            MIGRATION_13_14
+        )
+
+        migrated.query("SELECT name, mode FROM recorded_sessions ORDER BY id").use { rows ->
+            assertTrue("the walk is still there", rows.moveToFirst())
+            assertEquals("Home block 14 Sep", rows.getString(0))
+            assertEquals("and it reads as a walk", "WALK", rows.getString(1))
+
+            assertTrue("so does the one that came from a file", rows.moveToNext())
+            assertEquals("Morning_Walk_2026-11-03", rows.getString(0))
+            assertEquals("WALK", rows.getString(1))
+        }
+
+        // And a row written by this build can say otherwise, so the column is usable rather than merely
+        // present.
+        migrated.execSQL(
+            """
+            INSERT INTO recorded_sessions
+                (name, startedAtEpochMs, status, distanceM, durationMs, pointCount, imported, mode)
+            VALUES ('Taupo ride', 1790000000000, 'FINISHED', 18200.0, 5460000, 2400, 0, 'RIDE')
+            """.trimIndent()
+        )
+        migrated.query("SELECT COUNT(*) FROM recorded_sessions WHERE mode = 'RIDE'").use { rows ->
+            rows.moveToFirst()
+            assertEquals("a ride is kept as a ride", 1, rows.getInt(0))
+        }
+    }
+
     private companion object {
         /** Names of this test's own: the real database is never opened by a test. */
         const val TEST_DATABASE = "migration-test.db"
@@ -348,5 +401,8 @@ class MigrationTest {
 
         /** And an eighth, for the version 12 to 13 change. */
         const val TEST_DATABASE_FOLLOWED = "migration-test-followed.db"
+
+        /** And a ninth, for the version 13 to 14 change. */
+        const val TEST_DATABASE_MODES = "migration-test-modes.db"
     }
 }

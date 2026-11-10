@@ -9,6 +9,7 @@ import kotlinx.coroutines.runBlocking
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
+import nz.mckenzie.trailday.domain.recording.ActivityMode
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -118,6 +119,47 @@ class RecordingDataTest {
         assertEquals(3, session.pointCount)
         // Two 0.001 degree hops along the equator.
         assertEquals(222.39, session.distanceM, 1.0)
+    }
+
+    @Test
+    fun aFinishedRideIsKeptAsARideAndAWalkAsAWalk() = runBlocking {
+        val ride = recordings.startRecording(name = "Ride")
+        fixes.forEach { recordings.appendPoint(ride, it) }
+        recordings.finishRecording(ride, distanceM = 222.0, mode = ActivityMode.RIDE)
+
+        val walk = recordings.startRecording(name = "Walk")
+        fixes.forEach { recordings.appendPoint(walk, it) }
+        recordings.finishRecording(walk, distanceM = 222.0, mode = ActivityMode.WALK)
+
+        assertEquals(ActivityMode.RIDE.name, recordings.getSession(ride)!!.mode)
+        assertEquals(ActivityMode.WALK.name, recordings.getSession(walk)!!.mode)
+    }
+
+    @Test
+    fun anImportedRideIsKeptAsARide() = runBlocking {
+        val sessionId = recordings.importActivity(
+            name = "Morning_Ride_2026-11-03",
+            points = fixes,
+            startedAtEpochMs = 1_000L,
+            endedAtEpochMs = 5_000L,
+            mode = ActivityMode.RIDE
+        )
+
+        assertEquals(ActivityMode.RIDE.name, recordings.getSession(sessionId)!!.mode)
+    }
+
+    @Test
+    fun aTripsModeCanBeChangedAfterTheFact() = runBlocking {
+        val sessionId = recordings.startRecording(name = "Walk")
+        fixes.forEach { recordings.appendPoint(sessionId, it) }
+        recordings.finishRecording(sessionId, distanceM = 222.0)
+
+        assertEquals("a pass with no mode said is a walk", ActivityMode.WALK.name, recordings.getSession(sessionId)!!.mode)
+
+        recordings.setMode(sessionId, ActivityMode.RIDE)
+
+        assertEquals(ActivityMode.RIDE.name, recordings.getSession(sessionId)!!.mode)
+        assertEquals("and nothing else about the trip moved", 3, recordings.getSession(sessionId)!!.pointCount)
     }
 
     @Test

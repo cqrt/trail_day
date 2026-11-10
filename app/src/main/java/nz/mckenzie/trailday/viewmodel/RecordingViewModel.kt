@@ -38,6 +38,7 @@ import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.EmptyDocCache
 import nz.mckenzie.trailday.domain.geo.DriftWord
+import nz.mckenzie.trailday.domain.geo.AverageSpeed
 import nz.mckenzie.trailday.domain.geo.FollowPoint
 import nz.mckenzie.trailday.domain.geo.FollowProgress
 import nz.mckenzie.trailday.domain.geo.GeoPoint
@@ -60,10 +61,12 @@ import nz.mckenzie.trailday.domain.journey.joinedWalkName
 import nz.mckenzie.trailday.domain.journey.near
 import nz.mckenzie.trailday.domain.geo.splitAtBreaks
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
+import nz.mckenzie.trailday.domain.recording.ActivityMode
 import nz.mckenzie.trailday.domain.recording.followedRefs
 import nz.mckenzie.trailday.domain.recording.recordingSourceRef
 import nz.mckenzie.trailday.domain.look.Look
 import nz.mckenzie.trailday.domain.look.LookTarget
+import nz.mckenzie.trailday.domain.look.MapLook
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.map.AssetColors
@@ -272,6 +275,27 @@ class RecordingViewModel(
     /** The line of DOC's being followed, when the target is DOC's rather than the walker's own. */
     private val _selectedDoc = MutableStateFlow<DocTarget?>(null)
 
+    /**
+     * What the line being followed is: a walk's ground or a ride's.
+     *
+     * The recorder's readouts are about the ground ahead, and the ground ahead is estimated differently
+     * on foot and on a bike - so the to-go time and the pace figure are asked of the target rather than
+     * assumed to be a walk. A published line is a walk, because nothing in the file says otherwise and
+     * a walker is the likelier reader; a new line has no kind at all until it is saved, so it stays on
+     * foot until then, which is also the honest answer for the mode not being known yet.
+     */
+    val targetMode: StateFlow<ActivityMode?> =
+        combine(_selectedAssetId, assets, _selectedDoc) { id, places, doc ->
+            val place = places.firstOrNull { it.id == id }
+            when {
+                place != null && AssetShape.fromStorage(place.shape) == AssetShape.LINE ->
+                    ActivityMode.of(AssetKind.fromStorage(place.kind))
+
+                doc != null -> ActivityMode.WALK
+                else -> null
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
     val selectedTrackName: StateFlow<String?> =
         combine(_selectedAssetId, assets, _selectedDoc) { id, list, doc ->
             doc?.name ?: list.firstOrNull { it.id == id }?.name
@@ -456,7 +480,29 @@ class RecordingViewModel(
         val recorded: List<GeoPoint>,
         /** The stretches of it that were paused for, so the line stays honest. */
         val breaks: List<RecordingBreak> = emptyList(),
+        /**
+         * What the pass turned out to be, so the recorder's map draws the saved line as what it is: a
+         * ride in the bike colour and dash, a walk in the recorded green, both with the gold edge.
+         */
+        val mode: ActivityMode = ActivityMode.WALK,
         val summary: PassSummary
+    )
+
+    /**
+     * A pass waiting for its name, and what it has been decided to be.
+     *
+     * **The guess is frozen when the dialog opens**, and everything the dialog says comes from this one
+     * object, so the sentence about the average and the mode the trip is saved as cannot disagree. The
+     * recording keeps running behind the dialog, so a very long wait makes the sentence a little stale
+     * about the last few minutes - which is the smaller evil against a title that changes while the
+     * walker is reading it.
+     */
+    data class PendingFinish(
+        /** The name suggested for the place this pass would make. */
+        val name: String,
+        val mode: ActivityMode,
+        /** The average the mode was decided from, as the page prints it: null when there is none. */
+        val kmh: Double?
     )
 
     /** The live pass's numbers, in the shape the card reads. */
@@ -510,40 +556,69 @@ class RecordingViewModel(
      * What the map draws: the recorded line, broken where the walker paused.
      *
      * With nothing live, the pass that has just been saved stays where it was rather than the
-     * map going blank the moment Save is pressed.
+     * map going blank the moment Save is pressed - and it keeps what it was saved as, so a ride's line
+     * turns the bike colour and dash rather than staying the green of a walk.
      */
     val recordedGeoJson: StateFlow<String> =
-        combine(sessionPoints, sessionBreaks, _finished) { points, breaks, done ->
+        combine(sessionPoints, sessionBreaks, _finished, Look.current) { points, breaks, done, look ->
             when {
-                points.isNotEmpty() -> points to breaks
-                done != null -> done.recorded to done.breaks
-                else -> emptyList<GeoPoint>() to emptyList()
+                points.isNotEmpty() -> RecordingDrawn(points, breaks, null, look)
+                done != null -> RecordingDrawn(done.recorded, done.breaks, done.mode, look)
+                else -> RecordingDrawn(emptyList(), emptyList(), null, look)
             }
         }
-            .map { (points, breaks) -> recordingGeoJson(points, breaks) }
+            .map { drawn -> recordingGeoJson(drawn.points, drawn.breaks, drawn.mode, drawn.look) }
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
                 AssetGeoJson.build(emptyList())
             )
 
+    /** The line the recorder's map is about, and what it is known to be so far. */
+    private data class RecordingDrawn(
+        val points: List<GeoPoint>,
+        val breaks: List<RecordingBreak>,
+        /** Null while a pass is still being driven: the mode is not decided until it is finished. */
+        val mode: ActivityMode?,
+        val look: MapLook
+    )
+
     /**
      * The recorded line as the map draws it, in pieces where the walker paused.
      *
      * The gaps where the fixes only went missing are drawn through: the recording is the
      * evidence, and what the walker stopped for is part of it.
+     *
+     * **A saved ride is drawn as a ride** - the walker's bike colour, the bike dash, and the gold edge
+     * every recorded line wears - because the map's own colour for a ride is the colour of riding, and
+     * a ride drawn as a green walk on the screen the rider is looking at is the app disagreeing with
+     * the trip it just saved. While a pass is running there is no mode yet, so the live line stays the
+     * recorded green.
      */
-    private fun recordingGeoJson(points: List<GeoPoint>, breaks: List<RecordingBreak>): String {
+    private fun recordingGeoJson(
+        points: List<GeoPoint>,
+        breaks: List<RecordingBreak>,
+        mode: ActivityMode?,
+        look: MapLook
+    ): String {
         if (points.isEmpty()) return AssetGeoJson.build(emptyList())
+        val colour = if (mode == ActivityMode.RIDE) {
+            look.colourOf(AssetKind.BIKE_TRACK).hex
+        } else {
+            AssetColors.RECORDED
+        }
         return AssetGeoJson.build(
             listOf(
                 AssetLine(
                     assetId = RECORDING_ID,
                     name = "Recording",
-                    colorHex = AssetColors.RECORDED,
+                    colorHex = colour,
                     points = points,
+                    kind = mode?.assetKind ?: AssetKind.TRACK,
+                    recorded = true,
+                    named = false,
                     stretches = points.splitAtBreaks(breaks).map { piece ->
-                        AssetStretch(colorHex = AssetColors.RECORDED, points = piece)
+                        AssetStretch(colorHex = colour, points = piece)
                     }
                 )
             )
@@ -554,12 +629,12 @@ class RecordingViewModel(
     val message: StateFlow<String?> = _message
 
     /**
-     * The name suggested for the track a finished recording is about to become, or
-     * null when no name is being asked for. The screen shows a dialog while this is
-     * set, so a new line always gets a name before it is saved as a track.
+     * The name suggested for the track a finished recording is about to become, with the mode the pass
+     * has been decided to be. The screen shows a dialog while this is set, so a new line always gets a
+     * name before it is saved as a place - and the dialog states the mode rather than asking for it.
      */
-    private val _pendingTrackName = MutableStateFlow<String?>(null)
-    val pendingTrackName: StateFlow<String?> = _pendingTrackName
+    private val _pendingFinish = MutableStateFlow<PendingFinish?>(null)
+    val pendingFinish: StateFlow<PendingFinish?> = _pendingFinish
 
     init {
         // A new pass is a map that should be moving with the walker: following comes back on
@@ -924,39 +999,77 @@ class RecordingViewModel(
     }
 
     /**
-     * Closes the session with the distance the service accumulated.
+     * Closes the session, with the mode its own average says it was.
      *
      * A pass followed for a place that already exists finishes straight away - it has a name.
      * A brand new line asks what to call it first, because on this screen "record" means
-     * "make a track".
+     * "make a track". Either way the guess is made once, here, from the pass as it stands.
      */
     fun finish() {
+        val sessionId = sessionIdOrNull() ?: return
         // A line that is DOC's needs no name and makes no place: the walk is the record, and the line
         // already has a name of DOC's. A brand new line asks what to call it first.
-        val assetId = _selectedAssetId.value
-        if (assetId == null && _selectedDoc.value == null) {
-            _pendingTrackName.value = defaultTrackName()
-            return
+        val newLine = _selectedAssetId.value == null && _selectedDoc.value == null
+        viewModelScope.launch {
+            val guess = guessMode(sessionId)
+            if (newLine) {
+                _pendingFinish.value = PendingFinish(
+                    name = defaultTrackName(),
+                    mode = guess.mode,
+                    kmh = guess.kmh
+                )
+            } else {
+                completeFinish(newTrackName = null, mode = guess.mode)
+            }
         }
-        completeFinish(newTrackName = null)
     }
 
     /**
-     * From the naming dialog: saves the recorded line as a new, named track of [kind].
+     * What a pass as it stands is: its mode, and the average the mode was decided from.
      *
-     * The type is the place's, not the recording's: the pass is the same evidence either way, and
-     * the line's kind is what decides its colour, its glyph and where it appears in the list.
+     * **The same figures the trip's page will print**, read the same way: the line's own length where
+     * there is one, the distance the service measured where the line is empty, and moving time with the
+     * pauses taken off. Anything else and the dialog would say "6.4 km/h, so this is a ride" about a
+     * page that reads 6.3.
      */
-    fun confirmFinish(name: String, kind: AssetKind = AssetKind.TRACK) {
+    private suspend fun guessMode(sessionId: Long): ModeGuess {
+        val points = runCatching { recordings.getPoints(sessionId) }.getOrDefault(emptyList())
+        val breaks = runCatching { recordings.getBreaks(sessionId) }.getOrDefault(emptyList())
+        val live = TrackingState.current
+        val endedAtEpochMs = System.currentTimeMillis()
+        val distanceM = polylineLengthMeters(points).takeIf { it > 0.0 } ?: live.distanceM
+        val movingMs = AverageSpeed.movingMs(
+            startedAtEpochMs = live.startedAtEpochMs ?: endedAtEpochMs,
+            endedAtEpochMs = endedAtEpochMs,
+            breaks = breaks
+        )
+        return ModeGuess(
+            mode = ActivityMode.fromSpeed(distanceM, movingMs),
+            kmh = AverageSpeed.shownKmh(distanceM, movingMs)
+        )
+    }
+
+    /** A pass's answer about itself: what it was, and the average that said so. */
+    private data class ModeGuess(val mode: ActivityMode, val kmh: Double?)
+
+    /**
+     * From the naming dialog: saves the recorded line as a new place under [name].
+     *
+     * **The mode is the one the dialog was showing**, not a second guess made now: the walker read
+     * "Averaged 6.4 km/h, so this is a ride" and pressed Save, so that is what the trip and the place it
+     * makes are. The trip's own page is where it is changed.
+     */
+    fun confirmFinish(name: String) {
+        val pending = _pendingFinish.value
         completeFinish(
             newTrackName = name.trim().ifBlank { defaultTrackName() },
-            newTrackKind = kind
+            mode = pending?.mode ?: ActivityMode.WALK
         )
     }
 
     /** Dismisses the naming dialog without ending the recording. */
     fun cancelFinish() {
-        _pendingTrackName.value = null
+        _pendingFinish.value = null
     }
 
     /**
@@ -971,7 +1084,7 @@ class RecordingViewModel(
     fun discard() {
         val sessionId = sessionIdOrNull() ?: return
         viewModelScope.launch {
-            _pendingTrackName.value = null
+            _pendingFinish.value = null
 
             TrackingService.stop(context)
             val failure = runCatching { recordings.deleteRecording(sessionId) }.exceptionOrNull()
@@ -990,11 +1103,11 @@ class RecordingViewModel(
 
     private fun completeFinish(
         newTrackName: String?,
-        newTrackKind: AssetKind = AssetKind.TRACK
+        mode: ActivityMode = ActivityMode.WALK
     ) {
         val sessionId = sessionIdOrNull() ?: return
         viewModelScope.launch {
-            _pendingTrackName.value = null
+            _pendingFinish.value = null
 
             val distanceM = TrackingState.current.distanceM
             val points = TrackingState.current.pointCount
@@ -1029,7 +1142,9 @@ class RecordingViewModel(
                     assetRepository.createAsset(
                         name = newTrackName,
                         geometry = geometry,
-                        kind = newTrackKind,
+                        // The place a trip makes is the mode the trip was saved as: a ride makes a bike
+                        // track, so the line the walker finds on the Places page is the line they rode.
+                        kind = mode.assetKind,
                         // The mark that says a walk made this place, so deleting the trip can take the place
                         // with it without guessing which places came from walks.
                         sourceRef = recordingSourceRef(sessionId)
@@ -1046,7 +1161,7 @@ class RecordingViewModel(
                 runCatching { assetRepository.getAsset(id)?.name }.getOrNull()
             }
 
-            recordings.finishRecording(sessionId, distanceM = distanceM)
+            recordings.finishRecording(sessionId, distanceM = distanceM, mode = mode)
 
             // Name the trip after the work it is: a new line takes the name the
             // walker typed, and a trip made for an existing place takes that
@@ -1084,6 +1199,7 @@ class RecordingViewModel(
                 trackName = recordingName,
                 recorded = geometry,
                 breaks = breaks,
+                mode = mode,
                 summary = numbersNow
             )
             _selectedAssetId.value = null
