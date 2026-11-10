@@ -40,6 +40,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * The record screen's finish flow.
@@ -82,20 +83,27 @@ class RecordingViewModelTest {
         DevicePosition.useForTest(null)
         // And neither is the Hand-over switch a test turned off: it is one preference for the whole
         // app, so a test that leaves it off would break every hand-over test after it.
-        runBlocking { SettingsRepository(context).setHandOver(true) }
+        runBlocking {
+            SettingsRepository(context).setHandOver(true)
+            SettingsRepository(context).setChimeOnSwitch(true)
+        }
         // Deliberately no db.close(): this view model observes the session's points for
         // as long as it lives, so closing the database underneath it throws on a
         // background thread and takes the whole instrumentation process down - with
         // whichever test happens to be running blamed for it.
     }
 
-    private fun viewModel(otherStore: OtherTracksCache = EmptyOtherTracksCache) = RecordingViewModel(
+    private fun viewModel(
+        otherStore: OtherTracksCache = EmptyOtherTracksCache,
+        chime: () -> Unit = {}
+    ) = RecordingViewModel(
         recordings = recordings,
         assetRepository = assetRepository,
         settingsRepository = SettingsRepository(context),
         context = context,
         locationSource = NoFixLocation,
-        otherStore = otherStore
+        otherStore = otherStore,
+        chime = chime
     )
 
     /** A phone that offers no fix: this suite is about recording, not about framing. */
@@ -596,7 +604,8 @@ class RecordingViewModelTest {
         // Standing at the end of the first piece, having walked it: the end of a piece is where a walker
         // stops to look at the phone.
         DevicePosition.useForTest(FakeLocation(listOf(first.last().copy(accuracyM = 5f))))
-        val viewModel = viewModel(otherStore = TracksHeld(listOf(walkway)))
+        val chimes = AtomicInteger()
+        val viewModel = viewModel(TracksHeld(listOf(walkway)), chime = { chimes.incrementAndGet() })
         val sessionId = recordings.startRecording(name = "Recording")
         TrackingState.begin(sessionId, System.currentTimeMillis())
         TrackingState.setStatus(RecordingStatus.RECORDING)
@@ -619,6 +628,7 @@ class RecordingViewModelTest {
             "Kingswell Creek Walkway",
             withTimeout(5_000) { viewModel.selectedTrackName.first { it != null } }
         )
+        assertEquals("and it was not worth a sound", 0, chimes.get())
     }
 
     /**
@@ -643,7 +653,8 @@ class RecordingViewModelTest {
             paths = listOf(onwards)
         )
         DevicePosition.useForTest(FakeLocation(listOf(first.last().copy(accuracyM = 5f))))
-        val viewModel = viewModel(otherStore = TracksHeld(listOf(here, next)))
+        val chimes = AtomicInteger()
+        val viewModel = viewModel(TracksHeld(listOf(here, next)), chime = { chimes.incrementAndGet() })
         val sessionId = recordings.startRecording(name = "Recording")
         TrackingState.begin(sessionId, System.currentTimeMillis())
         TrackingState.setStatus(RecordingStatus.RECORDING)
@@ -663,6 +674,7 @@ class RecordingViewModelTest {
             "Mount Pleasant Track",
             withTimeout(5_000) { viewModel.selectedTrackName.first { it == "Mount Pleasant Track" } }
         )
+        assertEquals("and a hand-over at a junction is worth a sound too", 1, chimes.get())
     }
 
     /**
@@ -829,6 +841,58 @@ class RecordingViewModelTest {
     private fun lineFrom(lat: Double, lng: Double, lengthM: Double, steps: Int = 20): List<GeoPoint> {
         val perDegree = METRES_PER_DEG_LNG_AT_EQUATOR * kotlin.math.cos(Math.toRadians(lat))
         return (0..steps).map { step -> GeoPoint(lat, lng + lengthM * step / steps / perDegree) }
+    }
+
+    /**
+     * A walk that leaves one published line and takes up another, for the tests about the noise it makes.
+     *
+     * The same ground as [theRecorderSwitchesWhenTheWalkWandersOntoAnotherLine]: 44 m off the line being
+     * followed and onto the one beside it, 8 m a fix.
+     */
+    private suspend fun walkOntoAnotherTrack(chime: () -> Unit): RecordingViewModel {
+        val followed = OtherTrack(
+            globalId = "6f1c2b8e-0000-4000-8000-000000000021",
+            name = "Major Hornbrook Track",
+            paths = listOf(lineFrom(-41.5000, 173.9500, 400.0))
+        )
+        val other = OtherTrack(
+            globalId = "6f1c2b8e-0000-4000-8000-000000000022",
+            name = "Mount Pleasant Track",
+            paths = listOf(lineFrom(-41.4996, 173.9500, 400.0))
+        )
+        val phone = SteppedLocation()
+        DevicePosition.useForTest(phone)
+        val viewModel = viewModel(TracksHeld(listOf(followed, other)), chime = chime)
+        val sessionId = recordings.startRecording(name = "Recording")
+        TrackingState.begin(sessionId, System.currentTimeMillis())
+        TrackingState.setStatus(RecordingStatus.RECORDING)
+
+        viewModel.refreshTracksToFollow()
+        withTimeout(5_000) { viewModel.otherTracksHeld.first { it } }
+        viewModel.selectDoc(followed)
+        walk(phone, lineFrom(-41.4996, 173.9500, 64.0, steps = 8))
+        return viewModel
+    }
+
+    @Test
+    fun theRecorderChimesWhenItTakesUpAnotherTrack() = runBlocking {
+        val chimes = AtomicInteger()
+        val viewModel = walkOntoAnotherTrack { chimes.incrementAndGet() }
+
+        withTimeout(5_000) { viewModel.switched.first { it != null } }
+
+        assertEquals("one switch, one chime", 1, chimes.get())
+    }
+
+    @Test
+    fun theChimeStaysQuietWhenItIsTurnedOff() = runBlocking {
+        SettingsRepository(context).setChimeOnSwitch(false)
+        val chimes = AtomicInteger()
+        val viewModel = walkOntoAnotherTrack { chimes.incrementAndGet() }
+
+        withTimeout(5_000) { viewModel.switched.first { it != null } }
+
+        assertEquals("the line changed and nothing was said out loud", 0, chimes.get())
     }
 
     /**

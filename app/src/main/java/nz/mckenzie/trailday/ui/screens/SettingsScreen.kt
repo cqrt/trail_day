@@ -97,6 +97,7 @@ fun SettingsScreen(
     val webEditorTokenRequired by viewModel.webEditorTokenRequired.collectAsStateWithLifecycle()
     val webEditorKeepAwake by viewModel.webEditorKeepAwake.collectAsStateWithLifecycle()
     val handOver by viewModel.handOver.collectAsStateWithLifecycle()
+    val chimeOnSwitch by viewModel.chimeOnSwitch.collectAsStateWithLifecycle()
     val storedTiles by viewModel.storedTiles.collectAsStateWithLifecycle()
     val dataMessage by viewModel.dataMessage.collectAsStateWithLifecycle()
     val dataBusy by viewModel.dataBusy.collectAsStateWithLifecycle()
@@ -321,6 +322,31 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+
+                    // A switch that changes the line under the walker without asking has to say so, and a
+                    // screen is no use to somebody whose phone is in a pocket. Greyed out with Hand-over
+                    // off, because a chime for a switch that cannot happen is a switch that does nothing.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Chime when it switches",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (handOver) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = chimeOnSwitch,
+                            onCheckedChange = viewModel::setChimeOnSwitch,
+                            enabled = handOver
+                        )
+                    }
                 }
             }
 

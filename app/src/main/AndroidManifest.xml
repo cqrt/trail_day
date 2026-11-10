@@ -27,6 +27,11 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!--
+        The buzz when the recorder takes up another track - see SwitchChime. A normal permission, so
+        nothing is ever asked of the walker; Android still decides whether a phone may vibrate.
+    -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!--
         Installing a downloaded update over this copy of the app. This only lets the
         request be made: Android still asks the walker to confirm every time, and an APK
         signed with a different key is refused by the installer whatever this says.

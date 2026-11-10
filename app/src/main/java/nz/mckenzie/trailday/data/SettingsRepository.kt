@@ -81,6 +81,15 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
      * having happened - that is on the session, not on the phone.
      */
     private val handOverPref = booleanPreferencesKey("hand_over")
+
+    /**
+     * Whether the recorder makes a noise when it takes up another track - the Hand-over card's second row.
+     *
+     * **On when unset**, like the hand-over above it: the switch happens without being asked for, so the
+     * walker has to be told, and a chime nobody can hear is not a default worth shipping quietly. A walker
+     * who wants a silent phone turns it off, and that stays off because only an off is written.
+     */
+    private val chimeOnSwitchPref = booleanPreferencesKey("chime_on_switch")
     private val docPlacesDroppedPref = booleanPreferencesKey("doc_places_dropped")
     private val lastNotifiedUpdatePref = stringPreferencesKey("last_notified_update")
     private val backupDestinationPref = stringPreferencesKey("backup_destination")
@@ -479,6 +488,23 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     suspend fun setHandOver(enabled: Boolean) {
         context.settingsDataStore.edit { prefs ->
             if (enabled) prefs.remove(handOverPref) else prefs[handOverPref] = false
+        }
+    }
+
+    /**
+     * Whether the recorder makes a noise when it takes up another track.
+     *
+     * Read on the fix that switches, and by the card that sets it. Turns nothing else on: with Hand-over
+     * off there are no switches to be noisy about.
+     */
+    val chimeOnSwitch: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[chimeOnSwitchPref] ?: true
+    }
+
+    /** Turns the chime off, or puts it back. An on is written as no value at all. */
+    suspend fun setChimeOnSwitch(enabled: Boolean) {
+        context.settingsDataStore.edit { prefs ->
+            if (enabled) prefs.remove(chimeOnSwitchPref) else prefs[chimeOnSwitchPref] = false
         }
     }
 

@@ -78,6 +78,7 @@ import nz.mckenzie.trailday.tracking.DevicePosition
 import nz.mckenzie.trailday.tracking.FusedLocationSource
 import nz.mckenzie.trailday.tracking.LocationPermission
 import nz.mckenzie.trailday.tracking.LocationSource
+import nz.mckenzie.trailday.tracking.SwitchChime
 import nz.mckenzie.trailday.tracking.TrackingService
 import nz.mckenzie.trailday.tracking.TrackingState
 import nz.mckenzie.trailday.tracking.frameOnDevice
@@ -132,7 +133,14 @@ class RecordingViewModel(
      * The place the page that opened the recorder is about, if any: a track's own page offers "Record this",
      * and arriving at the recorder with the target already chosen is the whole point of that button.
      */
-    private val initialTargetId: Long? = null
+    private val initialTargetId: Long? = null,
+    /**
+     * The noise made when the recorder takes up another track - see [SwitchChime].
+     *
+     * Handed in rather than reached for so a test can count how many times it was asked for without a
+     * phone making a noise in the room, which is the only way to test a sound anybody can hear.
+     */
+    private val chime: () -> Unit = { SwitchChime.play(context) }
 ) : ViewModel() {
 
     /** Which map to draw the pass on: the walker's choice in Settings. */
@@ -147,6 +155,15 @@ class RecordingViewModel(
      * asked, which is the switch quietly not working.
      */
     val handOver: StateFlow<Boolean> = settingsRepository.handOver
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /**
+     * Whether the recorder makes a noise as it takes up another track - the Hand-over card's second row.
+     *
+     * Eagerly, for the reason [handOver] is: the answer is wanted on the fix that switches, and a
+     * preference only collected while a screen showed it would never be read at all.
+     */
+    val chimeOnSwitch: StateFlow<Boolean> = settingsRepository.chimeOnSwitch
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     val tracking: StateFlow<TrackingState.State> = TrackingState.state
@@ -1188,6 +1205,10 @@ class RecordingViewModel(
         furthestFromEndM = 0.0
         handOverLine = emptyList()
         if (track.sourceRef == from.ref) return
+        // A different track, taken up without being asked for, while the phone is in a pocket: told by a
+        // sound before it is told by a card nobody is looking at. The next piece of the same walkway is
+        // silent, because nothing about the walk has changed.
+        if (chimeOnSwitch.value) chime()
         _switched.value = SwitchedBack(
             toName = track.name,
             from = from.track,

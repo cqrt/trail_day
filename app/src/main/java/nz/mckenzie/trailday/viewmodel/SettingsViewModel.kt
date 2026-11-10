@@ -380,6 +380,20 @@ class SettingsViewModel(
         viewModelScope.launch { settings.setHandOver(enabled) }
     }
 
+    /**
+     * Whether the recorder makes a noise when it takes up another track.
+     *
+     * Seeded with `true`, like the switches above: the card shows an untouched install's answer rather
+     * than a switch that sits blank for a frame and then moves.
+     */
+    val chimeOnSwitch: StateFlow<Boolean> = settings.chimeOnSwitch
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), true)
+
+    /** The chime switch. The recorder reads the same preference at the moment it switches. */
+    fun setChimeOnSwitch(enabled: Boolean) {
+        viewModelScope.launch { settings.setChimeOnSwitch(enabled) }
+    }
+
     private val _storedTiles = MutableStateFlow(TileStoreSummary(0, 0))
     val storedTiles: StateFlow<TileStoreSummary> = _storedTiles
 
