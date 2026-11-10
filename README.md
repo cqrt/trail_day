@@ -17,7 +17,7 @@ It's installed straight from GitHub rather than a store, and updates itself from
 | **Map** | Your location, your places, and DOC and other tracks, over the base map you pick |
 | **Places** | Everything you've saved or imported: tracks, bike tracks, huts, campsites and waypoints |
 | **Record** | Record a walk or ride, either as a new route or along a place you already have |
-| **Activities** | The trips you've recorded, and walks you've brought in from a file |
+| **Activities** | The trips you've recorded, and walks and rides you've brought in from a file |
 | **Offline** | What's downloaded to the phone, and where you start new downloads |
 
 Settings, a single place's page, the DOC browser and the other-tracks browser all open from these tabs.
@@ -41,7 +41,7 @@ If the LINZ imagery fails to load, the app tells you why (for example, the key w
 
 Each thing the map draws has its own colour and weight: Te Araroa, your tracks, your bike tracks, other organisations' tracks, and the huts, campsites and waypoints you've saved. Settings has a screen for them, **Colours & Styles**, with a sample of all seven drawn on the map you were last looking at, so you see a colour over the ground it will be seen over ([details](docs/tracks-and-places.md)).
 
-There's no Save. The sample and the map change as you tap, and **Back to how it came** puts all seven back. A recorded walk stays green with its gold edge, and the dot that says where you are doesn't change either, whatever you pick.
+There's no Save. The sample and the map change as you tap, and **Back to how it came** puts all seven back. A recorded walk stays green with its gold edge, and the dot that says where you are doesn't change either, whatever you pick. A recorded ride is your bike colour and dash with the same gold edge ([details](docs/tracks-and-places.md)).
 
 ## Working without reception
 
@@ -72,7 +72,7 @@ You can get places into the app by:
 - importing a GPX, KML, KMZ or GeoJSON file (a file with several tracks becomes several places, and both Import buttons take several files at once)
 - importing something from DOC or the other-tracks browser
 - tapping the map to add a spot
-- walking it with the recorder
+- walking or riding it with the recorder (a ride becomes a bike track)
 
 A track can have **side tracks**: spurs that branch off the main line. Their length is counted once, and they're kept when you export to GPX ([details](docs/side-tracks.md)).
 
@@ -94,9 +94,11 @@ The map keeps the zoom you left it at. Go to another tab and come back and it's 
 
 A recording is saved as a trip with its line, distance, time and points. If you record along a place you already had, the trip is linked to it. If you record a brand new route, it also becomes a new place, and deleting that trip deletes the place it created (but not a place that was yours beforehand).
 
-You can also bring a walk in from a file. Import on the Activities tab takes a GPX, KML, KMZ or GeoJSON file and saves each track in it as a finished trip, dated from the file's own times so it sorts where it belongs. An untimed file takes today, and says nothing about how long it took rather than claiming nothing at all.
+Whether the trip was a walk or a ride is worked out when you save it, from its average speed with the pauses left out. 6 km/h and up is a ride, below that is a walk. The naming dialog says what it decided and why, and a ride makes a bike track. If it got it wrong, its page has **Walk or ride** under the title ([details](docs/rides.md)).
 
-A file of several tracks asks where it should go, because four tracks could be a week of walks or four places. Both Import buttons take several files at once, and a file the app can't read is named in the message rather than stopping the rest. A trip from a file says so on its page.
+You can also bring a walk or a ride in from a file. Import on the Activities tab takes a GPX, KML, KMZ or GeoJSON file and saves each track in it as a finished trip, dated from the file's own times so it sorts where it belongs. An untimed file takes today, and says nothing about how long it took rather than claiming nothing at all.
+
+A file of several tracks asks where it should go, because four tracks could be a week of walks or four places. A file that says nothing about whether it was a walk or a ride is asked once, after that, and a file from a watch or an app that says - `cycling`, `hiking` - is not asked at all. Both Import buttons take several files at once, and a file the app can't read is named in the message rather than stopping the rest. A trip from a file says so on its page.
 
 ## DOC tracks, huts and campsites
 

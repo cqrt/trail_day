@@ -15,7 +15,7 @@ the bush you were reading a moment ago says what it will look like.
 | --- | --- | --- |
 | Te Araroa | The whole trail, from Cape Reinga to Bluff | Thin, Normal or Thick |
 | Tracks | Your tracks, DOC's tracks, and a walk you have recorded | Thin, Normal or Thick |
-| Bike tracks | Your bike tracks, and the bike trails DOC publishes | Thin, Normal or Thick |
+| Bike tracks | Your bike tracks, the bike trails DOC publishes, and a ride you have recorded | Thin, Normal or Thick |
 | Other tracks | The tracks councils, trusts and clubs publish | Thin, Normal or Thick |
 | Huts | Your huts, and DOC's | Small, Normal or Large |
 | Campsites | Your campsites, and DOC's | Small, Normal or Large |
@@ -23,6 +23,11 @@ the bush you were reading a moment ago says what it will look like.
 
 A hut is a hut whether you saved it or DOC published it, so one colour covers both. The same goes for a
 track you walked and a track DOC maintains.
+
+**A recorded ride is drawn in the Bike tracks colour**, because that row is what riding looks like on
+this map. It keeps its own dash and the gold edge every recorded line wears, and it stays under the
+Recordings switch in Your Places rather than under Bike tracks: it's a trip you made, not a place you
+saved.
 
 **Other tracks has a row of its own because it's a publisher, not a kind.** Once you have coloured your
 own tracks, a council walkway beside them needs a colour that keeps it apart from DOC's.
@@ -107,7 +112,8 @@ card, not for a line drawn on the ground.
 
 Some things are not yours to recolour, because they mean something on their own:
 
-- **A recorded walk** is green with a gold edge, whatever colour you have given tracks.
+- **A recorded walk** is green with a gold edge, whatever colour you have given tracks. A recorded ride
+  is the Bike tracks colour and dash with the same gold edge.
 - **The position dot** is the phone, and looks like nothing else.
 - **The white casing** round a published line is white, so a line says where it is before it says what
   colour it is.
