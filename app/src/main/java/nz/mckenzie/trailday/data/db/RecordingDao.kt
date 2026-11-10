@@ -34,7 +34,8 @@ abstract class RecordingDao {
         SET status = :status,
             endedAtEpochMs = :endedAtEpochMs,
             distanceM = :distanceM,
-            pointCount = :pointCount
+            pointCount = :pointCount,
+            mode = :mode
         WHERE id = :sessionId
         """
     )
@@ -43,11 +44,21 @@ abstract class RecordingDao {
         status: String,
         endedAtEpochMs: Long,
         distanceM: Double,
-        pointCount: Int
+        pointCount: Int,
+        mode: String
     )
 
     @Query("UPDATE recorded_sessions SET status = :status WHERE id = :sessionId")
     abstract suspend fun setStatus(sessionId: Long, status: String)
+
+    /**
+     * Says what a saved trip was, walk or ride.
+     *
+     * One column, for the trip's own page: the line, its figures and the ground it covered do not
+     * change when somebody says the day was a ride, so nothing else is written.
+     */
+    @Query("UPDATE recorded_sessions SET mode = :mode WHERE id = :sessionId")
+    abstract suspend fun setMode(sessionId: Long, mode: String)
 
     /**
      * Records which planned asset a session is for. The walker may pick the asset

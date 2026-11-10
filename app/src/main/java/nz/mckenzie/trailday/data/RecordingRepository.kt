@@ -10,6 +10,7 @@ import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.RecordingBreak
 import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
+import nz.mckenzie.trailday.domain.recording.ActivityMode
 import nz.mckenzie.trailday.domain.recording.DOC_REFS_SEPARATOR
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 
@@ -107,11 +108,27 @@ class RecordingRepository(private val db: TrailDayDatabase) {
     suspend fun renameSession(sessionId: Long, name: String) =
         recordingDao.renameSession(sessionId, name)
 
-    /** Closes a session, storing the distance and point count actually recorded. */
+    /**
+     * Says what a saved trip was, walk or ride.
+     *
+     * Called from the trip's own page, which is the one place the app offers to correct the recorder's
+     * guess - see [nz.mckenzie.trailday.domain.recording.ActivityMode.fromSpeed].
+     */
+    suspend fun setMode(sessionId: Long, mode: ActivityMode) =
+        recordingDao.setMode(sessionId, mode.name)
+
+    /**
+     * Closes a session, storing the distance, point count and mode actually recorded.
+     *
+     * [mode] is what the pass was decided to be - by its own average at the moment Save was pressed -
+     * and it is written with the closing figures because it is the same fact about the same row. A pass
+     * left as a walk is one whose mode nobody decided, which is what an old recording is.
+     */
     suspend fun finishRecording(
         sessionId: Long,
         distanceM: Double,
-        endedAtEpochMs: Long = System.currentTimeMillis()
+        endedAtEpochMs: Long = System.currentTimeMillis(),
+        mode: ActivityMode = ActivityMode.WALK
     ) {
         val count = recordingDao.pointCount(sessionId)
         recordingDao.closeSession(
@@ -119,7 +136,8 @@ class RecordingRepository(private val db: TrailDayDatabase) {
             status = RecordingStatus.FINISHED.name,
             endedAtEpochMs = endedAtEpochMs,
             distanceM = distanceM,
-            pointCount = count
+            pointCount = count,
+            mode = mode.name
         )
     }
 
@@ -141,7 +159,9 @@ class RecordingRepository(private val db: TrailDayDatabase) {
         name: String,
         points: List<GeoPoint>,
         startedAtEpochMs: Long,
-        endedAtEpochMs: Long?
+        endedAtEpochMs: Long?,
+        /** What the file said it was, or the walker's answer when it said nothing. */
+        mode: ActivityMode = ActivityMode.WALK
     ): Long = db.withTransaction {
         val sessionId = recordingDao.insertSession(
             RecordedSessionEntity(
@@ -152,7 +172,8 @@ class RecordingRepository(private val db: TrailDayDatabase) {
                 distanceM = polylineLengthMeters(points),
                 durationMs = endedAtEpochMs?.let { (it - startedAtEpochMs).coerceAtLeast(0L) } ?: 0L,
                 pointCount = points.size,
-                imported = true
+                imported = true,
+                mode = mode.name
             )
         )
         recordingDao.insertPoints(

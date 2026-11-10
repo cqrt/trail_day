@@ -215,7 +215,8 @@ private fun RecordedSessionEntity.toRecord(
     },
     breaks = breaks.sortedBy { it.fromEpochMs }.map {
         RecordedBreakRecord(fromEpochMs = it.fromEpochMs, toEpochMs = it.toEpochMs)
-    }
+    },
+    mode = mode
 )
 
 private fun RecordingRecord.toEntity() = RecordedSessionEntity(
@@ -227,5 +228,6 @@ private fun RecordingRecord.toEntity() = RecordedSessionEntity(
     status = status,
     distanceM = distanceM,
     durationMs = durationMs,
-    pointCount = pointCount
+    pointCount = pointCount,
+    mode = mode
 )

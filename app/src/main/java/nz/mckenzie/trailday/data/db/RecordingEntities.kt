@@ -57,7 +57,19 @@ data class RecordedSessionEntity(
      * lets the list say where it came from instead of calling it a walk of nothing. It is not a
      * second kind of recording: nothing else about the row changes.
      */
-    val imported: Boolean = false
+    val imported: Boolean = false,
+    /**
+     * Whether the trip was a walk or a ride: [nz.mckenzie.trailday.domain.recording.ActivityMode] name.
+     *
+     * **The trip's own answer, not its place's kind.** A walk along a bike track is a walk, so this is
+     * never read back off [assetId]'s place - the place says what the line is for, and this says what
+     * was done on the day. A pass still being recorded is a walk until it is finished, which is what an
+     * unfinished row honestly is.
+     *
+     * Every row written before the column existed reads as a walk: nothing older than this could tell,
+     * and calling a season of somebody's walks rides would be inventing a fact about their trips.
+     */
+    val mode: String = nz.mckenzie.trailday.domain.recording.ActivityMode.WALK.name
 )
 
 /**

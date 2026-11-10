@@ -320,3 +320,20 @@ internal val MIGRATION_12_13 = object : Migration(12, 13) {
         db.execSQL("UPDATE recorded_sessions SET docRefs = docRef WHERE docRef IS NOT NULL")
     }
 }
+
+/**
+ * Where a trip says whether it was a walk or a ride.
+ *
+ * **Every trip already saved is a walk.** Nothing before this column could tell a recorded ride from a
+ * recorded walk - the recorder drew both in the same green and saved both as a `TRACK` - so the honest
+ * answer for the rows that exist is the default. A ride already on the phone is a ride the walker can
+ * say so about on its own page, which is one tap and one column.
+ *
+ * The default is written into the table rather than left to the app: a row inserted by a later build
+ * supplies its own value, and this build's own reads of old rows find words they recognise.
+ */
+internal val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE recorded_sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'WALK'")
+    }
+}

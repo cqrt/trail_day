@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNames
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
+import nz.mckenzie.trailday.domain.recording.ActivityMode
 
 /**
  * Everything the walker would lose if the phone went in the creek.
@@ -139,7 +140,16 @@ data class RecordingRecord(
      * pauses is read exactly as the app read it before - a gap in its fixes was ground the pass
      * drove, which is what a gap is.
      */
-    val breaks: List<RecordedBreakRecord> = emptyList()
+    val breaks: List<RecordedBreakRecord> = emptyList(),
+    /**
+     * Whether the trip was a walk or a ride: [ActivityMode] name.
+     *
+     * Optional in the same way the pauses were, and added without a version bump: a file written before
+     * this has no key, and a recording restored from one is a walk - which is what every trip on a
+     * phone that old was. The format version stays where it is because nothing a newer build writes is
+     * unreadable to an older one: unknown keys are ignored, and the mode is one more of them.
+     */
+    val mode: String = ActivityMode.WALK.name
 )
 
 /**
