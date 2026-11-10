@@ -194,21 +194,31 @@ class RecordingViewModelTest {
      * A recording's mode is decided from its average over the wall clock - the start the service stored
      * to the moment Save is pressed - so a pass's speed is set here by putting its start back rather
      * than by giving its fixes times.
+     *
+     * **The session is set up before the recorder is built**, so the recorder's own reattach finds a
+     * pass already mirrored and leaves it alone: a recorder built first races the session it is given,
+     * and the loser of that race is the backdated start.
      */
     private suspend fun sessionAveraging(kmh: Double): Long {
-        val sessionId = recordings.startRecording(name = "Recording")
-        line.forEach { recordings.appendPoint(sessionId, it) }
         val distanceM = polylineLengthMeters(line)
-        val movingMs = (distanceM / (kmh * 1_000.0 / 3_600.0)).toLong()
-        TrackingState.begin(sessionId, System.currentTimeMillis() - movingMs)
+        // How long the pass would have been driven for, in milliseconds, to average km/h over its own
+        // length: the metre-per-second figure is in seconds, and the clock is in milliseconds.
+        val movingMs = (distanceM / (kmh * 1_000.0 / 3_600.0) * 1_000.0).toLong()
+        val startedAtEpochMs = System.currentTimeMillis() - movingMs
+        val sessionId = recordings.startRecording(
+            name = "Recording",
+            startedAtEpochMs = startedAtEpochMs
+        )
+        line.forEach { recordings.appendPoint(sessionId, it) }
+        TrackingState.begin(sessionId, startedAtEpochMs)
         TrackingState.onAcceptedFix(pointCount = line.size, distanceM = distanceM, accuracyM = 5f)
         return sessionId
     }
 
     @Test
     fun aPassOverSixKilometresAnHourIsSavedAsARideThatMadeABikeTrack() = runBlocking {
-        val viewModel = viewModel()
         val sessionId = sessionAveraging(12.0)
+        val viewModel = viewModel()
 
         viewModel.finish()
 
@@ -237,8 +247,8 @@ class RecordingViewModelTest {
 
     @Test
     fun aPassUnderSixKilometresAnHourIsSavedAsAWalkThatMadeATrack() = runBlocking {
-        val viewModel = viewModel()
         val sessionId = sessionAveraging(4.0)
+        val viewModel = viewModel()
 
         viewModel.finish()
 
