@@ -288,10 +288,11 @@ class WebEditorServer(
         is WebEditorWrite.Removed -> json(WebEditorJson.removed(result.message))
         // A file read, and nothing written: the page is handed the first track and the count of the rest.
         is WebEditorWrite.GpxRead -> json(WebEditorJson.gpx(result.track, result.otherTracks))
-        // A file brought in as activities or places, in the phone's own sentence; or the question a file
-        // of several tracks asks, with nothing written yet.
+        // A file brought in as activities or places, in the phone's own sentence; or one of the two
+        // questions a file can ask, with nothing written yet.
         is WebEditorWrite.ActivitiesWritten -> json(WebEditorJson.activitiesWritten(result.message))
         is WebEditorWrite.AsksWhereItGoes -> json(WebEditorJson.activitiesAsked(result.question))
+        is WebEditorWrite.AsksWalksOrRides -> json(WebEditorJson.activitiesModesAsked(result.question))
         is WebEditorWrite.Refused -> HttpResponse.bytes(
             result.refusal.status,
             JSON,

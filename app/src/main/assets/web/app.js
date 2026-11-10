@@ -956,19 +956,19 @@ async function importGpxFile(file) {
 /**
  * A file brought in as an activity: the walk itself, written on the phone as a finished recording.
  *
- * **Everything about it is the phone's answer** - the reading, the naming, the date and the writing -
- * so `POST /api/activities` is handed the file's bytes and the file's name, and answers with the
- * sentence the walker would have read had they imported the same file on the phone. The page adds
- * nothing to it and takes nothing away from it: a second copy of "Imported ... as an activity" here
- * would be a second set of words about the same walk.
+ * **Everything about it is the phone's answer** - the reading, the naming, the date, the writing and
+ * what it was - so `POST /api/activities` is handed the file's bytes, the file's name and the answers
+ * so far, and answers with the sentence the walker would have read had they imported the same file on
+ * the phone. The page adds nothing to it and takes nothing away from it: a second copy of "Imported
+ * ... as a walk" here would be a second set of words about the same walk.
  *
- * A file of several tracks is answered with a question instead, and nothing has been written. The page
- * asks it, and sends the same file again with the answer - which is why [file] is kept rather than the
+ * A file that has questions is answered with the first of them and nothing written. The page asks it,
+ * and sends the same file again with the answer it has - which is why [file] is kept rather than the
  * bytes: the phone reads the file itself each time, and one reading is one rule.
  */
 let asking = null;
 
-async function importActivityFile(file, destination) {
+async function importActivityFile(file, destination, mode) {
   const problem = importProblem(file, state.gpx.maxBytes);
   if (problem) {
     showNotice(problem);
@@ -981,6 +981,7 @@ async function importActivityFile(file, destination) {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const body = { [state.gpx.field]: base64Of(bytes), name: file.name };
     if (destination) body.as = destination;
+    if (mode) body.mode = mode;
     const { status, answer } = await sendJson('/api/activities', 'POST', body);
     if (status !== 200) {
       // The phone's own words about a file it would not read: the same sentence the phone's own import
@@ -989,7 +990,7 @@ async function importActivityFile(file, destination) {
       return;
     }
     if (answer.question) {
-      askWhereItGoes(file, answer.question);
+      askQuestion(file, answer.question, destination, mode);
       return;
     }
     // A place arrives on the map, so the map is read again; an activity does not, and reloading costs
@@ -1004,14 +1005,33 @@ async function importActivityFile(file, destination) {
   }
 }
 
-/** Puts the file's question in front of the walker, with the phone's own sentence and labels. */
-function askWhereItGoes(file, question) {
-  asking = { file };
+/**
+ * Puts a file's question in front of the walker, with the phone's own heading, sentence and labels.
+ *
+ * **One overlay for both questions.** The phone decides which is being asked - where the file goes, or
+ * whether it was a walk or a ride - and sends the heading and both labels with it, so this page never
+ * holds a copy of either question's words. [pending] remembers the answers already given, because the
+ * file is sent again from the start with everything the phone has been told: a file of four silent
+ * tracks is asked twice, and the second answer alone would be a file with no destination.
+ */
+function askQuestion(file, question, destination, mode) {
+  asking = { file, destination, mode: mode || null, question };
+  // Which field an answer goes in. The two buttons mean different things by question, and the phone
+  // says which question it is so the answer is not sent back under the other one's name.
+  asking.answerField = question.kind === 'walks' ? 'mode' : 'as';
+  asking.leftValue = question.kind === 'walks' ? 'walk' : 'places';
+  asking.rightValue = question.kind === 'walks' ? 'ride' : 'activities';
+
+  field('ask-title').textContent = question.title || 'Where should they go?';
   field('ask-words').textContent = question.sentence;
-  field('ask-activities').textContent = question.activitiesLabel;
-  field('ask-places').textContent = question.placesLabel;
+  field('ask-left').textContent = question.kind === 'walks'
+    ? question.walkLabel
+    : question.placesLabel;
+  field('ask-right').textContent = question.kind === 'walks'
+    ? question.rideLabel
+    : question.activitiesLabel;
   field('ask-overlay').hidden = false;
-  field('ask-activities').focus();
+  field('ask-right').focus();
 }
 
 /**
@@ -1607,21 +1627,26 @@ document.getElementById('import-activity-file').addEventListener('change', (even
 });
 
 /*
- * The question a file of several tracks asks: two answers and a way out. The overlay's own press closes
- * it, as the browsers' dialog does - a press rather than a click, so a drag that left the dialog does
- * not count as a press on the page behind it.
+ * A file's questions: two answers and a way out. The overlay's own press closes it, as the browsers'
+ * dialog does - a press rather than a click, so a drag that left the dialog does not count as a press
+ * on the page behind it.
+ *
+ * The two buttons answer whichever question was last asked, which the phone named when it sent it: the
+ * answer is added to the ones already given and the file is sent again, so the phone can ask its next
+ * question or write the file with everything it has been told.
  */
-document.getElementById('ask-activities').addEventListener('click', () => {
-  const pending = asking;
-  closeQuestion();
-  if (pending) importActivityFile(pending.file, 'activities');
-});
+document.getElementById('ask-left').addEventListener('click', () => answerQuestion('left'));
+document.getElementById('ask-right').addEventListener('click', () => answerQuestion('right'));
 
-document.getElementById('ask-places').addEventListener('click', () => {
+function answerQuestion(side) {
   const pending = asking;
   closeQuestion();
-  if (pending) importActivityFile(pending.file, 'places');
-});
+  if (!pending) return;
+  const answer = side === 'left' ? pending.leftValue : pending.rightValue;
+  const destination = pending.answerField === 'as' ? answer : pending.destination;
+  const mode = pending.answerField === 'mode' ? answer : pending.mode;
+  importActivityFile(pending.file, destination, mode);
+}
 
 document.getElementById('ask-close').addEventListener('click', closeQuestion);
 document.getElementById('ask-overlay').addEventListener('mousedown', (event) => {

@@ -299,6 +299,10 @@ class WebEditorServerTest {
                 WebEditorWrite.AsksWhereItGoes(
                     ImportWords.Question(fileName = "Taupo rides", tracks = 4)
                 )
+            } else if (body.contains("walks")) {
+                WebEditorWrite.AsksWalksOrRides(
+                    ImportWords.ModeQuestion(fileName = "Morning", tracks = 1)
+                )
             } else {
                 WebEditorWrite.ActivitiesWritten("Imported \"Morning Walk\" as an activity on the phone.")
             }
@@ -859,12 +863,33 @@ class WebEditorServerTest {
         )
 
         assertEquals(200, response.code)
-        // The page draws the question from the phone's own words: one sentence and the two answers,
-        // count and all.
+        // The page draws the question from the phone's own words: a heading, one sentence and the two
+        // answers, count and all - and the kind, so it knows which question it is holding.
         assertEquals(
-            """{"message":"","question":{"sentence":"Taupo rides holds 4 tracks. """ +
+            """{"message":"","question":{"kind":"where","title":"Where should they go?",""" +
+                """"sentence":"Taupo rides holds 4 tracks. """ +
                 """Keep them as 4 activities, or as 4 places?","tracks":4,""" +
-                """"activitiesLabel":"4 activities","placesLabel":"4 places"}}""",
+                """"activitiesLabel":"4 activities","placesLabel":"4 places",""" +
+                """"walkLabel":"","rideLabel":""}}""",
+            response.body
+        )
+    }
+
+    @Test
+    fun `a file that says nothing is asked whether it was a walk or a ride`() {
+        start()
+
+        val response = send(
+            WebEditorServer.ACTIVITIES_PATH,
+            "POST",
+            """{"gpx":"PGdweC8+","name":"Morning.gpx","as":"walks"}"""
+        )
+
+        assertEquals(200, response.code)
+        assertEquals(
+            """{"message":"","question":{"kind":"walks","title":"Is it a walk or a ride?",""" +
+                """"sentence":"Morning doesn't say whether it is a walk or a ride.","tracks":1,""" +
+                """"activitiesLabel":"","placesLabel":"","walkLabel":"Walk","rideLabel":"Ride"}}""",
             response.body
         )
     }

@@ -180,10 +180,33 @@ object WebEditorJson {
         WebEditorActivitiesAnswer.serializer(),
         WebEditorActivitiesAnswer(
             question = WebEditorImportQuestion(
+                kind = WebEditorImportQuestion.WHERE,
+                title = question.title,
                 sentence = question.sentence,
                 tracks = question.tracks,
                 activitiesLabel = question.activitiesLabel,
                 placesLabel = question.placesLabel
+            )
+        )
+    )
+
+    /**
+     * What a file that says nothing answers with, once it has been told where it is going: whether it
+     * was a walk or a ride, and nothing written.
+     *
+     * The page hands both answers back with the file on the next send - the destination it already has
+     * and this one - which is why the question says what kind it is. See [WebEditorImportQuestion.kind].
+     */
+    fun activitiesModesAsked(question: ImportWords.ModeQuestion): String = json.encodeToString(
+        WebEditorActivitiesAnswer.serializer(),
+        WebEditorActivitiesAnswer(
+            question = WebEditorImportQuestion(
+                kind = WebEditorImportQuestion.WALKS,
+                title = question.title,
+                sentence = question.sentence,
+                tracks = question.tracks,
+                walkLabel = question.walkLabel,
+                rideLabel = question.rideLabel
             )
         )
     )
@@ -532,7 +555,8 @@ data class WebEditorGpxBody(
 )
 
 /**
- * The body `POST /api/activities` carries: a file, its own name, and where its tracks should go.
+ * The body `POST /api/activities` carries: a file, its own name, where its tracks should go, and what
+ * they were.
  *
  * **The naming and the meaning are the phone's.** The page sends the file's name exactly as the
  * laptop holds it - `Morning_Walk_2026-11-03.gpx` - and the phone drops the extension by its own rule,
@@ -544,12 +568,17 @@ data class WebEditorGpxBody(
  * again with the walker's answer. `"activities"` or `"places"` are the only two values anything acts on;
  * anything else reads as no answer, so a page from another build asks rather than writing somewhere the
  * walker never chose.
+ *
+ * [mode] is `"walk"` or `"ride"`, and absent in the same way: a file that says nothing about itself is
+ * asked once the destination is settled, and the page sends the file again with both answers. A file
+ * whose own type says what it was never asks, and its own answer outranks this one.
  */
 @Serializable
 data class WebEditorActivitiesBody(
     val gpx: String = "",
     val name: String = "",
-    val `as`: String? = null
+    val `as`: String? = null,
+    val mode: String? = null
 )
 
 /**
@@ -568,18 +597,36 @@ data class WebEditorActivitiesAnswer(
 )
 
 /**
- * The question, as the page draws it: one sentence and the two answers' own labels.
+ * The question, as the page draws it: one heading, one sentence and the two answers' own labels.
  *
- * The labels carry the count - "4 activities", "4 places" - because the answer is a count, and the
+ * **Two questions arrive in this one shape**, and [kind] is what tells the page which it is holding: it
+ * decides whether the two buttons answer with `as` (where the file goes) or `mode` (what it was), and
+ * which two labels belong on them. The words themselves are the phone's either way, so the desk's
+ * overlay and the phone's dialog ask the same question in the same words.
+ *
+ * The labels carry the count - "4 activities", "4 places" - because that answer is a count, and the
  * phone says the numbers rather than the page working them out from the file it never read.
  */
 @Serializable
 data class WebEditorImportQuestion(
+    val kind: String = WHERE,
+    val title: String = "",
     val sentence: String = "",
     val tracks: Int = 0,
     val activitiesLabel: String = "",
-    val placesLabel: String = ""
-)
+    val placesLabel: String = "",
+    /** The walk-or-ride question's two answers, empty for the other question. */
+    val walkLabel: String = "",
+    val rideLabel: String = ""
+) {
+    companion object {
+        /** Where the file's tracks go: activities or places. */
+        const val WHERE = "where"
+
+        /** What the file's tracks were: walks or rides. */
+        const val WALKS = "walks"
+    }
+}
 
 /**
  * The track-file facts the page has to know, carried in the state document.

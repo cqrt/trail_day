@@ -29,6 +29,7 @@ import nz.mckenzie.trailday.domain.other.within
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.domain.tiles.PlaceLabels
 import nz.mckenzie.trailday.domain.tiles.boxAround
+import nz.mckenzie.trailday.domain.recording.ActivityMode
 import nz.mckenzie.trailday.domain.track.ActivityDate
 import nz.mckenzie.trailday.domain.track.ActivityDates
 import nz.mckenzie.trailday.domain.track.FileTracks
@@ -347,6 +348,18 @@ class WebEditorDocuments(
         }
 
         val destination = chosen ?: ImportDestination.ACTIVITIES
+
+        // **Then what the file was**, and only for a file going to Activities: a place is a line, and
+        // whether it was ridden is the kind of thing its page can say later. A file that says it was a
+        // ride - a Garmin `<type>cycling</type>` - is never asked, which is the same rule the phone uses.
+        if (destination == ImportDestination.ACTIVITIES &&
+            ImportDecision.asksMode(tracks = tracks, answered = request.mode)
+        ) {
+            return WebEditorWrite.AsksWalksOrRides(
+                ImportWords.ModeQuestion(fileName = fileName, tracks = tracks.size)
+            )
+        }
+
         val sideTracks = tracks.sumOf { it.reading.sideTracks }
 
         if (destination == ImportDestination.PLACES) {
@@ -354,7 +367,8 @@ class WebEditorDocuments(
                 .getOrElse { return refused(WebEditorRefusal.INVALID, it.message ?: "Nothing was imported.") }
             return WebEditorWrite.ActivitiesWritten(
                 ImportWords.summary(
-                    activities = 0,
+                    walks = 0,
+                    rides = 0,
                     tracks = written.size,
                     files = 1,
                     onPhone = true
@@ -365,16 +379,19 @@ class WebEditorDocuments(
         // One clock reading for the file, so every track in it that carries no time of its own is dated
         // the same day rather than a day apart across a midnight.
         val today = now()
-        var written = 0
-        var first: Pair<NamedTrack, ActivityDate>? = null
+        var walks = 0
+        var rides = 0
+        var first: Triple<NamedTrack, ActivityDate, ActivityMode>? = null
         for (track in tracks) {
             val date = ActivityDates.of(track.line, today)
+            val mode = track.hint ?: request.mode ?: ActivityMode.WALK
             val made = runCatching {
                 recordings.importActivity(
                     name = track.name,
                     points = track.line,
                     startedAtEpochMs = date.startEpochMs,
-                    endedAtEpochMs = date.endEpochMs
+                    endedAtEpochMs = date.endEpochMs,
+                    mode = mode
                 )
             }
             if (made.isFailure) {
@@ -383,8 +400,8 @@ class WebEditorDocuments(
                     made.exceptionOrNull()?.message ?: "Nothing was imported."
                 )
             }
-            written++
-            if (tracks.size == 1) first = track to date
+            if (mode == ActivityMode.RIDE) rides++ else walks++
+            if (tracks.size == 1) first = Triple(track, date, mode)
         }
 
         val one = first
@@ -394,12 +411,14 @@ class WebEditorDocuments(
                     name = one.first.name,
                     dateEpochMs = one.second.startEpochMs,
                     points = one.first.line.size,
+                    mode = one.third,
                     sideTracks = sideTracks,
                     onPhone = true
                 )
             } else {
                 ImportWords.summary(
-                    activities = written,
+                    walks = walks,
+                    rides = rides,
                     tracks = 0,
                     files = 1,
                     sideTracks = sideTracks,

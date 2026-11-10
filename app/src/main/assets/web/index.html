@@ -89,22 +89,26 @@
   </main>
 
   <!--
-    The question a file of several tracks asks, over the work: as activities, or as places. Nothing has
-    been written when it appears - the phone asked before writing anything - and the two buttons are its
-    own labels, count and all. Closing it imports nothing, which is the honest outcome of a question
-    left unanswered.
+    The question a file asks, over the work: where its tracks go, and - when it says nothing about
+    itself - whether it was a walk or a ride. Nothing has been written when it appears, because the phone
+    asks before writing anything, and the two buttons wear its own labels.
 
-    Places first, because that is the order the phone's own dialog shows them in: there, activities takes
-    the confirm slot on the right, as the likely answer for somebody who pressed Import on Activities. The
-    two surfaces offering the same two answers should not offer them in a different order.
+    **One overlay for both questions**, because they are one interruption: the phone is asking about one
+    file, and it will ask again if there is a second question. The heading and the two labels come from
+    the phone with the question, so the desk and the phone's own dialog ask the same thing in the same
+    words. Closing it imports nothing, which is the honest outcome of a question left unanswered.
+
+    The second answer is the likelier one, on the right where a confirm belongs: activities for a file
+    somebody pressed Import on, and a ride because a file that says nothing is more often a ride than a
+    walk. Places first, as the phone's own dialog shows it.
   -->
   <div id="ask-overlay" hidden>
     <section id="ask" role="dialog" aria-labelledby="ask-title">
-      <h2 id="ask-title">Where should they go?</h2>
+      <h2 id="ask-title"></h2>
       <p id="ask-words"></p>
       <div id="ask-answers">
-        <button id="ask-places" type="button"></button>
-        <button id="ask-activities" type="button"></button>
+        <button id="ask-left" type="button"></button>
+        <button id="ask-right" type="button"></button>
       </div>
       <button id="ask-close" type="button" aria-label="Close">&times;</button>
     </section>

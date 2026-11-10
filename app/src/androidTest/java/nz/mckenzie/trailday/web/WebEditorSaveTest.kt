@@ -12,6 +12,7 @@ import nz.mckenzie.trailday.data.RecordingRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.recording.ActivityMode
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -132,6 +133,36 @@ class WebEditorSaveTest {
     private fun pointsJson(points: List<GeoPoint>): String =
         points.joinToString(prefix = "[", postfix = "]") { """{"lat":${it.lat},"lng":${it.lng}}""" }
 
+    /**
+     * The body the desk sends when it hands a track file to `/api/activities`.
+     *
+     * The file's bytes are base64 of a GPX of one silent track, written out here rather than built from
+     * a class, for the reason the other bodies are: a page and a test that shared a builder would keep
+     * passing after a field was renamed.
+     */
+    private fun activitiesBody(
+        name: String = "Morning.gpx",
+        destination: String? = null,
+        mode: String? = null
+    ): String {
+        val gpx = """
+            <?xml version="1.0"?>
+            <gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1">
+              <trk><trkseg>
+                <trkpt lat="0.0" lon="0.0"><time>2026-11-03T09:00:00Z</time></trkpt>
+                <trkpt lat="0.0" lon="0.001"><time>2026-11-03T09:10:00Z</time></trkpt>
+              </trkseg></trk>
+            </gpx>
+        """.trimIndent()
+        val parts = mutableListOf(
+            """"gpx":"${java.util.Base64.getEncoder().encodeToString(gpx.toByteArray())}"""",
+            """"name":"$name""""
+        )
+        destination?.let { parts += """"as":"$it"""" }
+        mode?.let { parts += """"mode":"$it"""" }
+        return "{" + parts.joinToString(",") + "}"
+    }
+
     private fun saved(answer: WebEditorWrite): WebEditorWrite.Saved {
         assertTrue("expected a save: $answer", answer is WebEditorWrite.Saved)
         return answer as WebEditorWrite.Saved
@@ -152,6 +183,42 @@ class WebEditorSaveTest {
         val refusal = answer as WebEditorWrite.Refused
         assertEquals("refused for the right reason: ${refusal.message}", expected, refusal.refusal)
         return refusal
+    }
+
+    @Test
+    fun aSilentFileIsAskedWhetherItWasAWalkOrARideAndNothingIsWritten() = runBlocking {
+        // The file has no type in it and its name says nothing, so the phone asks rather than guessing:
+        // a ride saved as a walk is a green line where a bike belongs.
+        val answer = documents.activities(activitiesBody())
+
+        assertTrue("the question rather than a write: $answer", answer is WebEditorWrite.AsksWalksOrRides)
+        assertEquals(
+            "nothing is written until it is answered",
+            0,
+            db.recordingDao().observeSessions().first().size
+        )
+    }
+
+    @Test
+    fun theSameFileSentWithTheAnswerBecomesARide() = runBlocking {
+        val answer = documents.activities(activitiesBody(destination = "activities", mode = "ride"))
+
+        assertTrue("a write, not another question: $answer", answer is WebEditorWrite.ActivitiesWritten)
+        val written = db.recordingDao().observeSessions().first().single()
+        assertEquals("the trip says what the walker said", ActivityMode.RIDE.name, written.mode)
+        assertTrue("and it came in as an imported activity", written.imported)
+    }
+
+    @Test
+    fun aFileSentToPlacesIsNeverAskedWhatItWas() = runBlocking {
+        val answer = documents.activities(activitiesBody(destination = "places"))
+
+        assertTrue(
+            "a place is a line, and its kind is its page's business: $answer",
+            answer is WebEditorWrite.ActivitiesWritten
+        )
+        val place = assets.observeActiveAssets().first().single()
+        assertEquals("something the file said nothing about is a track", "TRACK", place.kind)
     }
 
     @Test

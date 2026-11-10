@@ -10,6 +10,7 @@ import nz.mckenzie.trailday.domain.asset.AssetPathResult
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.recording.ActivityMode
 import nz.mckenzie.trailday.domain.track.ImportDestination
 import nz.mckenzie.trailday.domain.track.TrackInterchange
 import nz.mckenzie.trailday.ui.AssetEditFields
@@ -171,17 +172,19 @@ sealed interface WebEditorCreateResult {
 }
 
 /**
- * A file the desk sent to be brought in, and where its tracks are to go.
+ * A file the desk sent to be brought in, where its tracks are to go, and what they were.
  *
  * [fileName] is the file's own name, extension and all, because the phone drops it by its own rule -
  * see [nz.mckenzie.trailday.domain.track.FileTracks.baseNameOf] - and an activity must be called what the
  * same file imported on the phone would be called. [destination] is null until the walker has answered
- * the question a file of several tracks asks.
+ * the question a file of several tracks asks, and [mode] is null until they have answered the one a file
+ * that says nothing asks - or until the file says what it was itself, in which case nothing asks.
  */
 data class WebEditorActivityImport(
     val fileName: String,
     val bytes: ByteArray,
-    val destination: ImportDestination?
+    val destination: ImportDestination?,
+    val mode: ActivityMode? = null
 )
 
 /** What a route answers a write with. */
@@ -226,6 +229,15 @@ sealed interface WebEditorWrite {
      * which. The page asks, then sends the file again with the answer.
      */
     data class AsksWhereItGoes(val question: ImportWords.Question) : WebEditorWrite
+
+    /**
+     * A file that says nothing about whether it was a walk or a ride, and the question that raises.
+     *
+     * Nothing is written for the same reason: a ride saved as a walk is a green line where a bike
+     * belongs. Asked after the destination, so the page may hold a file that has been told where to go
+     * and is now being asked what it was.
+     */
+    data class AsksWalksOrRides(val question: ImportWords.ModeQuestion) : WebEditorWrite
 
     data class Refused(val refusal: WebEditorRefusal, val message: String) : WebEditorWrite
 }
@@ -318,13 +330,13 @@ object WebEditorEdits {
         ?.takeIf { it.isNotEmpty() }
 
     /**
-     * The file, its name and where its tracks are to go, from a `POST /api/activities` body.
+     * The file, its name, where its tracks are to go and what it was, from a `POST /api/activities` body.
      *
      * Null when the body carried no file this build can read - which is a refusal with a sentence of
      * its own, not an empty file. [WebEditorActivityImport.destination] is null when the page has not
      * answered the question yet, which is what a file of several tracks is asked about; an answer this
      * build does not know reads the same way, so a page that sent something else is asked rather than
-     * writing where the walker never chose.
+     * writing where the walker never chose. The mode is read by the same rule.
      */
     fun readActivityImport(body: String?): WebEditorActivityImport? {
         val parsed = body
@@ -339,6 +351,11 @@ object WebEditorEdits {
             destination = when (parsed.`as`?.trim()?.lowercase()) {
                 "activities" -> ImportDestination.ACTIVITIES
                 "places" -> ImportDestination.PLACES
+                else -> null
+            },
+            mode = when (parsed.mode?.trim()?.lowercase()) {
+                "walk" -> ActivityMode.WALK
+                "ride" -> ActivityMode.RIDE
                 else -> null
             }
         )
