@@ -50,8 +50,32 @@ object KmlParser {
         }
         return placemarks.mapNotNull { placemark ->
             val paths = pathsUnder(placemark)
-            if (paths.isEmpty()) null else FileTrack(childText(placemark, "name"), paths)
+            if (paths.isEmpty()) {
+                null
+            } else {
+                FileTrack(
+                    name = childText(placemark, "name"),
+                    paths = paths,
+                    type = extendedTypeOf(placemark)
+                )
+            }
         }
+    }
+
+    /**
+     * What a placemark's `ExtendedData` says it was: the value of the `Data` named `type`,
+     * `activityType` or `sport`.
+     *
+     * KML has no field of its own for this, so every tool that writes one writes it as a `Data` pair
+     * under its own name - `gx:Track`s from Google Earth carry `sport`, others `type`. The names are
+     * tried in a fixed order rather than any `Data` whose name contains "type", for the reason
+     * [GeoJsonParser]'s name keys are: a file of a hundred fields has one of them that means this.
+     */
+    private fun extendedTypeOf(placemark: Element): String? {
+        val data = TYPED_DATA.flatMap { wanted ->
+            elementsOf(placemark, "Data").filter { it.getAttribute("name").equals(wanted, ignoreCase = true) }
+        }
+        return data.firstOrNull()?.let { childText(it, "value") }?.takeIf { it.isNotBlank() }
     }
 
     /**
@@ -159,4 +183,7 @@ object KmlParser {
         element.localName ?: element.nodeName.substringAfterLast(':')
 
     private val WHITESPACE = Regex("\\s+")
+
+    /** The `Data name=` values a KML file may carry a track's own type under, in the order worth trying. */
+    private val TYPED_DATA = listOf("type", "activityType", "sport")
 }

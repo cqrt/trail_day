@@ -38,7 +38,13 @@ object GpxParser {
         return tracks.mapNotNull { track ->
             val segments = elementsOf(track, "trkseg").map { pointsOf(it) }.filter { it.isNotEmpty() }
             val paths = segments.ifEmpty { listOf(pointsOf(track)).filter { it.isNotEmpty() } }
-            if (paths.isEmpty()) null else FileTrack(childText(track, "name"), paths)
+            if (paths.isEmpty()) {
+                null
+            } else {
+                // The `<type>` child GPX 1.1 defines beside `<name>`, which Garmin writes as "cycling"
+                // or "biking". It is the one field a file has for saying what the track was.
+                FileTrack(childText(track, "name"), paths, type = childText(track, "type"))
+            }
         }
     }
 

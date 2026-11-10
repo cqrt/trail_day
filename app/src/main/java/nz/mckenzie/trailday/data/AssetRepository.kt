@@ -234,6 +234,14 @@ class AssetRepository(
 
     suspend fun deleteAsset(assetId: Long) = assetDao.delete(assetId)
 
+    /**
+     * Says what kind a place is, and nothing else.
+     *
+     * For a trip's own page: when a walk turns out to have been a ride, the place the trip made is the
+     * same line in a different kind, and its name, notes, geometry and length all stay as they were.
+     */
+    suspend fun setKind(assetId: Long, kind: AssetKind) = assetDao.setKind(assetId, kind.name)
+
     // --- Photographs ----------------------------------------------------------------
 
     /**
@@ -334,6 +342,11 @@ class AssetRepository(
      * [RecordingRepository.importActivity]. A file that names its own tracks becomes one place per
      * track, which is what the Te Araroa Trust's own export of the trail needs: 466 named sections
      * rather than one line drawn across the country.
+     *
+     * **A file that says it was ridden becomes a bike track**, so a ride brought in from Places is the
+     * line the walker rode rather than a walk's line with somebody's bike attached. A file that says
+     * nothing is a track, which is what every file became before this and is the likelier answer for
+     * something drawn by hand. Places asks nothing, as it never has.
      */
     suspend fun createPlacesFrom(
         tracks: List<NamedTrack>,
@@ -344,6 +357,7 @@ class AssetRepository(
             // A file whose later paths start on the line's own vertices is a track with side
             // tracks, and the reading has already decided that; anything else arrives as one line.
             geometry = AssetGeometry(track.reading.paths),
+            kind = track.hint?.assetKind ?: AssetKind.TRACK,
             createdAtEpochMs = createdAtEpochMs
         )
         ImportedTrack(name = track.name, reading = track.reading)

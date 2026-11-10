@@ -1,7 +1,9 @@
 package nz.mckenzie.trailday.domain.track
 
+import nz.mckenzie.trailday.domain.recording.ActivityMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -63,6 +65,34 @@ class FileTracksTest {
             "one file, two unnamed tracks, so they can still be told apart",
             listOf("Ride 1", "Ride 2"),
             tracks.map { it.name }
+        )
+    }
+
+    @Test
+    fun `the hint travels with the named track, out of the file's own type`() {
+        val gpx = buildString {
+            append("""<?xml version="1.0"?><gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1">""")
+            append("<trk><name>Morning</name><type>cycling</type><trkseg>")
+            append("""<trkpt lat="-41.5" lon="173.8"><time>2026-11-03T09:00:00Z</time></trkpt>""")
+            append("""<trkpt lat="-41.6" lon="173.9"><time>2026-11-03T09:10:00Z</time></trkpt>""")
+            append("</trkseg></trk>")
+            append("<trk><name>Evening</name><trkseg>")
+            append("""<trkpt lat="-41.7" lon="173.9"><time>2026-11-03T18:00:00Z</time></trkpt>""")
+            append("""<trkpt lat="-41.8" lon="174.0"><time>2026-11-03T18:10:00Z</time></trkpt>""")
+            append("</trkseg></trk>")
+            append("</gpx>")
+        }.toByteArray()
+
+        val tracks = FileTracks.read(fileName = "Two_days.gpx", bytes = gpx)
+
+        assertEquals(
+            "the file said what the first track was, so it is not asked about",
+            ActivityMode.RIDE,
+            tracks[0].hint
+        )
+        assertNull(
+            "and it said nothing about the second, which is a question rather than a guess",
+            tracks[1].hint
         )
     }
 

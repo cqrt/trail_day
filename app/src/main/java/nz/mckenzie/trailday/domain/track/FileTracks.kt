@@ -1,5 +1,7 @@
 package nz.mckenzie.trailday.domain.track
 
+import nz.mckenzie.trailday.domain.recording.ActivityMode
+
 /**
  * A file's tracks, read once, each under the name it will be kept as.
  *
@@ -11,10 +13,16 @@ package nz.mckenzie.trailday.domain.track
  *
  * [reading] is [TrackInterchange]'s own answer about the ground: the line first and its side tracks
  * after it, or the line every path was joined into.
+ *
+ * [hint] is what the file said the track was - see [ActivityHint] - and null when it said nothing. It
+ * travels with the track rather than being read again by each caller, so the phone, the desk and the
+ * Places import all read a file the same way: a file that says ride is a ride on all three, and a file
+ * that says nothing asks on the two surfaces that ask.
  */
 data class NamedTrack(
     val name: String,
-    val reading: TrackInterchange.Reading
+    val reading: TrackInterchange.Reading,
+    val hint: ActivityMode? = null
 ) {
     /** The line itself: everything after it is a side track, which an activity does not keep. */
     val line get() = reading.paths.firstOrNull().orEmpty()
@@ -41,10 +49,14 @@ object FileTracks {
             is TrackInterchange.FileOutcome.Read -> outcome.tracks
         }
         if (tracks.isEmpty()) throw IllegalArgumentException(TrackInterchange.TOO_SHORT)
+        val baseName = baseNameOf(fileName)
         return tracks.mapIndexed { index, track ->
             NamedTrack(
                 name = nameOf(fileName = fileName, own = track.name, index = index, count = tracks.size),
-                reading = track.reading
+                reading = track.reading,
+                // Computed here rather than by each caller, so the phone, the desk and the Places import
+                // cannot come to different conclusions about the same file.
+                hint = ActivityHint.of(type = track.type, trackName = track.name, fileName = baseName)
             )
         }
     }

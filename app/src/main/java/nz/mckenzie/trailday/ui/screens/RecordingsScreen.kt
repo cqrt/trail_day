@@ -35,10 +35,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import nz.mckenzie.trailday.domain.asset.AssetKind
+import nz.mckenzie.trailday.domain.recording.ActivityMode
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.domain.reference.followedLineWords
 import nz.mckenzie.trailday.domain.track.ImportDestination
 import nz.mckenzie.trailday.map.AssetColors
+import nz.mckenzie.trailday.ui.ImportWords
 import nz.mckenzie.trailday.ui.formatDate
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.formatDuration
@@ -67,6 +70,7 @@ fun RecordingsScreen(
     val sessions by viewModel.sessions.collectAsStateWithLifecycle()
     val shown by viewModel.shown.collectAsStateWithLifecycle()
     val query by viewModel.query.collectAsStateWithLifecycle()
+    val filter by viewModel.filter.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val question by viewModel.question.collectAsStateWithLifecycle()
@@ -82,19 +86,36 @@ fun RecordingsScreen(
     question?.let { asking ->
         AlertDialog(
             onDismissRequest = viewModel::cancelImport,
-            title = { Text("Where should they go?") },
+            title = { Text(asking.title) },
             text = { Text(asking.sentence) },
-            // Both answers are answers: the walker pressed Import on this screen, so activities is the
-            // likely one and sits where a confirm always sits.
+            // Both answers are answers: the walker pressed Import on this screen, so the likelier one
+            // sits where a confirm always sits. A file sent to Places is never asked what it was - the
+            // question is only put to one going to Activities.
             confirmButton = {
-                TextButton(onClick = { viewModel.answerImport(ImportDestination.ACTIVITIES) }) {
-                    Text(asking.activitiesLabel)
-                }
+                TextButton(
+                    onClick = {
+                        when (asking) {
+                            is ImportWords.Ask.WhereItGoes ->
+                                viewModel.answerImport(ImportDestination.ACTIVITIES)
+
+                            is ImportWords.Ask.WalksOrRides ->
+                                viewModel.answerMode(ActivityMode.RIDE)
+                        }
+                    }
+                ) { Text(asking.firstLabel) }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.answerImport(ImportDestination.PLACES) }) {
-                    Text(asking.placesLabel)
-                }
+                TextButton(
+                    onClick = {
+                        when (asking) {
+                            is ImportWords.Ask.WhereItGoes ->
+                                viewModel.answerImport(ImportDestination.PLACES)
+
+                            is ImportWords.Ask.WalksOrRides ->
+                                viewModel.answerMode(ActivityMode.WALK)
+                        }
+                    }
+                ) { Text(asking.secondLabel) }
             }
         )
     }
@@ -123,6 +144,26 @@ fun RecordingsScreen(
                     onValueChange = viewModel::search,
                     placeholder = "Search activities"
                 )
+
+                // Walks and rides, with the count of each, once there is a reason to tell them apart: a
+                // list of nothing but walks needs no chip saying so. A search is a question of its own,
+                // so the row steps aside while one is being asked - the same rule the places list follows.
+                if (!searching && bothModes(sessions)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ChoiceChip(
+                            selected = filter == null,
+                            label = "All ${sessions.size}",
+                            onClick = { viewModel.showOnly(null) }
+                        )
+                        ActivityMode.entries.forEach { mode ->
+                            ChoiceChip(
+                                selected = filter == mode,
+                                label = "${modeWord(mode)} ${sessions.count { it.mode == mode }}",
+                                onClick = { viewModel.showOnly(mode) }
+                            )
+                        }
+                    }
+                }
 
                 // What the list holds, in the mock screens' line under the search: how many trips and how far
                 // they went between them. It counts what is shown, so a search's answer is described too.
@@ -180,22 +221,45 @@ fun RecordingsScreen(
  * "4 activities - 46.5 km between them", for whatever the list is showing.
  *
  * One activity is its own sentence: "1 activity - 2.4 km between them" would be describing a crowd of one.
+ * **Once the list holds both walks and rides it says how many of each**, because a list of eighteen trips
+ * is a season somebody wants to read the shape of - and the chips above can only count what is there.
  */
 internal fun summaryOf(rows: List<RecordingRow>): String {
     val metres = rows.sumOf { it.distanceM }
+    val walks = rows.count { it.mode == ActivityMode.WALK }
+    val rides = rows.size - walks
     return when {
         rows.isEmpty() -> "No activities"
         rows.size == 1 -> if (metres <= 0.0) "1 activity" else "1 activity \u00b7 ${formatDistance(metres)}"
+        bothModes(rows) -> listOfNotNull(
+            "${rows.size} activities",
+            "${counted(walks, "walk", "walks")}, ${counted(rides, "ride", "rides")}",
+            formatDistance(metres).takeIf { metres > 0.0 }
+        ).joinToString(" \u00b7 ")
         metres <= 0.0 -> "${rows.size} activities"
         else -> "${rows.size} activities \u00b7 ${formatDistance(metres)} between them"
     }
 }
 
+/** Whether these trips are of both modes, which is when the chips and the split sentence are worth it. */
+internal fun bothModes(rows: List<RecordingRow>): Boolean =
+    rows.any { it.mode == ActivityMode.RIDE } && rows.any { it.mode == ActivityMode.WALK }
+
+/** "1 ride", "3 rides": the count and the word that agrees with it. */
+private fun counted(count: Int, one: String, many: String): String =
+    "$count ${if (count == 1) one else many}"
+
+/** "Walks", "Rides": the chip's own word, capitalised because it starts the label. */
+private fun modeWord(mode: ActivityMode): String =
+    mode.many.replaceFirstChar { it.uppercase() }
+
 /**
- * One trip, as a card: **the recorded line's own tile, the name, when and how far, and the place it was for.**
+ * One trip, as a card: **its own tile, the name, when and how far, and the place it was for.**
  *
- * The tile is the recorded line's green rather than a kind's colour: a trip is not one of the five kinds, it is
- * the line that was walked, and it wears the colour that line wears on every map in the app.
+ * A walk wears the recorded line's green, because a walk is the line that was walked and that is the
+ * colour it wears on every map in the app. **A ride wears a bike track's tile** - the walker's own bike
+ * colour, with the bike track's glyph - so the list tells a day on the bike from a day on foot without
+ * the row having to say so in words.
  */
 @Composable
 private fun TripCard(row: RecordingRow, onOpen: () -> Unit) {
@@ -205,7 +269,11 @@ private fun TripCard(row: RecordingRow, onOpen: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            RecordedTile()
+            if (row.mode == ActivityMode.RIDE) {
+                KindTile(kind = AssetKind.BIKE_TRACK)
+            } else {
+                RecordedTile()
+            }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(text = row.name, style = MaterialTheme.typography.titleMedium)
                 // A trip still being recorded says so: that is what the walker is looking for when they
@@ -284,5 +352,9 @@ internal fun recordingAsset(row: RecordingRow): String {
     // A walk that came in a file was not recorded against anything, so it says where it came from
     // rather than calling itself a new track - which is what a walk of the walker's own is.
     if (row.imported) return "Imported from a file"
-    return if (row.assetWasDeleted) "Its place has since been deleted" else "A new track"
+    if (row.assetWasDeleted) return "Its place has since been deleted"
+    return when (row.mode) {
+        ActivityMode.RIDE -> "A new bike track"
+        ActivityMode.WALK -> "A new track"
+    }
 }

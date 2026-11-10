@@ -249,7 +249,8 @@ class AssetListViewModel(
             )
         }
         return ImportWords.summary(
-            activities = 0,
+            walks = 0,
+            rides = 0,
             tracks = written.size,
             files = files,
             failures = failures

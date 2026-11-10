@@ -38,7 +38,16 @@ object GeoJsonParser {
         val paths: List<List<GeoPoint>>,
         val properties: Map<String, String> = emptyMap(),
         /** The coordinate, for a feature that is a place rather than a line. */
-        val point: GeoPoint? = null
+        val point: GeoPoint? = null,
+        /**
+         * What the file says the track was: one of its own scalar properties, read by
+         * [TYPE_KEYS].
+         *
+         * GeoJSON has no field for this either, so tools put it in properties under one of a handful
+         * of names - Strava's own export uses `activityType`, others `sport`. Which words mean a ride
+         * is [ActivityHint]'s answer, not this reader's.
+         */
+        val type: String? = null
     )
 
     /**
@@ -79,11 +88,15 @@ object GeoJsonParser {
             feature
         }
         val properties = feature["properties"] as? JsonObject
+        val scalars = scalarsOf(properties)
         return Feature(
-            name = nameOf(properties),
+            name = nameOf(scalars),
             paths = pathsOf(geometry),
-            properties = scalarsOf(properties),
-            point = pointOf(geometry)
+            properties = scalars,
+            point = pointOf(geometry),
+            type = TYPE_KEYS.firstNotNullOfOrNull { key ->
+                scalars[key]?.takeIf { it.isNotBlank() }
+            }
         )
     }
 
@@ -134,14 +147,23 @@ object GeoJsonParser {
     private fun number(element: JsonElement?): Double? =
         (element as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull()
 
-    private fun nameOf(properties: JsonObject?): String? {
-        properties ?: return null
+    private fun nameOf(scalars: Map<String, String>): String? {
         for (key in NAME_KEYS) {
-            val value = (properties[key] as? JsonPrimitive)?.contentOrNull
+            val value = scalars[key]
             if (!value.isNullOrBlank()) return value.trim()
         }
         return null
     }
+
+    /**
+     * The property names a feature may carry its own track type under, in the order worth trying.
+     *
+     * `activityType` is Strava's own, `sport` is Garmin's and several others', and `type` is what is
+     * left when a tool has one field and calls it the obvious thing. The order matters because a file
+     * may carry both - a `type` of "Feature collection" and an `activityType` of "Ride" are not the
+     * same answer, and the second is the one that says what was done.
+     */
+    private val TYPE_KEYS = listOf("activityType", "activity_type", "sport", "type")
 
     private fun typeOf(element: JsonObject): String? =
         (element["type"] as? JsonPrimitive)?.contentOrNull

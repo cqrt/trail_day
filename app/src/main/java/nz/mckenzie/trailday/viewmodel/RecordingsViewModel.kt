@@ -22,6 +22,7 @@ import nz.mckenzie.trailday.domain.other.EmptyOtherTracksCache
 import nz.mckenzie.trailday.domain.other.OtherTracksCache
 import nz.mckenzie.trailday.domain.reference.FollowedRef
 import nz.mckenzie.trailday.domain.reference.followedPublishers
+import nz.mckenzie.trailday.domain.recording.ActivityMode
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.domain.recording.followedRefs
 import nz.mckenzie.trailday.domain.track.ActivityDate
@@ -74,7 +75,15 @@ data class RecordingRow(
      */
     val followed: List<FollowedRef> = emptyList(),
     /** Whether this activity was brought in from a file rather than walked with the phone. */
-    val imported: Boolean = false
+    val imported: Boolean = false,
+    /**
+     * Whether the trip was a walk or a ride.
+     *
+     * The trip's own answer - a walk along a bike track is a walk - and what the row's tile and the
+     * list's chips are drawn from. A pass still being recorded reads as a walk, because the mode is
+     * decided when it is finished.
+     */
+    val mode: ActivityMode = ActivityMode.WALK
 ) {
     val isFinished: Boolean get() = status == RecordingStatus.FINISHED
 
@@ -133,14 +142,30 @@ class RecordingsViewModel(
     }
 
     /**
-     * The trips the list is built from: all of them, or the ones the search leaves.
+     * The mode the list is narrowed to, or null for all of them.
+     *
+     * Local and instant, like the places list's kind filter: every trip on the phone is already loaded,
+     * so showing only rides is a filter rather than a read.
+     */
+    private val _filter = MutableStateFlow<ActivityMode?>(null)
+    val filter: StateFlow<ActivityMode?> = _filter
+
+    fun showOnly(mode: ActivityMode?) {
+        _filter.value = mode
+    }
+
+    /**
+     * The trips the list is built from: all of them, or the ones the search and the filter leave.
      *
      * The delete is not here: a trip is removed from its own page, where the walker can see the line and its
      * numbers before it goes - see [nz.mckenzie.trailday.ui.screens.RecordingsScreen].
      */
-    val shown: StateFlow<List<RecordingRow>> = combine(sessions, _query) { all, query ->
+    val shown: StateFlow<List<RecordingRow>> = combine(sessions, _query, _filter) { all, query, mode ->
         val typed = query.trim()
-        all.filter { row -> typed.isEmpty() || row.name.contains(typed, ignoreCase = true) }
+        all.filter { row ->
+            (typed.isEmpty() || row.name.contains(typed, ignoreCase = true)) &&
+                (mode == null || row.mode == mode)
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     private val _message = MutableStateFlow<String?>(null)
@@ -150,13 +175,14 @@ class RecordingsViewModel(
     val busy: StateFlow<Boolean> = _busy
 
     /**
-     * The question a file of several tracks is asking, or null when nothing is being asked.
+     * The question a file is asking, or null when nothing is being asked.
      *
      * One at a time: a batch of three such files asks three times, in the order they were picked, and
-     * nothing is written until every one has an answer.
+     * nothing is written until every one has an answer. A file can be asked twice - where it goes, then
+     * whether it was a walk or a ride - and the second question is only asked once the first is answered.
      */
-    private val _question = MutableStateFlow<ImportWords.Question?>(null)
-    val question: StateFlow<ImportWords.Question?> = _question
+    private val _question = MutableStateFlow<ImportWords.Ask?>(null)
+    val question: StateFlow<ImportWords.Ask?> = _question
 
     /** The file the question on screen is about. */
     private var asking: BatchFile? = null
@@ -169,7 +195,9 @@ class RecordingsViewModel(
         val fileName: String,
         val tracks: List<NamedTrack>,
         /** Where the walker said this file's tracks go, for a file that had to be asked about. */
-        var chosen: ImportDestination? = null
+        var chosen: ImportDestination? = null,
+        /** Whether the file was a walk or a ride, for a file whose tracks said nothing. */
+        var mode: ActivityMode? = null
     )
 
     /** A batch of picked files: what was read, what would not read, and how many were picked. */
@@ -180,7 +208,7 @@ class RecordingsViewModel(
     )
 
     /** An activity written, kept only for the single-file sentence, which names it. */
-    private data class ImportedOne(val track: NamedTrack, val date: ActivityDate)
+    private data class ImportedOne(val track: NamedTrack, val date: ActivityDate, val mode: ActivityMode)
 
     /**
      * Imports GPX, KML, KMZ or GeoJSON files as activities.
@@ -239,6 +267,19 @@ class RecordingsViewModel(
     }
 
     /**
+     * The walker's answer to whether the file was a walk or a ride.
+     *
+     * It is only asked of a file whose tracks said nothing, and only once the file is going to
+     * Activities - so writing it is the last thing that file has to say.
+     */
+    fun answerMode(mode: ActivityMode) {
+        val pending = batch ?: return
+        val file = asking ?: return
+        file.mode = mode
+        askNext(pending)
+    }
+
+    /**
      * Dismissing the question: nothing in this batch is written.
      *
      * The whole batch goes rather than the file being asked about, because the walker has said they do
@@ -252,34 +293,58 @@ class RecordingsViewModel(
         _message.value = "Nothing was imported."
     }
 
-    /** Puts up the next file's question, or writes the batch when none is left. */
+    /**
+     * Puts up the next file's question, or writes the batch when none is left.
+     *
+     * **Two questions, in order, and never both at once**: where a file of several tracks goes, and then
+     * - only for a file going to Activities - whether it was a walk or a ride when its own tracks said
+     * nothing. A file whose tracks carry their own type is never asked the second one.
+     */
     private fun askNext(pending: Batch) {
-        val file = pending.files.firstOrNull { one ->
+        val destination = pending.files.firstOrNull { one ->
             ImportDecision.asks(
                 tracks = one.tracks.size,
                 destination = ImportDestination.ACTIVITIES,
                 answered = one.chosen
             )
         }
-        asking = file
-        if (file == null) {
-            _question.value = null
-            viewModelScope.launch { writeBatch(pending) }
+        if (destination != null) {
+            asking = destination
+            _question.value = ImportWords.Ask.WhereItGoes(
+                ImportWords.Question(fileName = destination.fileName, tracks = destination.tracks.size)
+            )
             return
         }
-        _question.value = ImportWords.Question(fileName = file.fileName, tracks = file.tracks.size)
+
+        val mode = pending.files.firstOrNull { one ->
+            (one.chosen ?: ImportDestination.ACTIVITIES) == ImportDestination.ACTIVITIES &&
+                ImportDecision.asksMode(tracks = one.tracks, answered = one.mode)
+        }
+        if (mode != null) {
+            asking = mode
+            _question.value = ImportWords.Ask.WalksOrRides(
+                ImportWords.ModeQuestion(fileName = mode.fileName, tracks = mode.tracks.size)
+            )
+            return
+        }
+
+        asking = null
+        _question.value = null
+        viewModelScope.launch { writeBatch(pending) }
     }
 
     /**
      * Writes every file in the batch, and says what happened in one sentence.
      *
-     * An activity is the file's line, dated from its own times: the side tracks a file may hang off
-     * that line are counted and left out, because a walk is one line. Places are the file's tracks
-     * whole, side tracks and all, exactly as the Places button writes them.
+     * An activity is the file's line, dated from its own times and saved as what it was: the file's own
+     * hint, the walker's answer when it said nothing, or a walk. Places are the file's tracks whole,
+     * side tracks and all, exactly as the Places button writes them - and a file that says it was
+     * ridden becomes a bike track there, which [AssetRepository.createPlacesFrom] decides.
      */
     private suspend fun writeBatch(pending: Batch) {
         _busy.value = true
-        var activities = 0
+        var walks = 0
+        var rides = 0
         var places = 0
         var sideTracks = 0
         var single: ImportedOne? = null
@@ -299,24 +364,26 @@ class RecordingsViewModel(
 
                 for (track in file.tracks) {
                     val date = ActivityDates.of(track.line, now())
+                    val mode = track.hint ?: file.mode ?: ActivityMode.WALK
                     val written = runCatching {
                         recordings.importActivity(
                             name = track.name,
                             points = track.line,
                             startedAtEpochMs = date.startEpochMs,
-                            endedAtEpochMs = date.endEpochMs
+                            endedAtEpochMs = date.endEpochMs,
+                            mode = mode
                         )
                     }
                     if (written.isFailure) {
                         pending.failures += file.fileName
                         continue
                     }
-                    activities++
+                    if (mode == ActivityMode.RIDE) rides++ else walks++
                     sideTracks += track.reading.sideTracks
                     // The single-file sentence names the walk, which is only possible when there is
                     // one of them: a count is the honest answer to a batch.
                     if (pending.files.size == 1 && file.tracks.size == 1) {
-                        single = ImportedOne(track = track, date = date)
+                        single = ImportedOne(track = track, date = date, mode = mode)
                     }
                 }
             }
@@ -328,11 +395,13 @@ class RecordingsViewModel(
                     name = one.track.name,
                     dateEpochMs = one.date.startEpochMs,
                     points = one.track.line.size,
+                    mode = one.mode,
                     sideTracks = sideTracks
                 )
             } else {
                 ImportWords.summary(
-                    activities = activities,
+                    walks = walks,
+                    rides = rides,
                     tracks = places,
                     files = pending.picked,
                     sideTracks = sideTracks,
@@ -385,5 +454,6 @@ internal fun RecordedSessionEntity.toRow(assetNames: Map<Long, String>) = Record
     assetName = assetId?.let { assetNames[it] },
     docRef = docRef,
     followed = followedRefs(docRef, docRefs).map { FollowedRef(it) },
-    imported = imported
+    imported = imported,
+    mode = ActivityMode.ofStorage(mode)
 )

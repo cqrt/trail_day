@@ -1,6 +1,7 @@
 package nz.mckenzie.trailday.ui.screens
 
 import nz.mckenzie.trailday.domain.reference.FollowedRef
+import nz.mckenzie.trailday.domain.recording.ActivityMode
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.viewmodel.RecordingRow
 import org.junit.Assert.assertEquals
@@ -26,7 +27,8 @@ class RecordingsRowTest {
         publisher: String? = null,
         distanceM: Double = 2350.0,
         durationMs: Long? = 750_000L,
-        imported: Boolean = false
+        imported: Boolean = false,
+        mode: ActivityMode = ActivityMode.WALK
     ) = RecordingRow(
         id = 1L,
         name = "Home block 14 Sep",
@@ -40,7 +42,8 @@ class RecordingsRowTest {
         docRef = docRef,
         publisher = publisher,
         followed = docRef?.let { listOf(FollowedRef(it, publisher)) }.orEmpty(),
-        imported = imported
+        imported = imported,
+        mode = mode
     )
 
     @Test
@@ -136,6 +139,28 @@ class RecordingsRowTest {
     }
 
     @Test
+    fun `a ride of the walker's own says it made a bike track`() {
+        assertEquals(
+            "A new bike track",
+            recordingAsset(row(assetId = null, assetName = null, mode = ActivityMode.RIDE))
+        )
+    }
+
+    @Test
+    fun `a list of both modes counts each rather than calling them all activities`() {
+        val rows = listOf(
+            row(distanceM = 10_000.0),
+            row(distanceM = 4_350.0),
+            row(distanceM = 20_000.0, mode = ActivityMode.RIDE)
+        )
+
+        assertEquals(
+            "3 activities \u00b7 2 walks, 1 ride \u00b7 34.35 km",
+            summaryOf(rows)
+        )
+    }
+
+    @Test
     fun `the list says what it holds, and one trip is its own sentence`() {
         assertEquals(
             "2 activities \u00b7 14.35 km between them",
@@ -148,5 +173,12 @@ class RecordingsRowTest {
         )
         assertEquals("no distance is no distance to say", "2 activities", summaryOf(listOf(row(distanceM = 0.0), row(distanceM = 0.0))))
         assertEquals("No activities", summaryOf(emptyList()))
+    }
+
+    @Test
+    fun `the chips are only worth drawing when the list holds both modes`() {
+        assertTrue(bothModes(listOf(row(), row(mode = ActivityMode.RIDE))))
+        assertTrue("a list of walks needs no chip saying walks", !bothModes(listOf(row(), row())))
+        assertTrue(!bothModes(emptyList()))
     }
 }

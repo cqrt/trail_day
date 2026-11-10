@@ -52,8 +52,9 @@ object TrackInterchange {
      *
      * [name] is null when the format gives no name - a GPX or KML track is imported under the file's
      * own name, as it always was - and a GeoJSON feature carries its own when its properties have one.
+     * [type] is what the file says the track was, in the file's own words: see [ActivityHint].
      */
-    data class Track(val name: String?, val reading: Reading)
+    data class Track(val name: String?, val reading: Reading, val type: String? = null)
 
     /** The paths to store, or why this file is not a track. */
     sealed interface Outcome {
@@ -137,7 +138,7 @@ object TrackInterchange {
     private fun geoJson(text: String): FileOutcome {
         val features = runCatching { GeoJsonParser.parse(text) }
             .getOrElse { return FileOutcome.Invalid(MALFORMED) }
-        return fromTracks(features.map { FileTrack(it.name, it.paths) })
+        return fromTracks(features.map { FileTrack(it.name, it.paths, it.type) })
     }
 
     /**
@@ -150,7 +151,7 @@ object TrackInterchange {
     private fun fromTracks(tracks: List<FileTrack>): FileOutcome {
         val read = tracks.mapNotNull { track ->
             when (val outcome = readingOf(track.paths)) {
-                is Outcome.Read -> Track(track.name, outcome.reading)
+                is Outcome.Read -> Track(track.name, outcome.reading, track.type)
                 is Outcome.Invalid -> null
             }
         }

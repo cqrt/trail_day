@@ -1,5 +1,6 @@
 package nz.mckenzie.trailday.ui
 
+import nz.mckenzie.trailday.domain.recording.ActivityMode
 import java.util.Locale
 
 /**
@@ -23,12 +24,71 @@ object ImportWords {
      * and the numbers are on the buttons as well as in the sentence: the answer is a count.
      */
     data class Question(val fileName: String, val tracks: Int) {
+        val title: String get() = "Where should they go?"
+
         val sentence: String
             get() = "$fileName holds $tracks tracks. Keep them as $tracks activities, or as $tracks places?"
 
         val activitiesLabel: String get() = "$tracks activities"
 
         val placesLabel: String get() = "$tracks places"
+    }
+
+    /**
+     * The second question a file that says nothing asks: **is it a walk or a ride?**
+     *
+     * Only the tracks the file says nothing about are asked about, so a Garmin file that writes
+     * "cycling" in its own type is never asked. Asked once per file rather than once per track, because
+     * a file of four silent tracks is four of the same thing far more often than it is two and two.
+     */
+    data class ModeQuestion(val fileName: String, val tracks: Int) {
+        /** One track is asked about in the singular, and several in the plural: "it" or "these". */
+        val one: Boolean get() = tracks == 1
+
+        val title: String get() = if (one) "Is it a walk or a ride?" else "Are they walks or rides?"
+
+        val sentence: String
+            get() = if (one) {
+                "$fileName doesn't say whether it is a walk or a ride."
+            } else {
+                "$fileName doesn't say whether these are walks or rides."
+            }
+
+        val walkLabel: String get() = if (one) "Walk" else "Walks"
+
+        val rideLabel: String get() = if (one) "Ride" else "Rides"
+    }
+
+    /**
+     * The question a file raises on its way in, whichever of the two it is.
+     *
+     * One type rather than two flows, because a file is asked its questions in order and only ever one
+     * at a time: the destination first, then the mode, and the screen and the desk each show the one
+     * they are holding. The four words are here rather than in each screen, so the phone's dialog and
+     * the desk's overlay cannot come to ask the same thing differently.
+     */
+    sealed interface Ask {
+        /** The heading: what the walker is being asked. */
+        val title: String
+        val sentence: String
+
+        /** The likelier answer, which sits where a confirm always sits. */
+        val firstLabel: String
+        val secondLabel: String
+
+        data class WhereItGoes(val question: Question) : Ask {
+            override val title get() = question.title
+            override val sentence get() = question.sentence
+            override val firstLabel get() = question.activitiesLabel
+            override val secondLabel get() = question.placesLabel
+        }
+
+        data class WalksOrRides(val question: ModeQuestion) : Ask {
+            override val title get() = question.title
+            override val sentence get() = question.sentence
+            override val firstLabel get() = question.rideLabel
+            override val secondLabel get() = question.walkLabel
+        }
     }
 
     /**
@@ -54,8 +114,11 @@ object ImportWords {
         }
 
     /**
-     * One activity, dated from its own track: `Imported "Morning Walk" as an activity, 3 Nov 2026,
+     * One activity, dated from its own track: `Imported "Morning Walk" as a walk, 3 Nov 2026,
      * 1,240 points.`
+     *
+     * [mode] is what the file said it was, or the walker's answer when it said nothing: a sentence that
+     * called every import "an activity" would be leaving out the one fact the app just asked about.
      *
      * [onPhone] is the desk's version of the same sentence, which says where it went - a walker reading
      * it on a laptop has not seen the activity appear anywhere.
@@ -67,17 +130,23 @@ object ImportWords {
         name: String,
         dateEpochMs: Long,
         points: Int,
+        mode: ActivityMode = ActivityMode.WALK,
         sideTracks: Int = 0,
         onPhone: Boolean = false
     ): String {
         val where = if (onPhone) " on the phone" else ""
-        val head = "Imported \"$name\" as an activity$where, ${formatDate(dateEpochMs)}, " +
+        val head = "Imported \"$name\" as ${sayMode(mode)}$where, ${formatDate(dateEpochMs)}, " +
             "${grouped(points)} points"
         return clauses(head, leftOut(sideTracks))
     }
 
     /**
-     * Anything more than one track: `Imported 5 tracks from 3 files`, and what could not be read.
+     * Anything more than one track: `Imported 2 walks and 3 rides from 3 files`, and what could not be read.
+     *
+     * **Walks and rides rather than activities**, because a list that says "5 activities" says nothing
+     * about what the app just asked twice and the walker just answered twice. One mode alone is named
+     * too - "5 walks" - so the only sentence that says "activities" is one about a count of neither,
+     * which cannot happen: a file sent to Activities writes walks and rides or nothing.
      *
      * A place is called a track, because that is what it was - files hold tracks - and that is the
      * word Places' own import has always used. A file that failed is named in the same sentence rather
@@ -85,7 +154,8 @@ object ImportWords {
      * to go and look at.
      */
     fun summary(
-        activities: Int,
+        walks: Int,
+        rides: Int,
         tracks: Int,
         files: Int,
         sideTracks: Int = 0,
@@ -93,7 +163,8 @@ object ImportWords {
         onPhone: Boolean = false
     ): String {
         val written = listOfNotNull(
-            if (activities > 0) counted(activities, "activity", "activities") else null,
+            if (walks > 0) counted(walks, "walk", "walks") else null,
+            if (rides > 0) counted(rides, "ride", "rides") else null,
             if (tracks > 0) counted(tracks, "track", "tracks") else null
         ).joinToString(" and ")
 
@@ -124,6 +195,10 @@ object ImportWords {
 
     /** "1,240" - a count with its thousands shown, which is how the plan writes a long track's points. */
     fun grouped(count: Int): String = String.format(Locale.US, "%,d", count)
+
+    /** "a walk", "a ride": what the sentence calls what was imported. */
+    private fun sayMode(mode: ActivityMode): String =
+        if (mode == ActivityMode.RIDE) "a ride" else "a walk"
 
     private fun counted(count: Int, one: String, many: String): String =
         "$count ${if (count == 1) one else many}"
