@@ -58,7 +58,25 @@ data class AssetLine(
      * Only the reference layer reads it: it is how the map draws the rideable tracks as their own
      * layer, so the Bike tracks switch can hide them without hiding the walking-only ones.
      */
-    val bikeFriendly: Boolean = false
+    val bikeFriendly: Boolean = false,
+    /**
+     * Whether the line's name is written along it, as a track's is.
+     *
+     * **A recording is never named on the map**, and says so with false. Its name is the trip's, and a
+     * stretch of the line cut out for a name is a stretch the line layers then leave blank - a small gap
+     * in a recorded line, drawn by a name that never appears because no name layer reads that source.
+     * False writes the name as a property and draws no stretch for it.
+     */
+    val named: Boolean = true,
+    /**
+     * Whether this line is the evidence of a pass: a walk or a ride that happened.
+     *
+     * The map's own gold casing is drawn under it wherever it is - the recorder, a trip's page, and a
+     * place a pass has been made of - and a ride's line is drawn in the walker's bike colour, which is
+     * not the recorded green the casing used to recognise. This property is what says "recorded" about
+     * a line whose colour cannot.
+     */
+    val recorded: Boolean = false
 ) {
 
     /** Every path to draw: the line first, then its side tracks. */
@@ -172,6 +190,15 @@ object AssetGeoJson {
      */
     internal const val BIKE_FRIENDLY_PROPERTY = "bikeFriendly"
 
+    /**
+     * The property that marks a line as the evidence of a walk or a ride.
+     *
+     * The map's gold casing reads it: a recorded line is not always the recorded green any more - a
+     * ride is drawn in the walker's own bike colour - so the casing has to be told which lines are
+     * recorded rather than infer it from their colour.
+     */
+    internal const val RECORDED_PROPERTY = "recorded"
+
     private const val EMPTY = "{\"type\":\"FeatureCollection\",\"features\":[]}"
 
     fun build(lines: List<AssetLine>): String {
@@ -232,8 +259,13 @@ object AssetGeoJson {
      * not a name the map writes. The stretch is taken from the track's own points rather than
      * from the pieces above, so a track that is part walked still carries its name once, near the middle
      * of the whole track.
+     *
+     * **A line that says [AssetLine.named] false carries no stretch**, and neither does a recorded one:
+     * the name is still written as a property, and the stretch that would have carried it is a piece of
+     * the line the line layers skip - a gap in somebody's walk, cut for a name that nothing draws.
      */
     private fun nameStretch(line: AssetLine): List<AssetStretch> {
+        if (!line.named || line.recorded) return emptyList()
         if (line.kind != AssetKind.TRACK || line.shape != AssetShape.LINE) return emptyList()
         if (line.name.isBlank()) return emptyList()
         val piece = TrackNames.pieceOf(line.points)
@@ -250,6 +282,11 @@ object AssetGeoJson {
         builder.append("\"shape\":\"").append(line.shape.name).append("\"")
         if (line.bikeFriendly) {
             builder.append(",\"").append(BIKE_FRIENDLY_PROPERTY).append("\":true")
+        }
+        // A recorded line says so, because its colour no longer always does: a ride is drawn in the
+        // walker's bike colour and still wears the gold edge of something that really happened.
+        if (line.recorded) {
+            builder.append(",\"").append(RECORDED_PROPERTY).append("\":true")
         }
         // The one stretch that carries the name is marked, so the line layers can leave it alone and the
         // name layer can draw nothing else.

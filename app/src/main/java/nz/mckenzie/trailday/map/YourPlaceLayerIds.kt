@@ -23,16 +23,29 @@ object YourPlaceLayerIds {
     /** The gold edge under the raw recorded lines, from [BasemapView.YOUR_TRACKS_SOURCE]. */
     const val YOUR_TRACKS_CASING = "trailday-your-tracks-casing"
 
-    /** The green core of the raw recorded lines. */
+    /** The green core of the raw recorded walks. */
     const val YOUR_TRACKS_LINE = "trailday-your-tracks-line"
+
+    /**
+     * The gold edge under a recorded ride, in the bike track's width.
+     *
+     * Its own layer rather than one edge for both, for the reason every kind has its own line: a ride is
+     * drawn at the walker's bike width and dashed, so an edge cut for a walk would either be buried
+     * under the ride or stand out around it.
+     */
+    const val YOUR_TRACKS_RIDE_CASING = "trailday-your-tracks-ride-casing"
+
+    /** The colour a recorded ride was given - the walker's bike colour - at the bike width and dash. */
+    const val YOUR_TRACKS_RIDE_LINE = "trailday-your-tracks-ride-line"
 
     /**
      * Every style layer [layer] hides.
      *
      * A spot is every point kind of the walker's own: one marker layer each, because a kind can
      * only be hidden on its own if it is drawn on its own. A track takes its name and its recorded
-     * edge with it; a bike track takes its recorded edge. A recording is the two layers of the raw
-     * recorded source.
+     * edge with it; a bike track takes its recorded edge. A recording is the four layers of the raw
+     * recorded source - its walks and its rides, each with the gold under it - because they are one
+     * thing to the walker, who switches off yesterday's trips rather than yesterday's rides.
      */
     fun idsOf(layer: YourPlaceLayer): List<String> = when (layer) {
         YourPlaceLayer.SPOTS -> AssetKind.entries
@@ -50,6 +63,11 @@ object YourPlaceLayerIds {
             RECORDED_BIKE_CASING
         )
 
-        YourPlaceLayer.RECORDINGS -> listOf(YOUR_TRACKS_CASING, YOUR_TRACKS_LINE)
+        YourPlaceLayer.RECORDINGS -> listOf(
+            YOUR_TRACKS_CASING,
+            YOUR_TRACKS_LINE,
+            YOUR_TRACKS_RIDE_CASING,
+            YOUR_TRACKS_RIDE_LINE
+        )
     }
 }

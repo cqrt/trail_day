@@ -16,6 +16,7 @@ import nz.mckenzie.trailday.domain.asset.AssetLayer
 import nz.mckenzie.trailday.domain.asset.YourPlaceLayer
 import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.map.YourPlaceLayerIds
 import nz.mckenzie.trailday.tracking.LocationSource
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -152,9 +153,36 @@ class MapLayersTest {
         assertTrue(settings.hiddenYourPlaces.first().isEmpty())
     }
 
+    @Test
+    fun theRecordingsSwitchHidesARideAndAWalkTogether() = runBlocking {
+        // The raw recorded source draws four layers now - a walk's green and a ride's bike colour, each
+        // with the gold under it - and the Recordings tile is one switch for all of them: yesterday's
+        // trips, whichever way they were made.
+        val ids = YourPlaceLayerIds.idsOf(YourPlaceLayer.RECORDINGS)
+
+        assertEquals("two castings and two lines", 4, ids.size)
+        assertTrue(
+            "the walk's pair is under the switch: $ids",
+            YourPlaceLayerIds.YOUR_TRACKS_CASING in ids && YourPlaceLayerIds.YOUR_TRACKS_LINE in ids
+        )
+        assertTrue(
+            "and the ride's pair is too: $ids",
+            YourPlaceLayerIds.YOUR_TRACKS_RIDE_CASING in ids &&
+                YourPlaceLayerIds.YOUR_TRACKS_RIDE_LINE in ids
+        )
+
+        val viewModel = viewModel()
+        viewModel.setYourPlaceHidden(YourPlaceLayer.RECORDINGS, hidden = true)
+
+        assertEquals(
+            "one tap stores one switch, and the map hides what that switch names",
+            setOf(YourPlaceLayer.RECORDINGS),
+            withTimeout(5_000) { viewModel.hiddenYourPlaces.first { it.isNotEmpty() } }
+        )
+    }
+
     /**
      * The one switch in that sheet that starts **off**, and the one that fetches something new.
-     *
      * Everything else there is a layer of the work, which is why the app was opened; the names are
      * furniture over the walker's own ground, and their tiles come from the internet on the way
      * past - so the map draws what it already holds until somebody asks for more.

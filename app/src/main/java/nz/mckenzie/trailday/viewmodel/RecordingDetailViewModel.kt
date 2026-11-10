@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -16,6 +17,7 @@ import nz.mckenzie.trailday.data.RecordingRepository
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
+import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.RecordingBreak
 import nz.mckenzie.trailday.domain.geo.polylineLengthMeters
@@ -25,8 +27,11 @@ import nz.mckenzie.trailday.domain.other.OtherTracksCache
 import nz.mckenzie.trailday.domain.reference.FollowedRef
 import nz.mckenzie.trailday.domain.reference.followedPublishers
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
+import nz.mckenzie.trailday.domain.recording.ActivityMode
 import nz.mckenzie.trailday.domain.recording.followedRefs
 import nz.mckenzie.trailday.domain.recording.placeMadeByWalk
+import nz.mckenzie.trailday.domain.recording.recordingSourceRef
+import nz.mckenzie.trailday.domain.look.Look
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.AssetGeoJson
@@ -60,7 +65,15 @@ data class RecordingDetail(
     /** Every published line this walk followed, in the order it followed them: see [RecordingRow.followed]. */
     val followed: List<FollowedRef> = emptyList(),
     /** Whether this walk came in a file rather than being recorded with the phone. */
-    val imported: Boolean = false
+    val imported: Boolean = false,
+    /**
+     * Whether the trip was a walk or a ride.
+     *
+     * The trip's own answer rather than its place's kind, because a walk along a bike track is a walk.
+     * A row written before the app could tell reads as a walk, which is what every trip of that age was
+     * drawn and saved as - see [nz.mckenzie.trailday.domain.recording.ActivityMode.ofStorage].
+     */
+    val mode: ActivityMode = ActivityMode.WALK
 ) {
     /**
      * How long it took, or null when the file gave no times and there is nothing to claim.
@@ -102,25 +115,38 @@ class RecordingDetailViewModel(
      * The recorded line, broken where the pass was paused and drawn straight through the gaps
      * where the fixes only went missing: the recording is the evidence, and what the walker
      * stopped for is part of it.
+     *
+     * **Drawn as what the trip was**: the recorded green for a walk, the walker's bike colour and dash
+     * for a ride, both with the gold edge of a line that really happened. The colour is read from
+     * [Look] as a flow rather than once, so changing the bike colour in Settings repaints the page
+     * rather than leaving it in the colour it opened with.
      */
-    val geoJson: StateFlow<String> = _detail
-        .map { detail ->
-            val points = detail?.points.orEmpty()
-            val breaks = detail?.breaks.orEmpty()
-            AssetGeoJson.build(
-                listOf(
-                    AssetLine(
-                        assetId = RECORDED_ID,
-                        name = detail?.name ?: "Activity",
-                        colorHex = AssetColors.RECORDED,
-                        points = points,
-                        stretches = points.splitAtBreaks(breaks).map { piece ->
-                            AssetStretch(colorHex = AssetColors.RECORDED, points = piece)
-                        }
-                    )
+    val geoJson: StateFlow<String> = combine(_detail, Look.current) { detail, look ->
+        val points = detail?.points.orEmpty()
+        val breaks = detail?.breaks.orEmpty()
+        val mode = detail?.mode ?: ActivityMode.WALK
+        val colour = if (mode == ActivityMode.RIDE) {
+            look.colourOf(AssetKind.BIKE_TRACK).hex
+        } else {
+            AssetColors.RECORDED
+        }
+        AssetGeoJson.build(
+            listOf(
+                AssetLine(
+                    assetId = RECORDED_ID,
+                    name = detail?.name ?: "Activity",
+                    colorHex = colour,
+                    points = points,
+                    kind = mode.assetKind,
+                    recorded = true,
+                    named = false,
+                    stretches = points.splitAtBreaks(breaks).map { piece ->
+                        AssetStretch(colorHex = colour, points = piece)
+                    }
                 )
             )
-        }
+        )
+    }
         .stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
@@ -198,8 +224,39 @@ class RecordingDetailViewModel(
                 docRef = session.docRef,
                 publisher = publishers.lastOrNull(),
                 followed = refs.zip(publishers).map { (ref, publisher) -> FollowedRef(ref, publisher) },
-                imported = session.imported
+                imported = session.imported,
+                mode = ActivityMode.ofStorage(session.mode)
             )
+        }
+    }
+
+    /**
+     * Says what the trip was: a walk or a ride.
+     *
+     * **The trip's own page is the place this is corrected**, because the recorder's guess is made from
+     * an average and an average cannot tell a brisk walk from a bike pushed up a hill. Correcting the
+     * trip also corrects the place the trip made, so the line on the Places page is the kind the day
+     * was - but only a place this trip made: a place the trip was recorded *for* was the walker's before
+     * the trip and is not the trip's to rewrite.
+     *
+     * The place is found by its mark rather than by the delete rule, because a place this trip made is
+     * still this trip's to correct after another pass has been made of the same ground.
+     */
+    fun setMode(mode: ActivityMode) {
+        viewModelScope.launch {
+            val detail = _detail.value
+            runCatching {
+                recordings.setMode(sessionId, mode)
+                val placeId = detail?.assetId
+                if (placeId != null) {
+                    val place = assetRepository.getAsset(placeId)
+                    if (place?.sourceRef == recordingSourceRef(sessionId)) {
+                        assetRepository.setKind(placeId, mode.assetKind)
+                    }
+                }
+            }
+                .onSuccess { _detail.value = detail?.copy(mode = mode) ?: _detail.value }
+                .onFailure { _message.value = it.message ?: "Could not change the activity" }
         }
     }
 

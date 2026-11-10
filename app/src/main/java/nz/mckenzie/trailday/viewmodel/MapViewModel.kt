@@ -34,6 +34,7 @@ import nz.mckenzie.trailday.domain.geo.AssetGeometry
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.nearestPathDistanceMeters
 import nz.mckenzie.trailday.domain.geo.splitAtBreaks
+import nz.mckenzie.trailday.domain.recording.ActivityMode
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
@@ -232,12 +233,19 @@ class MapViewModel(
      * A recording in progress is left out rather than drawn from its last stored fix: the layer is a
      * record of what is done, and a line that grew only when the database happened to be read would
      * be a still photograph of a walk still happening.
+     *
+     * **A ride is drawn as a ride.** Each trip is drawn in its own mode's kind and colour - the recorded
+     * green for a walk, the walker's bike colour for a ride, dashed and cased in gold - so the map says
+     * which of the walker's days was on a bike without the trip's page being opened. The line is not
+     * named: its name is the trip's, written on the card that opens it, and a stretch cut out for a name
+     * is a gap in somebody's recorded line.
      */
     val yourTracksGeoJson: StateFlow<String> =
         combine(
             recordingRepository?.observeSessions() ?: flowOf(emptyList()),
-            assets
-        ) { sessions, places ->
+            assets,
+            Look.current
+        ) { sessions, places, look ->
             val recordings = recordingRepository
                 ?: return@combine AssetGeoJson.build(emptyList())
             val lineAssetIds = places
@@ -256,16 +264,26 @@ class MapViewModel(
                     // A pause is a gap in the ground covered, not a line across it: the recorded
                     // line is broken where the walker stopped, as it is on the recording's page.
                     val breaks = runCatching { recordings.getBreaks(session.id) }.getOrDefault(emptyList())
+                    val mode = ActivityMode.ofStorage(session.mode)
+                    // A walk keeps the recorded green, which is nobody's colour to choose. A ride takes
+                    // the walker's own bike colour, because that is what a ride is drawn in everywhere.
+                    val colour = if (mode == ActivityMode.RIDE) {
+                        look.colourOf(AssetKind.BIKE_TRACK).hex
+                    } else {
+                        AssetColors.RECORDED
+                    }
                     AssetLine(
                         assetId = 0L,
                         name = session.name,
-                        colorHex = AssetColors.RECORDED,
+                        colorHex = colour,
                         points = points,
-                        kind = AssetKind.TRACK,
+                        kind = mode.assetKind,
                         shape = AssetShape.LINE,
                         stretches = points.splitAtBreaks(breaks).map { piece ->
-                            AssetStretch(colorHex = AssetColors.RECORDED, points = piece)
-                        }
+                            AssetStretch(colorHex = colour, points = piece)
+                        },
+                        named = false,
+                        recorded = true
                     )
                 }
             AssetGeoJson.build(lines)

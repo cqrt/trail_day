@@ -1126,6 +1126,13 @@ internal fun MapLibreMap.loadTrailDayStyle(
         addLineLayer(style, AssetLayerIds.BIKE_TRACKS, AssetKind.BIKE_TRACK, weight = bikeWeight)
         // What was actually walked or ridden, in its own source: evidence rather than a place, and
         // drawn over the planned lines it is read against.
+        //
+        // **Two pairs of layers, one pair per mode**, because a ride is drawn at the walker's bike width
+        // and dashed, and a dash is a constant in MapLibre rather than something a feature carries - the
+        // same reason every kind of place has its own layer. A ride's colour comes from its own feature,
+        // because it is the walker's bike colour and only they know it; a walk's is the recorded green,
+        // which is nobody's choice. The Recordings switch hides all four together: they are one thing to
+        // the walker, who switches off yesterday's trips rather than yesterday's rides.
         if (style.getSource(YOUR_TRACKS_SOURCE) == null) {
             style.addSource(GeoJsonSource(YOUR_TRACKS_SOURCE, yourTracksGeoJson))
         }
@@ -1138,9 +1145,19 @@ internal fun MapLibreMap.loadTrailDayStyle(
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                     )
-                    .withFilter(
-                        Expression.neq(Expression.get(TrackNames.CARRIES_NAME), Expression.literal(true))
+                    .withFilter(recordedLineFilter(AssetKind.TRACK))
+            )
+        }
+        if (style.getLayer(YourPlaceLayerIds.YOUR_TRACKS_RIDE_CASING) == null) {
+            style.addLayer(
+                LineLayer(YourPlaceLayerIds.YOUR_TRACKS_RIDE_CASING, YOUR_TRACKS_SOURCE)
+                    .withProperties(
+                        PropertyFactory.lineColor(Expression.literal(AssetColors.RECORDED_EDGE)),
+                        PropertyFactory.lineWidth(Expression.literal(bikeWeight.edge)),
+                        PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                        PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                     )
+                    .withFilter(recordedLineFilter(AssetKind.BIKE_TRACK))
             )
         }
         if (style.getLayer(YourPlaceLayerIds.YOUR_TRACKS_LINE) == null) {
@@ -1152,9 +1169,20 @@ internal fun MapLibreMap.loadTrailDayStyle(
                         PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                         PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                     )
-                    .withFilter(
-                        Expression.neq(Expression.get(TrackNames.CARRIES_NAME), Expression.literal(true))
+                    .withFilter(recordedLineFilter(AssetKind.TRACK))
+            )
+        }
+        if (style.getLayer(YourPlaceLayerIds.YOUR_TRACKS_RIDE_LINE) == null) {
+            style.addLayer(
+                LineLayer(YourPlaceLayerIds.YOUR_TRACKS_RIDE_LINE, YOUR_TRACKS_SOURCE)
+                    .withProperties(
+                        PropertyFactory.lineColor(Expression.get("stroke")),
+                        PropertyFactory.lineWidth(Expression.literal(bikeWeight.stylePx)),
+                        PropertyFactory.lineDasharray(bikeWeight.dashArray),
+                        PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                        PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                     )
+                    .withFilter(recordedLineFilter(AssetKind.BIKE_TRACK))
             )
         }
         // The names beside tracks: written over the tracks they belong to, and under the places so a
@@ -1270,14 +1298,19 @@ private fun applyLook(style: Style, look: MapLook, density: Float) {
     width(AssetLayerIds.BIKE_TRACKS, bikes.stylePx)
     width(YourPlaceLayerIds.YOUR_TRACKS_CASING, tracks.edge)
     width(YourPlaceLayerIds.YOUR_TRACKS_LINE, tracks.stylePx)
+    width(YourPlaceLayerIds.YOUR_TRACKS_RIDE_CASING, bikes.edge)
+    width(YourPlaceLayerIds.YOUR_TRACKS_RIDE_LINE, bikes.stylePx)
 
     // A dash array is in multiples of its line's width, so a bike track's dashes are worked out again
     // from the width it now has: left alone they would be a stipple at one width and a broken line at
-    // another. Only the walker's own bike line is dashed - DOC's rideable tracks are drawn solid.
-    style.getLayer(AssetLayerIds.BIKE_TRACKS)?.let { layer ->
-        AssetLineStyles.forKind(AssetKind.BIKE_TRACK, bikes)?.let { dash ->
-            layer.setProperties(PropertyFactory.lineDasharray(dash))
-        }
+    // another. Only the walker's own bike lines are dashed - DOC's rideable tracks are drawn solid.
+    val bikeDash = AssetLineStyles.forKind(AssetKind.BIKE_TRACK, bikes)
+    if (bikeDash != null) {
+        style.getLayer(AssetLayerIds.BIKE_TRACKS)?.setProperties(PropertyFactory.lineDasharray(bikeDash))
+        // A recorded ride is dashed for the same reason and with the same numbers, so it says "bike"
+        // with its shape wherever it is drawn, at whatever width the walker has chosen.
+        style.getLayer(YourPlaceLayerIds.YOUR_TRACKS_RIDE_LINE)
+            ?.setProperties(PropertyFactory.lineDasharray(bikeDash))
     }
 
     // The markers: a picture cannot be recoloured or resized once the style has it, so each is taken out
@@ -1302,15 +1335,37 @@ private fun addRecordedCasing(style: Style, id: String, kind: AssetKind, weight:
             )
             .withFilter(
                 Expression.all(
-                    Expression.eq(
-                        Expression.get("stroke"),
-                        Expression.literal(AssetColors.RECORDED)
+                    // **Recorded is a property as well as a colour.** A walk is the recorded green,
+                    // which is what this used to recognise; a ride is the walker's own bike colour and
+                    // says `recorded` instead. An edge that only knew the green would leave a ride
+                    // drawn on its own page with no gold under it.
+                    Expression.any(
+                        Expression.eq(
+                            Expression.get("stroke"),
+                            Expression.literal(AssetColors.RECORDED)
+                        ),
+                        Expression.eq(
+                            Expression.get(AssetGeoJson.RECORDED_PROPERTY),
+                            Expression.literal(true)
+                        )
                     ),
                     Expression.eq(Expression.get("kind"), Expression.literal(kind.name))
                 )
             )
     )
 }
+
+/**
+ * The features of [YOUR_TRACKS_SOURCE] that are a recorded [kind].
+ *
+ * The one stretch of a line that would carry its name belongs to the name layer alone: drawn here it
+ * would be a second line over the first. A recorded line asks for no such stretch - see
+ * [AssetLine.named] - and the test stays as the guard it has always been.
+ */
+private fun recordedLineFilter(kind: AssetKind): Expression = Expression.all(
+    Expression.eq(Expression.get("kind"), Expression.literal(kind.name)),
+    Expression.neq(Expression.get(TrackNames.CARRIES_NAME), Expression.literal(true))
+)
 
 /**
  * Draws or hides each layer, as the switches have it.

@@ -94,10 +94,29 @@ class AssetLayerIdsTest {
         assertEquals(
             listOf(
                 YourPlaceLayerIds.YOUR_TRACKS_CASING,
-                YourPlaceLayerIds.YOUR_TRACKS_LINE
+                YourPlaceLayerIds.YOUR_TRACKS_LINE,
+                YourPlaceLayerIds.YOUR_TRACKS_RIDE_CASING,
+                YourPlaceLayerIds.YOUR_TRACKS_RIDE_LINE
             ),
             YourPlaceLayerIds.idsOf(YourPlaceLayer.RECORDINGS)
         )
+    }
+
+    @Test
+    fun `the recordings tile hides a ride and a walk together, so one switch means one thing`() {
+        // A walk's green and a ride's bike colour are one thing to the walker - yesterday's trips - and a
+        // switch that hid the rides and left the walks would be a difference the sheet never offered.
+        val ids = YourPlaceLayerIds.idsOf(YourPlaceLayer.RECORDINGS)
+
+        assertEquals("two edges and two lines", 4, ids.size)
+        listOf(
+            YourPlaceLayerIds.YOUR_TRACKS_CASING,
+            YourPlaceLayerIds.YOUR_TRACKS_LINE,
+            YourPlaceLayerIds.YOUR_TRACKS_RIDE_CASING,
+            YourPlaceLayerIds.YOUR_TRACKS_RIDE_LINE
+        ).forEach { id ->
+            assertTrue("$id is not drawn by the recordings tile", id in ids)
+        }
     }
 
     @Test
@@ -105,6 +124,8 @@ class AssetLayerIdsTest {
         assertEquals("trailday-assets-line-track", AssetLayerIds.TRACKS)
         assertEquals("trailday-assets-line-bike-track", AssetLayerIds.BIKE_TRACKS)
         assertEquals("trailday-assets-line-track-names", AssetLayerIds.TRACK_NAMES)
+        assertEquals("trailday-your-tracks-ride-casing", YourPlaceLayerIds.YOUR_TRACKS_RIDE_CASING)
+        assertEquals("trailday-your-tracks-ride-line", YourPlaceLayerIds.YOUR_TRACKS_RIDE_LINE)
         assertEquals("trailday-assets-point-hut", AssetLayerIds.pointOf(AssetKind.HUT))
         assertEquals("trailday-assets-point-campsite", AssetLayerIds.pointOf(AssetKind.CAMPSITE))
         assertEquals("trailday-assets-point-waypoint", AssetLayerIds.pointOf(AssetKind.WAYPOINT))

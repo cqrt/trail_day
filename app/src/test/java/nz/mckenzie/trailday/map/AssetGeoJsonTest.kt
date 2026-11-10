@@ -389,4 +389,42 @@ class AssetGeoJsonTest {
             Regex("\"type\":\"LineString\"").findAll(json).count()
         )
     }
+
+    @Test
+    fun `a recorded line says so, because a ride's colour is the walker's own`() {
+        // The gold edge used to be found by the recorded green. A ride is drawn in the bike colour, so
+        // the property is what tells the map - and the trip's page - that this line really happened.
+        val ride = line(kind = AssetKind.BIKE_TRACK).copy(recorded = true)
+
+        val json = AssetGeoJson.build(listOf(ride))
+
+        assertTrue("the feature carries the mark: $json", json.contains("\"recorded\":true"))
+    }
+
+    @Test
+    fun `a line that is not named writes its name but nothing for it to be drawn on`() {
+        val trip = line(name = "Morning ride").copy(named = false)
+
+        val json = AssetGeoJson.build(listOf(trip))
+
+        assertTrue("the name is still a property", json.contains("\"name\":\"Morning ride\""))
+        assertFalse("and no stretch is cut out of the line for it", json.contains("carriesName"))
+        assertEquals(
+            "so the line is drawn once, whole",
+            1,
+            Regex("\"type\":\"Feature\",").findAll(json).count()
+        )
+    }
+
+    @Test
+    fun `a recorded line is never named, even where the kind would be`() {
+        // A ride of a walk's kind cannot happen in the app, but the rule is the line's own: a recorded
+        // line's name is the trip's, and a stretch cut for a name nothing draws is a gap in the line.
+        val trip = line(name = "Morning walk").copy(recorded = true)
+
+        val json = AssetGeoJson.build(listOf(trip))
+
+        assertFalse(json.contains("carriesName"))
+        assertEquals(1, Regex("\"type\":\"Feature\",").findAll(json).count())
+    }
 }

@@ -29,10 +29,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import nz.mckenzie.trailday.domain.geo.AverageSpeed
 import nz.mckenzie.trailday.domain.geo.ElevationPhrase
 import nz.mckenzie.trailday.domain.geo.ElevationProfile
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.geo.pointAlong
+import nz.mckenzie.trailday.domain.recording.ActivityMode
 import nz.mckenzie.trailday.domain.reference.followedLineWords
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.map.BasemapView
@@ -167,6 +169,16 @@ fun RecordingDetailScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
+                    // What the day was, and the one tap that corrects the recorder's guess: an average
+                    // cannot tell a brisk walk from a bike pushed up a hill, and the walker can.
+                    ChoiceRow(
+                        label = "Walk or ride",
+                        choices = ActivityMode.entries,
+                        selected = recording.mode,
+                        onChoose = viewModel::setMode,
+                        text = { mode -> mode.one.replaceFirstChar { it.uppercase() } }
+                    )
+
                     // The height card: the range in the domain's words and, under it, the shape.
                     elevation?.let { profile ->
                         Card(modifier = Modifier.fillMaxWidth()) {
@@ -270,31 +282,33 @@ private fun subtitleOf(recording: RecordingDetail): String = listOfNotNull(
  * The trip's figures, in the mock screens' cells: how far, how long, how much of that was moving, how fast,
  * and how much ground it took up and down.
  *
- * **Moving time is the total less the pauses**, which is what the pass recorded: a walker who stopped for
- * lunch did not spend it walking. The average is over the moving time for the same reason, and says nothing
- * while there is no moving time to divide by.
+ * **Moving time and the average are [AverageSpeed]'s**, not this file's: the recorder decides from the
+ * same two numbers whether the pass was a walk or a ride, and a page and a tile disagreeing about the
+ * same trip is the one thing this must not do. A walker who stopped for lunch did not spend it walking,
+ * and the average is over the moving time for the same reason; it says nothing while there is no moving
+ * time to divide by.
  *
  * **A walk with no times has no time cells at all.** A file with no `<time>` in it says how far and how high,
  * and nothing about how long; three cells reading "0s" and "–" would be claiming a measurement. So those rows
  * are left out, and the distance and the climb stand on their own.
  */
 internal fun figuresOf(recording: RecordingDetail, elevation: ElevationProfile?): List<List<Figure>> {
-    val end = recording.endedAtEpochMs ?: recording.startedAtEpochMs
-    val pausedMs = recording.breaks.sumOf { brk ->
-        ((brk.toEpochMs ?: end) - brk.fromEpochMs).coerceAtLeast(0L)
-    }
     val durationMs = recording.durationMs
-    val movingMs = durationMs?.let { (it - pausedMs).coerceAtLeast(0L) }
+    val movingMs = durationMs?.let {
+        AverageSpeed.movingMs(
+            startedAtEpochMs = recording.startedAtEpochMs,
+            endedAtEpochMs = recording.endedAtEpochMs,
+            breaks = recording.breaks
+        )
+    }
     val distanceM = if (recording.geometryDistanceM > 0.0) {
         recording.geometryDistanceM
     } else {
         recording.recordedDistanceM
     }
-    val average = if (movingMs != null && movingMs > 0L && distanceM > 0.0) {
-        String.format(Locale.US, "%.1f km/h", distanceM / 1000.0 / (movingMs / 3_600_000.0))
-    } else {
-        "\u2013"
-    }
+    val average = AverageSpeed.shownKmh(distanceM, movingMs ?: 0L)
+        ?.let { String.format(Locale.US, "%.1f km/h", it) }
+        ?: "\u2013"
 
     return listOfNotNull(
         listOfNotNull(

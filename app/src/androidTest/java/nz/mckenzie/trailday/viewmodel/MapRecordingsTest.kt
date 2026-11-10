@@ -16,6 +16,9 @@ import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.GeoPoint
+import nz.mckenzie.trailday.domain.look.Look
+import nz.mckenzie.trailday.domain.recording.ActivityMode
+import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.tracking.LocationSource
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -71,11 +74,12 @@ class MapRecordingsTest {
     private suspend fun pass(
         name: String,
         points: List<GeoPoint>,
-        linkedTo: Long? = null
+        linkedTo: Long? = null,
+        mode: ActivityMode = ActivityMode.WALK
     ) {
         val id = recordings.startRecording(name = name, assetId = linkedTo)
         points.forEach { recordings.appendPoint(id, it) }
-        recordings.finishRecording(id, distanceM = 100.0)
+        recordings.finishRecording(id, distanceM = 100.0, mode = mode)
     }
 
     @Test
@@ -117,5 +121,37 @@ class MapRecordingsTest {
         }
         assertEquals("the tile counts the two raw lines it controls", 2, counts.recordings)
         assertEquals("and the place is counted as a track", 1, counts.tracks)
+    }
+
+    @Test
+    fun aRideIsDrawnAsARideAndAWalkAsAWalk() = runBlocking {
+        val line = listOf(
+            GeoPoint(-41.5000, 173.9500),
+            GeoPoint(-41.5010, 173.9600)
+        )
+        pass("Taupo ride", line, mode = ActivityMode.RIDE)
+        pass("Home block", line, mode = ActivityMode.WALK)
+
+        val drawn = withTimeout(5_000) {
+            viewModel().yourTracksGeoJson.first {
+                it.contains("\"name\":\"Taupo ride\"") && it.contains("\"name\":\"Home block\"")
+            }
+        }
+
+        val bikeColour = Look.colourOf(AssetKind.BIKE_TRACK).hex
+        assertTrue("a ride is drawn in the walker's bike colour: $drawn", drawn.contains("\"stroke\":\"$bikeColour\""))
+        assertTrue("and as a bike track, so the map dashes it", drawn.contains("\"kind\":\"BIKE_TRACK\""))
+        assertTrue("a walk keeps the recorded green", drawn.contains("\"stroke\":\"${AssetColors.RECORDED}\""))
+        assertTrue("and its own kind", drawn.contains("\"kind\":\"TRACK\""))
+        assertTrue("both say they are recorded, which is what edges them in gold", drawn.contains("\"recorded\":true"))
+        assertFalse(
+            "and neither is cut for a name: a recorded line is not named on the map",
+            drawn.contains("carriesName")
+        )
+        assertEquals(
+            "both lines are whole: two features, one per trip",
+            2,
+            Regex("\"type\":\"Feature\",").findAll(drawn).count()
+        )
     }
 }

@@ -84,6 +84,15 @@ abstract class AssetDao {
     @Query("UPDATE assets SET lengthM = :lengthM WHERE id = :assetId")
     abstract suspend fun updateMeasures(assetId: Long, lengthM: Double)
 
+    /**
+     * Says what kind a place is, and nothing else.
+     *
+     * One column, for correcting a trip: when a walk turns out to have been a ride, the place it made is
+     * the same line, and only its kind - the colour, the dash and the layer it appears under - changes.
+     */
+    @Query("UPDATE assets SET kind = :kind WHERE id = :assetId")
+    abstract suspend fun setKind(assetId: Long, kind: String)
+
     @Query("SELECT * FROM asset_points WHERE assetId = :assetId ORDER BY pathIndex, sequence")
     abstract suspend fun getGeometry(assetId: Long): List<AssetPointEntity>
 
