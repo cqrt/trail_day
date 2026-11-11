@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
@@ -49,6 +48,7 @@ import nz.mckenzie.trailday.domain.other.OtherTracksCache
 import nz.mckenzie.trailday.domain.other.distanceM
 import nz.mckenzie.trailday.domain.reference.ChooserChoice
 import nz.mckenzie.trailday.domain.reference.Followable
+import nz.mckenzie.trailday.domain.reference.HiddenTracks
 import nz.mckenzie.trailday.domain.reference.chooserChoices
 import nz.mckenzie.trailday.domain.reference.followedLookTarget
 import nz.mckenzie.trailday.domain.geo.RecordingBreak
@@ -169,6 +169,17 @@ class RecordingViewModel(
      */
     val chimeOnSwitch: StateFlow<Boolean> = settingsRepository.chimeOnSwitch
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /**
+     * The published tracks the walker has hidden - see [HiddenTracks].
+     *
+     * Read eagerly, like the two switches above, and filtered from the two lists a fix can hand over onto.
+     * **Not read inside [refresh]**, which is what a `first()` of the preference would be: the chooser's
+     * refresh is a cold read of the cache already, and a second disk read in front of it puts a preference
+     * between a walker and a list they are waiting for.
+     */
+    private val hidden: StateFlow<HiddenTracks> = settingsRepository.hiddenTracks
+        .stateIn(viewModelScope, SharingStarted.Eagerly, HiddenTracks.NONE)
 
     val tracking: StateFlow<TrackingState.State> = TrackingState.state
 
@@ -812,9 +823,9 @@ class RecordingViewModel(
         viewModelScope.launch {
             // The lines the walker has hidden are not offered to follow either: the chooser's own rule
             // is that a track it offers is one the map can already draw, and a hidden line is not.
-            val hidden = settingsRepository.hiddenTracks.first()
+            val hiddenNow = hidden.value
             val kept = runCatching { docStore.cached(DocSource.TRACKS) }.getOrDefault(emptyList())
-                .filterNot { hidden.hides(it.sourceRef) }
+                .filterNot { hiddenNow.hides(it.sourceRef) }
             val bikes = runCatching { docStore.cached(DocSource.BIKES) }.getOrDefault(emptyList())
             _docTracks.value = kept
             _docBikeLinks.value = DocBikeLinks.of(kept, bikes)
@@ -833,9 +844,9 @@ class RecordingViewModel(
     fun refreshTracksToFollow() {
         refreshDocTracks()
         viewModelScope.launch {
-            val hidden = settingsRepository.hiddenTracks.first()
+            val hiddenNow = hidden.value
             _otherTracks.value = runCatching { otherStore.cached() }.getOrDefault(emptyList())
-                .filterNot { hidden.hides(it.sourceRef) }
+                .filterNot { hiddenNow.hides(it.sourceRef) }
             rememberLinesNearby()
             rememberFix()
         }
