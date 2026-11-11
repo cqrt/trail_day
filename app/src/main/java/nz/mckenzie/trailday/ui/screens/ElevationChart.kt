@@ -192,15 +192,15 @@ fun ElevationChart(
             drawLine(ruleColor, Offset(x, bottom), Offset(x, bottom + 3.dp.toPx()), 1.dp.toPx())
         }
 
-        // The heights, inside the left edge and over the fill. A label on the very top of the box - the one
-        // that covers the highest point - hangs inside it rather than half outside the drawing.
+        // The heights, inside the left edge and over the fill. A label on the top of the box - the one
+        // over the highest point - is centred on its line like the rest, which puts half of it in the
+        // margin above the plot rather than hanging it under the line.
         heightTicks.forEach { tick ->
             val text = "${tick.roundToInt()} m"
             val ink = textMeasurer.measure(text, labelStyle)
-            val y = yFor(tick) - ink.size.height / 2f
             label(
                 text = text,
-                at = Offset(left + 3.dp.toPx(), y.coerceAtLeast(top + 1.dp.toPx())),
+                at = Offset(left + 3.dp.toPx(), yFor(tick) - ink.size.height / 2f),
                 halo = true
             )
         }
@@ -268,8 +268,11 @@ private fun heightAt(samples: List<ElevationSample>, alongM: Double): Double {
 /** The room left at each end of the chart, so a label at the inside edge is not at the card's edge. */
 private val EDGE = 8.dp
 
-/** The room above the plot, so a label at the top of the box is not cut in half. */
-private val TOP = 6.dp
+/**
+ * The room above the plot: half a label, because the number over the highest point is centred on the
+ * top of the box like every other one.
+ */
+private val TOP = 8.dp
 
 /** The foot of the card given to the distance axis: a rule, its ticks and their labels. */
 private val AXIS = 16.dp
