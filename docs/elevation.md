@@ -34,6 +34,17 @@ metres from one fix to the next, so the raw heights make a sawtooth. Each sample
 heights in the 30 m around it, 15 m either side. A climb reads as a climb, and the small turns along it
 are still there.
 
+**The chart is labelled, in small numbers.** The heights run down the inside of the left edge, on a
+faint line each, and the distance runs along the foot in kilometres. The numbers are 8 sp, which is what
+a card this short will take. They are round ones - 50 m steps, or 2 km steps on a long walk - so there
+are as few as will place a point, and they are drawn against the box rather than the ground: the top and
+bottom of the drawing are not a measurement, and the numbers on it are.
+
+**The highest point always has a number over it.** When the peak is past the last round number in the
+box, the box is raised to the next one: the Kiwi Burn walk reaches 664 m, its box ends at 682, and its
+labels are 550, 600, 650 and 700. The box only ever grows for this, so the floor and the centring are
+otherwise untouched.
+
 The first and last samples keep their measured heights, so the line starts and ends where you did.
 
 The four figures above do not change. Lowest, highest, climb and descent are still the measured ones.
@@ -82,6 +93,11 @@ heights, not the shape.
 `ElevationBox.kt` is the height the chart draws across: the measured range, widened to 180 m and
 centred when a line has less ground than that in it. The phone's chart and the desk's card are both
 given it from there, so the two draw the same picture.
+
+`ElevationAxis.kt` chooses the numbers along the two axes: round ones from the 1, 2 and 5 series, and as
+few as will still place a point, so a 12 km walk is labelled every 2 km and a 900 m one every 200 m. The
+desk's card is 100 by 30 units, which is too small for a number to be read: it draws the shape, and the
+numbers are on the phone.
 
 The finger's dot is the same arithmetic the other way round. `ElevationProfile.alongAt` says how far
 along the line a fraction of the chart is, and `PathWalk.pointAlong` turns metres along a line into a
