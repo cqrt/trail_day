@@ -147,8 +147,7 @@ in the plan log.
 These are decisions that were taken to leave, not oversights. Check whether any is now wanted rather
 than assuming it is a bug:
 
-- The map's small DOC card is unreachable dead code: `DocCard`, `docPick`/`DocPick`, `focusDoc` and
-  `MapFocus.Doc`.
+- The map's small DOC card is unreachable dead code: `DocCard`, `docPick`/`DocPick` and `focusDoc`.
 - "Clear all imagery" does not say "LINZ imagery", which is what that pack is called everywhere else.
 - The desk reaches the LINZ proxy directly for its sprite, its glyphs and its elevation, where the
   phone serves its own.

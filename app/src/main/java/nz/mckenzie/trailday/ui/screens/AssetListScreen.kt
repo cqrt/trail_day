@@ -63,6 +63,10 @@ import nz.mckenzie.trailday.viewmodel.AssetListViewModel
  * undifferentiated list. The kind's tile, the name and how long the line is are the row; nothing
  * destructive lives here, because a place is removed from its own page.
  *
+ * **A row opens the place's own page**, a track's as much as a spot's. It used to frame a line on the map
+ * and raise the map's card for it, which made a row a two-tap journey to the page the row was about - and
+ * the page opens on the line's own ground anyway.
+ *
  * [onOpenDoc] is not a third way to make a place: what DOC publishes is read here rather than kept.
  * A track in **Nearby from DOC** opens its own detail page, like a row in the DOC browser.
  */
@@ -72,7 +76,6 @@ fun AssetListScreen(
     viewModel: AssetListViewModel,
     onOpenTab: (Tab) -> Unit = {},
     onOpenAsset: (Long) -> Unit,
-    onShowOnMap: (AssetEntity) -> Unit,
     onOpenDocDetail: (DocItem, DocItem?) -> Unit,
     onAddSpot: () -> Unit,
     /** Opens the screen that builds a walk out of DOC's separate tracks. */
@@ -102,15 +105,9 @@ fun AssetListScreen(
     val counts = remember(places) {
         places.groupingBy { AssetKind.fromStorage(it.kind) }.eachCount()
     }
-    val openPlace: (AssetEntity) -> Unit = { item ->
-        // A track is a line on the ground, and the map is where a line is read; a spot opens the
-        // page about it, which is where it can be changed.
-        if (AssetShape.fromStorage(item.shape) == AssetShape.LINE) {
-            onShowOnMap(item)
-        } else {
-            onOpenAsset(item.id)
-        }
-    }
+    // Every row is the same journey: the place's own page, which is where a line is read as well as
+    // where it is changed. A track is not sent to the map first.
+    val openPlace: (AssetEntity) -> Unit = { item -> onOpenAsset(item.id) }
 
     Scaffold(
         topBar = {

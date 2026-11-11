@@ -45,11 +45,9 @@ import nz.mckenzie.trailday.viewmodel.AddSpotViewModel
 import nz.mckenzie.trailday.viewmodel.CreateJourneyViewModel
 import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
 import nz.mckenzie.trailday.viewmodel.DocDetailViewModel
-import nz.mckenzie.trailday.viewmodel.MapFocus
 import nz.mckenzie.trailday.viewmodel.MapViewModel
 import nz.mckenzie.trailday.viewmodel.OfflineAreaPickerViewModel
 import nz.mckenzie.trailday.viewmodel.PendingFollow
-import nz.mckenzie.trailday.viewmodel.PendingMapFocus
 import nz.mckenzie.trailday.viewmodel.OfflineViewModel
 import nz.mckenzie.trailday.viewmodel.OtherTrackViewModel
 import nz.mckenzie.trailday.viewmodel.OtherTracksBrowserViewModel
@@ -230,10 +228,6 @@ class MainActivity : ComponentActivity() {
                             onOpenAsset = { assetId ->
                                 selectedAssetId = assetId
                                 destination = Destination.ASSET_DETAIL
-                            },
-                            onShowOnMap = { place ->
-                                PendingMapFocus.offer(MapFocus.Place(place.id))
-                                destination = Destination.MAP
                             },
                             onOpenDocDetail = { item, bike ->
                                 selectedDocItem = item

@@ -716,34 +716,6 @@ class MapViewModel(
     }
 
     /**
-     * Frames one of the walker's own places and brings the card for it up.
-     *
-     * Asked for from the places list, where a track is a row rather than ground: the map is what
-     * answers "where is it". A layer the walker had switched off is switched back on for the visit,
-     * because a frame around something that is not drawn is not an answer.
-     */
-    fun focusPlace(assetId: Long) {
-        viewModelScope.launch {
-            val asset = assetRepository.getAsset(assetId) ?: return@launch
-            val geometry = runCatching { assetRepository.getAssetGeometry(assetId) }.getOrNull()
-                ?: return@launch
-            val points = geometry.paths.flatten()
-            if (points.size < 2) return@launch
-            clearPickedDoc()
-            _pickedPlaceId.value = assetId
-            _selectionFrame.value = boundsOf(points)
-            val kind = AssetKind.fromStorage(asset.kind)
-            // Asking to see one of the walker's own places turns its own tile back on, and says
-            // nothing about DOC's material underneath it.
-            val yourLayer = YourPlaceLayer.forKind(kind)
-            if (yourLayer in settingsRepository.hiddenYourPlaces.first()) {
-                settingsRepository.setYourPlaceHidden(yourLayer, hidden = false)
-            }
-            frame(points)
-        }
-    }
-
-    /**
      * Frames one of DOC's things and brings its card up, as a tap on the map itself would.
      *
      * The row in DOC's browser is a name and a length; the map is where the line is read, and where a

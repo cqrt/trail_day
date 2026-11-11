@@ -111,9 +111,7 @@ import nz.mckenzie.trailday.ui.formatDate
 import nz.mckenzie.trailday.tracking.LocationPermission
 import nz.mckenzie.trailday.ui.docCardProse
 import nz.mckenzie.trailday.ui.formatLengthOf
-import nz.mckenzie.trailday.viewmodel.MapFocus
 import nz.mckenzie.trailday.viewmodel.MapViewModel
-import nz.mckenzie.trailday.viewmodel.PendingMapFocus
 import nz.mckenzie.trailday.viewmodel.YourPlaceCounts
 import kotlinx.coroutines.launch
 
@@ -179,18 +177,6 @@ fun MapScreen(
     val zoom = rememberMapZoomState()
 
     val context = LocalContext.current
-
-    // A track chosen from a list is asked for here, when the map is the screen in front of the walker:
-    // the request is taken once, so a later visit to the map opens on the work rather than on the last
-    // row somebody tapped in a list.
-    LaunchedEffect(Unit) {
-        when (val focus = PendingMapFocus.take()) {
-            is MapFocus.Place -> viewModel.focusPlace(focus.assetId)
-
-            is MapFocus.Doc -> viewModel.focusDoc(focus.item, focus.bike)
-            null -> Unit
-        }
-    }
 
     // Where the app asks for the permission the marker needs, and asked on a tap rather than on
     // the way in: a prompt that arrives with the map is a prompt for nothing, and one that
