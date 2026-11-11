@@ -9,8 +9,10 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.domain.other.OtherTrack
+import nz.mckenzie.trailday.domain.reference.HiddenTrack
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.domain.tiles.withMinimumSpan
@@ -27,11 +29,26 @@ import nz.mckenzie.trailday.map.OtherTracksGeoJson
  */
 class OtherTrackViewModel(
     val track: OtherTrack,
-    settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     val basemap: StateFlow<Basemap> = settingsRepository.basemap
         .stateIn(viewModelScope, SharingStarted.Eagerly, Basemap.DEFAULT)
+
+    /**
+     * Hides this track, once the walker has said so on the page.
+     *
+     * [after] runs after the write for the reason DOC's page gives: the page pops back, the view model
+     * goes with it, and a cancelled write is a line that comes straight back.
+     */
+    fun hide(after: () -> Unit = {}) {
+        viewModelScope.launch {
+            settingsRepository.hideTrack(
+                HiddenTrack(sourceRef = track.sourceRef, name = track.name)
+            )
+            after()
+        }
+    }
 
     /**
      * The track's own line, as the map's second reference layer draws it.

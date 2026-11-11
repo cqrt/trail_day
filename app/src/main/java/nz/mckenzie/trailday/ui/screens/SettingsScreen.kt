@@ -85,6 +85,7 @@ fun SettingsScreen(
     }
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
     val themeChoice by viewModel.themeChoice.collectAsStateWithLifecycle()
+    val hiddenTracks by viewModel.hiddenTracks.collectAsStateWithLifecycle()
     // The hidden section, and everything it shows when it is open. See [DeveloperOptionsCard].
     val developerOptions by viewModel.developerOptions.collectAsStateWithLifecycle()
     val doorMessage by viewModel.doorMessage.collectAsStateWithLifecycle()
@@ -288,6 +289,47 @@ fun SettingsScreen(
                             dimension = 18.dp,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                }
+            }
+
+            // **The way back for a hidden track.** Hiding one is a single tap on its page and easy to do
+            // while annoyed; finding it again is not, because the line it was is off the map and out of
+            // both lists. So the list of what has been hidden lives here, with the name the walker saw,
+            // and each row is one tap to put back.
+            if (hiddenTracks.isEmpty.not()) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("Hidden tracks", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = "Published tracks you've hidden stay off the map until you show them again.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        hiddenTracks.entries.forEach { hidden ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = hidden.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TextButton(onClick = { viewModel.showTrack(hidden.sourceRef) }) {
+                                    Text("Show")
+                                }
+                            }
+                        }
+                        if (hiddenTracks.entries.size > 1) {
+                            OutlinedButton(onClick = viewModel::showEveryHiddenTrack) {
+                                Text("Show all")
+                            }
+                        }
                     }
                 }
             }

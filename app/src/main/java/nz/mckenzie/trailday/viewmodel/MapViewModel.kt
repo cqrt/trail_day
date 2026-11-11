@@ -36,6 +36,7 @@ import nz.mckenzie.trailday.domain.geo.nearestPathDistanceMeters
 import nz.mckenzie.trailday.domain.geo.splitAtBreaks
 import nz.mckenzie.trailday.domain.recording.ActivityMode
 import nz.mckenzie.trailday.domain.recording.RecordingStatus
+import nz.mckenzie.trailday.domain.reference.HiddenTracks
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LatLngBounds
 import nz.mckenzie.trailday.domain.tiles.withMinimumSpan
@@ -169,8 +170,20 @@ class MapViewModel(
      * Null in a test that has no database, and in that case the notice offers what is downloaded
      * rather than a basemap it cannot name - see [MapTrouble.Offline].
      */
-    private val downloadedBasemaps: DownloadedBasemaps? = null
+    private val downloadedBasemaps: DownloadedBasemaps? = null,
+    /**
+     * The published tracks the walker has hidden - see [HiddenTracks].
+     *
+     * Read here rather than in the style, because what is hidden is a fact about the reference layer
+     * and the layer is built from the cache: a track hidden on its own page must leave the map at that
+     * moment, and be gone again after the same region is downloaded a second time.
+     */
+    private val hiddenTracks: Flow<HiddenTracks> = flowOf(HiddenTracks.NONE)
 ) : ViewModel() {
+
+    /** The latest answer, for the two tap tests, which are suspend and read it as they go. */
+    private val hidden: StateFlow<HiddenTracks> = hiddenTracks
+        .stateIn(viewModelScope, SharingStarted.Eagerly, HiddenTracks.NONE)
 
     /** Which map to draw under the work: the walker's choice in Settings. */
     val basemap: StateFlow<Basemap> = settingsRepository.basemap
@@ -301,10 +314,14 @@ class MapViewModel(
      * Re-read whenever the cache changes, so an area downloaded while the app is open appears on the map
      * without a restart - and read from the cache rather than from DOC, because the reference layer is
      * what is on the phone: that is what makes it draw where reception does not.
+     *
+     * **What the walker has hidden is taken out here**, before anything downstream reads it, so the
+     * line, its name, its tap and the card that follows a tap all go together. Read again when the
+     * hidden set changes, which is what makes a line disappear the moment its page says so.
      */
-    private val docItems: StateFlow<List<DocItem>> = docStore.observeCount()
-        .map { cached() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+    private val docItems: StateFlow<List<DocItem>> =
+        combine(docStore.observeCount(), hidden) { _, hiddenNow -> cached(hiddenNow) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
     /**
      * DOC's bike points, paired with the tracks they sit on.
@@ -386,8 +403,18 @@ class MapViewModel(
      * walker's own work is what this screen is for, and the layer under it is the ground.
      */
     private suspend fun cached(): List<DocItem> =
+        cached(HiddenTracks.NONE)
+
+    /**
+     * The cache read with the walker's hidden lines taken out.
+     *
+     * One filter, here, rather than a second copy of the rule in the layer, the tap test and the
+     * browser: a hidden track is not on this phone as far as the map is concerned.
+     */
+    private suspend fun cached(hidden: HiddenTracks): List<DocItem> =
         runCatching { DocSource.entries.flatMap { source -> docStore.cached(source) } }
             .getOrDefault(emptyList())
+            .filterNot { hidden.hides(it.sourceRef) }
 
     /**
      * The raw recorded lines the Recordings tile actually draws: finished passes not represented by
@@ -552,9 +579,10 @@ class MapViewModel(
     ): DocItem? {
         // What is switched off is not tappable either: DOC's huts go with the huts. A linked bike point
         // is not a place under the finger: its track is, and the track's card carries the bike facts.
-        val hidden = hiddenLayers.value
+        val hiddenLayersNow = hiddenLayers.value
+        val hiddenTracksNow = hidden.value
         val held = withContext(Dispatchers.Default) {
-            val items = cached()
+            val items = cached(hiddenTracksNow)
             val links = DocBikeLinks.of(
                 tracks = items.filter { it.source == DocSource.TRACKS },
                 bikes = items.filter { it.source == DocSource.BIKES }
@@ -564,12 +592,12 @@ class MapViewModel(
                     // A dual-use track is walkable too: Tracks draws every track, and Bike trails
                     // draws the rideable subset on its own when Tracks is off.
                     DocTrackVisibility.lineShown(
-                        tracksShown = AssetLayer.TRACKS !in hidden,
-                        bikeTrailsShown = AssetLayer.BIKE_TRACKS !in hidden,
+                        tracksShown = AssetLayer.TRACKS !in hiddenLayersNow,
+                        bikeTrailsShown = AssetLayer.BIKE_TRACKS !in hiddenLayersNow,
                         bikeFriendly = item.sourceRef in links.linkedTrackRefs
                     )
                 } else {
-                    layerOf(item.source.drawingKind()) !in hidden
+                    layerOf(item.source.drawingKind()) !in hiddenLayersNow
                 }
                 shown && !(item.source == DocSource.BIKES && item.sourceRef in links.linkedBikeRefs)
             }
@@ -611,8 +639,10 @@ class MapViewModel(
      */
     suspend fun pickOtherTrackAt(lat: Double, lng: Double, radiusM: Double): OtherTrack? {
         val at = GeoPoint(lat = lat, lng = lng)
+        val hiddenNow = hidden.value
         val track = withContext(Dispatchers.Default) {
             otherTracksStore.cached()
+                .filterNot { hiddenNow.hides(it.sourceRef) }
                 .mapNotNull { candidate ->
                     nearestPathDistanceMeters(candidate.paths, at)
                         ?.takeIf { it <= radiusM }
@@ -1045,17 +1075,26 @@ class MapViewModel(
      * downloaded - and an area kept for the walk ahead is expected on the map before the walk starts, not
      * after the app is opened again. Built off the main thread: an area can hold thousands of lines, and
      * a map's first frame is not the place to build them.
+     *
+     * What the walker has hidden is taken out here, by the publisher's own reference, so a track hidden on
+     * its page leaves the map at once and stays off it when the region is downloaded again.
      */
     val otherTracksGeoJson: StateFlow<String> =
-        combine(otherTracks, otherTracksStore.observeCount(), Look.current) { shown, _, look ->
-            shown to look
-        }
-            .map { (shown, look) ->
+        combine(
+            otherTracks,
+            otherTracksStore.observeCount(),
+            Look.current,
+            hidden
+        ) { shown, _, look, hiddenNow -> Triple(shown, look, hiddenNow) }
+            .map { (shown, look, hiddenNow) ->
                 if (!shown) {
                     OtherTracksGeoJson.EMPTY
                 } else {
                     withContext(Dispatchers.Default) {
-                        OtherTracksGeoJson.build(otherTracksStore.cached(), look)
+                        OtherTracksGeoJson.build(
+                            otherTracksStore.cached().filterNot { hiddenNow.hides(it.sourceRef) },
+                            look
+                        )
                     }
                 }
             }
@@ -1143,9 +1182,10 @@ class MapViewModel(
             return viewModelFactory {
                 initializer {
                     val recordings = RecordingRepository(TrailDayDatabase.get(appContext))
+                    val settings = SettingsRepository(appContext)
                     MapViewModel(
                         assetRepository = AssetRepository(TrailDayDatabase.get(appContext)),
-                        settingsRepository = SettingsRepository(appContext),
+                        settingsRepository = settings,
                         locationSource = FusedLocationSource(appContext),
                         docStore = OfflineDocStore(
                             dao = TrailDayDatabase.get(appContext).offlineDocItemDao(),
@@ -1160,6 +1200,7 @@ class MapViewModel(
                             .map { sessions -> sessions.mapNotNull { it.assetId }.toSet() },
                         recordingRepository = recordings,
                         trailGeoJson = TeAraroaGeoJson.reader(appContext),
+                        hiddenTracks = settings.hiddenTracks,
                         downloadedBasemaps = DownloadedBasemaps(
                             TrailDayDatabase.get(appContext).offlineAreaDao()
                         )

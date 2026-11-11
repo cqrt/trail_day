@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
@@ -809,7 +810,11 @@ class RecordingViewModel(
      */
     fun refreshDocTracks() {
         viewModelScope.launch {
+            // The lines the walker has hidden are not offered to follow either: the chooser's own rule
+            // is that a track it offers is one the map can already draw, and a hidden line is not.
+            val hidden = settingsRepository.hiddenTracks.first()
             val kept = runCatching { docStore.cached(DocSource.TRACKS) }.getOrDefault(emptyList())
+                .filterNot { hidden.hides(it.sourceRef) }
             val bikes = runCatching { docStore.cached(DocSource.BIKES) }.getOrDefault(emptyList())
             _docTracks.value = kept
             _docBikeLinks.value = DocBikeLinks.of(kept, bikes)
@@ -828,7 +833,9 @@ class RecordingViewModel(
     fun refreshTracksToFollow() {
         refreshDocTracks()
         viewModelScope.launch {
+            val hidden = settingsRepository.hiddenTracks.first()
             _otherTracks.value = runCatching { otherStore.cached() }.getOrDefault(emptyList())
+                .filterNot { hidden.hides(it.sourceRef) }
             rememberLinesNearby()
             rememberFix()
         }

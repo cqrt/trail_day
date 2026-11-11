@@ -18,6 +18,8 @@ import nz.mckenzie.trailday.domain.backup.BackupDestination
 import nz.mckenzie.trailday.domain.backup.BackupSettingsRecord
 import nz.mckenzie.trailday.domain.backup.BackupSwitches
 import nz.mckenzie.trailday.domain.look.MapLook
+import nz.mckenzie.trailday.domain.reference.HiddenTrack
+import nz.mckenzie.trailday.domain.reference.HiddenTracks
 import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.domain.tiles.Basemap
 
@@ -41,6 +43,8 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
     private val mapLookPref = stringPreferencesKey("map_look")
     private val hiddenMapLayersPref = stringSetPreferencesKey("hidden_map_layers")
     private val hiddenYourPlacesPref = stringSetPreferencesKey("hidden_your_places")
+    /** The published tracks the walker has hidden: see [HiddenTracks]. One set, of references and names. */
+    private val hiddenTracksPref = stringSetPreferencesKey("hidden_tracks")
     /** The old "Your Tracks" switch: read once to seed [hiddenYourPlaces], never written again. */
     private val legacyYourTracksHiddenPref = booleanPreferencesKey("your_tracks_hidden")
     private val placeNamesPref = booleanPreferencesKey("place_names")
@@ -373,6 +377,43 @@ class SettingsRepository(private val context: Context) : BackupSwitches {
 
     suspend fun setOtherTracks(shown: Boolean) {
         context.settingsDataStore.edit { prefs -> prefs[otherTracksPref] = shown }
+    }
+
+    /**
+     * The published tracks the walker has hidden, by the publisher's own reference.
+     *
+     * Empty on a phone that has never hidden anything, which is the shape every preference here takes:
+     * storing what is *hidden* means a line that arrives in a later build arrives drawn.
+     *
+     * Hidden rather than deleted, and that is the whole design: a downloaded track is a row belonging
+     * to a region, so deleting it would be undone by the next download of that region - while the
+     * reference is what the app compares, so hiding survives the download and the release after it.
+     */
+    val hiddenTracks: Flow<HiddenTracks> = context.settingsDataStore.data.map { prefs ->
+        HiddenTracks.read(prefs[hiddenTracksPref])
+    }
+
+    /** Hides one published track. Hiding one already hidden writes nothing. */
+    suspend fun hideTrack(track: HiddenTrack) {
+        context.settingsDataStore.edit { prefs ->
+            val now = HiddenTracks.read(prefs[hiddenTracksPref])
+            val after = now.hiding(track)
+            if (after != now) prefs[hiddenTracksPref] = HiddenTracks.write(after)
+        }
+    }
+
+    /** Puts one hidden track back on the map. */
+    suspend fun showTrack(sourceRef: String) {
+        context.settingsDataStore.edit { prefs ->
+            val now = HiddenTracks.read(prefs[hiddenTracksPref])
+            val after = now.showing(sourceRef)
+            if (after != now) prefs[hiddenTracksPref] = HiddenTracks.write(after)
+        }
+    }
+
+    /** Shows every hidden track again: one switch to undo the lot, as the layers have. */
+    suspend fun showEveryHiddenTrack() {
+        context.settingsDataStore.edit { prefs -> prefs.remove(hiddenTracksPref) }
     }
 
     /**

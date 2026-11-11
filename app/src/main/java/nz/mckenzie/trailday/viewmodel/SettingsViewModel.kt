@@ -29,6 +29,7 @@ import nz.mckenzie.trailday.domain.backup.BackupDestination
 import nz.mckenzie.trailday.domain.backup.BackupSummary
 import nz.mckenzie.trailday.domain.backup.OffsiteBackupRules
 import nz.mckenzie.trailday.domain.backup.StoredBackup
+import nz.mckenzie.trailday.domain.reference.HiddenTracks
 import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LinzAccess
@@ -392,6 +393,25 @@ class SettingsViewModel(
     /** The chime switch. The recorder reads the same preference at the moment it switches. */
     fun setChimeOnSwitch(enabled: Boolean) {
         viewModelScope.launch { settings.setChimeOnSwitch(enabled) }
+    }
+
+    /**
+     * The published tracks the walker has hidden, for the card that lists them.
+     *
+     * The card is drawn only when there is something in it, so a walker who has never hidden a line sees
+     * no new row in Settings at all - which is the same rule the layer switches follow.
+     */
+    val hiddenTracks: StateFlow<HiddenTracks> = settings.hiddenTracks
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), HiddenTracks.NONE)
+
+    /** Puts one hidden track back on the map. */
+    fun showTrack(sourceRef: String) {
+        viewModelScope.launch { settings.showTrack(sourceRef) }
+    }
+
+    /** Puts every hidden track back, so undoing a bad afternoon is one tap. */
+    fun showEveryHiddenTrack() {
+        viewModelScope.launch { settings.showEveryHiddenTrack() }
     }
 
     private val _storedTiles = MutableStateFlow(TileStoreSummary(0, 0))

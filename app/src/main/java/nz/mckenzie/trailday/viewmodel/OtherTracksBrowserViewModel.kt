@@ -13,10 +13,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
 import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.other.OTHER_TRACK_FILTERS
@@ -28,6 +30,7 @@ import nz.mckenzie.trailday.domain.other.matching
 import nz.mckenzie.trailday.domain.other.showing
 import nz.mckenzie.trailday.domain.other.valuesPresent
 import nz.mckenzie.trailday.domain.other.within
+import nz.mckenzie.trailday.domain.reference.HiddenTracks
 import nz.mckenzie.trailday.domain.reference.ReferenceFilter
 import nz.mckenzie.trailday.domain.reference.ReferenceSort
 import nz.mckenzie.trailday.domain.tiles.boxAround
@@ -56,7 +59,15 @@ import nz.mckenzie.trailday.tracking.DevicePosition
 class OtherTracksBrowserViewModel(
     private val reader: OtherTracksReader,
     /** What has been downloaded for offline use, read when the service cannot be reached. */
-    private val cache: OtherTracksCache
+    private val cache: OtherTracksCache,
+    /**
+     * The tracks the walker has hidden - see [HiddenTracks].
+     *
+     * Filtered out of the service's own answer as well as out of the downloaded copy: the search asks the
+     * dataset directly, so a line hidden on its page would come straight back on the next search for that
+     * name.
+     */
+    private val hiddenTracks: Flow<HiddenTracks> = flowOf(HiddenTracks.NONE)
 ) : ViewModel() {
 
     private val _name = MutableStateFlow("")
@@ -98,13 +109,33 @@ class OtherTracksBrowserViewModel(
     private val _sort = MutableStateFlow(ReferenceSort.NEAREST)
     val sort: StateFlow<ReferenceSort> = _sort
 
+    /** The latest answer, so a row leaves the list the moment the walker hides it. */
+    private val hidden: StateFlow<HiddenTracks> = hiddenTracks
+        .stateIn(viewModelScope, SharingStarted.Eagerly, HiddenTracks.NONE)
+
+    /** The last answer, with the lines the walker has hidden taken out. */
+    private val kept: StateFlow<List<OtherTrack>> = combine(_results, hidden) { results, hiddenNow ->
+        results.filterNot { hiddenNow.hides(it.sourceRef) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
+    /**
+     * Whether every row the dataset answered with is hidden.
+     *
+     * Kept apart from the chips, because the line under an empty page should name the thing that emptied
+     * it: hiding the only match leaves a list with nothing in it, and the way back is Settings rather
+     * than a filter the walker never set.
+     */
+    val allHidden: StateFlow<Boolean> = combine(_results, kept) { results, shown ->
+        results.isNotEmpty() && shown.isEmpty()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
+
     /**
      * What each filter should offer, from the page that came back.
      *
      * Built from the results rather than from the dataset's own domain, so every chip is a fact about
      * something on the screen and a chip that matches nothing cannot be offered.
      */
-    val filterChoices: StateFlow<List<Pair<ReferenceFilter, List<String>>>> = _results
+    val filterChoices: StateFlow<List<Pair<ReferenceFilter, List<String>>>> = kept
         .map { page ->
             OTHER_TRACK_FILTERS.map { filter -> filter to page.valuesPresent(filter.field) }
         }
@@ -131,7 +162,7 @@ class OtherTracksBrowserViewModel(
      */
     val visible: StateFlow<List<OtherTrack>> =
         combine(
-            _results,
+            kept,
             _filters,
             _sort,
             fix,
@@ -302,7 +333,8 @@ class OtherTracksBrowserViewModel(
                     val database = TrailDayDatabase.get(appContext)
                     OtherTracksBrowserViewModel(
                         reader = ArcGisOtherTracks(),
-                        cache = OfflineOtherTrackStore(dao = database.offlineOtherTrackDao())
+                        cache = OfflineOtherTrackStore(dao = database.offlineOtherTrackDao()),
+                        hiddenTracks = SettingsRepository(appContext).hiddenTracks
                     )
                 }
             }

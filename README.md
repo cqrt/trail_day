@@ -108,6 +108,8 @@ Importing a DOC item stores DOC's own ID against it. If you rename it later, the
 
 DOC's API key is kept on its own Worker (`worker/`), not in the app.
 
+A published track that's wrong on the ground can be hidden from its own page. It goes off the map and out of both browsers, and downloading the area again doesn't bring it back. Settings lists what you've hidden, with a Show on each. See [docs/hidden-tracks.md](docs/hidden-tracks.md).
+
 ## Tracks from other organisations
 
 These come from the National Tracks Dataset published by Herenga ā Nuku Aotearoa (the Outdoor Access Commission), which merges tracks from councils, trusts, clubs and Te Araroa. The app leaves out DOC's own tracks (the DOC browser covers those), tracks that nobody may walk on, and tracks with no name. A track published in sections by different publishers under one name is shown as a single track. Te Araroa's line is drawn as its own separate layer ([details](docs/te-araroa.md)).

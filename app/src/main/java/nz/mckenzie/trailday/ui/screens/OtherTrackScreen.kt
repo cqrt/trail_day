@@ -127,6 +127,8 @@ fun OtherTrackScreen(
                 ReferenceTextSection("Who publishes it", track.suppliers.joinToString(", "))
                 ReferenceTextSection("Looked after by", track.managedBy)
                 ReferenceTextSection("Conditions of use", track.conditions)
+
+                HideTrackLine(onHide = { viewModel.hide(after = onBack) })
             }
         }
     }

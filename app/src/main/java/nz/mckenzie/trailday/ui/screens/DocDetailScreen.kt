@@ -173,6 +173,12 @@ fun DocDetailScreen(
                         Text("Open the full DOC page \u2197")
                     }
                 }
+
+                // Only a line can be the wrong line: a hut in the wrong place is still the hut a
+                // walker is looking for, and hiding one would be hiding the thing they came to find.
+                if (item.source.isLine) {
+                    HideTrackLine(onHide = { viewModel.hide(after = onBack) })
+                }
             }
         }
     }

@@ -25,6 +25,7 @@ import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocSource
 import nz.mckenzie.trailday.domain.doc.isPictureAddress
 import nz.mckenzie.trailday.domain.doc.withCompanion
+import nz.mckenzie.trailday.domain.reference.HiddenTrack
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.offline.OfflineDocStore
 import java.net.HttpURLConnection
@@ -41,7 +42,7 @@ import java.net.URL
 class DocDetailViewModel(
     item: DocItem,
     val bike: DocItem?,
-    settingsRepository: SettingsRepository,
+    private val settingsRepository: SettingsRepository,
     private val reader: DocDetailReader,
     private val docStore: DocCache
 ) : ViewModel() {
@@ -74,6 +75,21 @@ class DocDetailViewModel(
             val current = _item.value
             _picture.value = pictureFor(current.pictureUrl)
             _alerts.value = reader.alertsFor(current)
+        }
+    }
+
+    /**
+     * Hides this track, once the walker has said so on the page.
+     *
+     * [after] runs once the phone has written it rather than at the same moment, because what happens
+     * next is the page popping back to the map - and that throws this view model away. A write in a
+     * scope that has just been cancelled is a hide nobody would ever see.
+     */
+    fun hide(after: () -> Unit = {}) {
+        val item = _item.value
+        viewModelScope.launch {
+            settingsRepository.hideTrack(HiddenTrack(sourceRef = item.sourceRef, name = item.name))
+            after()
         }
     }
 

@@ -67,6 +67,7 @@ fun OtherTracksBrowserScreen(
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val visible by viewModel.visible.collectAsStateWithLifecycle()
+    val allHidden by viewModel.allHidden.collectAsStateWithLifecycle()
     val filterChoices by viewModel.filterChoices.collectAsStateWithLifecycle()
     val filters by viewModel.filters.collectAsStateWithLifecycle()
     val sort by viewModel.sort.collectAsStateWithLifecycle()
@@ -133,6 +134,15 @@ fun OtherTracksBrowserScreen(
                 }
 
                 when {
+                    // Before anything else: a page emptied by hiding is not a page where nothing matched,
+                    // and the line under it has to name the thing that emptied it.
+                    visible.isEmpty() && allHidden && !busy -> Text(
+                        text = "The only match is a track you've hidden. Show it again in Settings, " +
+                            "under Hidden tracks.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+
                     visible.isEmpty() && searched && message == null && !busy -> EmptyState(
                         glyph = IconGlyph.TRAIL,
                         title = "No tracks matched",

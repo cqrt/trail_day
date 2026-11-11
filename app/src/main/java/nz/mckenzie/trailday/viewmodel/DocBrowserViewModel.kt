@@ -15,10 +15,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
+import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.doc.ArcGisDoc
 import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.doc.DocNearestSearcher
@@ -29,6 +31,7 @@ import nz.mckenzie.trailday.domain.doc.DocCache
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.doc.DocQuery
 import nz.mckenzie.trailday.domain.doc.DocSource
+import nz.mckenzie.trailday.domain.reference.HiddenTracks
 import nz.mckenzie.trailday.domain.reference.ReferenceFilter
 import nz.mckenzie.trailday.domain.reference.ReferenceSort
 import nz.mckenzie.trailday.domain.doc.matching
@@ -109,8 +112,20 @@ internal fun referencePageMessage(
 class DocBrowserViewModel(
     private val reader: DocReader,
     /** What has been downloaded for offline use, read when DOC cannot be reached. */
-    private val cache: DocCache
+    private val cache: DocCache,
+    /**
+     * The published tracks the walker has hidden - see [HiddenTracks].
+     *
+     * **DOC's own answer is filtered too, not just the downloaded copy.** The search asks DOC directly,
+     * so a line hidden on its page would otherwise come straight back in the next answer to the same
+     * question, which is the exact loop that hiding is meant to end.
+     */
+    private val hiddenTracks: Flow<HiddenTracks> = flowOf(HiddenTracks.NONE)
 ) : ViewModel() {
+
+    /** The latest answer, so an answer already on the screen leaves it the moment a line is hidden. */
+    private val hidden: StateFlow<HiddenTracks> = hiddenTracks
+        .stateIn(viewModelScope, SharingStarted.Eagerly, HiddenTracks.NONE)
 
     private val _name = MutableStateFlow("")
     val name: StateFlow<String> = _name
@@ -129,6 +144,28 @@ class DocBrowserViewModel(
 
     private val _results = MutableStateFlow<List<DocItem>>(emptyList())
     val results: StateFlow<List<DocItem>> = _results
+
+    /**
+     * The last answer with the walker's hidden lines taken out.
+     *
+     * Everything the page offers is built from this rather than from the raw page: the rows, the count
+     * above them, and the chips - because a chip is meant to be a fact about something on the screen, and
+     * a chip built from a line nobody can see is a chip that matches nothing.
+     */
+    private val kept: Flow<List<DocItem>> = combine(_results, hidden) { results, hiddenNow ->
+        results.filterNot { hiddenNow.hides(it.sourceRef) }
+    }
+
+    /**
+     * Whether every row DOC answered with is hidden, which is not the same as a filter hiding them.
+     *
+     * The page has one line for an answer it cannot show, and it should not name a filter the walker never
+     * set: hiding the only match for a search leaves a page with nothing on it, and the way out of that is
+     * the list in Settings rather than a chip.
+     */
+    val allHidden: StateFlow<Boolean> = combine(_results, kept) { results, shown ->
+        results.isNotEmpty() && shown.isEmpty()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
 
     /** Whether a search has been made at all, so the screen can tell "no results" from "not yet". */
     private val _searched = MutableStateFlow(false)
@@ -191,7 +228,7 @@ class DocBrowserViewModel(
      * and a chip that matches nothing cannot be offered.
      */
     val filterChoices: StateFlow<List<Pair<ReferenceFilter, List<String>>>> =
-        combine(_results, _source) { results, source ->
+        combine(kept, _source) { results, source ->
             source.filters.map { filter -> filter to results.valuesPresent(filter.field) }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
 
@@ -202,7 +239,7 @@ class DocBrowserViewModel(
      * re-orders the page without asking DOC again.
      */
     private val narrowed: Flow<List<DocItem>> =
-        combine(_results, _filters, _sort, fix) { results, filters, sort, position ->
+        combine(kept, _filters, _sort, fix) { results, filters, sort, position ->
             results.showing(filters, sort, position)
         }
 
@@ -434,7 +471,8 @@ class DocBrowserViewModel(
                         cache = OfflineDocStore(
                             dao = database.offlineDocItemDao(),
                             downloader = DocDownloader.online()
-                        )
+                        ),
+                        hiddenTracks = SettingsRepository(appContext).hiddenTracks
                     )
                 }
             }

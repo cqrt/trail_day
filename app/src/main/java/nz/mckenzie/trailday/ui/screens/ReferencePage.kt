@@ -18,10 +18,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,6 +35,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import nz.mckenzie.trailday.domain.reference.HiddenTracks
 import nz.mckenzie.trailday.domain.tiles.Basemap
 
 /**
@@ -142,6 +149,50 @@ fun ReferenceTextSection(title: String, text: String?) {
         ReferenceSectionLabel(title)
         Spacer(modifier = Modifier.height(2.dp))
         Text(text = it, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+/**
+ * The one thing a walker can say about a track somebody else publishes that is wrong.
+ *
+ * **It sits at the foot of the page, in the page's own quiet words**, beside "Open the full DOC page":
+ * a line drawn through a slip, or an alignment that never existed, is something a walker only finds out
+ * about after walking it, and a button on every page would be the app inviting them to disagree with a
+ * publisher. A line at the foot of the one page about that track is where a walker who *has* found out
+ * will look.
+ *
+ * What it does is recorded on the phone by the publisher's own reference, so it survives the next
+ * download of the area and the next copy of the dataset - see [HiddenTracks] for why that is not the
+ * same as deleting it.
+ */
+@Composable
+fun HideTrackLine(onHide: () -> Unit) {
+    var confirming by remember { mutableStateOf(false) }
+    TextButton(onClick = { confirming = true }) {
+        Text("Track wrong? Hide it from the map.")
+    }
+    if (confirming) {
+        AlertDialog(
+            onDismissRequest = { confirming = false },
+            title = { Text("Hide this track?") },
+            // Both halves of what happens, because the second half is the surprise: nothing is
+            // deleted, so a walker who wants the line back has somewhere to find it.
+            text = {
+                Text(
+                    "It comes off the map and out of the lists, and downloading the area again " +
+                        "won't bring it back. Show it again from Settings, under Hidden tracks."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirming = false
+                    onHide()
+                }) { Text("Hide") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirming = false }) { Text("Cancel") }
+            }
+        )
     }
 }
 

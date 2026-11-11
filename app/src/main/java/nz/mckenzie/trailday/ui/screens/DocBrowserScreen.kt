@@ -83,6 +83,7 @@ fun DocBrowserScreen(
     val message by viewModel.message.collectAsStateWithLifecycle()
     val results by viewModel.results.collectAsStateWithLifecycle()
     val visible by viewModel.visible.collectAsStateWithLifecycle()
+    val allHidden by viewModel.allHidden.collectAsStateWithLifecycle()
     val source by viewModel.source.collectAsStateWithLifecycle()
     val filterChoices by viewModel.filterChoices.collectAsStateWithLifecycle()
     val filters by viewModel.filters.collectAsStateWithLifecycle()
@@ -159,6 +160,15 @@ fun DocBrowserScreen(
                 }
 
                 when {
+                    // Before the empty state: a page emptied by hiding is not a page where nothing matched,
+                    // and the line under it has to name the thing that emptied it.
+                    visible.isEmpty() && allHidden && !busy -> Text(
+                        text = "The only match is a track you've hidden. Show it again in Settings, " +
+                            "under Hidden tracks.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+
                     results.isEmpty() && searched && message == null && !busy -> EmptyState(
                         glyph = IconGlyph.ASSETS,
                         title = "No ${source.displayName.lowercase()} matched",
