@@ -132,7 +132,11 @@ fun RecordScreen(
 
     // The kind of recording being set up: following a line, or a new line of the walker's own. Not held
     // while a pass is being driven - by then it is a fact, not a choice.
-    var followingMode by rememberSaveable { mutableStateOf(false) }
+    //
+    // **It opens on the mode the walker arrived in.** Following a line from its own page chooses it in the
+    // view model before this screen exists, so a chip reading "Record New Track" would be the app showing
+    // them the opposite of the button they pressed.
+    var followingMode by rememberSaveable { mutableStateOf(viewModel.hasTarget()) }
     var trackQuery by rememberSaveable { mutableStateOf("") }
     val docChoices by viewModel.docChoices.collectAsStateWithLifecycle()
     val docTracksHeld by viewModel.docTracksHeld.collectAsStateWithLifecycle()

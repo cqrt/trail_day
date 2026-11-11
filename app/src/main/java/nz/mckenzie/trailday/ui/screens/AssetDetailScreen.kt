@@ -314,7 +314,7 @@ fun AssetDetailScreen(
                             Text(
                                 when {
                                     track?.journey != null -> "Follow this journey"
-                                    shape == AssetShape.LINE -> "Record this"
+                                    shape == AssetShape.LINE -> "Follow this track"
                                     else -> "Head for this"
                                 }
                             )

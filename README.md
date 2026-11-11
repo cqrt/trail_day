@@ -65,7 +65,7 @@ There are five kinds of place:
 - **Track** and **bike track** are lines you travel along.
 - **Hut**, **campsite** and **waypoint** are single points.
 
-The kind decides the shape, so you never have to say a hut is a point and a track is a line separately. On the Places tab you can filter by kind.
+The kind decides the shape, so you never have to say a hut is a point and a track is a line separately. On the Places tab you can filter by kind, and a row opens that place's own page.
 
 You can get places into the app by:
 
@@ -81,6 +81,8 @@ If a track came from a file with elevation data, its page shows the height range
 ## Following a track
 
 On the Record tab, Follow a track opens a list of what you can follow: your own tracks and places, DOC's tracks near you, and the council, trust and club tracks near you. The search box looks through all of them by name, however far away the line is. The two published lists come from what you've downloaded, so the list and the search work with no reception.
+
+A track's own page has the same button. **Follow this track** takes you to the Record tab with that line already chosen, so the walk you are about to do is measured against the line you were just reading.
 
 When you're following a track, the app shows how far off the line you are, how far along you've got, how much is left, and roughly how long that will take. The time estimate uses Naismith's rule (5 km/h plus an hour for every 600 m climbed when walking, and 12 km/h plus an hour per 450 m climbed when riding). It only counts climbing, not descent, and always rounds up, so treat it as a rough guide rather than a promise.
 

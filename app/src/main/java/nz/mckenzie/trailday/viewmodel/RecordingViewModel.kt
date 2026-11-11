@@ -1244,6 +1244,15 @@ class RecordingViewModel(
 
     private fun defaultName(): String = "Activity"
 
+    /**
+     * Whether a place is already chosen, so the screen opens in the mode the walker asked for.
+     *
+     * A track's page offers **Follow this track**, and pressing it arrives here with that line already
+     * chosen - the chips must then read Follow a track rather than Record New Track, or the app would be
+     * showing the walker the opposite of what they just pressed.
+     */
+    fun hasTarget(): Boolean = _selectedAssetId.value != null || _selectedDoc.value != null
+
     /** Suggests a track name: "Track 14 Sep" beats an empty box to type into. */
     private fun defaultTrackName(): String = "Track " + formatShortDate(System.currentTimeMillis())
 
