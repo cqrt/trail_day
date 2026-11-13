@@ -67,6 +67,21 @@ class OfflineTileStoreTest {
     }
 
     @Test
+    fun `bytes count this store's own files, not a store kept inside it`() {
+        // The drawn map's heights live in a folder inside the map's own, which is what made a card
+        // add them twice: once in the map's walk, once in theirs.
+        val map = OfflineTileStore(temp.root, ".pbf")
+        val heights = OfflineTileStore(File(temp.root, "elevation-png"), ".png")
+
+        map.write(12, 1, 1, ByteArray(100))
+        heights.write(12, 1, 1, ByteArray(900))
+
+        assertEquals(100L, map.storedBytes())
+        assertEquals(900L, heights.storedBytes())
+        assertEquals(1L, map.storedTileCount())
+    }
+
+    @Test
     fun `an empty store reports nothing`() {
         val store = store()
 

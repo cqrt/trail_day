@@ -84,7 +84,17 @@ class OfflineTileStore(
     /** Tiles currently held, by walking the tree (used for reporting on launch). */
     fun storedTileCount(): Long = root.walkTopDown().count { it.isFile && it.name.endsWith(suffix) }.toLong()
 
-    fun storedBytes(): Long = root.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+    /**
+     * What this store's tiles cost on disk - **only its own**, judged by its suffix.
+     *
+     * A store's folder is not always only its own files. The drawn map keeps its heights in
+     * `topography/elevation-png`, inside the folder that holds its tiles, so a walk of everything under
+     * the root charged those heights twice: once as part of the map and again as the heights' own store.
+     * A phone holding three small areas and 12,528 tiles read 883 MB because of it. Anything in here of
+     * another type is another store's business, and counting it makes this one lie.
+     */
+    fun storedBytes(): Long =
+        root.walkTopDown().filter { it.isFile && it.name.endsWith(suffix) }.sumOf { it.length() }
 
     /** Removes everything. Returns how many files were deleted. */
     fun deleteAll(): Int {
