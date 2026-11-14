@@ -25,7 +25,7 @@
             android:rotation="-10">
             <path
                 android:fillColor="#F2E3A8"
-                android:pathData="M37,28 H44 A6,6 0 0 1 50,34 V35 A6,6 0 0 1 44,41 H37 A6,6 0 0 1 31,35 V34 A6,6 0 0 1 37,28 Z" />
+                android:pathData="M39,28 H44 A6,6 0 0 1 50,34 V35 A6,6 0 0 1 44,41 H39 A6,6 0 0 1 33,35 V34 A6,6 0 0 1 39,28 Z" />
         </group>
         <group
             android:pivotX="36"
@@ -33,29 +33,33 @@
             android:rotation="-10">
             <path
                 android:fillColor="#F2E3A8"
-                android:pathData="M34,40 H38 A9,9 0 0 1 47,49 V51 A9,9 0 0 1 38,60 H34 A9,9 0 0 1 25,51 V49 A9,9 0 0 1 34,40 Z" />
+                android:pathData="M37,40 H38 A9,9 0 0 1 47,49 V51 A9,9 0 0 1 38,60 H37 A9,9 0 0 1 28,51 V49 A9,9 0 0 1 37,40 Z" />
         </group>
 
         <!-- Head, torso and both legs in one colour, in heavy round-capped strokes: that heaviness is
-             what survives being drawn at 48 pixels on a home screen. -->
+             what survives being drawn at 48 pixels on a home screen. It was 16, 12.5 and 11 to begin
+             with, and at 38 pixels the two legs met in the middle and the arm was lost in the torso, so
+             the walker was one white pear. The widths that keep a gap between the legs and let the arm
+             show are 12.5, 10.5 and 9.2, with the head at 7.6 and the pack pulled in by the same
+             hand: at that size the stride reads as two legs rather than one. -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M55,32 A8,8 0 1 0 71,32 A8,8 0 1 0 55,32 Z" />
+            android:pathData="M55.4,32 A7.6,7.6 0 1 0 70.6,32 A7.6,7.6 0 1 0 55.4,32 Z" />
         <path
             android:pathData="M59,44 L53,63"
             android:strokeColor="#FFFFFF"
-            android:strokeWidth="16"
+            android:strokeWidth="12.5"
             android:strokeLineCap="round" />
         <path
             android:pathData="M53,63 L61,73 L59,82"
             android:strokeColor="#FFFFFF"
-            android:strokeWidth="12.5"
+            android:strokeWidth="10.5"
             android:strokeLineCap="round"
             android:strokeLineJoin="round" />
         <path
             android:pathData="M53,63 L45,73 L37,81"
             android:strokeColor="#FFFFFF"
-            android:strokeWidth="12.5"
+            android:strokeWidth="10.5"
             android:strokeLineCap="round"
             android:strokeLineJoin="round" />
 
@@ -64,7 +68,7 @@
         <path
             android:pathData="M61,47 L72,53 L74,60"
             android:strokeColor="#FFFFFF"
-            android:strokeWidth="11"
+            android:strokeWidth="9.2"
             android:strokeLineCap="round"
             android:strokeLineJoin="round" />
         <path
