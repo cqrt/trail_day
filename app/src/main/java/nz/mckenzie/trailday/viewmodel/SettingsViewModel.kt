@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import nz.mckenzie.trailday.BuildConfig
 import nz.mckenzie.trailday.backup.BackupTargets
 import nz.mckenzie.trailday.backup.FileBackupTarget
@@ -122,13 +124,14 @@ class SettingsViewModel(
      */
     private val checkKey: suspend (String) -> KeyCheck = { LinzKeyProbe().check(it) },
     /**
-     * What the four offline packs hold, in bytes, for the **Offline areas** row.
+     * What the three packs that are not imagery hold, in bytes, for the **Offline areas** row.
      *
-     * Injected rather than built here because it is four stores' arithmetic - imagery and the drawn map's
-     * tiles, DOC's material and the other publisher's tracks - and a test of this screen has no packs to
-     * count. It defaults to nothing, which is what a phone that has downloaded nothing reads.
+     * Imagery is added by [init] from the number it counts anyway, and the rest is this: the drawn
+     * map's tiles, DOC's material with its pictures, and the other publisher's tracks. Injected rather
+     * than built here because a test of this screen has no packs to count; it defaults to nothing,
+     * which is what a phone that has downloaded nothing reads.
      */
-    private val packBytes: suspend () -> Long = { 0L }
+    private val otherPacksBytes: suspend () -> Long = { 0L }
 ) : ViewModel() {
 
     /**
@@ -426,8 +429,16 @@ class SettingsViewModel(
         viewModelScope.launch { settings.showEveryHiddenTrack() }
     }
 
-    private val _storedTiles = MutableStateFlow(TileStoreSummary(0, 0))
-    val storedTiles: StateFlow<TileStoreSummary> = _storedTiles
+    /**
+     * What the imagery pack holds: its tiles and their size, for the line under the version.
+     *
+     * **Null until it has been counted**, and counted off the main thread. This is a walk of the tile
+     * folder, and a phone with an area downloaded has tens of thousands of files in it: counting them
+     * while the screen was being built froze Settings for two or three seconds on the first open after
+     * a launch, which was long enough to be taken for the picker's pictures loading.
+     */
+    private val _storedTiles = MutableStateFlow<TileStoreSummary?>(null)
+    val storedTiles: StateFlow<TileStoreSummary?> = _storedTiles
 
     /**
      * What the four offline packs hold on this phone, in bytes: the number beside **Offline areas**.
@@ -435,9 +446,13 @@ class SettingsViewModel(
      * One number rather than four, because the row is a door rather than a summary - the page behind it
      * names each pack and each one's size. Read when this screen is built, which is also just after a
      * download may have finished; the packs' own page recounts what it shows.
+     *
+     * Null until counted, for the same reason as [storedTiles], and **not zero**: "Nothing downloaded
+     * yet" is a claim about the phone rather than a placeholder, and saying it for a moment on a phone
+     * full of downloads is a sentence the row then has to take back.
      */
-    private val _keptBytes = MutableStateFlow(0L)
-    val keptBytes: StateFlow<Long> = _keptBytes
+    private val _keptBytes = MutableStateFlow<Long?>(null)
+    val keptBytes: StateFlow<Long?> = _keptBytes
 
     /** What the last backup or restore said. One line, because it is one card. */
     private val _dataMessage = MutableStateFlow<String?>(null)
@@ -627,8 +642,19 @@ class SettingsViewModel(
             // The key the field starts from, read before anything can be typed into it - see the note
             // above this block for why that order matters.
             _keyText.value = settings.developerLinzKey.first()
-            _storedTiles.value = TileStoreSummary(store.storedTileCount(), store.storedBytes())
-            _keptBytes.value = runCatching { packBytes() }.getOrDefault(0L)
+            // **The two counts are folder walks, so they are done off the main thread.** Settings used
+            // to build itself and then walk the imagery folder twice, the drawn map's once and the
+            // packs twice more - on the thread that draws the screen - which on a phone with an area
+            // downloaded was a frozen Settings page for two or three seconds after a launch. They land
+            // a moment later now, and the screen is usable while they do.
+            withContext(Dispatchers.IO) {
+                val imagery = TileStoreSummary(store.storedTileCount(), store.storedBytes())
+                _storedTiles.value = imagery
+                // The imagery number is just counted, so the total adds it rather than walking the
+                // same folder a second time. A pack that will not count leaves the row blank rather
+                // than reporting a total that quietly leaves something out.
+                _keptBytes.value = runCatching { imagery.bytes + otherPacksBytes() }.getOrNull()
+            }
         }
 
         // The off-site fields are seeded the same way, and for the same reason: pasting a
@@ -916,17 +942,17 @@ class SettingsViewModel(
                     SettingsViewModel(
                         settings = settings,
                         store = TileServerHolder.imageryStore(appContext),
-                        // The four packs, summed for the Offline areas row: the imagery and the drawn
-                        // map's tiles, DOC's material with its pictures, and the other publisher's
-                        // tracks. Built here rather than in the view model because they are the stores
-                        // the rest of the app already reads, not a second set.
-                        packBytes = {
+                        // The three packs that are not imagery, summed for the Offline areas row: the
+                        // drawn map's tiles, DOC's material with its pictures, and the other
+                        // publisher's tracks. Imagery is added by the view model from the count it
+                        // makes anyway. Built here rather than in the view model because they are the
+                        // stores the rest of the app already reads, not a second set.
+                        otherPacksBytes = {
                             val database = TrailDayDatabase.get(appContext)
-                            TileServerHolder.imageryStore(appContext).storedBytes() +
-                                OfflineAreaManager
-                                    .topography(appContext, database.offlineAreaDao())
-                                    .summary()
-                                    .bytes +
+                            OfflineAreaManager
+                                .topography(appContext, database.offlineAreaDao())
+                                .summary()
+                                .bytes +
                                 OfflineDocStore(
                                     dao = database.offlineDocItemDao(),
                                     downloader = DocDownloader.online(),

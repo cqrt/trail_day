@@ -259,6 +259,39 @@ class SettingsViewModelTest {
     }
 
     /**
+     * The two numbers Settings shows about this phone: the imagery count and the Offline row's total.
+     *
+     * They are worked out in the background - they are folder walks, and a phone with an area
+     * downloaded has tens of thousands of files to walk - so the screen draws first and the numbers
+     * land after it. What this holds is that they land at all, and what the total is made of: the
+     * imagery the version line already names, counted once, plus the packs handed over.
+     */
+    @Test
+    fun theImageryCountAndTheKeptSizeAreWorkedOutAndPublished(): Unit = runBlocking {
+        store.tileFile(12, 1, 1).apply {
+            parentFile?.mkdirs()
+            writeBytes(ByteArray(10))
+        }
+        store.tileFile(12, 1, 2).apply {
+            parentFile?.mkdirs()
+            writeBytes(ByteArray(10))
+        }
+
+        val viewModel = SettingsViewModel(
+            settings = SettingsRepository(context),
+            store = store,
+            otherPacksBytes = { 5L }
+        )
+
+        val imagery = withTimeout(TIMEOUT_MS) { viewModel.storedTiles.first { it != null }!! }
+        assertEquals("two tiles in the folder", 2L, imagery.tiles)
+        assertEquals("and their size", 20L, imagery.bytes)
+
+        val kept = withTimeout(TIMEOUT_MS) { viewModel.keptBytes.first { it != null }!! }
+        assertEquals("imagery once, then the other three packs", 25L, kept)
+    }
+
+    /**
      * The light setting: written down, and published to every screen that draws.
      *
      * Stored rather than held in the view model, because it is a property of this phone rather than

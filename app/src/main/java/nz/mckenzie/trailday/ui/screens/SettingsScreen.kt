@@ -856,15 +856,22 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
+                    // The count arrives a moment after the screen does, because counting it is a walk
+                    // of the tile folder: the line is drawn once there is a number rather than as a
+                    // zero the walker would read as an empty cache, and it holds its place so nothing
+                    // under it moves when the answer lands.
                     Text(
-                        text = "${storedTiles.tiles} imagery tiles cached, ${storedTiles.sizeLabel}",
-                        style = MaterialTheme.typography.bodyMedium
+                        text = storedTiles
+                            ?.let { "${it.tiles} imagery tiles cached, ${it.sizeLabel}" }
+                            .orEmpty(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        minLines = 1
                     )
                     // **The fourth door to the Offline page**, with what it holds: the map's round
                     // button, the map's notice and this row are the only ways in, because the page is
                     // not a tab. The size is the four packs added together - the page behind this
-                    // names each one - and "Nothing downloaded yet" rather than "0 B", which would
-                    // read as a measurement of a thing that is not there.
+                    // names each one - and the line stays empty until it has been counted, rather than
+                    // saying "Nothing downloaded yet" about a phone that may be full.
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -878,14 +885,16 @@ fun SettingsScreen(
                                 text = OFFLINE_WORD,
                                 style = MaterialTheme.typography.labelLarge
                             )
+                            // **Not "0 B" and not "Nothing downloaded yet" while the packs are being
+                            // counted**: both are claims about the phone, and the count is a folder
+                            // walk that lands a moment after the screen is usable. An empty line
+                            // keeps the row's height so nothing jumps when the answer arrives.
                             Text(
-                                text = if (keptBytes > 0L) {
-                                    "${formatBytes(keptBytes)} kept on this phone"
-                                } else {
-                                    "Nothing downloaded yet"
-                                },
+                                text = keptBytes?.let { "${formatBytes(it)} kept on this phone" }
+                                    .orEmpty(),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                minLines = 1
                             )
                         }
                         AppIcon(

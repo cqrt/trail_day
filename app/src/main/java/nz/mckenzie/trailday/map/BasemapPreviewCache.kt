@@ -4,6 +4,11 @@ import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.offline.sprayDayUserAgent
@@ -21,22 +26,47 @@ import kotlin.math.tan
  * changes: fetching it again every time Settings opens is what made the picker take seconds. The
  * application prefetches all of them at launch, so by the time the walker looks the pictures are
  * already here.
+ *
+ * **One request per tile, however many ask at once.** The prefetch and a Settings screen opened while
+ * it is still running ask for the same four pictures, and without this gate the screen started a
+ * second request for every tile the prefetch had not reached yet - so the pictures arrived after a
+ * round trip of their own rather than the moment the one already in flight landed. The second caller
+ * waits on the first and takes its answer.
  */
 object BasemapPreviewCache {
 
     private val cache = ConcurrentHashMap<String, ImageBitmap>()
 
+    /**
+     * One gate per basemap, so a fetch already on its way is waited on rather than repeated.
+     *
+     * Four entries for the life of the process: a gate is never removed, because keeping it is what
+     * makes a *later* pair of callers share a retry after a fetch that failed with no reception.
+     */
+    private val gates = ConcurrentHashMap<String, Mutex>()
+
     /** The tile for [basemap], fetched once and remembered. */
     suspend fun load(basemap: Basemap): ImageBitmap? {
         cache[cacheKey(basemap)]?.let { return it }
-        val picture = fetch(basemap) ?: return null
-        cache[cacheKey(basemap)] = picture
-        return picture
+        return gates.getOrPut(cacheKey(basemap)) { Mutex() }.withLock {
+            // Asked again inside the gate: the caller this one waited behind may have just filled it.
+            cache[cacheKey(basemap)]?.let { return@withLock it }
+            val picture = fetch(basemap) ?: return@withLock null
+            cache[cacheKey(basemap)] = picture
+            picture
+        }
     }
 
-    /** Fetches every basemap's tile, so the picker has nothing left to wait for. */
-    suspend fun loadAll() {
-        Basemap.entries.forEach { basemap -> load(basemap) }
+    /**
+     * Fetches every basemap's tile, so the picker has nothing left to wait for.
+     *
+     * **All at once rather than one after another**: four small tiles in parallel are ready in about
+     * the time of the slowest, where four in a queue are ready in the time of all four added up - and
+     * this runs while the walker is looking at the map, so the shorter it is the less of it they can
+     * walk into by opening Settings.
+     */
+    suspend fun loadAll() = coroutineScope {
+        Basemap.entries.map { basemap -> async { load(basemap) } }.awaitAll()
     }
 
     /**
