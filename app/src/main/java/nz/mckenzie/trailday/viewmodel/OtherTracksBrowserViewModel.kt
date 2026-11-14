@@ -150,6 +150,19 @@ class OtherTracksBrowserViewModel(
     val wheelchairOnly: StateFlow<Boolean> = _wheelchairOnly
 
     /**
+     * How many answers have replaced this page, so the screen can put the list back at its top.
+     *
+     * **A new answer is a new page of rows.** Choosing 50 km over the larger radius that filled the page
+     * kept the list's place in it, so the walker landed part-way into an answer they had never seen the
+     * top of. The distance is the question, so its answer is read from the top.
+     *
+     * **Filters and the two chips are not in here on purpose.** They narrow the rows already on screen,
+     * and a walker who ticked "Rideable" halfway down a list is still reading the same page.
+     */
+    private val _answers = MutableStateFlow(0)
+    val answers: StateFlow<Int> = _answers
+
+    /**
      * The rows the screen shows: the search's results, narrowed by the filters and the two chips, ordered
      * by the sort.
      *
@@ -307,6 +320,8 @@ class OtherTracksBrowserViewModel(
                     }
                 }
             }
+            // Either service's answer replaces the page, so the screen starts its list again at the top.
+            _answers.value += 1
             _busy.value = false
         }
     }

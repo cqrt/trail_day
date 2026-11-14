@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -22,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,7 +75,13 @@ fun OtherTracksBrowserScreen(
     val searched by viewModel.searched.collectAsStateWithLifecycle()
     val bikeOnly by viewModel.bikeOnly.collectAsStateWithLifecycle()
     val wheelchairOnly by viewModel.wheelchairOnly.collectAsStateWithLifecycle()
+    val answers by viewModel.answers.collectAsStateWithLifecycle()
     val focus = LocalFocusManager.current
+
+    // The list's place, held here rather than inside the list, so an answer that replaces the rows can
+    // put it back at the top: choosing 50 km over 200 km is a new page, not a place in the old one.
+    val listState = rememberLazyListState()
+    LaunchedEffect(answers) { listState.scrollToItem(0) }
 
     val search = {
         focus.clearFocus()
@@ -155,6 +163,7 @@ fun OtherTracksBrowserScreen(
                         )
                     }
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)

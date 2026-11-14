@@ -146,6 +146,20 @@ class DocBrowserViewModel(
     val results: StateFlow<List<DocItem>> = _results
 
     /**
+     * How many answers have replaced this page, so the screen can put the list back at its top.
+     *
+     * **A new answer is a new page of rows.** Choosing 50 km over the 200 km that filled the page kept
+     * the list's place in it, so the walker landed nine rows into an answer they had never seen the top
+     * of, with the nearest track, 10.85 km away, above them. The distance is the question, so its answer
+     * is read from the top.
+     *
+     * **Filters and the order are not in here on purpose.** They narrow or re-order the rows already on
+     * screen, and a walker who ticked "Bookable" halfway down a list is still reading the same page.
+     */
+    private val _answers = MutableStateFlow(0)
+    val answers: StateFlow<Int> = _answers
+
+    /**
      * The last answer with the walker's hidden lines taken out.
      *
      * Everything the page offers is built from this rather than from the raw page: the rows, the count
@@ -432,6 +446,9 @@ class DocBrowserViewModel(
                     }
                 }
             }
+            // Whether DOC answered or the downloaded copy did, the page's rows are new ones, and the
+            // screen reads this to start its list at the top.
+            _answers.value += 1
             _busy.value = false
         }
     }
