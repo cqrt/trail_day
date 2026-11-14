@@ -46,6 +46,9 @@ than making it.
   says how many of each.
 - On a trip's **page** a ride is drawn dashed in your bike colour, with the gold edge every recorded line
   wears. A walk stays solid green with the same edge.
+- On the same map the finish wears a green flag, whichever the trip was, and the start a slate dot. The
+  flag stays green on a ride because it is the end of a trip rather than a colour of one, so a purple
+  ride line runs up to a green flag.
 - On the **map** a ride is the same: your bike colour, dashed, gold edge. It is hidden by the Recordings
   switch under Your Places, not by Bike tracks, because it is a trip rather than a place.
 - On the **Record** tab, following a bike track gives you a speed in km/h instead of minutes a

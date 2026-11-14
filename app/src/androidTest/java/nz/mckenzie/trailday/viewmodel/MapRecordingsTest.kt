@@ -19,6 +19,7 @@ import nz.mckenzie.trailday.domain.geo.GeoPoint
 import nz.mckenzie.trailday.domain.look.Look
 import nz.mckenzie.trailday.domain.recording.ActivityMode
 import nz.mckenzie.trailday.map.AssetColors
+import nz.mckenzie.trailday.map.EndsGeoJson
 import nz.mckenzie.trailday.tracking.LocationSource
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -124,8 +125,7 @@ class MapRecordingsTest {
     }
 
     @Test
-    fun aRideIsDrawnAsARideAndAWalkAsAWalk() = runBlocking {
-        val line = listOf(
+    fun aRideIsDrawnAsARideAndAWalkAsAWalk() = runBlocking {        val line = listOf(
             GeoPoint(-41.5000, 173.9500),
             GeoPoint(-41.5010, 173.9600)
         )
@@ -154,4 +154,60 @@ class MapRecordingsTest {
             Regex("\"type\":\"Feature\",").findAll(drawn).count()
         )
     }
+
+    /**
+     * The two marks an activity's page puts on its own map, read through the page's own view model.
+     *
+     * A trip's ends are its first and last fixes and nothing in between - the days in the middle of a
+     * walk are the line, not ends - and a trip with one fix has no two ends to tell apart.
+     */
+    @Test
+    fun aTripsEndsAreItsFirstFixAndItsLast() = runBlocking {
+        val points = listOf(
+            GeoPoint(-41.5000, 173.9500),
+            GeoPoint(-41.5010, 173.9600),
+            GeoPoint(-41.5020, 173.9700)
+        )
+        val id = recordings.startRecording(name = "Three fixes")
+        points.forEach { recordings.appendPoint(id, it) }
+        recordings.finishRecording(id, distanceM = 100.0)
+
+        val ends = withTimeout(5_000) {
+            detailViewModel(id).endsGeoJson.first { it != EndsGeoJson.EMPTY }
+        }
+
+        assertEquals("one mark per end", 2, Regex("\"type\":\"Feature\",").findAll(ends).count())
+        assertTrue("the start is the first fix: $ends", ends.contains("[173.9500000,-41.5000000]"))
+        assertTrue("the finish is the last", ends.contains("[173.9700000,-41.5020000]"))
+        assertFalse(
+            "the fix in the middle is not an end",
+            ends.contains("[173.9600000,-41.5010000]")
+        )
+        assertTrue("the dot and the flag are told apart", ends.contains("\"part\":\"start\""))
+        assertTrue(ends.contains("\"part\":\"finish\""))
+    }
+
+    @Test
+    fun aTripOfOneFixHasNoEnds() = runBlocking {
+        val id = recordings.startRecording(name = "One fix")
+        recordings.appendPoint(id, GeoPoint(-41.5000, 173.9500))
+
+        val viewModel = detailViewModel(id)
+        val detail = withTimeout(5_000) { viewModel.detail.first { it != null } }
+
+        assertEquals("the page has its one fix", 1, detail!!.points.size)
+        assertEquals(
+            "one point has no two ends to tell apart",
+            EndsGeoJson.EMPTY,
+            viewModel.endsGeoJson.first()
+        )
+    }
+
+    /** One activity's own page, with no publisher cache: nothing here followed anything. */
+    private fun detailViewModel(sessionId: Long) = RecordingDetailViewModel(
+        sessionId = sessionId,
+        recordings = recordings,
+        assetRepository = assetRepository,
+        settingsRepository = SettingsRepository(context)
+    )
 }

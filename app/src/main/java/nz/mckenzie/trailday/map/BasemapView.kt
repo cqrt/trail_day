@@ -146,6 +146,22 @@ internal const val FINGER_SOURCE = "trailday-finger"
 internal const val FINGER_LAYER = "trailday-finger-dot"
 
 /**
+ * Where one trip began and where it stopped: its own source, and a layer per end.
+ *
+ * **Empty on every map that is not that trip's page.** An end is a fact about one trip, and a dot on
+ * the map tab would be the app marking the walker's last visit rather than their walk. Its own source
+ * so a rebuilt line replaces two features rather than the style under them, and its own two layers so a
+ * dot and a flag can be drawn as the different things they are. See [EndsGeoJson].
+ *
+ * They are added after the places and before the phone's dot: over the line the trip is, under the
+ * walker - a start dot that hid where they are standing would be the wrong way round on the one page
+ * that has both.
+ */
+internal const val ENDS_SOURCE = "trailday-ends"
+internal const val ENDS_START_LAYER = "trailday-ends-start"
+internal const val ENDS_FINISH_LAYER = "trailday-ends-finish"
+
+/**
  * The uncertainty around the dot, faint enough to read the imagery through and to sit under
  * the work rather than over it.
  *
@@ -209,6 +225,15 @@ fun BasemapView(
      * [FingerGeoJson].
      */
     fingerGeoJson: String = FingerGeoJson.EMPTY,
+    /**
+     * The marks of one trip: **a slate dot at its first fix and a green flag at its last**.
+     *
+     * Empty by default, and empty on every map that is not that trip's own page. The two marks are the
+     * whole of it - the page adds no words about where they are - because the subtitle already says
+     * when the trip began and how long it took. The line itself still says how it went; these say where
+     * it started and where it stopped. See [EndsGeoJson].
+     */
+    endsGeoJson: String = EndsGeoJson.EMPTY,
     modifier: Modifier = Modifier,
     /**
      * Whether the camera should keep the phone in the middle of the screen.
@@ -630,6 +655,7 @@ fun BasemapView(
                         docBikeBadgesGeoJson = docBikeBadgesGeoJson,
                         targetGeoJson = targetGeoJson,
                         fingerGeoJson = fingerGeoJson,
+                        endsGeoJson = endsGeoJson,
                         positionGeoJson = positionGeoJson,
                         density = density,
                         hiddenLayers = hiddenLayers,
@@ -674,6 +700,7 @@ fun BasemapView(
                 docBikeBadgesGeoJson = docBikeBadgesGeoJson,
                 targetGeoJson = targetGeoJson,
                 fingerGeoJson = fingerGeoJson,
+                endsGeoJson = endsGeoJson,
                 positionGeoJson = positionGeoJson,
                 density = density,
                 hiddenLayers = hiddenLayers,
@@ -765,6 +792,12 @@ fun BasemapView(
     // finger along a graph restyles one dot rather than the map under it.
     LaunchedEffect(fingerGeoJson, styleState.value) {
         styleState.value?.getSourceAs<GeoJsonSource>(FINGER_SOURCE)?.setGeoJson(fingerGeoJson)
+    }
+
+    // A trip's two ends, handed over the same way: the source's two features replaced per page, so
+    // opening an activity draws two marks rather than reloading the map under them.
+    LaunchedEffect(endsGeoJson, styleState.value) {
+        styleState.value?.getSourceAs<GeoJsonSource>(ENDS_SOURCE)?.setGeoJson(endsGeoJson)
     }
 
     // A layer the walker has switched off, applied to the style that is already loaded. This is a
@@ -915,6 +948,8 @@ internal fun MapLibreMap.loadTrailDayStyle(
     targetGeoJson: String = AssetGeoJson.build(emptyList()),
     /** The chart's finger: see [BasemapView.fingerGeoJson]. */
     fingerGeoJson: String = FingerGeoJson.EMPTY,
+    /** The two ends of one trip: see [BasemapView.endsGeoJson]. */
+    endsGeoJson: String = EndsGeoJson.EMPTY,
     positionGeoJson: String,
     density: Float,
     hiddenLayers: Set<AssetLayer>,
@@ -1194,6 +1229,53 @@ internal fun MapLibreMap.loadTrailDayStyle(
         // material, before either set of marker layers: both draw the same glyphs.
         PlaceIcons.KINDS.forEach { kind -> addPlaceLayer(style, kind) }
 
+        // Where this trip began and where it stopped. Added after the places and before the phone's
+        // dot: over the line it is drawn on, under the walker - the page that has both is the one where
+        // a start dot could hide the phone.
+        if (style.getSource(ENDS_SOURCE) == null) {
+            style.addSource(GeoJsonSource(ENDS_SOURCE, endsGeoJson))
+        }
+        // The picture before the layer that asks for it, as the place markers are added before theirs:
+        // a symbol layer for an image the style has not got draws nothing at all.
+        addEndImages(style, density)
+        if (style.getLayer(ENDS_START_LAYER) == null) {
+            style.addLayer(
+                CircleLayer(ENDS_START_LAYER, ENDS_SOURCE)
+                    .withProperties(
+                        PropertyFactory.circleColor(Expression.literal(AssetColors.TRIP_START)),
+                        // The phone's own two numbers, because a start dot is the same mark as the fix it
+                        // was: MapLibre draws the rim outside the radius rather than centred on it, so
+                        // 7 and 2.5 come out 19 dp across on the glass, which is what the phone's dot
+                        // measures too. Measured on the emulator rather than worked out on paper.
+                        PropertyFactory.circleRadius(Expression.literal(7f)),
+                        // The white ring the phone's dot wears, for the same reason: separation from
+                        // whatever imagery is behind it, pale or dark.
+                        PropertyFactory.circleStrokeColor(Expression.literal("#FFFFFF")),
+                        PropertyFactory.circleStrokeWidth(Expression.literal(2.5f))
+                    )
+                    .withFilter(endsPartIs(EndsGeoJson.PART_START))
+            )
+        }
+        if (style.getLayer(ENDS_FINISH_LAYER) == null) {
+            style.addLayer(
+                SymbolLayer(ENDS_FINISH_LAYER, ENDS_SOURCE)
+                    .withProperties(
+                        // The name as a plain string, not a `literal` expression: icon-image refuses the
+                        // second, and says so only in logcat - the layer loads and draws nothing, which
+                        // is what the flag did before this was found on the emulator.
+                        PropertyFactory.iconImage(EndIcons.IMAGE_NAME),
+                        // The foot of the pole is the coordinate, so the flag stands on the last fix
+                        // rather than hanging its middle over it.
+                        PropertyFactory.iconAnchor(Property.ICON_ANCHOR_BOTTOM),
+                        // Two marks at one place both mean what they say: a loop finishes on its own
+                        // start, and a flag that hid behind the dot would be a trip with no finish.
+                        PropertyFactory.iconAllowOverlap(Expression.literal(true)),
+                        PropertyFactory.iconIgnorePlacement(Expression.literal(true))
+                    )
+                    .withFilter(endsPartIs(EndsGeoJson.PART_FINISH))
+            )
+        }
+
         // Where the phone is. Added after the assets so it draws over them: the work is what
         // the map is for, and where you are standing is read on top of it rather than under it.
         if (style.getSource(POSITION_SOURCE) == null) {
@@ -1451,6 +1533,27 @@ private fun applyLayerVisibility(
 private fun addPlaceMarkerImages(style: Style, density: Float, look: MapLook) {
     val missing = markerImages(look, density).filterKeys { style.getImage(it) == null }
     if (missing.isNotEmpty()) style.addImages(HashMap(missing))
+}
+
+/**
+ * Hands the style the flag a trip finishes under, when it has not got it.
+ *
+ * **One picture, and no look in it.** The flag is the end of a trip rather than a kind of place, so its
+ * colour is the recorded green whatever the day was and whatever the walker has chosen - which is also
+ * why [applyLook] never goes over it: there is nothing about a look that redraws this.
+ *
+ * Guarded by the lookup for the same reason the place markers are: an image belongs to the style it was
+ * added to, and a style can be loaded again - a basemap change, or a key just entered.
+ */
+private fun addEndImages(style: Style, density: Float) {
+    if (style.getImage(EndIcons.IMAGE_NAME) != null) return
+    style.addImage(
+        EndIcons.IMAGE_NAME,
+        EndIcons.bitmap(
+            sizePx = (EndIcons.SIZE_DP * density).roundToInt().coerceAtLeast(1),
+            outlinePx = PlaceIcons.MARKER_OUTLINE_DP * density
+        )
+    )
 }
 
 /**
@@ -1726,6 +1829,16 @@ private fun shapeIs(shape: AssetShape): Expression =
 /** Which of the marker's two features a layer draws: the dot, or the ring of uncertainty. */
 private fun partIs(part: String): Expression =
     Expression.eq(Expression.get(PositionGeoJson.PART_PROPERTY), Expression.literal(part))
+
+/**
+ * Which of a trip's two marks a layer draws: the dot at its first fix, or the flag at its last.
+ *
+ * The same `part` property the phone's marker uses, read from the document that writes it rather than
+ * from a second string: [PositionGeoJson] carries where the phone is, and this carries where the trip
+ * started, so the two names must not be shared by accident.
+ */
+private fun endsPartIs(part: String): Expression =
+    Expression.eq(Expression.get(EndsGeoJson.PART_PROPERTY), Expression.literal(part))
 
 /**
  * The camera that fits a set of bounds, with the app's padding.

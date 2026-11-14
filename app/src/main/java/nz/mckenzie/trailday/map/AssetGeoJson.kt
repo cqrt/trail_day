@@ -155,6 +155,16 @@ object AssetColors {
      * says where you are pointing, not what something is.
      */
     const val FINGER = "#2E7D32"
+
+    /**
+     * The dot under a trip's first fix, on that trip's own page.
+     *
+     * The waypoint kind's slate, and **deliberately not a look row**: the mark is the trip's rather than
+     * a place's, and the page it is drawn on draws no places for it to be confused with. What the walker
+     * chooses is what places look like, and a trip's two ends are not places - see
+     * [nz.mckenzie.trailday.map.EndsGeoJson].
+     */
+    const val TRIP_START = "#546E7A"
 }
 
 /**

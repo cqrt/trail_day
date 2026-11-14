@@ -183,6 +183,78 @@ class MarkerIconsTest {
      */
     private val mostEdgePercent = 27
 
+    @Test
+    fun theFinishFlagIsDrawnInTheRecordedGreen() {
+        // The flag is the one picture on the map whose colour is not the walker's to choose, so it has
+        // to be the recorded green and nothing else: a ride's purple line runs up to it, and the two
+        // marks read as one trip because the flag is the colour of a trip's evidence.
+        val bitmap = EndIcons.bitmap(sizePx = 64, outlinePx = 2f)
+
+        // Inside the pennant: a third of the way along it and level with its point, which is ink
+        // whatever the halo and the antialiasing do at the edges.
+        val pixel = bitmap.getPixel((bitmap.width * 0.40f).toInt(), (bitmap.height * 0.24f).toInt())
+
+        val wanted = Color.parseColor(AssetColors.RECORDED)
+        assertEquals("the flag's ink is not the recorded green", Color.alpha(pixel), 255)
+        assertEquals("red of ${Integer.toHexString(pixel)}", Color.red(wanted), Color.red(pixel))
+        assertEquals("green of ${Integer.toHexString(pixel)}", Color.green(wanted), Color.green(pixel))
+        assertEquals("blue of ${Integer.toHexString(pixel)}", Color.blue(wanted), Color.blue(pixel))
+    }
+
+    @Test
+    fun theFinishFlagIsDrawnOnNothing() {
+        // The flag is over imagery like every marker, so what is behind it has to show through. The top
+        // left corner is where a flag would be if the halo were ever drawn as a box again.
+        val bitmap = EndIcons.bitmap(sizePx = 64, outlinePx = 2f)
+
+        assertEquals("the top left corner is not see-through", 0, Color.alpha(bitmap.getPixel(0, 0)))
+        assertEquals(
+            "the top right corner is not see-through",
+            0,
+            Color.alpha(bitmap.getPixel(bitmap.width - 1, 0))
+        )
+    }
+
+    @Test
+    fun theFinishFlagWearsAWhiteHalo() {
+        // The flag is over imagery like every marker, so it wears the same white edge - and the edge
+        // is a rim rather than a white box: a halo wide enough to be the background would be a flag
+        // that had become a white square with a green notch in it. The bug this holds was real: the
+        // halo was passed as a fraction of the box where the drawing wanted pixels, and drew nothing.
+        val bitmap = EndIcons.bitmap(sizePx = 64, outlinePx = 4f)
+
+        val white = bitmap.whitePixels()
+        assertTrue("the flag is drawn with no white edge at all, so it is lost in dark bush", white > 0)
+        assertTrue(
+            "the white takes $white pixels of ${64 * 64}, which is a background rather than a halo",
+            white < 64 * 64 / 3
+        )
+    }
+
+    @Test
+    fun theFinishFlagStandsOnItsOwnFoot() {
+        // The style anchors the picture by its bottom edge, so the ink has to reach down to near that
+        // edge: a flag drawn in the top of its box would float above the last fix rather than stand on
+        // it. The foot is the pole, which is the only ink in the bottom quarter.
+        val bitmap = EndIcons.bitmap(sizePx = 64, outlinePx = 2f)
+
+        val lowest = (0 until bitmap.height).last { y ->
+            (0 until bitmap.width).any { x -> Color.alpha(bitmap.getPixel(x, y)) > 0 }
+        }
+        assertTrue(
+            "the flag's ink stops at ${lowest + 1} of ${bitmap.height}, above the bottom quarter",
+            lowest >= bitmap.height * 3 / 4
+        )
+
+        val footX = (0 until bitmap.width).filter { x -> Color.alpha(bitmap.getPixel(x, lowest)) > 0 }
+        assertTrue("the foot is drawn somewhere", footX.isNotEmpty())
+        val centre = (footX.first() + footX.last()) / 2
+        assertTrue(
+            "the pole's foot is at $centre of ${bitmap.width}, which is not under the pole",
+            kotlin.math.abs(centre - bitmap.width * 0.26f) <= bitmap.width * 0.08f
+        )
+    }
+
     /** The edge the map draws, in pixels of a picture [size] across. */
     private fun edgePx(size: Int): Float =
         PlaceIcons.MARKER_OUTLINE_DP * size / MarkerSizeChoice.NORMAL.dp

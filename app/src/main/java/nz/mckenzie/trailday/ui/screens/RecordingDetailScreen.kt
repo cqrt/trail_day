@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -68,6 +69,7 @@ fun RecordingDetailScreen(
     val detail by viewModel.detail.collectAsStateWithLifecycle()
     val basemap by viewModel.basemap.collectAsStateWithLifecycle()
     val geoJson by viewModel.geoJson.collectAsStateWithLifecycle()
+    val endsGeoJson by viewModel.endsGeoJson.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val deleted by viewModel.deleted.collectAsStateWithLifecycle()
     val placeGoesToo by viewModel.placeGoesToo.collectAsStateWithLifecycle()
@@ -107,14 +109,29 @@ fun RecordingDetailScreen(
             // The trip's own line, across the whole width: the map is what the page is about, so it is the top
             // of the page rather than a picture inside a card.
             Box {
+                // The fit leaves room for this page's own furniture: the back button and the zoom keys
+                // reach 60 dp in, and the credit strip's top is 72 dp above the foot. A loop's start
+                // landed under that strip on the emulator, so this page alone asks for the bigger box.
+                val pageDensity = LocalDensity.current
+                val fitPaddingPx = with(pageDensity) { FIT_PADDING.roundToPx() }
+                val fitFootPx = with(pageDensity) { FIT_FOOT.roundToPx() }
+
                 BasemapView(
                     basemap = basemap,
                     assetGeoJson = geoJson,
                     fingerGeoJson = fingerGeoJson,
+                    // Where the trip began and where it stopped: the two marks this page is about, over
+                    // its own line and under nothing else.
+                    endsGeoJson = endsGeoJson,
                     fitBounds = remember(detail) { boundsOf(detail) },
+                    fitBoundsPaddingPx = fitPaddingPx,
+                    fitBoundsPaddingBottomPx = fitFootPx,
                     // A picture of one trip, not a place to explore: every gesture off, and the zoom given
                     // to the buttons on the right instead.
                     interactive = false,
+                    // The page is about the trip, and the walker's own blue dot can land on the start dot
+                    // and read as a third mark.
+                    showPosition = false,
                     zoomStep = zoom.step,
                     zoomCount = zoom.count,
                     // Where the map settled, which is the only thing that knows what level the keys have
@@ -351,3 +368,14 @@ private val MAP_HEIGHT = 320.dp
 
 /** How far the sheet is lifted over the map, so the two read as one screen. */
 private val SHEET_LIFT = 28.dp
+
+/**
+ * The room the fit leaves around the line, and the extra at its foot.
+ *
+ * The default 96 px (37 dp) is less than the page's own furniture reaches: the back button and the zoom
+ * keys come 60 dp in, and the credit strip's top is 72 dp above the foot. A loop measured on the emulator
+ * put its start dot under that strip, so the marks got the box they need - 72 dp all round, with 96 dp at
+ * the foot, which is the strip's own 72 and the 22 a flag stands up from the point.
+ */
+private val FIT_PADDING = 72.dp
+private val FIT_FOOT = 24.dp

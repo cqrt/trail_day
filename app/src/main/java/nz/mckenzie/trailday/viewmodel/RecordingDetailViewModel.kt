@@ -37,6 +37,7 @@ import nz.mckenzie.trailday.map.AssetColors
 import nz.mckenzie.trailday.map.AssetGeoJson
 import nz.mckenzie.trailday.map.AssetLine
 import nz.mckenzie.trailday.map.AssetStretch
+import nz.mckenzie.trailday.map.EndsGeoJson
 import nz.mckenzie.trailday.offline.OfflineOtherTrackStore
 
 /** One recording, in full: what was walked or ridden, and for which place. */
@@ -151,6 +152,22 @@ class RecordingDetailViewModel(
             viewModelScope,
             SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
             AssetGeoJson.build(emptyList())
+        )
+
+    /**
+     * Where the trip began and where it stopped, as the map's two marks: a slate dot at the first fix
+     * and a green flag at the last.
+     *
+     * **Read from the detail rather than from a colour**, because the flag is the recorded green
+     * whatever the trip was: a ride's purple line still runs up to a green flag. The list is the whole
+     * trip rather than a stretch, so a break does not move an end - see [EndsGeoJson].
+     */
+    val endsGeoJson: StateFlow<String> = _detail
+        .map { EndsGeoJson.build(it?.points.orEmpty()) }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+            EndsGeoJson.EMPTY
         )
 
     private val _message = MutableStateFlow<String?>(null)
