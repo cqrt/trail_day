@@ -1,19 +1,13 @@
 package nz.mckenzie.trailday.ui.screens
 
-import androidx.compose.foundation.clickable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.unit.sp
-import nz.mckenzie.trailday.domain.doc.DocItem
-import nz.mckenzie.trailday.ui.docBikeLine
-import nz.mckenzie.trailday.ui.docRowDetail
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,62 +21,64 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.domain.asset.AssetKind
+import nz.mckenzie.trailday.domain.asset.AssetPhrase
+import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.domain.geo.TravelMode
 import nz.mckenzie.trailday.domain.geo.TravelTime
 import nz.mckenzie.trailday.domain.journey.JourneyNote
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.formatEstimate
-import nz.mckenzie.trailday.domain.asset.AssetPhrase
-import nz.mckenzie.trailday.domain.asset.AssetShape
 import nz.mckenzie.trailday.ui.formatLengthOf
 import nz.mckenzie.trailday.viewmodel.AssetListViewModel
 
 /**
  * The place library: what places you keep, and how long the lines among them are.
  *
- * **The page is a shelf of shelves.** The front door is a green Add a spot card, with import and DOC
- * reference beside it; the filter row carries the count of each kind; and the places themselves are
- * grouped by kind - spots first, then tracks - so the page reads as a collection rather than one long
- * undifferentiated list. The kind's tile, the name and how long the line is are the row; nothing
- * destructive lives here, because a place is removed from its own page.
+ * **The page is your own material, and only that.** The ways a place arrives are behind one **+** in the
+ * title bar - a spot, a file, a journey - because four cards and a row of buttons above the first place
+ * were a page of tools rather than a page of places. Reading what other people publish left this page
+ * for **Explore**, which is where a browser belongs; nothing here searches anybody else's material.
  *
- * **A row opens the place's own page**, a track's as much as a spot's. It used to frame a line on the map
- * and raise the map's card for it, which made a row a two-tap journey to the page the row was about - and
- * the page opens on the line's own ground anyway.
+ * **The page is a shelf of shelves.** The filter row carries the count of each kind, the journeys are a
+ * group of their own above them, and the places are grouped by kind - spots first, then lines - so the
+ * page reads as a collection rather than one long undifferentiated list. The shelves say "Your places"
+ * without a heading over them saying it again. The kind's tile, the name and how long the line is are
+ * the row; nothing destructive lives here, because a place is removed from its own page.
  *
- * [onOpenDoc] is not a third way to make a place: what DOC publishes is read here rather than kept.
- * A track in **Nearby from DOC** opens its own detail page, like a row in the DOC browser.
+ * **A row opens the place's own page**, a track's as much as a spot's: it is where a line is read as well
+ * as where it is changed, and the page opens on the line's own ground anyway.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AssetListScreen(
     viewModel: AssetListViewModel,
     onOpenTab: (Tab) -> Unit = {},
     onOpenAsset: (Long) -> Unit,
-    onOpenDocDetail: (DocItem, DocItem?) -> Unit,
     onAddSpot: () -> Unit,
     /** Opens the screen that builds a walk out of DOC's separate tracks. */
     onCreateJourney: () -> Unit = {},
-    onOpenDoc: () -> Unit,
-    /** Opens the browser for the tracks other people publish: see [OtherTracksBrowserScreen]. */
-    onOpenOtherTracks: () -> Unit = {},
     onOpenSettings: () -> Unit
 ) {
     val assets by viewModel.assets.collectAsStateWithLifecycle()
@@ -91,7 +87,8 @@ fun AssetListScreen(
     val query by viewModel.query.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
-    val docNearby by viewModel.docNearby.collectAsStateWithLifecycle()
+
+    var adding by remember { mutableStateOf(false) }
 
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
@@ -113,7 +110,14 @@ fun AssetListScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Places") },
-                actions = { SettingsAction(onOpenSettings) }
+                actions = {
+                    // The one way in, beside the way to Settings: everything that adds a place is behind
+                    // it, which is what leaves the page itself to the places.
+                    IconButton(onClick = { adding = true }) {
+                        AppIcon(IconGlyph.PLUS, contentDescription = "Add a place")
+                    }
+                    SettingsAction(onOpenSettings)
+                }
             )
         },
         bottomBar = { TrailDayNavBar(current = Tab.ASSETS, onSelect = onOpenTab) }
@@ -137,62 +141,25 @@ fun AssetListScreen(
                 )
             }
 
-            // While nothing is being searched for, the ways a place arrives, and the door to what DOC
-            // publishes. Both step aside when the walker is looking for something, so the answer has the
-            // screen rather than the tools.
-            if (!searching) {
-                AddSpotAction(onClick = onAddSpot)
-                JourneyAction(onClick = onCreateJourney)
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    SecondaryPlaceAction(
-                        label = if (busy) "Importing…" else "Import",
-                        glyph = IconGlyph.OFFLINE,
-                        enabled = !busy,
-                        onClick = { importLauncher.launch(TRACK_MIME_TYPES) },
-                        modifier = Modifier.weight(1f)
-                    )
-                    SecondaryPlaceAction(
-                        label = "DOC",
-                        glyph = IconGlyph.MAP,
-                        onClick = onOpenDoc,
-                        modifier = Modifier.weight(1f)
-                    )
-                    // The second publisher's tracks, beside DOC's: the three buttons are the three ways
-                    // somebody else's material reaches the phone, so they belong on one row. Their labels
-                    // are one word each because three of them share a phone's width - see the emulator
-                    // note in the plan log.
-                    SecondaryPlaceAction(
-                        label = "Other tracks",
-                        glyph = IconGlyph.TRAIL,
-                        onClick = onOpenOtherTracks,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                // What the list is showing. One line that scrolls sideways rather than a block of chips:
-                // five of them wrapped is a row of screen before the first place, and the rarer kinds are a
-                // swipe away. All leads, so the way back is always at the left - and tapping the chip
-                // already showing is the same way back, from wherever the walker is.
-                if (places.isNotEmpty()) {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item(key = "all") {
-                            ChoiceChip(
-                                selected = filter.kind == null,
-                                label = "All ${places.size}",
-                                onClick = { viewModel.showOnly(null) }
-                            )
-                        }
-                        items(PLACE_FILTER_ORDER, key = { kind -> kind.name }) { kind ->
-                            ChoiceChip(
-                                selected = filter.kind == kind,
-                                label = "${kindFilterLabel(kind)} ${counts[kind] ?: 0}",
-                                onClick = { viewModel.showOnly(kind) }
-                            )
-                        }
+            // What the list is showing. One line that scrolls sideways rather than a block of chips:
+            // five of them wrapped is a row of screen before the first place, and the rarer kinds are a
+            // swipe away. All leads, so the way back is always at the left - and tapping the chip
+            // already showing is the same way back, from wherever the walker is.
+            if (places.isNotEmpty()) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item(key = "all") {
+                        ChoiceChip(
+                            selected = filter.kind == null,
+                            label = "All ${places.size}",
+                            onClick = { viewModel.showOnly(null) }
+                        )
+                    }
+                    items(PLACE_FILTER_ORDER, key = { kind -> kind.name }) { kind ->
+                        ChoiceChip(
+                            selected = filter.kind == kind,
+                            label = "${kindFilterLabel(kind)} ${counts[kind] ?: 0}",
+                            onClick = { viewModel.showOnly(kind) }
+                        )
                     }
                 }
             }
@@ -201,8 +168,7 @@ fun AssetListScreen(
                 Text(text = it, style = MaterialTheme.typography.bodySmall)
             }
 
-            // One list for the page: the walker's places, and then - when any of DOC's tracks are kept near
-            // them - a small group of those, so a track at the end of the valley is a tap away.
+            // One list for the page: the walker's places, grouped by what they are.
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -222,7 +188,7 @@ fun AssetListScreen(
                         EmptyState(
                             glyph = IconGlyph.ASSETS,
                             title = "No places yet",
-                            body = "Add a spot, or bring in a GPX, KML, KMZ or GeoJSON file."
+                            body = "Tap + to add a spot, or to bring in a GPX, KML, KMZ or GeoJSON file."
                         )
                     }
 
@@ -259,14 +225,7 @@ fun AssetListScreen(
                         }
                     }
 
-                    // Journeys are the group above, so a page of nothing but journeys is not a page with
-                    // nothing on it.
-
-
                     else -> {
-                        item(key = "your-places") {
-                            GroupLabel("Your places · ${shown.size}")
-                        }
                         PLACE_SHELF_ORDER.forEach { kind ->
                             val group = shown.filter {
                                 AssetKind.fromStorage(it.kind) == kind
@@ -282,30 +241,90 @@ fun AssetListScreen(
                         }
                     }
                 }
-
-                if (docNearby.isNotEmpty()) {
-                    item { GroupLabel("Nearby from DOC") }
-                    items(docNearby, key = { "doc-${it.item.sourceRef}" }) { choice ->
-                        DocNearbyCard(
-                            choice = choice,
-                            onOpen = { onOpenDocDetail(choice.item, choice.bike) }
-                        )
-                    }
-                    item {
-                        Text(
-                            text = "See what else DOC publishes",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .clickable(onClick = onOpenDoc)
-                                .padding(vertical = 6.dp, horizontal = 4.dp)
-                        )
-                    }
-                }
             }
         }
     }
 
+    if (adding) {
+        AddSheet(
+            busy = busy,
+            onDismiss = { adding = false },
+            onAddSpot = {
+                adding = false
+                onAddSpot()
+            },
+            onImport = {
+                adding = false
+                importLauncher.launch(TRACK_MIME_TYPES)
+            },
+            onCreateJourney = {
+                adding = false
+                onCreateJourney()
+            }
+        )
+    }
+}
+
+/**
+ * The three ways a place arrives on this phone, in the order they are offered.
+ *
+ * A sheet rather than three cards and a row of buttons, because the page is the walker's places: the
+ * tools were a third of the screen before the first one, and they were there on every visit. The words
+ * are the sheet's own, so the page and the sheet cannot describe one action two ways.
+ *
+ * **What is not here is somebody else's material.** What DOC and the other publishers have is read in
+ * Explore now, and a row there opens the thing's own page - so "DOC" and "Other tracks" are not doors
+ * out of the place library any more.
+ */
+internal enum class AddChoice(val label: String, val detail: String, val glyph: IconGlyph) {
+    SPOT("Add a spot", "Save a place you found", IconGlyph.PLUS),
+    IMPORT("Import a file", "GPX, KML, KMZ or GeoJSON, one track or many", IconGlyph.OFFLINE),
+    JOURNEY("Create a journey", "Build a walk along DOC's tracks", IconGlyph.TRAIL)
+}
+
+/**
+ * The **+** sheet: one list of the three ways to add, each with its own line saying what it brings.
+ *
+ * Import says it is working while it is: a file of several tracks takes a moment, and a row that appeared
+ * to do nothing for that moment reads as a tap that missed.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddSheet(
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onAddSpot: () -> Unit,
+    onImport: () -> Unit,
+    onCreateJourney: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.padding(bottom = 24.dp)) {
+            Text(
+                text = "Add to your places",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+            )
+            AddChoice.entries.forEach { choice ->
+                val enabled = choice != AddChoice.IMPORT || !busy
+                ListItem(
+                    modifier = Modifier.clickable(enabled = enabled) {
+                        when (choice) {
+                            AddChoice.SPOT -> onAddSpot()
+                            AddChoice.IMPORT -> onImport()
+                            AddChoice.JOURNEY -> onCreateJourney()
+                        }
+                    },
+                    headlineContent = { Text(choice.label) },
+                    supportingContent = {
+                        Text(
+                            if (choice == AddChoice.IMPORT && busy) "Importing…" else choice.detail
+                        )
+                    },
+                    leadingContent = { AppIcon(glyph = choice.glyph) }
+                )
+            }
+        }
+    }
 }
 
 /**
@@ -346,58 +365,7 @@ private fun kindFilterLabel(kind: AssetKind): String = when (kind) {
     AssetKind.WAYPOINT -> "Spots"
 }
 
-/**
- * The front door of the page: the one thing a walker most often comes here to do.
- *
- * A green card rather than a button because it is the page's subject, not one action among equals:
- * adding a spot is how this library grows.
- */
-@Composable
-private fun AddSpotAction(onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(11.dp))
-                    .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center
-            ) {
-                AppIcon(
-                    glyph = IconGlyph.PLUS,
-                    dimension = 22.dp,
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Add a spot", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = "Save a place you found",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
-                )
-            }
-            AppIcon(
-                glyph = IconGlyph.CHEVRON,
-                dimension = 18.dp,
-                tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
-            )
-        }
-    }
-}
-
-/** A heading over the small group of DOC's tracks: a spaced capital label, as the pages write a thing. */
+/** A heading over a shelf of the page: a spaced capital label, as the pages write a thing. */
 @Composable
 private fun GroupLabel(text: String) {
     Text(
@@ -407,50 +375,6 @@ private fun GroupLabel(text: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = 4.dp, top = 12.dp, bottom = 2.dp)
     )
-}
-
-/**
- * One of DOC's tracks near the walker, as a card: **the track's tile, its name, what DOC says about
- * it, and how far away it is** - with a DOC tag at the end, because it is not a place of the walker's.
- *
- * The tile is the same track tile the walker's own lines use, so the row reads as a line to follow;
- * the DOC tag is what says whose line it is, and why there is no rename or delete here.
- */
-@Composable
-private fun DocNearbyCard(
-    choice: AssetListViewModel.DocChoice,
-    onOpen: () -> Unit
-) {
-    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            KindTile(kind = AssetKind.TRACK)
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = choice.item.name, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = docRowDetail(choice.item, choice.distanceM),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                choice.bike?.let { bike ->
-                    Text(
-                        text = docBikeLine(bike),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            Text(
-                text = "DOC",
-                style = MaterialTheme.typography.labelSmall,
-                letterSpacing = 1.1.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
 }
 
 /**
@@ -496,57 +420,6 @@ private fun PlaceCard(item: AssetEntity, onOpen: () -> Unit) {
  */
 internal fun assetRowDetail(item: AssetEntity): String =
     formatLengthOf(AssetShape.fromStorage(item.shape), item.lengthM)
-
-/**
- * The second way to make something: **a walk put together from DOC's separate tracks.**
- *
- * Its own tile rather than a fourth small button, because it is a thing you make rather than a source of
- * places, and because it opens the map straight away - a walker who taps it has already decided what
- * they are doing.
- */
-@Composable
-private fun JourneyAction(onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(11.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                AppIcon(
-                    glyph = IconGlyph.TRAIL,
-                    dimension = 19.dp,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Create a journey", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = "Build a walk along DOC's tracks",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            AppIcon(
-                glyph = IconGlyph.CHEVRON,
-                dimension = 18.dp,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
 
 /**
  * One journey in the list: what it is called and what it asks of a walker.

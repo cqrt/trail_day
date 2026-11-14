@@ -69,8 +69,8 @@ sealed interface MapTroubleAction {
     /** Draw [basemap] instead: one tap, the same preference the Settings screen writes. */
     data class SwitchTo(val basemap: Basemap) : MapTroubleAction
 
-    /** Show what is downloaded, which is the Offline tab. */
-    data object OpenOfflineTab : MapTroubleAction
+    /** Show what is downloaded: the Offline page, which the map opens. */
+    data object OpenOffline : MapTroubleAction
 
     /** Where a key of the walker's own is put in. */
     data object OpenSettings : MapTroubleAction
@@ -95,7 +95,7 @@ internal fun troubleWords(trouble: MapTrouble, basemap: Basemap): MapTroubleWord
                     "${covering.displayName} is downloaded for this spot."
         },
         action = when (val covering = trouble.downloaded) {
-            null -> MapTroubleAction.OpenOfflineTab
+            null -> MapTroubleAction.OpenOffline
             else -> MapTroubleAction.SwitchTo(covering)
         }
     )
@@ -139,7 +139,7 @@ internal fun offerLabel(basemap: Basemap): String = when (basemap) {
 /** The words on the notice's one button. */
 internal fun actionLabel(action: MapTroubleAction): String = when (action) {
     is MapTroubleAction.SwitchTo -> offerLabel(action.basemap)
-    MapTroubleAction.OpenOfflineTab -> "What's downloaded"
+    MapTroubleAction.OpenOffline -> "What's downloaded"
     MapTroubleAction.OpenSettings -> "Open Settings"
 }
 

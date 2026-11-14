@@ -22,8 +22,9 @@ import nz.mckenzie.trailday.data.SettingsRepository
 import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.ui.screens.AddSpotScreen
 import nz.mckenzie.trailday.ui.screens.CreateJourneyScreen
-import nz.mckenzie.trailday.ui.screens.DocBrowserScreen
 import nz.mckenzie.trailday.ui.screens.DocDetailScreen
+import nz.mckenzie.trailday.ui.screens.ExploreScreen
+import nz.mckenzie.trailday.ui.screens.ExploreSource
 import nz.mckenzie.trailday.ui.screens.MapScreen
 import nz.mckenzie.trailday.ui.screens.OfflineAreaPickerScreen
 import nz.mckenzie.trailday.ui.screens.OfflineScreen
@@ -37,7 +38,6 @@ import nz.mckenzie.trailday.ui.screens.AssetDetailScreen
 import nz.mckenzie.trailday.ui.screens.AssetEditScreen
 import nz.mckenzie.trailday.ui.screens.AssetListScreen
 import nz.mckenzie.trailday.ui.screens.OtherTrackScreen
-import nz.mckenzie.trailday.ui.screens.OtherTracksBrowserScreen
 import nz.mckenzie.trailday.ui.theme.TrailDayTheme
 import nz.mckenzie.trailday.domain.doc.DocItem
 import nz.mckenzie.trailday.domain.other.OtherTrack
@@ -64,7 +64,66 @@ import nz.mckenzie.trailday.web.WebEditorService
 import nz.mckenzie.trailday.web.WebEditorState
 
 /** Destinations for now; swap for a NavHost when routes need arguments. */
-private enum class Destination { MAP, ASSETS, ADD_SPOT, RECORD, OFFLINE, OFFLINE_PICKER, OFFLINE_DOC_PICKER, OFFLINE_OTHER_TRACKS_PICKER, OFFLINE_TOPO_PICKER, CREATE_JOURNEY, ASSET_DETAIL, ASSET_EDIT, RECORDINGS, RECORDING_DETAIL, SETTINGS, TRACKS_AND_PLACES, DOC, DOC_DETAIL, OTHER_TRACK_DETAIL, OTHER_TRACKS_BROWSER }
+internal enum class Destination {
+    MAP,
+    ASSETS,
+    ADD_SPOT,
+    RECORD,
+    OFFLINE,
+    OFFLINE_PICKER,
+    OFFLINE_DOC_PICKER,
+    OFFLINE_OTHER_TRACKS_PICKER,
+    OFFLINE_TOPO_PICKER,
+    CREATE_JOURNEY,
+    ASSET_DETAIL,
+    ASSET_EDIT,
+    RECORDINGS,
+    RECORDING_DETAIL,
+    SETTINGS,
+    TRACKS_AND_PLACES,
+    EXPLORE,
+    DOC_DETAIL,
+    OTHER_TRACK_DETAIL
+}
+
+/** A tab is named after the destination it opens, so a tap maps across by name. */
+internal fun destinationOf(tab: Tab): Destination = Destination.valueOf(tab.name)
+
+/**
+ * Where system Back goes from [from], and the whole of the rule the app's own back arrows follow.
+ *
+ * **A page returns to whatever opened it.** Three screens are reached from more than one place - one of
+ * DOC's things, somebody else's track, and the Offline page, which the map and Settings both open - so
+ * each of those carries the destination it was opened from rather than having a fixed home. Settings is
+ * the fourth, since every tab has a door to it.
+ *
+ * The Offline page's own area pickers go back to the page, because that is the arrow on them; everything
+ * else goes to the map, which is where a tab change lands.
+ */
+internal fun backFrom(
+    from: Destination,
+    docDetailOrigin: Destination,
+    otherTrackDetailOrigin: Destination,
+    settingsOrigin: Destination,
+    offlineOrigin: Destination
+): Destination = when (from) {
+    Destination.DOC_DETAIL -> docDetailOrigin
+    Destination.OTHER_TRACK_DETAIL -> otherTrackDetailOrigin
+    // The look screen is reached from Settings and goes back there, so a walker fiddling with a colour
+    // and pressing back lands on the screen they left rather than on the map.
+    Destination.TRACKS_AND_PLACES -> Destination.SETTINGS
+    // Settings is reached from every tab, so it goes back to the tab that asked - the same rule as its
+    // own back arrow, so the two cannot disagree.
+    Destination.SETTINGS -> settingsOrigin
+    // The Offline page is reached from the map and from Settings, and comes back to whichever asked.
+    Destination.OFFLINE -> offlineOrigin
+    // Choosing an area is a page under Offline, so Back returns to the page rather than to the map.
+    Destination.OFFLINE_PICKER,
+    Destination.OFFLINE_DOC_PICKER,
+    Destination.OFFLINE_OTHER_TRACKS_PICKER,
+    Destination.OFFLINE_TOPO_PICKER -> Destination.OFFLINE
+    else -> Destination.MAP
+}
 
 class MainActivity : ComponentActivity() {
 
@@ -115,6 +174,17 @@ class MainActivity : ComponentActivity() {
                 // rotation while the walker is in Settings would otherwise forget which tab asked.
                 var settingsOrigin by rememberSaveable { mutableStateOf(Destination.MAP) }
 
+                // Where the Offline page was opened from: the map's own round button or notice, or the row
+                // in Settings. It is a page rather than a tab now, so it has no home of its own and Back
+                // has to return to whichever of the two doors the walker came through.
+                var offlineOrigin by rememberSaveable { mutableStateOf(Destination.MAP) }
+
+                // Which publisher Explore is showing. Held here rather than in the screen so a thing's own
+                // page returns to the list it was opened from - a `remember` in Explore would be thrown
+                // away the moment Explore left the composition, and the walker would come back to DOC
+                // after reading a council track.
+                var exploreSource by rememberSaveable { mutableStateOf(ExploreSource.DOC) }
+
                 /**
                  * Somebody else's track, on its way to its own page.
                  *
@@ -153,20 +223,32 @@ class MainActivity : ComponentActivity() {
                     destination = Destination.SETTINGS
                 }
 
-                // System back returns the way the walker came, and never leaves the app.
+                /**
+                 * The two doors to the Offline page, each remembering where it was opened from.
+                 *
+                 * Written as two rather than one so neither has to inspect the current destination: the
+                 * map's door is the map's, and Settings' door is Settings', and both are true whichever
+                 * screen is up when the lambda runs.
+                 */
+                val openOfflineFromMap: () -> Unit = {
+                    offlineOrigin = Destination.MAP
+                    destination = Destination.OFFLINE
+                }
+                val openOfflineFromSettings: () -> Unit = {
+                    offlineOrigin = Destination.SETTINGS
+                    destination = Destination.OFFLINE
+                }
+
+                // System back returns the way the walker came, and never leaves the app. The rule lives
+                // in [backFrom] rather than here, so the four origins above can be held to it by a test.
                 BackHandler(enabled = destination != Destination.MAP) {
-                    destination = when (destination) {
-                        Destination.DOC_DETAIL -> docDetailOrigin
-                        Destination.OTHER_TRACK_DETAIL -> otherTrackDetailOrigin
-                        // The look screen is reached from Settings and goes back there, so a walker
-                        // fiddling with a colour and pressing back lands on the screen they left
-                        // rather than on the map.
-                        Destination.TRACKS_AND_PLACES -> Destination.SETTINGS
-                        // Settings is reached from every tab, so it goes back to the tab that asked -
-                        // the same rule as its own back arrow, so the two cannot disagree.
-                        Destination.SETTINGS -> settingsOrigin
-                        else -> Destination.MAP
-                    }
+                    destination = backFrom(
+                        from = destination,
+                        docDetailOrigin = docDetailOrigin,
+                        otherTrackDetailOrigin = otherTrackDetailOrigin,
+                        settingsOrigin = settingsOrigin,
+                        offlineOrigin = offlineOrigin
+                    )
                 }
 
                 // A reminder tap asks for the track list. Done here rather than in the
@@ -200,6 +282,7 @@ class MainActivity : ComponentActivity() {
                             viewModel = mapViewModel,
                             onOpenTab = { destination = destinationOf(it) },
                             onOpenSettings = openSettings,
+                            onOpenOffline = openOfflineFromMap,
                             onOpenAsset = { assetId ->
                                 selectedAssetId = assetId
                                 destination = Destination.ASSET_DETAIL
@@ -229,36 +312,43 @@ class MainActivity : ComponentActivity() {
                                 selectedAssetId = assetId
                                 destination = Destination.ASSET_DETAIL
                             },
-                            onOpenDocDetail = { item, bike ->
-                                selectedDocItem = item
-                                selectedDocBike = bike
-                                docDetailOrigin = Destination.ASSETS
-                                destination = Destination.DOC_DETAIL
-                            },
                             onCreateJourney = { destination = Destination.CREATE_JOURNEY },
                             onAddSpot = {
                                 addSpotVisit++
                                 destination = Destination.ADD_SPOT
                             },
-                            onOpenDoc = { destination = Destination.DOC },
-                            onOpenOtherTracks = { destination = Destination.OTHER_TRACKS_BROWSER },
                             onOpenSettings = openSettings
                         )
                     }
 
-                    Destination.DOC -> {
+                    // What other people publish: DOC's four services and the tracks councils, trusts
+                    // and clubs publish, one source at a time behind a switch. Both browsers live here
+                    // now, so a row of either opens the thing's own page and comes back to this list.
+                    Destination.EXPLORE -> {
                         val docViewModel: DocBrowserViewModel = viewModel(
                             factory = DocBrowserViewModel.factory(applicationContext)
                         )
-                        DocBrowserScreen(
-                            viewModel = docViewModel,
-                            onBack = { destination = Destination.ASSETS },
+                        val otherTracksViewModel: OtherTracksBrowserViewModel = viewModel(
+                            factory = OtherTracksBrowserViewModel.factory(applicationContext)
+                        )
+                        ExploreScreen(
+                            source = exploreSource,
+                            onChooseSource = { exploreSource = it },
+                            docViewModel = docViewModel,
+                            otherTracksViewModel = otherTracksViewModel,
                             onOpenDoc = { item, bike ->
                                 selectedDocItem = item
                                 selectedDocBike = bike
-                                docDetailOrigin = Destination.DOC
+                                docDetailOrigin = Destination.EXPLORE
                                 destination = Destination.DOC_DETAIL
-                            }
+                            },
+                            onOpenTrack = { track ->
+                                selectedOtherTrack = track
+                                otherTrackDetailOrigin = Destination.EXPLORE
+                                destination = Destination.OTHER_TRACK_DETAIL
+                            },
+                            onOpenSettings = openSettings,
+                            onOpenTab = { destination = destinationOf(it) }
                         )
                     }
 
@@ -284,21 +374,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
-                    }
-
-                    Destination.OTHER_TRACKS_BROWSER -> {
-                        val browserViewModel: OtherTracksBrowserViewModel = viewModel(
-                            factory = OtherTracksBrowserViewModel.factory(applicationContext)
-                        )
-                        OtherTracksBrowserScreen(
-                            viewModel = browserViewModel,
-                            onBack = { destination = Destination.ASSETS },
-                            onOpenTrack = { track ->
-                                selectedOtherTrack = track
-                                otherTrackDetailOrigin = Destination.OTHER_TRACKS_BROWSER
-                                destination = Destination.OTHER_TRACK_DETAIL
-                            }
-                        )
                     }
 
                     Destination.OTHER_TRACK_DETAIL -> {
@@ -454,6 +529,7 @@ class MainActivity : ComponentActivity() {
                             viewModel = settingsViewModel,
                             updateViewModel = updateViewModel,
                             onOpenTracksAndPlaces = { destination = Destination.TRACKS_AND_PLACES },
+                            onOpenOffline = openOfflineFromSettings,
                             onBack = { destination = settingsOrigin }
                         )
                     }
@@ -474,8 +550,7 @@ class MainActivity : ComponentActivity() {
                         )
                         OfflineScreen(
                             viewModel = offlineViewModel,
-                            onOpenTab = { destination = destinationOf(it) },
-                            onOpenSettings = openSettings,
+                            onBack = { destination = offlineOrigin },
                             onChooseArea = {
                                 offlinePickerVisit++
                                 destination = Destination.OFFLINE_PICKER
@@ -579,9 +654,6 @@ class MainActivity : ComponentActivity() {
                 DESTINATION_SETTINGS -> Destination.SETTINGS
                 else -> null
             }
-
-        /** A tab is named after the destination it opens, so a tap maps across by name. */
-        private fun destinationOf(tab: Tab): Destination = Destination.valueOf(tab.name)
     }
 }
 

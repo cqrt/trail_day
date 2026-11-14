@@ -33,9 +33,13 @@ import nz.mckenzie.trailday.domain.reference.HiddenTracks
 import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.domain.tiles.Basemap
 import nz.mckenzie.trailday.domain.tiles.LinzAccess
+import nz.mckenzie.trailday.doc.DocDownloader
 import nz.mckenzie.trailday.map.BasemapPreviewCache
 import nz.mckenzie.trailday.offline.KeyCheck
 import nz.mckenzie.trailday.offline.LinzKeyProbe
+import nz.mckenzie.trailday.offline.OfflineAreaManager
+import nz.mckenzie.trailday.offline.OfflineDocStore
+import nz.mckenzie.trailday.offline.OfflineOtherTrackStore
 import nz.mckenzie.trailday.offline.OfflineTileStore
 import nz.mckenzie.trailday.offline.TileServerHolder
 import nz.mckenzie.trailday.offline.TileStoreSummary
@@ -116,7 +120,15 @@ class SettingsViewModel(
      * Injected so a test never reaches LINZ: see [nz.mckenzie.trailday.offline.LinzKeyProbe], which also
      * explains why the probe is a style document rather than a tile.
      */
-    private val checkKey: suspend (String) -> KeyCheck = { LinzKeyProbe().check(it) }
+    private val checkKey: suspend (String) -> KeyCheck = { LinzKeyProbe().check(it) },
+    /**
+     * What the four offline packs hold, in bytes, for the **Offline areas** row.
+     *
+     * Injected rather than built here because it is four stores' arithmetic - imagery and the drawn map's
+     * tiles, DOC's material and the other publisher's tracks - and a test of this screen has no packs to
+     * count. It defaults to nothing, which is what a phone that has downloaded nothing reads.
+     */
+    private val packBytes: suspend () -> Long = { 0L }
 ) : ViewModel() {
 
     /**
@@ -417,6 +429,16 @@ class SettingsViewModel(
     private val _storedTiles = MutableStateFlow(TileStoreSummary(0, 0))
     val storedTiles: StateFlow<TileStoreSummary> = _storedTiles
 
+    /**
+     * What the four offline packs hold on this phone, in bytes: the number beside **Offline areas**.
+     *
+     * One number rather than four, because the row is a door rather than a summary - the page behind it
+     * names each pack and each one's size. Read when this screen is built, which is also just after a
+     * download may have finished; the packs' own page recounts what it shows.
+     */
+    private val _keptBytes = MutableStateFlow(0L)
+    val keptBytes: StateFlow<Long> = _keptBytes
+
     /** What the last backup or restore said. One line, because it is one card. */
     private val _dataMessage = MutableStateFlow<String?>(null)
     val dataMessage: StateFlow<String?> = _dataMessage
@@ -606,6 +628,7 @@ class SettingsViewModel(
             // above this block for why that order matters.
             _keyText.value = settings.developerLinzKey.first()
             _storedTiles.value = TileStoreSummary(store.storedTileCount(), store.storedBytes())
+            _keptBytes.value = runCatching { packBytes() }.getOrDefault(0L)
         }
 
         // The off-site fields are seeded the same way, and for the same reason: pasting a
@@ -893,6 +916,27 @@ class SettingsViewModel(
                     SettingsViewModel(
                         settings = settings,
                         store = TileServerHolder.imageryStore(appContext),
+                        // The four packs, summed for the Offline areas row: the imagery and the drawn
+                        // map's tiles, DOC's material with its pictures, and the other publisher's
+                        // tracks. Built here rather than in the view model because they are the stores
+                        // the rest of the app already reads, not a second set.
+                        packBytes = {
+                            val database = TrailDayDatabase.get(appContext)
+                            TileServerHolder.imageryStore(appContext).storedBytes() +
+                                OfflineAreaManager
+                                    .topography(appContext, database.offlineAreaDao())
+                                    .summary()
+                                    .bytes +
+                                OfflineDocStore(
+                                    dao = database.offlineDocItemDao(),
+                                    downloader = DocDownloader.online(),
+                                    areaDao = database.offlineDocAreaDao()
+                                ).bytes() +
+                                OfflineOtherTrackStore(
+                                    dao = database.offlineOtherTrackDao(),
+                                    areaDao = database.offlineOtherTrackAreaDao()
+                                ).bytes()
+                        },
                         // The editor's service, started from the screen that has the switch:
                         // Android only lets a visible app start a foreground service.
                         webEditor = object : WebEditorSwitch {

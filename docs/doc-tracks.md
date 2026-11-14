@@ -2,9 +2,11 @@
 
 DOC publishes four sets of data as online map services: walking tracks, huts, campsites and mountain
 bike locations. The app searches those services when you ask it to, rather than downloading the whole
-network, and imports whatever you tick as ordinary places on your own phone.
+network.
 
-All four are one browser with a bar across the top to choose between them.
+All four are one browser, in the **Explore** tab, with a bar across the top to choose between them.
+What DOC publishes is read rather than copied: a row opens the thing's own page, and the page is where
+you follow a track or open DOC's website.
 
 ## The four services
 
@@ -50,21 +52,10 @@ Results are narrowed and reordered without asking DOC again:
 
 ## What a row says
 
-A track row is titled with the name the import will give it: the place DOC's site code names, then
-DOC's own name. `CATLNSCO-TK11` "Historic House Walk" becomes **Catlins Coast Historic House Walk**,
-so your list reads by where the walk is. A site code the app does not know leaves DOC's own name alone,
-because a wrong place is worse than no place.
+A row shows the kind's tile, DOC's own name, the kind and the length, and how far away it is. The
+place a track is in travels with it everywhere: onto the map, into a download, and into a backup.
 
-Beneath the name are the kind, the length, and how far away it is. The place a track is in travels with
-it everywhere: onto the map, into a download, and into a backup.
-
-## Already imported
-
-A thing already on your phone is shown but cannot be imported again, so a second search cannot give you
-the same hut twice.
-
-It is recognised by DOC's own number, not by its name, so renaming a place does not make it look new,
-and deleting it makes it importable again.
+Nothing is written to your own places from here. A track you want to walk is followed from its page.
 
 ## Alerts
 

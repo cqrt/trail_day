@@ -54,8 +54,8 @@ and a test rather than a branch inside the card. There are five:
 - **You're offline.** No connection, so nothing can be fetched. A strip across the top of the map
   rather than a card in the middle, because nothing is broken. Its one button is the map already on the
   phone: **Use aerial imagery** when a finished download covers the spot the map is looking at (see
-  `offline/DownloadedBasemaps.kt`), otherwise **What's downloaded**, which is the Offline tab. There is
-  never a basemap switch when nothing covers the spot, because every map would fetch tiles it doesn't
+  `offline/DownloadedBasemaps.kt`), otherwise **What's downloaded**, which opens the Offline page. There
+  is never a basemap switch when nothing covers the spot, because every map would fetch tiles it doesn't
   have.
 - **The Worker said something.** Its `/health` sentence, repeated as it was given, with a one-tap
   **Use OpenStreetMap** under it.

@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nz.mckenzie.trailday.domain.backup.BackupDestination
 import nz.mckenzie.trailday.domain.settings.ThemeChoice
 import nz.mckenzie.trailday.domain.tiles.Basemap
+import nz.mckenzie.trailday.offline.formatBytes
 import nz.mckenzie.trailday.viewmodel.InstallState
 import nz.mckenzie.trailday.viewmodel.KeyCheckState
 import nz.mckenzie.trailday.viewmodel.OffsiteCheckState
@@ -70,6 +71,8 @@ fun SettingsScreen(
     viewModel: SettingsViewModel,
     updateViewModel: UpdateViewModel,
     onOpenTracksAndPlaces: () -> Unit,
+    /** The Offline page, which has no tab of its own and is also opened from the map. */
+    onOpenOffline: () -> Unit,
     onBack: () -> Unit
 ) {
     val updateState by updateViewModel.state.collectAsStateWithLifecycle()
@@ -100,6 +103,7 @@ fun SettingsScreen(
     val handOver by viewModel.handOver.collectAsStateWithLifecycle()
     val chimeOnSwitch by viewModel.chimeOnSwitch.collectAsStateWithLifecycle()
     val storedTiles by viewModel.storedTiles.collectAsStateWithLifecycle()
+    val keptBytes by viewModel.keptBytes.collectAsStateWithLifecycle()
     val dataMessage by viewModel.dataMessage.collectAsStateWithLifecycle()
     val dataBusy by viewModel.dataBusy.collectAsStateWithLifecycle()
     val pendingRestore by viewModel.pendingRestore.collectAsStateWithLifecycle()
@@ -856,12 +860,40 @@ fun SettingsScreen(
                         text = "${storedTiles.tiles} imagery tiles cached, ${storedTiles.sizeLabel}",
                         style = MaterialTheme.typography.bodyMedium
                     )
-                    Text(
-                        text = "Downloaded areas, their progress and clearing them are on the " +
-                            "Offline areas screen.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    // **The fourth door to the Offline page**, with what it holds: the map's round
+                    // button, the map's notice and this row are the only ways in, because the page is
+                    // not a tab. The size is the four packs added together - the page behind this
+                    // names each one - and "Nothing downloaded yet" rather than "0 B", which would
+                    // read as a measurement of a thing that is not there.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onOpenOffline)
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = OFFLINE_WORD,
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                            Text(
+                                text = if (keptBytes > 0L) {
+                                    "${formatBytes(keptBytes)} kept on this phone"
+                                } else {
+                                    "Nothing downloaded yet"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        AppIcon(
+                            glyph = IconGlyph.CHEVRON,
+                            dimension = 18.dp,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 

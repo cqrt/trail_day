@@ -37,7 +37,7 @@ class MapTroubleTest {
         val words = troubleWords(MapTrouble.Offline(downloaded = null), Basemap.LINZ_AERIAL)
 
         assertEquals("You're offline", words.title)
-        assertEquals(MapTroubleAction.OpenOfflineTab, words.action)
+        assertEquals(MapTroubleAction.OpenOffline, words.action)
         assertEquals("What's downloaded", actionLabel(words.action))
         // **Never a basemap switch here.** Every one of the four maps fetches tiles it does not have,
         // so offering one to a phone with no reception is offering the same blank screen again.

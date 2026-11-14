@@ -16,6 +16,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -57,7 +58,19 @@ import nz.mckenzie.trailday.offline.pictureCountWords
 import nz.mckenzie.trailday.viewmodel.OfflineViewModel
 
 /**
+ * The one name the Offline page has.
+ *
+ * Read by the map's round button and by Settings' row as well as by the page's own title, so the three
+ * doors and the room behind them cannot come to be called different things.
+ */
+internal const val OFFLINE_WORD = "Offline areas"
+
+/**
  * What is on the phone for the places with no reception: **imagery and what DOC publishes.**
+ *
+ * **A page rather than a tab.** It is opened from the map's own round button, from Settings and from
+ * the map's "what's downloaded" strip, and it goes back to whichever of those asked - so it has a back
+ * arrow and no bar, and nothing here is a place to start from.
  *
  * The shape is the mock screens': one list rather than tabs - a card per cache, each saying what it holds in one
  * line and carrying its own progress while it downloads - one **Download an area** button that asks which kind,
@@ -70,8 +83,7 @@ import nz.mckenzie.trailday.viewmodel.OfflineViewModel
 @Composable
 fun OfflineScreen(
     viewModel: OfflineViewModel,
-    onOpenTab: (Tab) -> Unit = {},
-    onOpenSettings: () -> Unit = {},
+    onBack: () -> Unit,
     onChooseArea: () -> Unit,
     onChooseDocArea: () -> Unit,
     onChooseOtherTracksArea: () -> Unit,
@@ -124,10 +136,15 @@ fun OfflineScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Offline") },
-                actions = { SettingsAction(onOpenSettings) }
+                // The way back is the page's own, and it returns to what opened it - the map or
+                // Settings - because a page reached from two places cannot have one fixed home.
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        AppIcon(IconGlyph.BACK, contentDescription = "Back")
+                    }
+                }
             )
-        },
-        bottomBar = { TrailDayNavBar(current = Tab.OFFLINE, onSelect = onOpenTab) }
+        }
     ) { innerPadding ->
         Column(
             modifier = Modifier

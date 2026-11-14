@@ -18,9 +18,9 @@ It's installed straight from GitHub rather than a store, and updates itself from
 | **Places** | Everything you've saved or imported: tracks, bike tracks, huts, campsites and waypoints |
 | **Record** | Record a walk or ride, either as a new route or along a place you already have |
 | **Activities** | The trips you've recorded, and walks and rides you've brought in from a file |
-| **Offline** | What's downloaded to the phone, and where you start new downloads |
+| **Explore** | What other people publish: DOC's tracks, huts, campsites and bike trails, and the tracks councils and trusts publish |
 
-Settings, a single place's page, the DOC browser and the other-tracks browser all open from these tabs.
+Settings, a single place's page and the Offline page all open from these tabs. Offline areas is not a tab: you reach it from the map's own download button, from Settings, or from the map's notice when nothing on the phone covers where you are.
 
 ## Base maps
 
@@ -45,7 +45,7 @@ There's no Save. The sample and the map change as you tap, and **Back to how it 
 
 ## Working without reception
 
-The Offline tab is where you download things. There are four separate downloads:
+The Offline page is where you download things. You reach it from the map's round download button, from the **Offline areas** row in Settings, or from the map's "what's downloaded" notice. It goes back to whichever of those you came from. There are four separate downloads:
 
 1. **Aerial imagery**: tap two opposite corners on the map to draw a box, drag the corners to adjust, choose how far in and out to zoom, and give it a name. You're shown the tile count before you start, and the download brings the roads and their names with the photographs.
 2. **Topographic map**: the same, for the LINZ topo map.
@@ -67,16 +67,23 @@ There are five kinds of place:
 
 The kind decides the shape, so you never have to say a hut is a point and a track is a line separately. On the Places tab you can filter by kind, and a row opens that place's own page.
 
-You can get places into the app by:
+The **+** in the tab's title bar is the one way in: **Add a spot**, **Import a file**, or **Create a journey**. So the page is your places rather than a page of tools, and you can get places into the app by:
 
 - importing a GPX, KML, KMZ or GeoJSON file (a file with several tracks becomes several places, and both Import buttons take several files at once)
-- importing something from DOC or the other-tracks browser
 - tapping the map to add a spot
 - walking or riding it with the recorder (a ride becomes a bike track)
 
 A track can have **side tracks**: spurs that branch off the main line. Their length is counted once, and they're kept when you export to GPX ([details](docs/side-tracks.md)).
 
 If a track came from a file with elevation data, its page shows the height range and a profile of the climb. A track drawn by hand has no heights, and the app leaves them blank rather than showing zeros ([details](docs/elevation.md)). Waypoints can have a photo attached, which is shrunk to fit before it's stored.
+
+## Explore
+
+Explore is what other people publish, in one tab: **DOC** and **Other tracks**, chosen by a switch at the top. The switch is a publisher; the row of chips under it is what you're looking for within that publisher.
+
+Each source has the same tools: a search, the kinds, **Near me** with a distance, a filter over the facts a page came back with, and an order. Near me works outward in rings, so widening the distance only adds results. Each source keeps its own search and results while you switch between them.
+
+A row opens the thing's own page. Back returns to Explore with the source and the results still where they were.
 
 ## Following a track
 
@@ -106,7 +113,7 @@ A file of several tracks asks where it should go, because four tracks could be a
 
 DOC publishes its data as online map services. Instead of downloading everything, the app searches those services when you ask: by name, or by distance from where you are. The "near me" search works outward in rings, so widening the distance only adds results and never shuffles the existing ones.
 
-Importing a DOC item stores DOC's own ID against it. If you rename it later, the app still knows it's the same one, and if you delete it you can import it again. A DOC page also shows any current alerts, and if the app couldn't check for alerts it says so rather than implying there are none. Offline, the browser falls back to whatever you've downloaded. See [docs/doc-tracks.md](docs/doc-tracks.md).
+What DOC publishes is read rather than kept: a page shows DOC's own facts, any current alerts, and a link to DOC's website. If the app couldn't check for alerts it says so rather than implying there are none. Offline, the browser falls back to whatever you've downloaded. See [docs/doc-tracks.md](docs/doc-tracks.md).
 
 DOC's API key is kept on its own Worker (`worker/`), not in the app.
 

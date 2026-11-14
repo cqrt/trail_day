@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -19,24 +18,21 @@ import kotlinx.coroutines.launch
 import nz.mckenzie.trailday.data.AssetRepository
 import nz.mckenzie.trailday.data.ImportedTrack
 import nz.mckenzie.trailday.data.SettingsRepository
-import nz.mckenzie.trailday.tracking.DevicePosition
 import nz.mckenzie.trailday.data.db.AssetEntity
 import nz.mckenzie.trailday.data.db.TrailDayDatabase
-import nz.mckenzie.trailday.doc.DocDownloader
-import nz.mckenzie.trailday.offline.OfflineDocStore
 import nz.mckenzie.trailday.domain.track.FileTracks
 import nz.mckenzie.trailday.ui.ImportWords
 import nz.mckenzie.trailday.domain.asset.AssetKind
 import nz.mckenzie.trailday.domain.asset.AssetKindFilter
-import nz.mckenzie.trailday.domain.doc.DocBikeLinks
-import nz.mckenzie.trailday.domain.doc.DocCache
-import nz.mckenzie.trailday.domain.doc.DocHitTest
-import nz.mckenzie.trailday.domain.doc.DocItem
-import nz.mckenzie.trailday.domain.doc.DocSource
-import nz.mckenzie.trailday.domain.doc.EmptyDocCache
 
 /**
- * The asset library: every planned asset, plus GPX import.
+ * The place library: every planned asset, plus GPX import.
+ *
+ * **The walker's own places and nothing else.** This used to carry a small group of DOC's tracks near the
+ * phone, so a track at the end of the valley was a tap away; DOC's material is read in **Explore** now,
+ * beside the other publisher's, and a page of your own places is not the place to mix in somebody
+ * else's. Removing it took the DOC cache, the phone's position and the distance test out of this class
+ * with it.
  */
 class AssetListViewModel(
     private val assetRepository: AssetRepository,
@@ -45,57 +41,11 @@ class AssetListViewModel(
      * Where the one-time tidy is remembered. Built from the context by default so a test that has no
      * opinion about it - or no need of one - does not have to hand one over.
      */
-    private val settings: SettingsRepository = SettingsRepository(context),
-    /**
-     * What DOC publishes, kept on the phone: the list's own small group of tracks near the walker reads it,
-     * so the group works with no reception and offers nothing the phone cannot draw.
-     */
-    private val docStore: DocCache = EmptyDocCache
+    private val settings: SettingsRepository = SettingsRepository(context)
 ) : ViewModel() {
 
     val assets: StateFlow<List<AssetEntity>> = assetRepository.observeActiveAssets()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
-
-    /**
-     * DOC's tracks near the phone, for the list's own small group: **what is kept on the phone**, nearest
-     * first, five of them inside ten kilometres.
-     *
-     * Not all of DOC's material and not a second list to scroll: the list is the walker's own places, and the
-     * group is there so the track at the end of the valley is a tap away without leaving the page. The full
-     * catalogue stays in "What DOC publishes".
-     */
-    private data class DocNearbySource(val tracks: List<DocItem>, val links: DocBikeLinks)
-
-    val docNearby: StateFlow<List<DocChoice>> = docStore.observeCount()
-        .map {
-            val tracks = docStore.cached(DocSource.TRACKS)
-            val bikes = docStore.cached(DocSource.BIKES)
-            DocNearbySource(tracks, DocBikeLinks.of(tracks, bikes))
-        }
-        .combine(DevicePosition.updates(viewModelScope)) { source, position ->
-            if (position == null) {
-                emptyList()
-            } else {
-                source.tracks
-                    .mapNotNull { item ->
-                        val distance = DocHitTest.distanceTo(item, position) ?: return@mapNotNull null
-                        if (distance <= DOC_NEARBY_M) {
-                            DocChoice(item, distance, source.links.bikeFor(item))
-                        } else {
-                            null
-                        }
-                    }
-                    .sortedBy { it.distanceM }
-                    .take(DOC_NEARBY)
-            }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
-
-    /**
-     * One row of the nearby group: a track of DOC's, how far away its line is, and the bike point
-     * DOC published on it when there is one.
-     */
-    data class DocChoice(val item: DocItem, val distanceM: Double, val bike: DocItem? = null)
 
     /**
      * What the list is showing: everything, or the one kind the chips are asking about.
@@ -260,22 +210,13 @@ class AssetListViewModel(
     companion object {
         private const val STOP_TIMEOUT_MS = 5_000L
 
-    /** How far around the phone the nearby group looks: ten kilometres, and five tracks of DOC's. */
-    private const val DOC_NEARBY_M = 10_000.0
-    private const val DOC_NEARBY = 5
-
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
             return viewModelFactory {
                 initializer {
                     AssetListViewModel(
                         assetRepository = AssetRepository(TrailDayDatabase.get(appContext)),
-                        context = appContext,
-                        // The tracks DOC has published for this area, for the nearby group.
-                        docStore = OfflineDocStore(
-                            dao = TrailDayDatabase.get(appContext).offlineDocItemDao(),
-                            downloader = DocDownloader.online()
-                        )
+                        context = appContext
                     )
                 }
             }

@@ -4,15 +4,16 @@ Sometimes a line somebody else publishes is wrong on the ground: it runs through
 alignment that never existed. You can't edit it, and there's nothing to fix about it. What you can do
 is hide it and walk your own.
 
-Open the track's page — from the map, or from the DOC browser or Other tracks — and scroll to the
-foot. Under **Track wrong? Hide it from the map.** is the tap.
+Open the track's page — from the map, or from either source in Explore — and scroll to the foot. Under
+**Track wrong? Hide it from the map.** is the tap.
 
 It asks first, because hiding is not quite deleting: nothing is stored and nothing is lost.
 
 ## What hiding does
 
 The line comes off the map, out of the DOC browser's results, out of the Other tracks list, and out of
-the list of tracks to follow on the Record tab. It stays hidden when you download that region again,
+the list of tracks to follow on the Record tab. Because both browsers are now the two sources in
+Explore, it is out of Explore as well. It stays hidden when you download that region again,
 and when a later release reads a newer copy of the dataset — the app remembers the publisher's own
 reference for the track, so it recognises the same line however it arrives.
 

@@ -15,20 +15,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -68,13 +64,16 @@ import nz.mckenzie.trailday.viewmodel.DocBrowserViewModel
  * filter and the order as pills - and **the answer in its own viewport below it**: how many came back and in
  * what order, then each thing DOC published as a card - the kind's tile, the name, DOC's own facts about it,
  * and how far away it is in the app's own colour.
+ *
+ * **It has no title bar of its own.** It is one of the two sources inside **Explore**, which owns the title,
+ * the switch between the publishers and the bar - so this draws the question and the answer and nothing that
+ * would be a second app bar in the middle of a page. [modifier] is where Explore puts it, under its switch.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DocBrowserScreen(
     viewModel: DocBrowserViewModel,
-    onBack: () -> Unit,
-    onOpenDoc: (DocItem, DocItem?) -> Unit = { _, _ -> }
+    onOpenDoc: (DocItem, DocItem?) -> Unit = { _, _ -> },
+    modifier: Modifier = Modifier
 ) {
     val name by viewModel.name.collectAsStateWithLifecycle()
     val nearMe by viewModel.nearMe.collectAsStateWithLifecycle()
@@ -99,129 +98,114 @@ fun DocBrowserScreen(
         viewModel.search()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                // Which of DOC's four services this page is about, in the phone's own words for it: the
-                // answer changes as the source does, so the title has to.
-                title = { Text("DOC ${source.displayName.lowercase()}") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { AppIcon(IconGlyph.BACK, contentDescription = "Back") }
-                }
-            )
-        }
-    ) { innerPadding ->
+    Column(
+        modifier = modifier.fillMaxSize()
+    ) {
+        // The controls, in one deck at the top: what is being asked, of which of DOC's services, and
+        // how the answer should be narrowed and ordered. One white surface is what separates the
+        // question from the answer below it, which is the shape the mock screens draw.
+        DocControlsDeck(
+            name = name,
+            onNameChange = viewModel::onNameChange,
+            onSearch = search,
+            nearMe = nearMe,
+            onNearMeChange = viewModel::onNearMeChange,
+            radiusKm = radiusKm,
+            onRadiusChange = viewModel::onRadiusChange,
+            source = source,
+            onChooseSource = viewModel::chooseSource,
+            filterChoices = filterChoices,
+            filters = filters,
+            onToggleFilter = viewModel::toggleFilter,
+            onClearFilters = viewModel::clearFilters,
+            sort = sort,
+            onSort = viewModel::setSort,
+            bikeOffered = source == DocSource.TRACKS &&
+                (companions.bikeForTrack.isNotEmpty() || bikeOnly),
+            bikeOnly = bikeOnly,
+            onBikeOnly = viewModel::setBikeOnly
+        )
+
+        // The answer, in its own viewport below the deck: a busy line while DOC is being asked, what
+        // DOC said if it said something, and then how many came back and in what order.
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
         ) {
-            // The controls, in one deck at the top: what is being asked, of which of DOC's services, and
-            // how the answer should be narrowed and ordered. One white surface is what separates the
-            // question from the answer below it, which is the shape the mock screens draw.
-            DocControlsDeck(
-                name = name,
-                onNameChange = viewModel::onNameChange,
-                onSearch = search,
-                nearMe = nearMe,
-                onNearMeChange = viewModel::onNearMeChange,
-                radiusKm = radiusKm,
-                onRadiusChange = viewModel::onRadiusChange,
-                source = source,
-                onChooseSource = viewModel::chooseSource,
-                filterChoices = filterChoices,
-                filters = filters,
-                onToggleFilter = viewModel::toggleFilter,
-                onClearFilters = viewModel::clearFilters,
-                sort = sort,
-                onSort = viewModel::setSort,
-                bikeOffered = source == DocSource.TRACKS &&
-                    (companions.bikeForTrack.isNotEmpty() || bikeOnly),
-                bikeOnly = bikeOnly,
-                onBikeOnly = viewModel::setBikeOnly
-            )
+            if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
 
-            // The answer, in its own viewport below the deck: a busy line while DOC is being asked, what
-            // DOC said if it said something, and then how many came back and in what order.
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            ) {
-                if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            message?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
 
-                message?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
+            when {
+                // Before the empty state: a page emptied by hiding is not a page where nothing matched,
+                // and the line under it has to name the thing that emptied it.
+                visible.isEmpty() && allHidden && !busy -> Text(
+                    text = "The only match is a track you've hidden. Show it again in Settings, " +
+                        "under Hidden tracks.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
 
-                when {
-                    // Before the empty state: a page emptied by hiding is not a page where nothing matched,
-                    // and the line under it has to name the thing that emptied it.
-                    visible.isEmpty() && allHidden && !busy -> Text(
-                        text = "The only match is a track you've hidden. Show it again in Settings, " +
-                            "under Hidden tracks.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 12.dp)
-                    )
+                results.isEmpty() && searched && message == null && !busy -> EmptyState(
+                    glyph = IconGlyph.ASSETS,
+                    title = "No ${source.displayName.lowercase()} matched",
+                    body = "Try part of a name, or turn on Near me and search again.",
+                    actionLabel = "Search again",
+                    onAction = { viewModel.search() }
+                )
 
-                    results.isEmpty() && searched && message == null && !busy -> EmptyState(
-                        glyph = IconGlyph.ASSETS,
-                        title = "No ${source.displayName.lowercase()} matched",
-                        body = "Try part of a name, or turn on Near me and search again.",
-                        actionLabel = "Search again",
-                        onAction = { viewModel.search() }
-                    )
+                // A filter that hides every row is not "nothing matched": the way out is to clear a
+                // filter, so say that rather than showing the empty state again.
+                results.isNotEmpty() && visible.isEmpty() -> Text(
+                    text = "Nothing matches those filters. Clear one to see the rest.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
 
-                    // A filter that hides every row is not "nothing matched": the way out is to clear a
-                    // filter, so say that rather than showing the empty state again.
-                    results.isNotEmpty() && visible.isEmpty() -> Text(
-                        text = "Nothing matches those filters. Clear one to see the rest.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 12.dp)
-                    )
-
-                    else -> {
-                        // How many, and in what order, said once above the list rather than on every row.
-                        if (results.isNotEmpty()) {
-                            DocResultSummary(
-                                count = visible.size,
-                                source = source,
-                                sort = sort,
-                                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
-                            )
-                        }
-                        LazyColumn(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)
-                        ) {
-                            items(visible, key = { item -> item.objectId }) { item ->
-                                // Bike Trails lists the track a bike point belongs to: a rider wants the
-                                // track, not the pin. An unmatched bike point is still its own row.
-                                val linkedTrack =
-                                    if (source == DocSource.BIKES) companions.trackForBike[item.sourceRef] else null
-                                val shown = linkedTrack ?: item
-                                val bike = when {
-                                    source == DocSource.BIKES && linkedTrack != null -> item
-                                    source == DocSource.TRACKS -> companions.bikeForTrack[item.sourceRef]
-                                    else -> null
-                                }
-                                DocItemCard(
-                                    item = shown,
-                                    bike = bike,
-                                    // Measured to what the row is about: the track's line when the bike point
-                                    // led us to a track, the bike point when it stands alone.
-                                    distanceM = phoneFix?.let { position -> shown.distanceM(position) },
-                                    // Every one of these is read best where it is: the map frames the line or
-                                    // the place and raises the card that says what DOC says about it.
-                                    onOpen = { onOpenDoc(shown, bike) }
-                                )
+                else -> {
+                    // How many, and in what order, said once above the list rather than on every row.
+                    if (results.isNotEmpty()) {
+                        DocResultSummary(
+                            count = visible.size,
+                            source = source,
+                            sort = sort,
+                            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
+                        )
+                    }
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)
+                    ) {
+                        items(visible, key = { item -> item.objectId }) { item ->
+                            // Bike Trails lists the track a bike point belongs to: a rider wants the
+                            // track, not the pin. An unmatched bike point is still its own row.
+                            val linkedTrack =
+                                if (source == DocSource.BIKES) companions.trackForBike[item.sourceRef] else null
+                            val shown = linkedTrack ?: item
+                            val bike = when {
+                                source == DocSource.BIKES && linkedTrack != null -> item
+                                source == DocSource.TRACKS -> companions.bikeForTrack[item.sourceRef]
+                                else -> null
                             }
+                            DocItemCard(
+                                item = shown,
+                                bike = bike,
+                                // Measured to what the row is about: the track's line when the bike point
+                                // led us to a track, the bike point when it stands alone.
+                                distanceM = phoneFix?.let { position -> shown.distanceM(position) },
+                                // Every one of these is read best where it is: the map frames the line or
+                                // the place and raises the card that says what DOC says about it.
+                                onOpen = { onOpenDoc(shown, bike) }
+                            )
                         }
                     }
                 }
@@ -299,7 +283,10 @@ private fun DocControlsDeck(
                 SearchField(
                     value = name,
                     onValueChange = onNameChange,
-                    placeholder = "Search ${source.displayName.lowercase()}",
+                    // **Says whose material it is searching**, because Explore puts another publisher
+                    // one tap away: "Search tracks" beside a switch reading Other tracks would leave a
+                    // walker unsure which list the field is about.
+                    placeholder = "Search DOC ${source.displayName.lowercase()}",
                     onSearch = onSearch,
                     modifier = Modifier.weight(1f)
                 )

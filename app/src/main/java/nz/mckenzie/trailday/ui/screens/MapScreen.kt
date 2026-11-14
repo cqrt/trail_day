@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -38,7 +39,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -105,6 +105,7 @@ import nz.mckenzie.trailday.map.ScaleBarSpan
 import org.maplibre.android.geometry.LatLng
 import nz.mckenzie.trailday.ui.formatDistance
 import nz.mckenzie.trailday.ui.theme.TrailDayElevation
+import nz.mckenzie.trailday.ui.theme.TrailDayPaper
 import nz.mckenzie.trailday.ui.docBikeFacts
 import nz.mckenzie.trailday.ui.docCardFacts
 import nz.mckenzie.trailday.ui.formatDate
@@ -121,6 +122,12 @@ fun MapScreen(
     viewModel: MapViewModel,
     onOpenTab: (Tab) -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    /**
+     * The Offline page, which is not a tab: this map's own round button, its notice and Settings are
+     * the three doors to it. Named here rather than reached through [onOpenTab] because a page the
+     * map opens has to come back to the map when it is closed.
+     */
+    onOpenOffline: () -> Unit = {},
     onOpenAsset: (Long) -> Unit = {},
     onOpenDocDetail: (DocItem, DocItem?) -> Unit = { _, _ -> },
     onOpenOtherTrack: (OtherTrack) -> Unit = {}
@@ -161,7 +168,7 @@ fun MapScreen(
     val actOnTrouble: (MapTroubleAction) -> Unit = { action ->
         when (action) {
             is MapTroubleAction.SwitchTo -> viewModel.useBasemap(action.basemap)
-            MapTroubleAction.OpenOfflineTab -> onOpenTab(Tab.OFFLINE)
+            MapTroubleAction.OpenOffline -> onOpenOffline()
             MapTroubleAction.OpenSettings -> onOpenSettings
         }
     }
@@ -203,255 +210,282 @@ fun MapScreen(
         }
     }
 
-    Scaffold(
-        // No bar over the map: the mock screens give the map the whole screen, and the three things that
-        // used to sit in a bar - what the map draws, the settings, and where I am - are round buttons over
-        // the map's top corner instead. The title has no job on a screen that is a place.
-        bottomBar = { TrailDayNavBar(current = Tab.MAP, onSelect = onOpenTab) }
-    ) { innerPadding ->
-        Box(
+    // **The map runs to the edges and the bar sits over it.** It used to be inside a Scaffold whose
+    // bar took a slice of the screen away from the map, so the ground stopped where the paper began.
+    // The bar is a translucent plate over the map's own foot now - see [TrailDayPaper] - and the map
+    // is drawn under the status bar as well, which is what "full bleed" means on a screen whose
+    // subject is a place rather than a page. The things drawn on the map carry the insets themselves:
+    // the top controls ask for the status bar's height, the bar brings its own.
+    Box(modifier = Modifier.fillMaxSize()) {
+        BasemapView(
+            basemap = basemap,
+            assetGeoJson = geoJson,
+            yourTracksGeoJson = yourTracksGeoJson,
+            // DOC's material, under the walker's own work: the tracks, huts, campsites and bike
+            // locations kept on the phone for offline use. It is not the walker's to change and has
+            // no page of its own - a tap on it is answered by the card at the bottom of the map.
+            docGeoJson = docGeoJson,
+            docBikeBadgesGeoJson = docBikeBadgesGeoJson,
+            // What the walker has switched off. The home map is the one these apply to: a
+            // screen that is about one place, or about the spot being drawn, draws it
+            // whatever is hidden here.
+            hiddenLayers = hiddenLayers,
+            hiddenYourPlaces = hiddenYourPlaces,
+            // The place names, which the walker asks for in the same sheet: this is the map
+            // they read the map on, and "which town is that" is asked here rather than on a
+            // screen that is about one place.
+            placeNames = placeNames,
+            // The roads, asked for in the same sheet: the gold line is what says a grey ribbon
+            // in a paddock is a road, and which road it is.
+            roads = roads,
+            // The trail, under everything including DOC's material: a national route is the ground
+            // the rest of the map is read against, and it is the app's own feature rather than
+            // anything the walker has to find and import.
+            showTeAraroa = teAraroa,
+            teAraroaGeoJson = teAraroaGeoJson,
+            // Somebody else's tracks: over the trail, and under DOC's material and the walker's own
+            // work. A second publisher's reference rather than the walker's, so it is drawn where the
+            // reference belongs - and it is empty until an area has been downloaded.
+            showOtherTracks = otherTracks,
+            otherTracksGeoJson = otherTracksGeoJson,
+            // The marker for the phone is the map's own business now, so this screen
+            // says nothing about it: it draws where you are wherever a map is drawn.
+            // The walker's own tracks first; failing that, where the device is;
+            // failing that, the neutral country-wide default.
+            // A card that is still up owns the frame when the map is rebuilt by a tab change;
+            // otherwise this is the first look at the walker's work.
+            fitBounds = selectionFrame ?: initialFrame,
+            // Where "show me" last asked the camera to be. Null until they ask: the map
+            // does not follow the phone, because it is also for reading the work.
+            recentreBounds = recentre?.bounds,
+            recentreCount = recentre?.count ?: 0,
+            // The move has been made, so the request is let go: one that stayed would be made again
+            // every time this screen was rebuilt, which a tab change does.
+            onRecentreHandled = viewModel::consumeRecentre,
+            // The ground the walker was last reading, so a tab change or a basemap change
+            // opens here rather than on the work or the phone.
+            initialTarget = camera?.let { LatLng(it.lat, it.lng) } ?: DEFAULT_CAMERA_TARGET,
+            initialZoom = camera?.zoom ?: DEFAULT_CAMERA_ZOOM,
+            restoreCamera = camera != null,
+            onCameraIdle = { lat, lng, level ->
+                viewModel.rememberCamera(lat, lng, level)
+                // The same callback carries the level the keys show: on this map the walker can also
+                // pinch, so the number is where the camera ended up rather than where a key put it.
+                zoom.reported(level)
+            },
+            // How far a pixel of this map covers, for the scale bar at the map's foot. The map
+            // measures it, being the only thing that knows its own projection; this screen draws
+            // it, because the corner it goes in is this screen's furniture.
+            onMetresPerPixel = { metresPerPixel = it },
+            // The zoom keys, which on this map are the second way to do what a pinch does - the first
+            // being the pinch itself. **The step and the count go to the map**: the keys only ask.
+            zoomStep = zoom.step,
+            zoomCount = zoom.count,
+            // A tap lands on something: a line of the walker's own or a thing DOC publishes. Either
+            // way the card below says what it is, and the card's own tap opens the place. The radius
+            // comes from the map's zoom, so the tap works at country scale as well as at paddock
+            // height, and the DOC question is worked out away from the drawing, because DOC's cache
+            // is far bigger than the walker's own list.
+            onMapClick = { lat, lng, radiusM ->
+                val asset = viewModel.assetAt(lat, lng, radiusM)
+                if (asset != null) {
+                    viewModel.pickPlace(asset)
+                } else {
+                    // The map says so itself when DOC has nothing there: the card goes away rather
+                    // than growing a nearest-thing answer nobody asked for.
+                    viewModel.clearPickedPlace()
+                    mapScope.launch {
+                        // The page this opens is the card at full size, so the map's own card is not
+                        // raised for it: coming back from the page should be coming back to the map,
+                        // not to the same thing twice.
+                        val picked = viewModel.pickDocAt(lat, lng, radiusM, raiseCard = false)
+                        if (picked != null) {
+                            onOpenDocDetail(picked, viewModel.bikeFor(picked))
+                        } else {
+                            // **DOC's material answers first when both are under the finger**, which is
+                            // deliberate rather than an accident of ordering: a council track running
+                            // along a DOC one is a tap on the DOC one, and that is what this map has
+                            // always answered. Somebody else's tracks are what a tap reaches where DOC
+                            // has nothing.
+                            viewModel.pickOtherTrackAt(lat, lng, radiusM)?.let(onOpenOtherTrack)
+                        }
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Everything at the top of the map in one column, so nothing has to know how tall
+        // anything else is: the offline strip pushes the round buttons below it rather than
+        // being drawn underneath them. The status bar's own height is paid for here, because the
+        // map behind it is drawn to the top edge of the screen.
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            BasemapView(
-                basemap = basemap,
-                assetGeoJson = geoJson,
-                yourTracksGeoJson = yourTracksGeoJson,
-                // DOC's material, under the walker's own work: the tracks, huts, campsites and bike
-                // locations kept on the phone for offline use. It is not the walker's to change and has
-                // no page of its own - a tap on it is answered by the card at the bottom of the map.
-                docGeoJson = docGeoJson,
-                docBikeBadgesGeoJson = docBikeBadgesGeoJson,
-                // What the walker has switched off. The home map is the one these apply to: a
-                // screen that is about one place, or about the spot being drawn, draws it
-                // whatever is hidden here.
-                hiddenLayers = hiddenLayers,
-                hiddenYourPlaces = hiddenYourPlaces,
-                // The place names, which the walker asks for in the same sheet: this is the map
-                // they read the map on, and "which town is that" is asked here rather than on a
-                // screen that is about one place.
-                placeNames = placeNames,
-                // The roads, asked for in the same sheet: the gold line is what says a grey ribbon
-                // in a paddock is a road, and which road it is.
-                roads = roads,
-                // The trail, under everything including DOC's material: a national route is the ground
-                // the rest of the map is read against, and it is the app's own feature rather than
-                // anything the walker has to find and import.
-                showTeAraroa = teAraroa,
-                teAraroaGeoJson = teAraroaGeoJson,
-                // Somebody else's tracks: over the trail, and under DOC's material and the walker's own
-                // work. A second publisher's reference rather than the walker's, so it is drawn where the
-                // reference belongs - and it is empty until an area has been downloaded.
-                showOtherTracks = otherTracks,
-                otherTracksGeoJson = otherTracksGeoJson,
-                // The marker for the phone is the map's own business now, so this screen
-                // says nothing about it: it draws where you are wherever a map is drawn.
-                // The walker's own tracks first; failing that, where the device is;
-                // failing that, the neutral country-wide default.
-                // A card that is still up owns the frame when the map is rebuilt by a tab change;
-                // otherwise this is the first look at the walker's work.
-                fitBounds = selectionFrame ?: initialFrame,
-                // Where "show me" last asked the camera to be. Null until they ask: the map
-                // does not follow the phone, because it is also for reading the work.
-                recentreBounds = recentre?.bounds,
-                recentreCount = recentre?.count ?: 0,
-                // The move has been made, so the request is let go: one that stayed would be made again
-                // every time this screen was rebuilt, which a tab change does.
-                onRecentreHandled = viewModel::consumeRecentre,
-                // The ground the walker was last reading, so a tab change or a basemap change
-                // opens here rather than on the work or the phone.
-                initialTarget = camera?.let { LatLng(it.lat, it.lng) } ?: DEFAULT_CAMERA_TARGET,
-                initialZoom = camera?.zoom ?: DEFAULT_CAMERA_ZOOM,
-                restoreCamera = camera != null,
-                onCameraIdle = { lat, lng, level ->
-                    viewModel.rememberCamera(lat, lng, level)
-                    // The same callback carries the level the keys show: on this map the walker can also
-                    // pinch, so the number is where the camera ended up rather than where a key put it.
-                    zoom.reported(level)
-                },
-                // How far a pixel of this map covers, for the scale bar at the map's foot. The map
-                // measures it, being the only thing that knows its own projection; this screen draws
-                // it, because the corner it goes in is this screen's furniture.
-                onMetresPerPixel = { metresPerPixel = it },
-                // The zoom keys, which on this map are the second way to do what a pinch does - the first
-                // being the pinch itself. **The step and the count go to the map**: the keys only ask.
-                zoomStep = zoom.step,
-                zoomCount = zoom.count,
-                // A tap lands on something: a line of the walker's own or a thing DOC publishes. Either
-                // way the card below says what it is, and the card's own tap opens the place. The radius
-                // comes from the map's zoom, so the tap works at country scale as well as at paddock
-                // height, and the DOC question is worked out away from the drawing, because DOC's cache
-                // is far bigger than the walker's own list.
-                onMapClick = { lat, lng, radiusM ->
-                    val asset = viewModel.assetAt(lat, lng, radiusM)
-                    if (asset != null) {
-                        viewModel.pickPlace(asset)
-                    } else {
-                        // The map says so itself when DOC has nothing there: the card goes away rather
-                        // than growing a nearest-thing answer nobody asked for.
-                        viewModel.clearPickedPlace()
-                        mapScope.launch {
-                            // The page this opens is the card at full size, so the map's own card is not
-                            // raised for it: coming back from the page should be coming back to the map,
-                            // not to the same thing twice.
-                            val picked = viewModel.pickDocAt(lat, lng, radiusM, raiseCard = false)
-                            if (picked != null) {
-                                onOpenDocDetail(picked, viewModel.bikeFor(picked))
-                            } else {
-                                // **DOC's material answers first when both are under the finger**, which is
-                                // deliberate rather than an accident of ordering: a council track running
-                                // along a DOC one is a tap on the DOC one, and that is what this map has
-                                // always answered. Somebody else's tracks are what a tap reaches where DOC
-                                // has nothing.
-                                viewModel.pickOtherTrackAt(lat, lng, radiusM)?.let(onOpenOtherTrack)
-                            }
-                        }
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-
-            // Everything at the top of the map in one column, so nothing has to know how tall
-            // anything else is: the offline strip pushes the round buttons below it rather than
-            // being drawn underneath them.
-            Column(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // **Offline is a state rather than a fault.** Nothing is broken: this ground is not
-                // on the phone and there is nothing to fetch it from. So it is a strip across the
-                // top of the map - where it says something true about the whole screen rather than
-                // sitting in the middle of the ground the walker is trying to read.
-                (basemapTrouble as? MapTrouble.Offline)?.let { offline ->
-                    val words = troubleWords(offline, basemap)
-                    MapTroubleNotice(
-                        words = words,
-                        onAction = { actOnTrouble(words.action) },
-                        onDismiss = viewModel::answerTrouble,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        locationNotice?.let { notice ->
-                            LocationNoticeCard(
-                                message = notice,
-                                onDismiss = viewModel::clearLocationNotice
-                            )
-                        }
-                    }
-
-                    // The three buttons over the map's top corner, as the mock screens draw them: white
-                    // circles with a shadow, settings above what-the-map-draws above where-I-am. The mock
-                    // screens have the last two; the settings need a door of their own once the bar is
-                    // gone, and this is the corner the walker's thumb is already going to.
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        RoundIconButton(
-                            glyph = IconGlyph.SETTINGS,
-                            description = SETTINGS_WORD,
-                            onClick = onOpenSettings
-                        )
-                        RoundIconButton(
-                            glyph = IconGlyph.LAYERS,
-                            description = "Layers",
-                            onClick = { layersOpen = true }
-                        )
-                        RoundIconButton(
-                            glyph = IconGlyph.LOCATE,
-                            description = "Show where I am",
-                            onClick = locate
-                        )
-                    }
-                }
-            }
-
-            // The zoom keys and the level, **halfway down the right-hand edge** - where they are on every
-            // preview map, and where a walker who has met them once will look for them again. Not in the
-            // corner with the buttons above: those are what the map is set up with, and this is what the
-            // map is *read* with, so it belongs beside the ground rather than in a stack of settings.
-            MapZoomButtons(
-                zoom = zoom,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = KEY_EDGE_PADDING)
-            )
-
-            // Why the map has stopped drawing, when the trouble is not the connection: the Worker's
-            // own sentence, the key's, or a drawn map's silence, and the one thing that helps with it
-            // - see [MapTrouble]. Drawn at the middle of the map, because a map that is not
-            // drawing is what the walker is looking at. The offline case is the strip at the top
-            // instead: nothing there is broken, and there is less to say.
-            basemapTrouble?.takeIf { it !is MapTrouble.Offline }?.let { trouble ->
-                val words = troubleWords(trouble, basemap)
+            // **Offline is a state rather than a fault.** Nothing is broken: this ground is not
+            // on the phone and there is nothing to fetch it from. So it is a strip across the
+            // top of the map - where it says something true about the whole screen rather than
+            // sitting in the middle of the ground the walker is trying to read.
+            (basemapTrouble as? MapTrouble.Offline)?.let { offline ->
+                val words = troubleWords(offline, basemap)
                 MapTroubleNotice(
                     words = words,
                     onAction = { actOnTrouble(words.action) },
                     onDismiss = viewModel::answerTrouble,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(24.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
 
-            // The card and the licence line share one column at the foot of the map, so the card sits *above*
-            // the line rather than on top of it - whatever the line's height is, with place names and without.
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 12.dp, bottom = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Top
             ) {
-                val picked = docPick
-                val place = pickedPlaceId?.let { id -> places.firstOrNull { it.id == id } }
-                if (picked != null) {
-                    // A tapped thing has more to say than a glance: a picture, what DOC says about it, and its
-                    // prose - so its card is a little wider and scrolls, rather than pushing the map off the
-                    // screen.
-                    DocCard(
-                        pick = picked,
-                        alerts = docAlerts,
-                        onClose = viewModel::clearPickedDoc,
-                        onFollow = {
-                            // The recorder takes it from here: the walk starts on the screen that asks about
-                            // walking, not on a card over a map.
-                            PendingFollow.offer(picked.item)
-                            viewModel.clearPickedDoc()
-                            onOpenTab(Tab.RECORD)
-                        },
-                        modifier = Modifier.widthIn(max = 300.dp)
-                    )
-                } else if (place != null) {
-                    PlaceCard(
-                        place = place,
-                        recorded = place.id in recordedPlaces,
-                        onOpen = { onOpenAsset(place.id) },
-                        onClose = viewModel::clearPickedPlace,
-                        modifier = Modifier.widthIn(max = 250.dp)
-                    )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    locationNotice?.let { notice ->
+                        LocationNoticeCard(
+                            message = notice,
+                            onDismiss = viewModel::clearLocationNotice
+                        )
+                    }
                 }
 
-                // The scale bar, above the credit line: the strip owns the very corner, so a bar
-                // drawn into it would be two plates on top of each other. Nothing is drawn until the
-                // map has said how far a pixel covers.
-                metresPerPixel?.let { perPixel ->
-                    ScaleBar.span(metresAcross = perPixel * scaleWidthPx, maxWidthPx = scaleWidthPx)
-                        ?.let { span -> MapScaleBar(span = span) }
+                // The four buttons over the map's top corner, as the mock screens draw them: white
+                // circles with a shadow, settings above what-the-map-draws above what-is-downloaded
+                // above where-I-am. The settings need a door of their own once the bar has no
+                // Offline tab, and Offline's is here for the same reason - a walker planning a trip
+                // is looking at the ground they are about to keep, not at a settings list.
+                //
+                // **At 80%**, the paper the bar wears: these sit on the map, and a fifth of the
+                // ground showing through is what says so. The glyph inside stays solid.
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    RoundIconButton(
+                        glyph = IconGlyph.SETTINGS,
+                        description = SETTINGS_WORD,
+                        onClick = onOpenSettings,
+                        containerAlpha = TrailDayPaper.ALPHA
+                    )
+                    RoundIconButton(
+                        glyph = IconGlyph.LAYERS,
+                        description = "Layers",
+                        onClick = { layersOpen = true },
+                        containerAlpha = TrailDayPaper.ALPHA
+                    )
+                    RoundIconButton(
+                        glyph = IconGlyph.OFFLINE,
+                        description = OFFLINE_WORD,
+                        onClick = onOpenOffline,
+                        containerAlpha = TrailDayPaper.ALPHA
+                    )
+                    RoundIconButton(
+                        glyph = IconGlyph.LOCATE,
+                        description = "Show where I am",
+                        onClick = locate,
+                        containerAlpha = TrailDayPaper.ALPHA
+                    )
                 }
-
-                AttributionStrip(basemap = basemap, teAraroa = teAraroa)
             }
+        }
+
+        // The zoom keys and the level, **halfway down the right-hand edge** - where they are on every
+        // preview map, and where a walker who has met them once will look for them again. Not in the
+        // corner with the buttons above: those are what the map is set up with, and this is what the
+        // map is *read* with, so it belongs beside the ground rather than in a stack of settings.
+        MapZoomButtons(
+            zoom = zoom,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = KEY_EDGE_PADDING)
+        )
+
+        // Why the map has stopped drawing, when the trouble is not the connection: the Worker's
+        // own sentence, the key's, or a drawn map's silence, and the one thing that helps with it
+        // - see [MapTrouble]. Drawn at the middle of the map, because a map that is not
+        // drawing is what the walker is looking at. The offline case is the strip at the top
+        // instead: nothing there is broken, and there is less to say.
+        basemapTrouble?.takeIf { it !is MapTrouble.Offline }?.let { trouble ->
+            val words = troubleWords(trouble, basemap)
+            MapTroubleNotice(
+                words = words,
+                onAction = { actOnTrouble(words.action) },
+                onDismiss = viewModel::answerTrouble,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(24.dp)
+            )
+        }
+
+        // **The card, the scale and the licence, lifted clear of the bar.** They sit in a column
+        // whose last child *is* the bar, so the bar's own height - gesture inset and all - becomes
+        // the air under them rather than a number this file has to guess. The card and the licence
+        // line share the column above it, so the card sits above the line rather than on top of it,
+        // whatever the line's height is, with place names and without.
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, end = 12.dp, bottom = 6.dp)
+            ) {
+                Column(
+                    modifier = Modifier.align(Alignment.BottomStart),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val picked = docPick
+                    val place = pickedPlaceId?.let { id -> places.firstOrNull { it.id == id } }
+                    if (picked != null) {
+                        // A tapped thing has more to say than a glance: a picture, what DOC says about
+                        // it, and its prose - so its card is a little wider and scrolls, rather than
+                        // pushing the map off the screen.
+                        DocCard(
+                            pick = picked,
+                            alerts = docAlerts,
+                            onClose = viewModel::clearPickedDoc,
+                            onFollow = {
+                                // The recorder takes it from here: the walk starts on the screen that
+                                // asks about walking, not on a card over a map.
+                                PendingFollow.offer(picked.item)
+                                viewModel.clearPickedDoc()
+                                onOpenTab(Tab.RECORD)
+                            },
+                            modifier = Modifier.widthIn(max = 300.dp)
+                        )
+                    } else if (place != null) {
+                        PlaceCard(
+                            place = place,
+                            recorded = place.id in recordedPlaces,
+                            onOpen = { onOpenAsset(place.id) },
+                            onClose = viewModel::clearPickedPlace,
+                            modifier = Modifier.widthIn(max = 250.dp)
+                        )
+                    }
+
+                    // The scale bar, above the credit line: the strip owns the very corner, so a bar
+                    // drawn into it would be two plates on top of each other. Nothing is drawn until
+                    // the map has said how far a pixel covers.
+                    metresPerPixel?.let { perPixel ->
+                        ScaleBar.span(
+                            metresAcross = perPixel * scaleWidthPx,
+                            maxWidthPx = scaleWidthPx
+                        )?.let { span -> MapScaleBar(span = span) }
+                    }
+
+                    AttributionStrip(basemap = basemap, teAraroa = teAraroa)
+                }
+            }
+
+            TrailDayNavBar(current = Tab.MAP, onSelect = onOpenTab)
         }
     }
 

@@ -40,6 +40,7 @@ enum class IconGlyph {
     TRASH,
     CHEVRON,
     LOCATE,
+    COMPASS,
     LAYERS,
     SEARCH,
     CLOSE,
@@ -177,6 +178,21 @@ internal fun AppIcon(
                 ring(0.50f, 0.38f, 0.22f)
                 line(0.36f, 0.55f, 0.50f, 0.86f)
                 line(0.64f, 0.55f, 0.50f, 0.86f)
+            }
+
+            // A compass: the ring and the needle across it, pointing north-east. Explore's own mark,
+            // and a thing for looking outward with rather than another place of the walker's own -
+            // which is the difference between this tab and Places beside it.
+            IconGlyph.COMPASS -> {
+                ring(0.50f, 0.50f, 0.36f)
+                val needle = Path().apply {
+                    moveTo(width * 0.70f, height * 0.30f)
+                    lineTo(width * 0.56f, height * 0.56f)
+                    lineTo(width * 0.30f, height * 0.70f)
+                    lineTo(width * 0.44f, height * 0.44f)
+                    close()
+                }
+                drawPath(needle, tint, style = Stroke(width = stroke))
             }
 
             // The place library: rows, the way they will read on the screen.

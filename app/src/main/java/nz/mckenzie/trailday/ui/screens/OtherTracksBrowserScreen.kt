@@ -14,17 +14,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -48,18 +44,20 @@ import nz.mckenzie.trailday.viewmodel.OtherTracksBrowserViewModel
  * use - and the shape is deliberate: **the question on one white deck across the top**, and **the answer in
  * its own viewport below it**. A walker who has used one browser has used this one.
  *
+ * **It has no title bar of its own.** It is the second source inside **Explore**, which owns the title, the
+ * switch between the publishers and the bar; [modifier] is where Explore puts it, under its switch.
+ *
  * Two things it does that DOC's does not. A row can be **taken on as the walker's own place** (see
  * [OtherTracksBrowserViewModel.import]) - DOC's material is read and never kept, and this is the difference
  * between the two publishers rather than an accident. And a row says what it *is* in the words this
  * dataset uses, which are DOC's own for the walking grades, so a chip here and a chip there say the same
  * thing.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OtherTracksBrowserScreen(
     viewModel: OtherTracksBrowserViewModel,
-    onBack: () -> Unit,
-    onOpenTrack: (OtherTrack) -> Unit = {}
+    onOpenTrack: (OtherTrack) -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     val name by viewModel.name.collectAsStateWithLifecycle()
     val nearMe by viewModel.nearMe.collectAsStateWithLifecycle()
@@ -82,104 +80,91 @@ fun OtherTracksBrowserScreen(
         viewModel.search()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Other tracks") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { AppIcon(IconGlyph.BACK, contentDescription = "Back") }
-                }
-            )
-        }
-    ) { innerPadding ->
+    Column(
+        modifier = modifier.fillMaxSize()
+    ) {
+        OtherTracksControlsDeck(
+            name = name,
+            onNameChange = viewModel::onNameChange,
+            onSearch = search,
+            nearMe = nearMe,
+            onNearMeChange = viewModel::onNearMeChange,
+            radiusKm = radiusKm,
+            onRadiusChange = viewModel::onRadiusChange,
+            filterChoices = filterChoices,
+            filters = filters,
+            onToggleFilter = viewModel::toggleFilter,
+            onClearFilters = viewModel::clearFilters,
+            sort = sort,
+            onSort = viewModel::setSort,
+            bikeOnly = bikeOnly,
+            onBikeOnly = viewModel::setBikeOnly,
+            wheelchairOnly = wheelchairOnly,
+            onWheelchairOnly = viewModel::setWheelchairOnly
+        )
+
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
         ) {
-            OtherTracksControlsDeck(
-                name = name,
-                onNameChange = viewModel::onNameChange,
-                onSearch = search,
-                nearMe = nearMe,
-                onNearMeChange = viewModel::onNearMeChange,
-                radiusKm = radiusKm,
-                onRadiusChange = viewModel::onRadiusChange,
-                filterChoices = filterChoices,
-                filters = filters,
-                onToggleFilter = viewModel::toggleFilter,
-                onClearFilters = viewModel::clearFilters,
-                sort = sort,
-                onSort = viewModel::setSort,
-                bikeOnly = bikeOnly,
-                onBikeOnly = viewModel::setBikeOnly,
-                wheelchairOnly = wheelchairOnly,
-                onWheelchairOnly = viewModel::setWheelchairOnly
-            )
+            if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
 
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            ) {
-                if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            message?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
 
-                message?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
+            when {
+                // Before anything else: a page emptied by hiding is not a page where nothing matched,
+                // and the line under it has to name the thing that emptied it.
+                visible.isEmpty() && allHidden && !busy -> Text(
+                    text = "The only match is a track you've hidden. Show it again in Settings, " +
+                        "under Hidden tracks.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
 
-                when {
-                    // Before anything else: a page emptied by hiding is not a page where nothing matched,
-                    // and the line under it has to name the thing that emptied it.
-                    visible.isEmpty() && allHidden && !busy -> Text(
-                        text = "The only match is a track you've hidden. Show it again in Settings, " +
-                            "under Hidden tracks.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 12.dp)
-                    )
+                visible.isEmpty() && searched && message == null && !busy -> EmptyState(
+                    glyph = IconGlyph.TRAIL,
+                    title = "No tracks matched",
+                    body = "Try part of a name, or turn on Near me and search again.",
+                    actionLabel = "Search again",
+                    onAction = { viewModel.search() }
+                )
 
-                    visible.isEmpty() && searched && message == null && !busy -> EmptyState(
-                        glyph = IconGlyph.TRAIL,
-                        title = "No tracks matched",
-                        body = "Try part of a name, or turn on Near me and search again.",
-                        actionLabel = "Search again",
-                        onAction = { viewModel.search() }
-                    )
+                // A filter or a chip that hides every row is not "nothing matched": the way out is to
+                // clear one, so say that rather than showing the empty state again.
+                visible.isEmpty() && message != null -> Text(
+                    text = "Nothing matches those filters. Clear one to see the rest.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
 
-                    // A filter or a chip that hides every row is not "nothing matched": the way out is to
-                    // clear one, so say that rather than showing the empty state again.
-                    visible.isEmpty() && message != null -> Text(
-                        text = "Nothing matches those filters. Clear one to see the rest.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 12.dp)
-                    )
-
-                    else -> {
-                        if (visible.isNotEmpty()) {
-                            ResultSummary(
-                                count = visible.size,
-                                noun = "tracks",
-                                sort = sort,
-                                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
+                else -> {
+                    if (visible.isNotEmpty()) {
+                        ResultSummary(
+                            count = visible.size,
+                            noun = "tracks",
+                            sort = sort,
+                            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
+                        )
+                    }
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)
+                    ) {
+                        items(visible, key = { track -> track.globalId }) { track ->
+                            OtherTrackCard(
+                                track = track,
+                                distanceM = phoneFix?.let { position -> track.distanceM(position) },
+                                onOpen = { onOpenTrack(track) }
                             )
-                        }
-                        LazyColumn(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)
-                        ) {
-                            items(visible, key = { track -> track.globalId }) { track ->
-                                OtherTrackCard(
-                                    track = track,
-                                    distanceM = phoneFix?.let { position -> track.distanceM(position) },
-                                    onOpen = { onOpenTrack(track) }
-                                )
-                            }
                         }
                     }
                 }
